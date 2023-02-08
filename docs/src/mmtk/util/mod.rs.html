@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -85,91 +83,90 @@
 <span id="83">83</span>
 <span id="84">84</span>
 <span id="85">85</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
-<span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,</span>
-<span class="comment">// but will be useful in future implementations.</span>
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
+</span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
+// but will be useful in future implementations.
+</span><span class="attribute">#![allow(dead_code)]
 
-<span class="comment">// The following modules are public. MMTk bindings can use them to help implementation.</span>
+</span><span class="comment">// The following modules are public. MMTk bindings can use them to help implementation.
 
-<span class="doccomment">/// An abstract of memory address and object reference.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">address</span>;
-<span class="doccomment">/// Allocators</span>
-<span class="comment">// This module is made public so the binding could implement allocator slowpaths if they would like to.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">alloc</span>;
-<span class="doccomment">/// Constants used in MMTk</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">constants</span>;
-<span class="doccomment">/// Calculation, conversion and rounding for memory related numbers.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">conversions</span>;
-<span class="doccomment">/// The copy allocators for a GC worker.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">copy</span>;
-<span class="doccomment">/// Linear scan through a heap range</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">linear_scan</span>;
-<span class="doccomment">/// Wrapper functions for memory syscalls such as mmap, mprotect, etc.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">memory</span>;
-<span class="doccomment">/// Opaque pointers used in MMTk, e.g. VMThread.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">opaque_pointer</span>;
-<span class="doccomment">/// MMTk command line options.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">options</span>;
-<span class="doccomment">/// Reference processing implementation.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">reference_processor</span>;
+</span><span class="doccomment">/// An abstract of memory address and object reference.
+</span><span class="kw">pub mod </span>address;
+<span class="doccomment">/// Allocators
+</span><span class="comment">// This module is made public so the binding could implement allocator slowpaths if they would like to.
+</span><span class="kw">pub mod </span>alloc;
+<span class="doccomment">/// Constants used in MMTk
+</span><span class="kw">pub mod </span>constants;
+<span class="doccomment">/// Calculation, conversion and rounding for memory related numbers.
+</span><span class="kw">pub mod </span>conversions;
+<span class="doccomment">/// The copy allocators for a GC worker.
+</span><span class="kw">pub mod </span>copy;
+<span class="doccomment">/// Linear scan through a heap range
+</span><span class="kw">pub mod </span>linear_scan;
+<span class="doccomment">/// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
+</span><span class="kw">pub mod </span>memory;
+<span class="doccomment">/// Opaque pointers used in MMTk, e.g. VMThread.
+</span><span class="kw">pub mod </span>opaque_pointer;
+<span class="doccomment">/// MMTk command line options.
+</span><span class="kw">pub mod </span>options;
+<span class="doccomment">/// Reference processing implementation.
+</span><span class="kw">pub mod </span>reference_processor;
 
-<span class="comment">// The following modules are only public in the mmtk crate. They should only be used in MMTk core.</span>
-<span class="doccomment">/// Alloc bit</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">alloc_bit</span>;
-<span class="doccomment">/// An analysis framework for collecting data and profiling in GC.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">analysis</span>;
-<span class="doccomment">/// Logging edges to check duplicated edges in GC.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">edge_logger</span>;
-<span class="doccomment">/// Non-generic refs to generic types of &lt;VM&gt;.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">erase_vm</span>;
-<span class="doccomment">/// Finalization implementation.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">finalizable_processor</span>;
-<span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">heap</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">is_mmtk_object</span>;
-<span class="doccomment">/// Logger initialization</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">logger</span>;
-<span class="doccomment">/// Various malloc implementations (conditionally compiled by features)</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">malloc</span>;
-<span class="doccomment">/// Metadata (OnSide or InHeader) implementation.</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">metadata</span>;
-<span class="doccomment">/// Forwarding word in object copying.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">object_forwarding</span>;
-<span class="doccomment">/// Utilities funcitons for Rust</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">rust_util</span>;
-<span class="doccomment">/// Sanity checker for GC.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">sanity</span>;
-<span class="doccomment">/// Utils for collecting statistics.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">statistics</span>;
-<span class="doccomment">/// Test utilities.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">test_util</span>;
-<span class="doccomment">/// A treadmill implementation.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">treadmill</span>;
+<span class="comment">// The following modules are only public in the mmtk crate. They should only be used in MMTk core.
+</span><span class="doccomment">/// Alloc bit
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>alloc_bit;
+<span class="doccomment">/// An analysis framework for collecting data and profiling in GC.
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;analysis&quot;</span>)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>analysis;
+<span class="doccomment">/// Logging edges to check duplicated edges in GC.
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>edge_logger;
+<span class="doccomment">/// Non-generic refs to generic types of &lt;VM&gt;.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>erase_vm;
+<span class="doccomment">/// Finalization implementation.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>finalizable_processor;
+<span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>heap;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+</span><span class="kw">pub mod </span>is_mmtk_object;
+<span class="doccomment">/// Logger initialization
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>logger;
+<span class="doccomment">/// Various malloc implementations (conditionally compiled by features)
+</span><span class="kw">pub mod </span>malloc;
+<span class="doccomment">/// Metadata (OnSide or InHeader) implementation.
+</span><span class="kw">pub mod </span>metadata;
+<span class="doccomment">/// Forwarding word in object copying.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_forwarding;
+<span class="doccomment">/// Utilities funcitons for Rust
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>rust_util;
+<span class="doccomment">/// Sanity checker for GC.
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>sanity;
+<span class="doccomment">/// Utils for collecting statistics.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>statistics;
+<span class="doccomment">/// Test utilities.
+</span><span class="attribute">#[cfg(test)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>test_util;
+<span class="doccomment">/// A treadmill implementation.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>treadmill;
 
-<span class="comment">// These modules are private. They are only used by other util modules.</span>
+<span class="comment">// These modules are private. They are only used by other util modules.
 
-<span class="doccomment">/// A very simple, generic malloc-free allocator</span>
-<span class="kw">mod</span> <span class="ident">generic_freelist</span>;
-<span class="doccomment">/// Implementation of GenericFreeList by an int vector.</span>
-<span class="kw">mod</span> <span class="ident">int_array_freelist</span>;
-<span class="doccomment">/// Implementation of GenericFreeList backed by raw memory, allocated</span>
-<span class="doccomment">/// on demand direct from the OS (via mmap).</span>
-<span class="kw">mod</span> <span class="ident">raw_memory_freelist</span>;
-<span class="comment">// TODO: This is not used. Probably we can remoev this.</span>
-<span class="kw">mod</span> <span class="ident">synchronized_counter</span>;
+</span><span class="doccomment">/// A very simple, generic malloc-free allocator
+</span><span class="kw">mod </span>generic_freelist;
+<span class="doccomment">/// Implementation of GenericFreeList by an int vector.
+</span><span class="kw">mod </span>int_array_freelist;
+<span class="doccomment">/// Implementation of GenericFreeList backed by raw memory, allocated
+/// on demand direct from the OS (via mmap).
+</span><span class="kw">mod </span>raw_memory_freelist;
+<span class="comment">// TODO: This is not used. Probably we can remoev this.
+</span><span class="kw">mod </span>synchronized_counter;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::address::Address</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::address::ObjectReference</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::reference_processor::ReferenceProcessor</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::synchronized_counter::SynchronizedCounter</span>;
+<span class="kw">pub use </span><span class="self">self</span>::address::Address;
+<span class="kw">pub use </span><span class="self">self</span>::address::ObjectReference;
+<span class="kw">pub use </span><span class="self">self</span>::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">pub use </span><span class="self">self</span>::reference_processor::ReferenceProcessor;
+<span class="kw">pub use </span><span class="self">self</span>::synchronized_counter::SynchronizedCounter;
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

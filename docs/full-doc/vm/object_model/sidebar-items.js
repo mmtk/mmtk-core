@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["specs",""]],"trait":[["ObjectModel","VM-specific methods for object model."]]});
+window.SIDEBAR_ITEMS = {"mod":[["specs",""]],"trait":[["ObjectModel","VM-specific methods for object model."]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"type":[["Mmapper",""],["VMMap",""]]});
+window.SIDEBAR_ITEMS = {"type":[["Mmapper",""],["VMMap",""]]};

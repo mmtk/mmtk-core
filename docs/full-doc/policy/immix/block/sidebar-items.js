@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["BlockState","The block allocation state."]],"struct":[["Block","Data structure to reference an immix block."],["ReusableBlockPool","A non-block single-linked list to store blocks."]]});
+window.SIDEBAR_ITEMS = {"enum":[["BlockState","The block allocation state."]],"struct":[["Block","Data structure to reference an immix block."],["ReusableBlockPool","A non-block single-linked list to store blocks."]]};

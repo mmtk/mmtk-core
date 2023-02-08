@@ -1,1 +1,1 @@
-initSidebarItems({"macro":[["define_vm_metadata_spec",""]],"struct":[["VMGlobalLogBitSpec",""],["VMLocalForwardingBitsSpec",""],["VMLocalForwardingPointerSpec",""],["VMLocalLOSMarkNurserySpec",""],["VMLocalMarkBitSpec",""],["VMLocalPinningBitSpec",""]]});
+window.SIDEBAR_ITEMS = {"macro":[["define_vm_metadata_spec",""]],"struct":[["VMGlobalLogBitSpec",""],["VMLocalForwardingBitsSpec",""],["VMLocalForwardingPointerSpec",""],["VMLocalLOSMarkNurserySpec",""],["VMLocalMarkBitSpec",""],["VMLocalPinningBitSpec",""]]};

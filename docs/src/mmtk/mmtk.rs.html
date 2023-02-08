@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;mmtk.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mmtk.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mmtk/index.html"><img class="rust-logo" src="../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/mmtk.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mmtk.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mmtk/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -165,171 +163,170 @@
 <span id="163">163</span>
 <span id="164">164</span>
 <span id="165">165</span>
-</pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map</span>::{<span class="ident">create_sft_map</span>, <span class="ident">SFTMap</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
+</pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.
+</span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::edge_logger::EdgeLogger</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor::FinalizableProcessor</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::map::Map</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::ReferenceProcessors</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::SanityChecker</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ReferenceGlue</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std::default::Default</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::edge_logger::EdgeLogger;
+<span class="kw">use </span><span class="kw">crate</span>::util::finalizable_processor::FinalizableProcessor;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::map::Map;
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
+<span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::ReferenceProcessors;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::sanity::sanity_checker::SanityChecker;
+<span class="kw">use </span><span class="kw">crate</span>::vm::ReferenceGlue;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>std::default::Default;
+<span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
+<span class="kw">use </span>std::sync::Arc;
+<span class="kw">use </span>std::sync::Mutex;
 
-<span class="macro">lazy_static!</span> {
-    <span class="comment">// I am not sure if we should include these mmappers as part of MMTk struct.</span>
-    <span class="comment">// The considerations are:</span>
-    <span class="comment">// 1. We need VMMap and Mmapper to create spaces. It is natural that the mappers are not</span>
-    <span class="comment">//    part of MMTK, as creating MMTK requires these mappers. We could use Rc/Arc for these mappers though.</span>
-    <span class="comment">// 2. These mmappers are possibly global across multiple MMTk instances, as they manage the</span>
-    <span class="comment">//    entire address space.</span>
-    <span class="comment">// TODO: We should refactor this when we know more about how multiple MMTK instances work.</span>
+<span class="macro">lazy_static! </span>{
+    <span class="comment">// I am not sure if we should include these mmappers as part of MMTk struct.
+    // The considerations are:
+    // 1. We need VMMap and Mmapper to create spaces. It is natural that the mappers are not
+    //    part of MMTK, as creating MMTK requires these mappers. We could use Rc/Arc for these mappers though.
+    // 2. These mmappers are possibly global across multiple MMTk instances, as they manage the
+    //    entire address space.
+    // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
-    <span class="doccomment">/// A global VMMap that manages the mapping of spaces to virtual memory ranges.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">VM_MAP</span>: <span class="ident">VMMap</span> <span class="op">=</span> <span class="ident">VMMap::new</span>();
+    </span><span class="doccomment">/// A global VMMap that manages the mapping of spaces to virtual memory ranges.
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>VM_MAP: VMMap = VMMap::new();
 
-    <span class="doccomment">/// A global Mmapper for mmaping and protection of virtual memory.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">MMAPPER</span>: <span class="ident">Mmapper</span> <span class="op">=</span> <span class="ident">Mmapper::new</span>();
+    <span class="doccomment">/// A global Mmapper for mmaping and protection of virtual memory.
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>MMAPPER: Mmapper = Mmapper::new();
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::rust_util::InitializeOnce</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::InitializeOnce;
 
-<span class="comment">// A global space function table that allows efficient dispatch space specific code for addresses in our heap.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">SFT_MAP</span>: <span class="ident">InitializeOnce</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">SFTMap</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">InitializeOnce::new</span>();
+<span class="comment">// A global space function table that allows efficient dispatch space specific code for addresses in our heap.
+</span><span class="kw">pub static </span>SFT_MAP: InitializeOnce&lt;Box&lt;<span class="kw">dyn </span>SFTMap&gt;&gt; = InitializeOnce::new();
 
-<span class="comment">// MMTk builder. This is used to set options before actually creating an MMTk instance.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MMTKBuilder</span> {
-    <span class="doccomment">/// The options for this instance.</span>
-    <span class="kw">pub</span> <span class="ident">options</span>: <span class="ident">Options</span>,
+<span class="comment">// MMTk builder. This is used to set options before actually creating an MMTk instance.
+</span><span class="kw">pub struct </span>MMTKBuilder {
+    <span class="doccomment">/// The options for this instance.
+    </span><span class="kw">pub </span>options: Options,
 }
 
-<span class="kw">impl</span> <span class="ident">MMTKBuilder</span> {
-    <span class="doccomment">/// Create an MMTK builder with default options</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">MMTKBuilder</span> {
-            <span class="ident">options</span>: <span class="ident">Options::default</span>(),
+<span class="kw">impl </span>MMTKBuilder {
+    <span class="doccomment">/// Create an MMTK builder with default options
+    </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+        MMTKBuilder {
+            options: Options::default(),
         }
     }
 
-    <span class="doccomment">/// Set an option.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_option</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">set_from_command_line</span>(<span class="ident">name</span>, <span class="ident">val</span>)
+    <span class="doccomment">/// Set an option.
+    </span><span class="kw">pub fn </span>set_option(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str, val: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="self">self</span>.options.set_from_command_line(name, val)
     }
 
-    <span class="doccomment">/// Set multiple options by a string. The string should be key-value pairs separated by white spaces,</span>
-    <span class="doccomment">/// such as `threads=1 stress_factor=4096`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_options_bulk_by_str</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">options</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">set_bulk_from_command_line</span>(<span class="ident">options</span>)
+    <span class="doccomment">/// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
+    /// such as `threads=1 stress_factor=4096`.
+    </span><span class="kw">pub fn </span>set_options_bulk_by_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="self">self</span>.options.set_bulk_from_command_line(options)
     }
 
-    <span class="doccomment">/// Build an MMTk instance from the builder.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">build</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="ident">MMTK::new</span>(<span class="ident">Arc::new</span>(<span class="self">self</span>.<span class="ident">options</span>.<span class="ident">clone</span>()))
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">MMTKBuilder</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::new</span>()
+    <span class="doccomment">/// Build an MMTk instance from the builder.
+    </span><span class="kw">pub fn </span>build&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MMTK&lt;VM&gt; {
+        MMTK::new(Arc::new(<span class="self">self</span>.options.clone()))
     }
 }
 
-<span class="doccomment">/// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.</span>
-<span class="doccomment">/// *Note that multi-instances is not fully supported yet*</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">plan</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">finalizable_processor</span>:
-        <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">VM::VMReferenceGlue</span> <span class="kw">as</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::FinalizableType</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">sanity_checker</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">SanityChecker</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">edge_logger</span>: <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>,
-    <span class="ident">inside_harness</span>: <span class="ident">AtomicBool</span>,
+<span class="kw">impl </span>Default <span class="kw">for </span>MMTKBuilder {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new()
+    }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="comment">// Initialize SFT first in case we need to use this in the constructor.</span>
-        <span class="comment">// The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.</span>
-        <span class="ident">SFT_MAP</span>.<span class="ident">initialize_once</span>(<span class="kw-2">&amp;</span><span class="ident">create_sft_map</span>);
+<span class="doccomment">/// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
+/// *Note that multi-instances is not fully supported yet*
+</span><span class="kw">pub struct </span>MMTK&lt;VM: VMBinding&gt; {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) options: Arc&lt;Options&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) plan: Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) reference_processors: ReferenceProcessors,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) finalizable_processor:
+        Mutex&lt;FinalizableProcessor&lt;&lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) sanity_checker: Mutex&lt;SanityChecker&lt;VM::VMEdge&gt;&gt;,
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) edge_logger: EdgeLogger&lt;VM::VMEdge&gt;,
+    inside_harness: AtomicBool,
+}
 
-        <span class="kw">let</span> <span class="ident">num_workers</span> <span class="op">=</span> <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;single_worker&quot;</span>) {
-            <span class="number">1</span>
-        } <span class="kw">else</span> {
-            <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">threads</span>
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; MMTK&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(options: Arc&lt;Options&gt;) -&gt; <span class="self">Self </span>{
+        <span class="comment">// Initialize SFT first in case we need to use this in the constructor.
+        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        </span>SFT_MAP.initialize_once(<span class="kw-2">&amp;</span>create_sft_map);
+
+        <span class="kw">let </span>num_workers = <span class="kw">if </span><span class="macro">cfg!</span>(feature = <span class="string">&quot;single_worker&quot;</span>) {
+            <span class="number">1
+        </span>} <span class="kw">else </span>{
+            <span class="kw-2">*</span>options.threads
         };
 
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">GCWorkScheduler::new</span>(<span class="ident">num_workers</span>, (<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">thread_affinity</span>).<span class="ident">clone</span>());
+        <span class="kw">let </span>scheduler = GCWorkScheduler::new(num_workers, (<span class="kw-2">*</span>options.thread_affinity).clone());
 
-        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::plan::create_plan</span>(
-            <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">plan</span>,
-            <span class="kw-2">&amp;</span><span class="ident">VM_MAP</span>,
-            <span class="kw-2">&amp;</span><span class="ident">MMAPPER</span>,
-            <span class="ident">options</span>.<span class="ident">clone</span>(),
-            <span class="ident">scheduler</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span>plan = <span class="kw">crate</span>::plan::create_plan(
+            <span class="kw-2">*</span>options.plan,
+            <span class="kw-2">&amp;</span>VM_MAP,
+            <span class="kw-2">&amp;</span>MMAPPER,
+            options.clone(),
+            scheduler.clone(),
         );
 
-        <span class="comment">// TODO: This probably does not work if we have multiple MMTk instances.</span>
-        <span class="ident">VM_MAP</span>.<span class="ident">boot</span>();
-        <span class="comment">// This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.</span>
-        <span class="ident">VM_MAP</span>.<span class="ident">finalize_static_space_map</span>(
-            <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">heap</span>.<span class="ident">get_discontig_start</span>(),
-            <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">heap</span>.<span class="ident">get_discontig_end</span>(),
+        <span class="comment">// TODO: This probably does not work if we have multiple MMTk instances.
+        </span>VM_MAP.boot();
+        <span class="comment">// This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
+        </span>VM_MAP.finalize_static_space_map(
+            plan.base().heap.get_discontig_start(),
+            plan.base().heap.get_discontig_end(),
         );
 
-        <span class="ident">MMTK</span> {
-            <span class="ident">options</span>,
-            <span class="ident">plan</span>,
-            <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors::new</span>(),
-            <span class="ident">finalizable_processor</span>: <span class="ident">Mutex::new</span>(<span class="ident">FinalizableProcessor</span>::<span class="op">&lt;</span>
-                <span class="op">&lt;</span><span class="ident">VM::VMReferenceGlue</span> <span class="kw">as</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::FinalizableType</span>,
-            <span class="op">&gt;</span><span class="ident">::new</span>()),
-            <span class="ident">scheduler</span>,
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-            <span class="ident">sanity_checker</span>: <span class="ident">Mutex::new</span>(<span class="ident">SanityChecker::new</span>()),
-            <span class="ident">inside_harness</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-            <span class="ident">edge_logger</span>: <span class="ident">EdgeLogger::new</span>(),
+        MMTK {
+            options,
+            plan,
+            reference_processors: ReferenceProcessors::new(),
+            finalizable_processor: Mutex::new(FinalizableProcessor::&lt;
+                &lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType,
+            &gt;::new()),
+            scheduler,
+            <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+            </span>sanity_checker: Mutex::new(SanityChecker::new()),
+            inside_harness: AtomicBool::new(<span class="bool-val">false</span>),
+            <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+            </span>edge_logger: EdgeLogger::new(),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_begin</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) {
-        <span class="comment">// FIXME Do a full heap GC if we have generational GC</span>
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">handle_user_collection_request</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">inside_harness</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stats</span>.<span class="ident">start_all</span>();
-        <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">enable_stat</span>();
+    <span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
+        <span class="comment">// FIXME Do a full heap GC if we have generational GC
+        </span><span class="self">self</span>.plan.handle_user_collection_request(tls, <span class="bool-val">true</span>);
+        <span class="self">self</span>.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+        <span class="self">self</span>.plan.base().stats.start_all();
+        <span class="self">self</span>.scheduler.enable_stat();
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">harness_end</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stats</span>.<span class="ident">stop_all</span>(<span class="self">self</span>);
-        <span class="self">self</span>.<span class="ident">inside_harness</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="kw">pub fn </span>harness_end(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) {
+        <span class="self">self</span>.plan.base().stats.stop_all(<span class="self">self</span>);
+        <span class="self">self</span>.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">as_ref</span>()
+    <span class="kw">pub fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+        <span class="self">self</span>.plan.as_ref()
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_options</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Options</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">options</span>
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>get_options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.options
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

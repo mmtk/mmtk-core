@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["WorkBucketStage",""]],"struct":[["BucketQueue",""],["WorkBucket",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["WorkBucketStage",""]],"struct":[["BucketQueue",""],["WorkBucket",""]],"type":[["BucketOpenCondition",""]]};

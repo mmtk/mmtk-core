@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;vm&#x2F;reference_glue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>reference_glue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/reference_glue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>reference_glue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -95,101 +93,100 @@
 <span id="93">93</span>
 <span id="94">94</span>
 <span id="95">95</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+<span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="doccomment">/// VM-specific methods for reference processing, including weak references, and finalizers.</span>
-<span class="doccomment">/// We handle weak references and finalizers differently:</span>
-<span class="doccomment">/// * for weak references, we assume they are implemented as normal reference objects (also known as weak objects)</span>
-<span class="doccomment">///   with a referent that is actually weakly reachable. This trait provides a few methods to access</span>
-<span class="doccomment">///   the referent of such an reference object.</span>
-<span class="doccomment">/// * for finalizers, we provide a `Finalizable` trait, and require bindings to specify a type</span>
-<span class="doccomment">///   that implements `Finalizable`. When the binding registers or pops a finalizable object</span>
-<span class="doccomment">///   from MMTk, the specified type is used for the finalizable objects. For most languages,</span>
-<span class="doccomment">///   they can just use `ObjectReference` for the finalizable type, meaning that they are registering</span>
-<span class="doccomment">///   and popping a normal object reference as finalizable objects.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The type of finalizable objects. This type is used when the binding registers and pops finalizable objects.</span>
-    <span class="kw">type</span> <span class="ident">FinalizableType</span>: <span class="ident">Finalizable</span>;
+<span class="doccomment">/// VM-specific methods for reference processing, including weak references, and finalizers.
+/// We handle weak references and finalizers differently:
+/// * for weak references, we assume they are implemented as normal reference objects (also known as weak objects)
+///   with a referent that is actually weakly reachable. This trait provides a few methods to access
+///   the referent of such an reference object.
+/// * for finalizers, we provide a `Finalizable` trait, and require bindings to specify a type
+///   that implements `Finalizable`. When the binding registers or pops a finalizable object
+///   from MMTk, the specified type is used for the finalizable objects. For most languages,
+///   they can just use `ObjectReference` for the finalizable type, meaning that they are registering
+///   and popping a normal object reference as finalizable objects.
+</span><span class="kw">pub trait </span>ReferenceGlue&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// The type of finalizable objects. This type is used when the binding registers and pops finalizable objects.
+    </span><span class="kw">type </span>FinalizableType: Finalizable;
 
-    <span class="comment">// TODO: Should we also move the following methods about weak references to a trait (similar to the `Finalizable` trait)?</span>
+    <span class="comment">// TODO: Should we also move the following methods about weak references to a trait (similar to the `Finalizable` trait)?
 
-    <span class="doccomment">/// Weak and soft references always clear the referent</span>
-    <span class="doccomment">/// before enqueueing.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `new_reference`: The reference whose referent is to be cleared.</span>
-    <span class="kw">fn</span> <span class="ident">clear_referent</span>(<span class="ident">new_reference</span>: <span class="ident">ObjectReference</span>) {
-        <span class="ident"><span class="self">Self</span>::set_referent</span>(<span class="ident">new_reference</span>, <span class="ident">ObjectReference::NULL</span>);
+    </span><span class="doccomment">/// Weak and soft references always clear the referent
+    /// before enqueueing.
+    ///
+    /// Arguments:
+    /// * `new_reference`: The reference whose referent is to be cleared.
+    </span><span class="kw">fn </span>clear_referent(new_reference: ObjectReference) {
+        <span class="self">Self</span>::set_referent(new_reference, ObjectReference::NULL);
     }
 
-    <span class="doccomment">/// Get the referent from a weak reference object.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `object`: The object reference.</span>
-    <span class="kw">fn</span> <span class="ident">get_referent</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
+    <span class="doccomment">/// Get the referent from a weak reference object.
+    ///
+    /// Arguments:
+    /// * `object`: The object reference.
+    </span><span class="kw">fn </span>get_referent(object: ObjectReference) -&gt; ObjectReference;
 
-    <span class="doccomment">/// Set the referent in a weak reference object.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `reff`: The object reference for the reference.</span>
-    <span class="doccomment">/// * `referent`: The referent object reference.</span>
-    <span class="kw">fn</span> <span class="ident">set_referent</span>(<span class="ident">reff</span>: <span class="ident">ObjectReference</span>, <span class="ident">referent</span>: <span class="ident">ObjectReference</span>);
+    <span class="doccomment">/// Set the referent in a weak reference object.
+    ///
+    /// Arguments:
+    /// * `reff`: The object reference for the reference.
+    /// * `referent`: The referent object reference.
+    </span><span class="kw">fn </span>set_referent(reff: ObjectReference, referent: ObjectReference);
 
-    <span class="doccomment">/// Check if the referent has been cleared.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `referent`: The referent object reference.</span>
-    <span class="kw">fn</span> <span class="ident">is_referent_cleared</span>(<span class="ident">referent</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">referent</span>.<span class="ident">is_null</span>()
+    <span class="doccomment">/// Check if the referent has been cleared.
+    ///
+    /// Arguments:
+    /// * `referent`: The referent object reference.
+    </span><span class="kw">fn </span>is_referent_cleared(referent: ObjectReference) -&gt; bool {
+        referent.is_null()
     }
 
-    <span class="doccomment">/// For weak reference types, if the referent is cleared during GC, the reference</span>
-    <span class="doccomment">/// will be added to a queue, and MMTk will call this method to inform</span>
-    <span class="doccomment">/// the VM about the changes for those references. This method is used</span>
-    <span class="doccomment">/// to implement Java&#39;s ReferenceQueue.</span>
-    <span class="doccomment">/// Note that this method is called for each type of weak references during GC, and</span>
-    <span class="doccomment">/// the references slice will be cleared after this call is returned. That means</span>
-    <span class="doccomment">/// MMTk will no longer keep these references alive once this method is returned.</span>
-    <span class="kw">fn</span> <span class="ident">enqueue_references</span>(<span class="ident">references</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>], <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+    <span class="doccomment">/// For weak reference types, if the referent is cleared during GC, the reference
+    /// will be added to a queue, and MMTk will call this method to inform
+    /// the VM about the changes for those references. This method is used
+    /// to implement Java&#39;s ReferenceQueue.
+    /// Note that this method is called for each type of weak references during GC, and
+    /// the references slice will be cleared after this call is returned. That means
+    /// MMTk will no longer keep these references alive once this method is returned.
+    </span><span class="kw">fn </span>enqueue_references(references: <span class="kw-2">&amp;</span>[ObjectReference], tls: VMWorkerThread);
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork</span>;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork;
 
-<span class="doccomment">/// A finalizable object for MMTk. MMTk needs to know the actual object reference in the type,</span>
-<span class="doccomment">/// while a binding can use this type to store some runtime information about finalizable objects.</span>
-<span class="doccomment">/// For example, for bindings that allows multiple finalizer methods with one object, they can define</span>
-<span class="doccomment">/// the type as a tuple of `(object, finalize method)`, and register different finalizer methods to MMTk</span>
-<span class="doccomment">/// for the same object.</span>
-<span class="doccomment">/// The implementation should mark theird method implementations as inline for performance.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Finalizable</span>: <span class="ident">std::fmt::Debug</span> <span class="op">+</span> <span class="ident">Send</span> {
-    <span class="doccomment">/// Load the object reference.</span>
-    <span class="kw">fn</span> <span class="ident">get_reference</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span>;
-    <span class="doccomment">/// Store the object reference.</span>
-    <span class="kw">fn</span> <span class="ident">set_reference</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>);
-    <span class="doccomment">/// Keep the heap references in the finalizable object alive. For example, the reference itself needs to be traced. However,</span>
-    <span class="doccomment">/// if the finalizable object includes other heap references, the implementation should trace them as well.</span>
-    <span class="doccomment">/// Note that trace_object() may move objects so we need to write the new reference in case that it is moved.</span>
-    <span class="kw">fn</span> <span class="ident">keep_alive</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>);
+<span class="doccomment">/// A finalizable object for MMTk. MMTk needs to know the actual object reference in the type,
+/// while a binding can use this type to store some runtime information about finalizable objects.
+/// For example, for bindings that allows multiple finalizer methods with one object, they can define
+/// the type as a tuple of `(object, finalize method)`, and register different finalizer methods to MMTk
+/// for the same object.
+/// The implementation should mark theird method implementations as inline for performance.
+</span><span class="kw">pub trait </span>Finalizable: std::fmt::Debug + Send {
+    <span class="doccomment">/// Load the object reference.
+    </span><span class="kw">fn </span>get_reference(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference;
+    <span class="doccomment">/// Store the object reference.
+    </span><span class="kw">fn </span>set_reference(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference);
+    <span class="doccomment">/// Keep the heap references in the finalizable object alive. For example, the reference itself needs to be traced. However,
+    /// if the finalizable object includes other heap references, the implementation should trace them as well.
+    /// Note that trace_object() may move objects so we need to write the new reference in case that it is moved.
+    </span><span class="kw">fn </span>keep_alive&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E);
 }
 
-<span class="doccomment">/// This provides an implementation of `Finalizable` for `ObjectReference`. Most bindings</span>
-<span class="doccomment">/// should be able to use `ObjectReference` as `ReferenceGlue::FinalizableType`.</span>
-<span class="kw">impl</span> <span class="ident">Finalizable</span> <span class="kw">for</span> <span class="ident">ObjectReference</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">get_reference</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw-2">*</span><span class="self">self</span>
+<span class="doccomment">/// This provides an implementation of `Finalizable` for `ObjectReference`. Most bindings
+/// should be able to use `ObjectReference` as `ReferenceGlue::FinalizableType`.
+</span><span class="kw">impl </span>Finalizable <span class="kw">for </span>ObjectReference {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>get_reference(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
+        <span class="kw-2">*</span><span class="self">self
+    </span>}
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>set_reference(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) {
+        <span class="kw-2">*</span><span class="self">self </span>= object;
     }
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">set_reference</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">object</span>;
-    }
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">keep_alive</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">trace</span>.<span class="ident">trace_object</span>(<span class="kw-2">*</span><span class="self">self</span>);
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>keep_alive&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E) {
+        <span class="kw-2">*</span><span class="self">self </span>= trace.trace_object(<span class="kw-2">*</span><span class="self">self</span>);
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

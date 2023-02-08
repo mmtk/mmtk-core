@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["sanity_checker",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["sanity_checker",""]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_ms_mutator",""]],"mod":[["native_mark_sweep",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["create_ms_mutator",""]],"mod":[["native_mark_sweep",""]]};

@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;vm&#x2F;scanning.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>scanning.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/scanning.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>scanning.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -290,296 +288,295 @@
 <span id="288">288</span>
 <span id="289">289</span>
 <span id="290">290</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::edge_shape::Edge</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
+<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+<span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
+<span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::Edge;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="doccomment">/// Callback trait of scanning functions that report edges.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Call this function for each edge.</span>
-    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">ES</span>);
+<span class="doccomment">/// Callback trait of scanning functions that report edges.
+</span><span class="kw">pub trait </span>EdgeVisitor&lt;ES: Edge&gt; {
+    <span class="doccomment">/// Call this function for each edge.
+    </span><span class="kw">fn </span>visit_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, edge: ES);
 }
 
-<span class="doccomment">/// This lets us use closures as EdgeVisitor.</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span>, <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">ES</span>)<span class="op">&gt;</span> <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">F</span> {
-    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">ES</span>) {
-        <span class="self">self</span>(<span class="ident">edge</span>)
+<span class="doccomment">/// This lets us use closures as EdgeVisitor.
+</span><span class="kw">impl</span>&lt;ES: Edge, F: FnMut(ES)&gt; EdgeVisitor&lt;ES&gt; <span class="kw">for </span>F {
+    <span class="kw">fn </span>visit_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, edge: ES) {
+        <span class="self">self</span>(edge)
     }
 }
 
-<span class="doccomment">/// Callback trait of scanning functions that directly trace through edges.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectTracer</span> {
-    <span class="doccomment">/// Call this function for the content of each edge,</span>
-    <span class="doccomment">/// and assign the returned value back to the edge.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note: This function is performance-critical.</span>
-    <span class="doccomment">/// Implementations should consider inlining if necessary.</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
+<span class="doccomment">/// Callback trait of scanning functions that directly trace through edges.
+</span><span class="kw">pub trait </span>ObjectTracer {
+    <span class="doccomment">/// Call this function for the content of each edge,
+    /// and assign the returned value back to the edge.
+    ///
+    /// Note: This function is performance-critical.
+    /// Implementations should consider inlining if necessary.
+    </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference;
 }
 
-<span class="doccomment">/// This lets us use closures as ObjectTracer.</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span><span class="op">&gt;</span> <span class="ident">ObjectTracer</span> <span class="kw">for</span> <span class="ident">F</span> {
-    <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="self">self</span>(<span class="ident">object</span>)
+<span class="doccomment">/// This lets us use closures as ObjectTracer.
+</span><span class="kw">impl</span>&lt;F: FnMut(ObjectReference) -&gt; ObjectReference&gt; ObjectTracer <span class="kw">for </span>F {
+    <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
+        <span class="self">self</span>(object)
     }
 }
 
-<span class="doccomment">/// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing</span>
-<span class="doccomment">/// the GC worker to trace objects.  This trait is intended to abstract out the implementation</span>
-<span class="doccomment">/// details of tracing objects, enqueuing objects, and creating work packets that expand the</span>
-<span class="doccomment">/// transitive closure, allowing the VM binding to focus on VM-specific parts.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This trait is used during root scanning and binding-side weak reference processing.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectTracerContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
-    <span class="doccomment">/// The concrete `ObjectTracer` type.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// FIXME: The current code works because of the unsafe method `ProcessEdgesWork::set_worker`.</span>
-    <span class="doccomment">/// The tracer should borrow the worker passed to `with_queuing_tracer` during its lifetime.</span>
-    <span class="doccomment">/// For this reason, `TracerType` should have a `&lt;&#39;w&gt;` lifetime parameter.</span>
-    <span class="doccomment">/// Generic Associated Types (GAT) is already stablized in Rust 1.65.</span>
-    <span class="doccomment">/// We should update our toolchain version, too.</span>
-    <span class="kw">type</span> <span class="ident">TracerType</span>: <span class="ident">ObjectTracer</span>;
+<span class="doccomment">/// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing
+/// the GC worker to trace objects.  This trait is intended to abstract out the implementation
+/// details of tracing objects, enqueuing objects, and creating work packets that expand the
+/// transitive closure, allowing the VM binding to focus on VM-specific parts.
+///
+/// This trait is used during root scanning and binding-side weak reference processing.
+</span><span class="kw">pub trait </span>ObjectTracerContext&lt;VM: VMBinding&gt;: Clone + Send + <span class="lifetime">&#39;static </span>{
+    <span class="doccomment">/// The concrete `ObjectTracer` type.
+    ///
+    /// FIXME: The current code works because of the unsafe method `ProcessEdgesWork::set_worker`.
+    /// The tracer should borrow the worker passed to `with_queuing_tracer` during its lifetime.
+    /// For this reason, `TracerType` should have a `&lt;&#39;w&gt;` lifetime parameter.
+    /// Generic Associated Types (GAT) is already stablized in Rust 1.65.
+    /// We should update our toolchain version, too.
+    </span><span class="kw">type </span>TracerType: ObjectTracer;
 
-    <span class="doccomment">/// Create a temporary `ObjectTracer` and provide access in the scope of `func`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// When the `ObjectTracer::trace_object` is called, if the traced object is first visited</span>
-    <span class="doccomment">/// in this transitive closure, it will be enqueued.  After `func` returns, the implememtation</span>
-    <span class="doccomment">/// will create work packets to continue computing the transitive closure from the newly</span>
-    <span class="doccomment">/// enqueued objects.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// API functions that provide `QueuingTracerFactory` should document</span>
-    <span class="doccomment">/// 1.  on which fields the user is supposed to call `ObjectTracer::trace_object`, and</span>
-    <span class="doccomment">/// 2.  which work bucket the generated work packet will be added to.  Sometimes the user needs</span>
-    <span class="doccomment">///     to know when the computing of transitive closure finishes.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// -   `worker`: The current GC worker.</span>
-    <span class="doccomment">/// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns: The return value of `func`.</span>
-    <span class="kw">fn</span> <span class="ident">with_tracer</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">func</span>: <span class="ident">F</span>) -&gt; <span class="ident">R</span>
-    <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> <span class="ident"><span class="self">Self</span>::TracerType</span>) -&gt; <span class="ident">R</span>;
+    <span class="doccomment">/// Create a temporary `ObjectTracer` and provide access in the scope of `func`.
+    ///
+    /// When the `ObjectTracer::trace_object` is called, if the traced object is first visited
+    /// in this transitive closure, it will be enqueued.  After `func` returns, the implememtation
+    /// will create work packets to continue computing the transitive closure from the newly
+    /// enqueued objects.
+    ///
+    /// API functions that provide `QueuingTracerFactory` should document
+    /// 1.  on which fields the user is supposed to call `ObjectTracer::trace_object`, and
+    /// 2.  which work bucket the generated work packet will be added to.  Sometimes the user needs
+    ///     to know when the computing of transitive closure finishes.
+    ///
+    /// Arguments:
+    /// -   `worker`: The current GC worker.
+    /// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.
+    ///
+    /// Returns: The return value of `func`.
+    </span><span class="kw">fn </span>with_tracer&lt;R, F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, func: F) -&gt; R
+    <span class="kw">where
+        </span>F: FnOnce(<span class="kw-2">&amp;mut </span><span class="self">Self</span>::TracerType) -&gt; R;
 }
 
-<span class="doccomment">/// Root-scanning methods use this trait to create work packets for processing roots.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Notes on the required traits:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// -   `Clone`: The VM may divide one root-scanning call (such as `scan_vm_specific_roots`) into</span>
-<span class="doccomment">///     multiple work packets to scan roots in parallel.  In this case, the factory shall be cloned</span>
-<span class="doccomment">///     to be given to multiple work packets.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">///     Cloning may be expensive if a factory contains many states. If the states are immutable, a</span>
-<span class="doccomment">///     `RootsWorkFactory` implementation may hold those states in an `Arc` field so that multiple</span>
-<span class="doccomment">///     factory instances can still share the part held in the `Arc` even after cloning.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// -   `Send` + &#39;static: The factory will be given to root-scanning work packets.</span>
-<span class="doccomment">///     Because work packets are distributed to and executed on different GC workers,</span>
-<span class="doccomment">///     it needs `Send` to be sent between threads.  `&#39;static` means it must not have</span>
-<span class="doccomment">///     references to variables with limited lifetime (such as local variables), because</span>
-<span class="doccomment">///     it needs to be moved between threads.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
-    <span class="doccomment">/// Create work packets to handle root edges.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The work packet may update the edges.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `edges`: A vector of edges.</span>
-    <span class="kw">fn</span> <span class="ident">create_process_edge_roots_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span>);
+<span class="doccomment">/// Root-scanning methods use this trait to create work packets for processing roots.
+///
+/// Notes on the required traits:
+///
+/// -   `Clone`: The VM may divide one root-scanning call (such as `scan_vm_specific_roots`) into
+///     multiple work packets to scan roots in parallel.  In this case, the factory shall be cloned
+///     to be given to multiple work packets.
+///
+///     Cloning may be expensive if a factory contains many states. If the states are immutable, a
+///     `RootsWorkFactory` implementation may hold those states in an `Arc` field so that multiple
+///     factory instances can still share the part held in the `Arc` even after cloning.
+///
+/// -   `Send` + &#39;static: The factory will be given to root-scanning work packets.
+///     Because work packets are distributed to and executed on different GC workers,
+///     it needs `Send` to be sent between threads.  `&#39;static` means it must not have
+///     references to variables with limited lifetime (such as local variables), because
+///     it needs to be moved between threads.
+</span><span class="kw">pub trait </span>RootsWorkFactory&lt;ES: Edge&gt;: Clone + Send + <span class="lifetime">&#39;static </span>{
+    <span class="doccomment">/// Create work packets to handle root edges.
+    ///
+    /// The work packet may update the edges.
+    ///
+    /// Arguments:
+    /// * `edges`: A vector of edges.
+    </span><span class="kw">fn </span>create_process_edge_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, edges: Vec&lt;ES&gt;);
 
-    <span class="doccomment">/// Create work packets to handle nodes pointed by root edges.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The work packet cannot update root edges, therefore it cannot move the objects.  This</span>
-    <span class="doccomment">/// method can only be used by GC algorithms that never moves objects, or GC algorithms that</span>
-    <span class="doccomment">/// supports object pinning.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This method is useful for conservative stack scanning, or VMs that cannot update some</span>
-    <span class="doccomment">/// of the root edges.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `nodes`: A vector of references to objects pointed by root edges.</span>
-    <span class="kw">fn</span> <span class="ident">create_process_node_roots_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">nodes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>);
+    <span class="doccomment">/// Create work packets to handle nodes pointed by root edges.
+    ///
+    /// The work packet cannot update root edges, therefore it cannot move the objects.  This
+    /// method can only be used by GC algorithms that never moves objects, or GC algorithms that
+    /// supports object pinning.
+    ///
+    /// This method is useful for conservative stack scanning, or VMs that cannot update some
+    /// of the root edges.
+    ///
+    /// Arguments:
+    /// * `nodes`: A vector of references to objects pointed by root edges.
+    </span><span class="kw">fn </span>create_process_node_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;);
 }
 
-<span class="doccomment">/// VM-specific methods for scanning roots/objects.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Scanning</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Scan stack roots after all mutators are paused.</span>
-    <span class="kw">const</span> <span class="ident">SCAN_MUTATORS_IN_SAFEPOINT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+<span class="doccomment">/// VM-specific methods for scanning roots/objects.
+</span><span class="kw">pub trait </span>Scanning&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Scan stack roots after all mutators are paused.
+    </span><span class="kw">const </span>SCAN_MUTATORS_IN_SAFEPOINT: bool = <span class="bool-val">true</span>;
 
-    <span class="doccomment">/// Scan all the mutators within a single work packet.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled</span>
-    <span class="kw">const</span> <span class="ident">SINGLE_THREAD_MUTATOR_SCANNING</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="doccomment">/// Scan all the mutators within a single work packet.
+    ///
+    /// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled
+    </span><span class="kw">const </span>SINGLE_THREAD_MUTATOR_SCANNING: bool = <span class="bool-val">true</span>;
 
-    <span class="doccomment">/// Return true if the given object supports edge enqueuing.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// -   If this returns true, MMTk core will call `scan_object` on the object.</span>
-    <span class="doccomment">/// -   Otherwise, MMTk core will call `scan_object_and_trace_edges` on the object.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// For maximum performance, the VM should support edge-enqueuing for as many objects as</span>
-    <span class="doccomment">/// practical.  Also note that this method is called for every object to be scanned, so it</span>
-    <span class="doccomment">/// must be fast.  The VM binding should avoid expensive checks and keep it as efficient as</span>
-    <span class="doccomment">/// possible.  Add `#[inline(always)]` to ensure it is inlined.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
-    <span class="doccomment">/// * `object`: The object to be scanned.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">support_edge_enqueuing</span>(<span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">true</span>
-    }
+    <span class="doccomment">/// Return true if the given object supports edge enqueuing.
+    ///
+    /// -   If this returns true, MMTk core will call `scan_object` on the object.
+    /// -   Otherwise, MMTk core will call `scan_object_and_trace_edges` on the object.
+    ///
+    /// For maximum performance, the VM should support edge-enqueuing for as many objects as
+    /// practical.  Also note that this method is called for every object to be scanned, so it
+    /// must be fast.  The VM binding should avoid expensive checks and keep it as efficient as
+    /// possible.  Add `#[inline(always)]` to ensure it is inlined.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
+    /// * `object`: The object to be scanned.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>support_edge_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -&gt; bool {
+        <span class="bool-val">true
+    </span>}
 
-    <span class="doccomment">/// Delegated scanning of a object, visiting each reference field encountered.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM shall call `edge_visitor.visit_edge` on each reference field.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged</span>
-    <span class="doccomment">/// references, it must skip tagged reference fields which are not holding references.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
-    <span class="doccomment">/// * `object`: The object to be scanned.</span>
-    <span class="doccomment">/// * `edge_visitor`: Called back for each edge.</span>
-    <span class="kw">fn</span> <span class="ident">scan_object</span><span class="op">&lt;</span><span class="ident">EV</span>: <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">edge_visitor</span>: <span class="kw-2">&amp;mut</span> <span class="ident">EV</span>,
+    <span class="doccomment">/// Delegated scanning of a object, visiting each reference field encountered.
+    ///
+    /// The VM shall call `edge_visitor.visit_edge` on each reference field.
+    ///
+    /// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged
+    /// references, it must skip tagged reference fields which are not holding references.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
+    /// * `object`: The object to be scanned.
+    /// * `edge_visitor`: Called back for each edge.
+    </span><span class="kw">fn </span>scan_object&lt;EV: EdgeVisitor&lt;VM::VMEdge&gt;&gt;(
+        tls: VMWorkerThread,
+        object: ObjectReference,
+        edge_visitor: <span class="kw-2">&amp;mut </span>EV,
     );
 
-    <span class="doccomment">/// Delegated scanning of a object, visiting each reference field encountered, and trace the</span>
-    <span class="doccomment">/// objects pointed by each field.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM shall call `object_tracer.trace_object` on the value held in each reference field,</span>
-    <span class="doccomment">/// and assign the returned value back to the field.  If the VM uses tagged references, the</span>
-    <span class="doccomment">/// value passed to `object_tracer.trace_object` shall be the `ObjectReference` to the object</span>
-    <span class="doccomment">/// without any tag bits.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged</span>
-    <span class="doccomment">/// references, it must skip tagged reference fields which are not holding references.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
-    <span class="doccomment">/// * `object`: The object to be scanned.</span>
-    <span class="doccomment">/// * `object_tracer`: Called back for the content of each edge.</span>
-    <span class="kw">fn</span> <span class="ident">scan_object_and_trace_edges</span><span class="op">&lt;</span><span class="ident">OT</span>: <span class="ident">ObjectTracer</span><span class="op">&gt;</span>(
-        <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">_object_tracer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">OT</span>,
+    <span class="doccomment">/// Delegated scanning of a object, visiting each reference field encountered, and trace the
+    /// objects pointed by each field.
+    ///
+    /// The VM shall call `object_tracer.trace_object` on the value held in each reference field,
+    /// and assign the returned value back to the field.  If the VM uses tagged references, the
+    /// value passed to `object_tracer.trace_object` shall be the `ObjectReference` to the object
+    /// without any tag bits.
+    ///
+    /// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged
+    /// references, it must skip tagged reference fields which are not holding references.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
+    /// * `object`: The object to be scanned.
+    /// * `object_tracer`: Called back for the content of each edge.
+    </span><span class="kw">fn </span>scan_object_and_trace_edges&lt;OT: ObjectTracer&gt;(
+        _tls: VMWorkerThread,
+        _object: ObjectReference,
+        _object_tracer: <span class="kw-2">&amp;mut </span>OT,
     ) {
         <span class="macro">unreachable!</span>(<span class="string">&quot;scan_object_and_trace_edges() will not be called when support_edge_enqueue() is always true.&quot;</span>)
     }
 
-    <span class="doccomment">/// MMTk calls this method at the first time during a collection that thread&#39;s stacks</span>
-    <span class="doccomment">/// have been scanned. This can be used (for example) to clean up</span>
-    <span class="doccomment">/// obsolete compiled methods that are no longer being executed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `partial_scan`: Whether the scan was partial or full-heap.</span>
-    <span class="doccomment">/// * `tls`: The GC thread that is performing the thread scan.</span>
-    <span class="kw">fn</span> <span class="ident">notify_initial_thread_scan_complete</span>(<span class="ident">partial_scan</span>: <span class="ident">bool</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+    <span class="doccomment">/// MMTk calls this method at the first time during a collection that thread&#39;s stacks
+    /// have been scanned. This can be used (for example) to clean up
+    /// obsolete compiled methods that are no longer being executed.
+    ///
+    /// Arguments:
+    /// * `partial_scan`: Whether the scan was partial or full-heap.
+    /// * `tls`: The GC thread that is performing the thread scan.
+    </span><span class="kw">fn </span>notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread);
 
-    <span class="doccomment">/// Scan all the mutators for roots.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The GC thread that is performing this scanning.</span>
-    <span class="doccomment">/// * `factory`: The VM uses it to create work packets for scanning roots.</span>
-    <span class="kw">fn</span> <span class="ident">scan_thread_roots</span>(<span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>);
+    <span class="doccomment">/// Scan all the mutators for roots.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC thread that is performing this scanning.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
+    </span><span class="kw">fn </span>scan_thread_roots(tls: VMWorkerThread, factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;);
 
-    <span class="doccomment">/// Scan one mutator for roots.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The GC thread that is performing this scanning.</span>
-    <span class="doccomment">/// * `mutator`: The reference to the mutator whose roots will be scanned.</span>
-    <span class="doccomment">/// * `factory`: The VM uses it to create work packets for scanning roots.</span>
-    <span class="kw">fn</span> <span class="ident">scan_thread_root</span>(
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Scan one mutator for roots.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC thread that is performing this scanning.
+    /// * `mutator`: The reference to the mutator whose roots will be scanned.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
+    </span><span class="kw">fn </span>scan_thread_root(
+        tls: VMWorkerThread,
+        mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+        factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;,
     );
 
-    <span class="doccomment">/// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)</span>
-    <span class="doccomment">/// goes here.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The GC thread that is performing this scanning.</span>
-    <span class="doccomment">/// * `factory`: The VM uses it to create work packets for scanning roots.</span>
-    <span class="kw">fn</span> <span class="ident">scan_vm_specific_roots</span>(<span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>);
+    <span class="doccomment">/// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
+    /// goes here.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC thread that is performing this scanning.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
+    </span><span class="kw">fn </span>scan_vm_specific_roots(tls: VMWorkerThread, factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;);
 
-    <span class="doccomment">/// Return whether the VM supports return barriers. This is unused at the moment.</span>
-    <span class="kw">fn</span> <span class="ident">supports_return_barrier</span>() -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Return whether the VM supports return barriers. This is unused at the moment.
+    </span><span class="kw">fn </span>supports_return_barrier() -&gt; bool;
 
-    <span class="kw">fn</span> <span class="ident">prepare_for_roots_re_scanning</span>();
+    <span class="kw">fn </span>prepare_for_roots_re_scanning();
 
-    <span class="doccomment">/// Process weak references.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function is called after a transitive closure is completed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// MMTk core enables the VM binding to do the following in this function:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// 1.  Query if an object is already reached in this transitive closure.</span>
-    <span class="doccomment">/// 2.  Keep certain objects and their descendents alive.</span>
-    <span class="doccomment">/// 3.  Get the new address of objects that are either</span>
-    <span class="doccomment">///     -   already alive before this function is called, or</span>
-    <span class="doccomment">///     -   explicitly kept alive in this function.</span>
-    <span class="doccomment">/// 4.  Request this function to be called again after transitive closure is finished again.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM binding can call `ObjectReference::is_reachable()` to query if an object is</span>
-    <span class="doccomment">/// currently reached.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM binding can use `tracer_factory` to get access to an `ObjectTracer`, and call</span>
-    <span class="doccomment">/// its `trace_object(object)` method to keep `object` and its decendents alive.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The return value of `ObjectTracer::trace_object(object)` is the new address of the given</span>
-    <span class="doccomment">/// `object` if it is moved by the GC.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`</span>
-    <span class="doccomment">/// to be called again after the MMTk core finishes transitive closure again from the objects</span>
-    <span class="doccomment">/// newly visited by `ObjectTracer::trace_object`.  This is useful if a VM supports multiple</span>
-    <span class="doccomment">/// levels of reachabilities (such as Java) or ephemerons.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Implementation-wise, this function is called as the &quot;sentinel&quot; of the `VMRefClosure` work</span>
-    <span class="doccomment">/// bucket, which means it is called when all work packets in that bucket have finished.  The</span>
-    <span class="doccomment">/// `tracer_factory` expands the transitive closure by adding more work packets in the same</span>
-    <span class="doccomment">/// bucket.  This means if `process_weak_refs` returns true, those work packets will have</span>
-    <span class="doccomment">/// finished (completing the transitive closure) by the time `process_weak_refs` is called</span>
-    <span class="doccomment">/// again.  The VM binding can make use of this by adding custom work packets into the</span>
-    <span class="doccomment">/// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.</span>
-    <span class="doccomment">/// See below.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `worker`: The current GC worker.</span>
-    <span class="doccomment">/// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to retain and</span>
-    <span class="doccomment">///   update weak references.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function shall return true if this function needs to be called again after the GC</span>
-    <span class="doccomment">/// finishes expanding the transitive closure from the objects kept alive.</span>
-    <span class="kw">fn</span> <span class="ident">process_weak_refs</span>(
-        <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">_tracer_context</span>: <span class="kw">impl</span> <span class="ident">ObjectTracerContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">false</span>
-    }
+    <span class="doccomment">/// Process weak references.
+    ///
+    /// This function is called after a transitive closure is completed.
+    ///
+    /// MMTk core enables the VM binding to do the following in this function:
+    ///
+    /// 1.  Query if an object is already reached in this transitive closure.
+    /// 2.  Keep certain objects and their descendents alive.
+    /// 3.  Get the new address of objects that are either
+    ///     -   already alive before this function is called, or
+    ///     -   explicitly kept alive in this function.
+    /// 4.  Request this function to be called again after transitive closure is finished again.
+    ///
+    /// The VM binding can call `ObjectReference::is_reachable()` to query if an object is
+    /// currently reached.
+    ///
+    /// The VM binding can use `tracer_factory` to get access to an `ObjectTracer`, and call
+    /// its `trace_object(object)` method to keep `object` and its decendents alive.
+    ///
+    /// The return value of `ObjectTracer::trace_object(object)` is the new address of the given
+    /// `object` if it is moved by the GC.
+    ///
+    /// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`
+    /// to be called again after the MMTk core finishes transitive closure again from the objects
+    /// newly visited by `ObjectTracer::trace_object`.  This is useful if a VM supports multiple
+    /// levels of reachabilities (such as Java) or ephemerons.
+    ///
+    /// Implementation-wise, this function is called as the &quot;sentinel&quot; of the `VMRefClosure` work
+    /// bucket, which means it is called when all work packets in that bucket have finished.  The
+    /// `tracer_factory` expands the transitive closure by adding more work packets in the same
+    /// bucket.  This means if `process_weak_refs` returns true, those work packets will have
+    /// finished (completing the transitive closure) by the time `process_weak_refs` is called
+    /// again.  The VM binding can make use of this by adding custom work packets into the
+    /// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.
+    /// See below.
+    ///
+    /// Arguments:
+    /// * `worker`: The current GC worker.
+    /// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to retain and
+    ///   update weak references.
+    ///
+    /// This function shall return true if this function needs to be called again after the GC
+    /// finishes expanding the transitive closure from the objects kept alive.
+    </span><span class="kw">fn </span>process_weak_refs(
+        _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+        _tracer_context: <span class="kw">impl </span>ObjectTracerContext&lt;VM&gt;,
+    ) -&gt; bool {
+        <span class="bool-val">false
+    </span>}
 
-    <span class="doccomment">/// Forward weak references.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function will only be called in the forwarding stage when using the mark-compact GC</span>
-    <span class="doccomment">/// algorithm.  Mark-compact computes transive closure twice during each GC.  It marks objects</span>
-    <span class="doccomment">/// in the first transitive closure, and forward references in the second transitive closure.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `worker`: The current GC worker.</span>
-    <span class="doccomment">/// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to update weak</span>
-    <span class="doccomment">///   references.</span>
-    <span class="kw">fn</span> <span class="ident">forward_weak_refs</span>(
-        <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">_tracer_context</span>: <span class="kw">impl</span> <span class="ident">ObjectTracerContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Forward weak references.
+    ///
+    /// This function will only be called in the forwarding stage when using the mark-compact GC
+    /// algorithm.  Mark-compact computes transive closure twice during each GC.  It marks objects
+    /// in the first transitive closure, and forward references in the second transitive closure.
+    ///
+    /// Arguments:
+    /// * `worker`: The current GC worker.
+    /// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to update weak
+    ///   references.
+    </span><span class="kw">fn </span>forward_weak_refs(
+        _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+        _tracer_context: <span class="kw">impl </span>ObjectTracerContext&lt;VM&gt;,
     ) {
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

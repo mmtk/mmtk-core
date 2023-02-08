@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["BLOCK_MASK",""],["BLOCK_SIZE",""],["BYTES_IN_PAGE",""]],"struct":[["BumpAllocator",""]]});
+window.SIDEBAR_ITEMS = {"constant":[["BLOCK_MASK",""],["BLOCK_SIZE",""],["BYTES_IN_PAGE",""]],"struct":[["BumpAllocator",""]]};

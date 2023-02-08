@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GCController","The thread local struct for the GC controller, the counterpart of `GCWorker`."]]});
+window.SIDEBAR_ITEMS = {"struct":[["GCController","The thread local struct for the GC controller, the counterpart of `GCWorker`."]]};

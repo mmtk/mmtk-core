@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["LargeObjectAllocator",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["LargeObjectAllocator",""]]};

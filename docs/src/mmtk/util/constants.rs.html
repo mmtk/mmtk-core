@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;constants.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>constants.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/constants.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>constants.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -117,123 +115,122 @@
 <span id="115">115</span>
 <span id="116">116</span>
 <span id="117">117</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
 
 <span class="doccomment">/**
  * Modes.
- */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">INSTANCE_FIELD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ARRAY_ELEMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
+ */
+</span><span class="kw">pub const </span>INSTANCE_FIELD: usize = <span class="number">0</span>;
+<span class="kw">pub const </span>ARRAY_ELEMENT: usize = <span class="number">1</span>;
 
 <span class="comment">/****************************************************************************
  *
  * Generic sizes
- */</span>
+ */
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_BYTE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_BYTE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_BYTE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">3</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_BYTE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>;
+</span><span class="kw">pub const </span>LOG_BYTES_IN_BYTE: u8 = <span class="number">0</span>;
+<span class="kw">pub const </span>BYTES_IN_BYTE: usize = <span class="number">1</span>;
+<span class="kw">pub const </span>LOG_BITS_IN_BYTE: u8 = <span class="number">3</span>;
+<span class="kw">pub const </span>BITS_IN_BYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_BYTE;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_MBYTE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">20</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_MBYTE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_MBYTE</span>;
+<span class="kw">pub const </span>LOG_BYTES_IN_MBYTE: u8 = <span class="number">20</span>;
+<span class="kw">pub const </span>BYTES_IN_MBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_KBYTE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">10</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_KBYTE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_KBYTE</span>;
+<span class="kw">pub const </span>LOG_BYTES_IN_KBYTE: u8 = <span class="number">10</span>;
+<span class="kw">pub const </span>BYTES_IN_KBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_KBYTE;
 
 <span class="comment">/****************************************************************************
  *
  * Card scanning
- */</span>
+ */
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SUPPORT_CARD_SCANNING</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>; <span class="comment">// each card consumes four bytes of metadata</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_UNITS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>; <span class="comment">// number of units tracked per card</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_GRAIN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// track at byte grain, save shifting</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_CARD_UNITS</span> <span class="op">+</span> <span class="ident">LOG_CARD_GRAIN</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_REGION</span> <span class="op">-</span> <span class="ident">LOG_CARD_BYTES</span> <span class="op">+</span> <span class="ident">LOG_CARD_META_SIZE</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_CARD_META_BYTES</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="doccomment">/// FIXME: Card scanning is not supported at the moment. Move this to side-metadata in the future.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">SUPPORT_CARD_SCANNING</span> {
-    <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_CARD_META_PAGES</span>
-} <span class="kw">else</span> {
-    <span class="number">0</span>
-};
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CARD_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_CARD_BYTES</span>) <span class="op">-</span> <span class="number">1</span>;
+</span><span class="kw">pub const </span>SUPPORT_CARD_SCANNING: bool = <span class="bool-val">false</span>;
+<span class="kw">pub const </span>LOG_CARD_META_SIZE: usize = <span class="number">2</span>; <span class="comment">// each card consumes four bytes of metadata
+</span><span class="kw">pub const </span>LOG_CARD_UNITS: usize = <span class="number">10</span>; <span class="comment">// number of units tracked per card
+</span><span class="kw">pub const </span>LOG_CARD_GRAIN: usize = <span class="number">0</span>; <span class="comment">// track at byte grain, save shifting
+</span><span class="kw">pub const </span>LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
+<span class="kw">pub const </span>LOG_CARD_META_BYTES: usize = LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
+<span class="kw">pub const </span>LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+<span class="doccomment">/// FIXME: Card scanning is not supported at the moment. Move this to side-metadata in the future.
+</span><span class="kw">pub const </span>CARD_META_PAGES_PER_REGION: usize = <span class="kw">if </span>SUPPORT_CARD_SCANNING {
+    <span class="number">1 </span>&lt;&lt; LOG_CARD_META_PAGES
+} <span class="kw">else </span>{
+    <span class="number">0
+</span>};
+<span class="kw">pub const </span>CARD_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_CARD_BYTES) - <span class="number">1</span>;
 
 <span class="doccomment">/**
  * Lazy sweeping - controlled from here because PlanConstraints needs to
  * tell the VM that we need to support linear scan.
- */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LAZY_SWEEP</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+ */
+</span><span class="kw">pub const </span>LAZY_SWEEP: bool = <span class="bool-val">true</span>;
 
 <span class="comment">/****************************************************************************
  *
  * Java-specific sizes currently required by MMTk
  *
  * TODO MMTk should really become independent of these Java types
- */</span>
+ */
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_CHAR</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_CHAR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHAR</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_CHAR</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_CHAR</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_CHAR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_CHAR</span>;
+</span><span class="kw">pub const </span>LOG_BYTES_IN_CHAR: u8 = <span class="number">1</span>;
+<span class="kw">pub const </span>BYTES_IN_CHAR: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHAR;
+<span class="kw">pub const </span>LOG_BITS_IN_CHAR: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_CHAR;
+<span class="kw">pub const </span>BITS_IN_CHAR: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_CHAR;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_SHORT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_SHORT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_SHORT</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_SHORT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_SHORT</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_SHORT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_SHORT</span>;
+<span class="kw">pub const </span>LOG_BYTES_IN_SHORT: u8 = <span class="number">1</span>;
+<span class="kw">pub const </span>BYTES_IN_SHORT: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_SHORT;
+<span class="kw">pub const </span>LOG_BITS_IN_SHORT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_SHORT;
+<span class="kw">pub const </span>BITS_IN_SHORT: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_SHORT;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_INT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_INT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_INT</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_INT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_INT</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_INT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_INT</span>;
+<span class="kw">pub const </span>LOG_BYTES_IN_INT: u8 = <span class="number">2</span>;
+<span class="kw">pub const </span>BYTES_IN_INT: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_INT;
+<span class="kw">pub const </span>LOG_BITS_IN_INT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_INT;
+<span class="kw">pub const </span>BITS_IN_INT: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_INT;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_LONG</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">3</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_LONG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_LONG</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_LONG</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_LONG</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_LONG</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_LONG</span>;
+<span class="kw">pub const </span>LOG_BYTES_IN_LONG: u8 = <span class="number">3</span>;
+<span class="kw">pub const </span>BYTES_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_LONG;
+<span class="kw">pub const </span>LOG_BITS_IN_LONG: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_LONG;
+<span class="kw">pub const </span>BITS_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_LONG;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_INT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">i32::max_value</span>() <span class="kw">as</span> <span class="ident">usize</span>; <span class="comment">// 0x7fff_ffff</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MIN_INT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">i32::min_value</span>() <span class="kw">as</span> <span class="ident">u32</span> <span class="kw">as</span> <span class="ident">usize</span>; <span class="comment">// 0x8000_0000</span>
+<span class="kw">pub const </span>MAX_INT: usize = i32::max_value() <span class="kw">as </span>usize; <span class="comment">// 0x7fff_ffff
+</span><span class="kw">pub const </span>MIN_INT: usize = i32::min_value() <span class="kw">as </span>u32 <span class="kw">as </span>usize; <span class="comment">// 0x8000_0000
 
-<span class="comment">/****************************************************************************
+/****************************************************************************
  *
  * VM-Specific sizes
- */</span>
+ */
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">3</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_ADDRESS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_ADDRESS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_ADDRESS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_ADDRESS</span>;
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS: u8 = <span class="number">2</span>;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS: u8 = <span class="number">3</span>;
+<span class="kw">pub const </span>BYTES_IN_ADDRESS: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_ADDRESS;
+<span class="kw">pub const </span>LOG_BITS_IN_ADDRESS: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize;
+<span class="kw">pub const </span>BITS_IN_ADDRESS: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_ADDRESS;
 
-<span class="comment">// Note that in MMTk we currently define WORD &amp; ADDRESS to be the same size</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_WORD</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_WORD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_WORD</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_WORD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_WORD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_WORD</span>;
+<span class="comment">// Note that in MMTk we currently define WORD &amp; ADDRESS to be the same size
+</span><span class="kw">pub const </span>LOG_BYTES_IN_WORD: u8 = LOG_BYTES_IN_ADDRESS;
+<span class="kw">pub const </span>BYTES_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_WORD;
+<span class="kw">pub const </span>LOG_BITS_IN_WORD: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_WORD <span class="kw">as </span>usize;
+<span class="kw">pub const </span>BITS_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_WORD;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_PAGE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">12</span>; <span class="comment">// XXX: This is a lie</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_PAGE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BITS_IN_PAGE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BITS_IN_PAGE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BITS_IN_PAGE</span>;
+<span class="kw">pub const </span>LOG_BYTES_IN_PAGE: u8 = <span class="number">12</span>; <span class="comment">// XXX: This is a lie
+</span><span class="kw">pub const </span>BYTES_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_PAGE;
+<span class="kw">pub const </span>LOG_BITS_IN_PAGE: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+<span class="kw">pub const </span>BITS_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_PAGE;
 
-<span class="comment">/* Assume byte-addressability */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_ADDRESS_SPACE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">BITS_IN_ADDRESS</span> <span class="kw">as</span> <span class="ident">u8</span>;
+<span class="comment">/* Assume byte-addressability */
+</span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS_SPACE: u8 = BITS_IN_ADDRESS <span class="kw">as </span>u8;
 
-<span class="comment">// TODO: Should this be VM specific?</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MIN_OBJECT_SIZE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_WORD</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MIN_OBJECT_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MIN_OBJECT_SIZE</span>;
+<span class="comment">// TODO: Should this be VM specific?
+</span><span class="kw">pub const </span>LOG_MIN_OBJECT_SIZE: u8 = LOG_BYTES_IN_WORD;
+<span class="kw">pub const </span>MIN_OBJECT_SIZE: usize = <span class="number">1 </span>&lt;&lt; LOG_MIN_OBJECT_SIZE;
 
 <span class="comment">/****************************************************************************
  *
  * Default options
- */</span>
+ */
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize::max_value</span>();
+</span><span class="kw">pub const </span>DEFAULT_STRESS_FACTOR: usize = usize::max_value();
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

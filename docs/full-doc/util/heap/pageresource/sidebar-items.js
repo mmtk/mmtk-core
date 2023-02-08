@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CommonPageResource",""],["PRAllocFail",""],["PRAllocResult",""]],"trait":[["PageResource",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["CommonPageResource",""],["PRAllocFail",""],["PRAllocResult",""]],"trait":[["PageResource",""]]};

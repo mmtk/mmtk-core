@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;generational&#x2F;copying&#x2F;global.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/generational/copying/global.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -253,259 +251,258 @@
 <span id="251">251</span>
 <span id="252">252</span>
 <span id="253">253</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenCopyGCWorkContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::CommonGenPlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::GenerationalPlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copyspace::CopySpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyGCWorkContext;
+<span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext;
+<span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
+<span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
+<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
+<span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
+<span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
+<span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
+<span class="kw">use </span>enum_map::EnumMap;
+<span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
 
-<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
+<span class="kw">use </span>mmtk_macros::PlanTraceObject;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PlanTraceObject</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
-    <span class="kw">pub</span> <span class="ident">gen</span>: <span class="ident">CommonGenPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">hi</span>: <span class="ident">AtomicBool</span>,
-    <span class="attribute">#[<span class="ident">trace</span>(<span class="ident">CopySemantics::Mature</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">copyspace0</span>: <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">trace</span>(<span class="ident">CopySemantics::Mature</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">copyspace1</span>: <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(PlanTraceObject)]
+</span><span class="kw">pub struct </span>GenCopy&lt;VM: VMBinding&gt; {
+    <span class="attribute">#[fallback_trace]
+    </span><span class="kw">pub </span>gen: CommonGenPlan&lt;VM&gt;,
+    <span class="kw">pub </span>hi: AtomicBool,
+    <span class="attribute">#[trace(CopySemantics::Mature)]
+    </span><span class="kw">pub </span>copyspace0: CopySpace&lt;VM&gt;,
+    <span class="attribute">#[trace(CopySemantics::Mature)]
+    </span><span class="kw">pub </span>copyspace1: CopySpace&lt;VM&gt;,
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GENCOPY_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::plan::generational::GEN_CONSTRAINTS</span>;
+<span class="kw">pub const </span>GENCOPY_CONSTRAINTS: PlanConstraints = <span class="kw">crate</span>::plan::generational::GEN_CONSTRAINTS;
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Plan</span> <span class="kw">for</span> <span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>GenCopy&lt;VM&gt; {
+    <span class="kw">type </span>VM = VM;
 
-    <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span> {
-        <span class="kw-2">&amp;</span><span class="ident">GENCOPY_CONSTRAINTS</span>
+    <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints {
+        <span class="kw-2">&amp;</span>GENCOPY_CONSTRAINTS
     }
 
-    <span class="kw">fn</span> <span class="ident">create_copy_config</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>) -&gt; <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span> {
-        <span class="kw">use</span> <span class="ident">enum_map::enum_map</span>;
-        <span class="ident">CopyConfig</span> {
-            <span class="ident">copy_mapping</span>: <span class="macro">enum_map!</span> {
-                <span class="ident">CopySemantics::Mature</span> =&gt; <span class="ident">CopySelector::CopySpace</span>(<span class="number">0</span>),
-                <span class="ident">CopySemantics::PromoteToMature</span> =&gt; <span class="ident">CopySelector::CopySpace</span>(<span class="number">0</span>),
-                <span class="kw">_</span> =&gt; <span class="ident">CopySelector::Unused</span>,
+    <span class="kw">fn </span>create_copy_config(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) -&gt; CopyConfig&lt;<span class="self">Self</span>::VM&gt; {
+        <span class="kw">use </span>enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: <span class="macro">enum_map! </span>{
+                CopySemantics::Mature =&gt; CopySelector::CopySpace(<span class="number">0</span>),
+                CopySemantics::PromoteToMature =&gt; CopySelector::CopySpace(<span class="number">0</span>),
+                <span class="kw">_ </span>=&gt; CopySelector::Unused,
             },
-            <span class="ident">space_mapping</span>: <span class="macro">vec!</span>[
-                <span class="comment">// The tospace argument doesn&#39;t matter, we will rebind before a GC anyway.</span>
-                (<span class="ident">CopySelector::CopySpace</span>(<span class="number">0</span>), <span class="self">self</span>.<span class="ident">tospace</span>()),
+            space_mapping: <span class="macro">vec!</span>[
+                <span class="comment">// The tospace argument doesn&#39;t matter, we will rebind before a GC anyway.
+                </span>(CopySelector::CopySpace(<span class="number">0</span>), <span class="self">self</span>.tospace()),
             ],
-            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">GENCOPY_CONSTRAINTS</span>,
+            constraints: <span class="kw-2">&amp;</span>GENCOPY_CONSTRAINTS,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>
-    <span class="kw">where</span>
-        <span class="self">Self</span>: <span class="ident">Sized</span>,
+    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool
+    <span class="kw">where
+        </span><span class="self">Self</span>: Sized,
     {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
+        <span class="self">self</span>.gen.collection_required(<span class="self">self</span>, space_full, space)
     }
 
-    <span class="kw">fn</span> <span class="ident">force_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">force_full_heap_collection</span>()
+    <span class="kw">fn </span>force_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.gen.force_full_heap_collection()
     }
 
-    <span class="kw">fn</span> <span class="ident">last_collection_full_heap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">last_collection_full_heap</span>()
+    <span class="kw">fn </span>last_collection_full_heap(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.gen.last_collection_full_heap()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_spaces</span>();
-        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace0</span>);
-        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace1</span>);
-        <span class="ident">ret</span>
+    <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.gen.get_spaces();
+        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.copyspace0);
+        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.copyspace1);
+        ret
     }
 
-    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">is_full_heap</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">requires_full_heap_collection</span>();
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
-        <span class="kw">if</span> <span class="ident">is_full_heap</span> {
-            <span class="ident">scheduler</span>.<span class="ident">schedule_common_work</span>::<span class="op">&lt;</span><span class="ident">GenCopyGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>);
-        } <span class="kw">else</span> {
-            <span class="ident">scheduler</span>.<span class="ident">schedule_common_work</span>::<span class="op">&lt;</span><span class="ident">GenCopyNurseryGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>);
+    <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
+        <span class="kw">let </span>is_full_heap = <span class="self">self</span>.requires_full_heap_collection();
+        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
+        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
+        <span class="kw">if </span>is_full_heap {
+            scheduler.schedule_common_work::&lt;GenCopyGCWorkContext&lt;VM&gt;&gt;(<span class="self">self</span>);
+        } <span class="kw">else </span>{
+            scheduler.schedule_common_work::&lt;GenCopyNurseryGCWorkContext&lt;VM&gt;&gt;(<span class="self">self</span>);
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>
+    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
+        <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING
     }
 
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="kw">let</span> <span class="ident">full_heap</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">is_current_gc_nursery</span>();
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>);
-        <span class="kw">if</span> <span class="ident">full_heap</span> {
-            <span class="self">self</span>.<span class="ident">hi</span>
-                .<span class="ident">store</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>), <span class="ident">Ordering::SeqCst</span>); <span class="comment">// flip the semi-spaces</span>
+    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
+        <span class="self">self</span>.gen.prepare(tls);
+        <span class="kw">if </span>full_heap {
+            <span class="self">self</span>.hi
+                .store(!<span class="self">self</span>.hi.load(Ordering::SeqCst), Ordering::SeqCst); <span class="comment">// flip the semi-spaces
+        </span>}
+        <span class="kw">let </span>hi = <span class="self">self</span>.hi.load(Ordering::SeqCst);
+        <span class="self">self</span>.copyspace0.prepare(hi);
+        <span class="self">self</span>.copyspace1.prepare(!hi);
+
+        <span class="self">self</span>.fromspace_mut()
+            .set_copy_for_sft_trace(<span class="prelude-val">Some</span>(CopySemantics::Mature));
+        <span class="self">self</span>.tospace_mut().set_copy_for_sft_trace(<span class="prelude-val">None</span>);
+    }
+
+    <span class="kw">fn </span>prepare_worker(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;<span class="self">Self</span>::VM&gt;) {
+        <span class="kw">unsafe </span>{ worker.get_copy_context_mut().copy[<span class="number">0</span>].assume_init_mut() }.rebind(<span class="self">self</span>.tospace());
+    }
+
+    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
+        <span class="self">self</span>.gen.release(tls);
+        <span class="kw">if </span>full_heap {
+            <span class="self">self</span>.fromspace().release();
         }
-        <span class="kw">let</span> <span class="ident">hi</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
-        <span class="self">self</span>.<span class="ident">copyspace0</span>.<span class="ident">prepare</span>(<span class="ident">hi</span>);
-        <span class="self">self</span>.<span class="ident">copyspace1</span>.<span class="ident">prepare</span>(<span class="op">!</span><span class="ident">hi</span>);
-
-        <span class="self">self</span>.<span class="ident">fromspace_mut</span>()
-            .<span class="ident">set_copy_for_sft_trace</span>(<span class="prelude-val">Some</span>(<span class="ident">CopySemantics::Mature</span>));
-        <span class="self">self</span>.<span class="ident">tospace_mut</span>().<span class="ident">set_copy_for_sft_trace</span>(<span class="prelude-val">None</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">prepare_worker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) {
-        <span class="kw">unsafe</span> { <span class="ident">worker</span>.<span class="ident">get_copy_context_mut</span>().<span class="ident">copy</span>[<span class="number">0</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">rebind</span>(<span class="self">self</span>.<span class="ident">tospace</span>());
+    <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
+        <span class="self">self</span>.gen
+            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>));
     }
 
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="kw">let</span> <span class="ident">full_heap</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">is_current_gc_nursery</span>();
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">release</span>(<span class="ident">tls</span>);
-        <span class="kw">if</span> <span class="ident">full_heap</span> {
-            <span class="self">self</span>.<span class="ident">fromspace</span>().<span class="ident">release</span>();
-        }
+    <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.gen.get_collection_reserved_pages() + <span class="self">self</span>.tospace().reserved_pages()
     }
 
-    <span class="kw">fn</span> <span class="ident">end_of_gc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">gen</span>
-            .<span class="ident">set_next_gc_full_heap</span>(<span class="ident">CommonGenPlan::should_next_gc_be_full_heap</span>(<span class="self">self</span>));
+    <span class="kw">fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.gen.get_used_pages() + <span class="self">self</span>.tospace().reserved_pages()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_collection_reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
+    <span class="doccomment">/// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
+    </span><span class="kw">fn </span>get_available_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="comment">// super.get_available_pages() / 2 to reserve pages for copying
+        </span>(<span class="self">self
+            </span>.get_total_pages()
+            .saturating_sub(<span class="self">self</span>.get_reserved_pages()))
+            &gt;&gt; <span class="number">1
+    </span>}
+
+    <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.gen.common.base
     }
 
-    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_used_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
+    <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.gen.common
     }
 
-    <span class="doccomment">/// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.</span>
-    <span class="kw">fn</span> <span class="ident">get_available_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="comment">// super.get_available_pages() / 2 to reserve pages for copying</span>
-        (<span class="self">self</span>
-            .<span class="ident">get_total_pages</span>()
-            .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">get_reserved_pages</span>()))
-            <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">common</span>.<span class="ident">base</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">common</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">generational</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">GenerationalPlan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">fn </span>generational(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = <span class="self">Self</span>::VM&gt;&gt; {
         <span class="prelude-val">Some</span>(<span class="self">self</span>)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GenerationalPlan</span> <span class="kw">for</span> <span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">common_gen</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonGenPlan</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">gen</span>
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GenerationalPlan <span class="kw">for </span>GenCopy&lt;VM&gt; {
+    <span class="kw">fn </span>common_gen(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonGenPlan&lt;<span class="self">Self</span>::VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.gen
     }
 
-    <span class="kw">fn</span> <span class="ident">get_mature_physical_pages_available</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">available_physical_pages</span>()
+    <span class="kw">fn </span>get_mature_physical_pages_available(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.tospace().available_physical_pages()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_mature_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
+    <span class="kw">fn </span>get_mature_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.tospace().reserved_pages()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
-            <span class="ident">global_args</span>: <span class="ident">args</span>,
-            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">GENCOPY_CONSTRAINTS</span>,
-            <span class="ident">global_side_metadata_specs</span>:
-                <span class="ident"><span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(),
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GenCopy&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: <span class="kw-2">&amp;</span>GENCOPY_CONSTRAINTS,
+            global_side_metadata_specs:
+                <span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs::&lt;VM&gt;(),
         };
 
-        <span class="kw">let</span> <span class="ident">copyspace0</span> <span class="op">=</span> <span class="ident">CopySpace::new</span>(
-            <span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;copyspace0&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()),
+        <span class="kw">let </span>copyspace0 = CopySpace::new(
+            plan_args.get_space_args(<span class="string">&quot;copyspace0&quot;</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
             <span class="bool-val">false</span>,
         );
-        <span class="kw">let</span> <span class="ident">copyspace1</span> <span class="op">=</span> <span class="ident">CopySpace::new</span>(
-            <span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;copyspace1&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()),
+        <span class="kw">let </span>copyspace1 = CopySpace::new(
+            plan_args.get_space_args(<span class="string">&quot;copyspace1&quot;</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
             <span class="bool-val">true</span>,
         );
 
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">GenCopy</span> {
-            <span class="ident">gen</span>: <span class="ident">CommonGenPlan::new</span>(<span class="ident">plan_args</span>),
-            <span class="ident">hi</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
-            <span class="ident">copyspace0</span>,
-            <span class="ident">copyspace1</span>,
+        <span class="kw">let </span>res = GenCopy {
+            gen: CommonGenPlan::new(plan_args),
+            hi: AtomicBool::new(<span class="bool-val">false</span>),
+            copyspace0,
+            copyspace1,
         };
 
-        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>
-        <span class="comment">// side metadata in extreme_assertions.</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-            <span class="ident">res</span>.<span class="ident">gen</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-            <span class="ident">res</span>.<span class="ident">copyspace0</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-            <span class="ident">res</span>.<span class="ident">copyspace1</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
+        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
+            res.gen
+                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
+            res.copyspace0
+                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
+            res.copyspace1
+                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
         }
 
-        <span class="ident">res</span>
+        res
     }
 
-    <span class="kw">fn</span> <span class="ident">requires_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">requires_full_heap_collection</span>(<span class="self">self</span>)
+    <span class="kw">fn </span>requires_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.gen.requires_full_heap_collection(<span class="self">self</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tospace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace1</span>
-        } <span class="kw">else</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace0</span>
-        }
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tospace_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace1</span>
-        } <span class="kw">else</span> {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace0</span>
+    <span class="kw">pub fn </span>tospace(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CopySpace&lt;VM&gt; {
+        <span class="kw">if </span><span class="self">self</span>.hi.load(Ordering::SeqCst) {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.copyspace1
+        } <span class="kw">else </span>{
+            <span class="kw-2">&amp;</span><span class="self">self</span>.copyspace0
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fromspace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace0</span>
-        } <span class="kw">else</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace1</span>
+    <span class="kw">pub fn </span>tospace_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CopySpace&lt;VM&gt; {
+        <span class="kw">if </span><span class="self">self</span>.hi.load(Ordering::SeqCst) {
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.copyspace1
+        } <span class="kw">else </span>{
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.copyspace0
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fromspace_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace0</span>
-        } <span class="kw">else</span> {
-            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace1</span>
+    <span class="kw">pub fn </span>fromspace(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CopySpace&lt;VM&gt; {
+        <span class="kw">if </span><span class="self">self</span>.hi.load(Ordering::SeqCst) {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.copyspace0
+        } <span class="kw">else </span>{
+            <span class="kw-2">&amp;</span><span class="self">self</span>.copyspace1
+        }
+    }
+
+    <span class="kw">pub fn </span>fromspace_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CopySpace&lt;VM&gt; {
+        <span class="kw">if </span><span class="self">self</span>.hi.load(Ordering::SeqCst) {
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.copyspace0
+        } <span class="kw">else </span>{
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.copyspace1
         }
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

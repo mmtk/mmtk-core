@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["fragmented_mapper",""],["heap_layout",""],["heap_parameters",""],["map",""],["map64",""],["mmapper",""],["vm_layout_constants",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["fragmented_mapper",""],["heap_layout",""],["heap_parameters",""],["map",""],["map64",""],["mmapper",""],["vm_layout_constants",""]]};

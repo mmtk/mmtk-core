@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;semispace&#x2F;mutator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/semispace/mutator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -74,80 +72,79 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::SemiSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::NoBarrier</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context::Mutator</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context::MutatorConfig</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context</span>::{
-    <span class="ident">create_allocator_mapping</span>, <span class="ident">create_space_mapping</span>, <span class="ident">ReservedAllocators</span>,
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SemiSpace;
+<span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators</span>::{<span class="ident">AllocatorSelector</span>, <span class="ident">Allocators</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::BumpAllocator</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::BumpAllocator;
+<span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ss_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">_mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
-    <span class="comment">// Do nothing</span>
-}
+<span class="kw">pub fn </span>ss_mutator_prepare&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
+    <span class="comment">// Do nothing
+</span>}
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ss_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
-    <span class="comment">// rebind the allocation bump pointer to the appropriate semispace</span>
-    <span class="kw">let</span> <span class="ident">bump_allocator</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-        <span class="ident">mutator</span>
-            .<span class="ident">allocators</span>
-            .<span class="ident">get_allocator_mut</span>(<span class="ident">mutator</span>.<span class="ident">config</span>.<span class="ident">allocator_mapping</span>[<span class="ident">AllocationSemantics::Default</span>])
+<span class="kw">pub fn </span>ss_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
+    <span class="comment">// rebind the allocation bump pointer to the appropriate semispace
+    </span><span class="kw">let </span>bump_allocator = <span class="kw">unsafe </span>{
+        mutator
+            .allocators
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
-    .<span class="ident">downcast_mut</span>::<span class="op">&lt;</span><span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-    .<span class="ident">unwrap</span>();
-    <span class="ident">bump_allocator</span>.<span class="ident">rebind</span>(
-        <span class="ident">mutator</span>
-            .<span class="ident">plan</span>
-            .<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">unwrap</span>()
-            .<span class="ident">tospace</span>(),
+    .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
+    .unwrap();
+    bump_allocator.rebind(
+        mutator
+            .plan
+            .downcast_ref::&lt;SemiSpace&lt;VM&gt;&gt;()
+            .unwrap()
+            .tospace(),
     );
 }
 
-<span class="kw">const</span> <span class="ident">RESERVED_ALLOCATORS</span>: <span class="ident">ReservedAllocators</span> <span class="op">=</span> <span class="ident">ReservedAllocators</span> {
-    <span class="ident">n_bump_pointer</span>: <span class="number">1</span>,
-    ..<span class="ident">ReservedAllocators::DEFAULT</span>
+<span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: <span class="number">1</span>,
+    ..ReservedAllocators::DEFAULT
 };
 
-<span class="macro">lazy_static!</span> {
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">create_allocator_mapping</span>(<span class="ident">RESERVED_ALLOCATORS</span>, <span class="bool-val">true</span>);
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::Default</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>);
-        <span class="ident">map</span>
+<span class="macro">lazy_static! </span>{
+    <span class="kw">pub static </span><span class="kw-2">ref </span>ALLOCATOR_MAPPING: EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; = {
+        <span class="kw">let </span><span class="kw-2">mut </span>map = create_allocator_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>);
+        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(<span class="number">0</span>);
+        map
     };
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_ss_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mutator_tls</span>: <span class="ident">VMMutatorThread</span>,
-    <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">ss</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
-    <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">MutatorConfig</span> {
-        <span class="ident">allocator_mapping</span>: <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>,
-        <span class="ident">space_mapping</span>: <span class="ident">Box::new</span>({
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="ident">create_space_mapping</span>(<span class="ident">RESERVED_ALLOCATORS</span>, <span class="bool-val">true</span>, <span class="ident">plan</span>);
-            <span class="ident">vec</span>.<span class="ident">push</span>((<span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>), <span class="ident">ss</span>.<span class="ident">tospace</span>()));
-            <span class="ident">vec</span>
+<span class="kw">pub fn </span>create_ss_mutator&lt;VM: VMBinding&gt;(
+    mutator_tls: VMMutatorThread,
+    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+) -&gt; Mutator&lt;VM&gt; {
+    <span class="kw">let </span>ss = plan.downcast_ref::&lt;SemiSpace&lt;VM&gt;&gt;().unwrap();
+    <span class="kw">let </span>config = MutatorConfig {
+        allocator_mapping: <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING,
+        space_mapping: Box::new({
+            <span class="kw">let </span><span class="kw-2">mut </span>vec = create_space_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>, plan);
+            vec.push((AllocatorSelector::BumpPointer(<span class="number">0</span>), ss.tospace()));
+            vec
         }),
-        <span class="ident">prepare_func</span>: <span class="kw-2">&amp;</span><span class="ident">ss_mutator_prepare</span>,
-        <span class="ident">release_func</span>: <span class="kw-2">&amp;</span><span class="ident">ss_mutator_release</span>,
+        prepare_func: <span class="kw-2">&amp;</span>ss_mutator_prepare,
+        release_func: <span class="kw-2">&amp;</span>ss_mutator_release,
     };
 
-    <span class="ident">Mutator</span> {
-        <span class="ident">allocators</span>: <span class="ident">Allocators</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator_tls</span>, <span class="ident">plan</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">space_mapping</span>),
-        <span class="ident">barrier</span>: <span class="ident">Box::new</span>(<span class="ident">NoBarrier</span>),
-        <span class="ident">mutator_tls</span>,
-        <span class="ident">config</span>,
-        <span class="ident">plan</span>,
+    Mutator {
+        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, plan, <span class="kw-2">&amp;</span>config.space_mapping),
+        barrier: Box::new(NoBarrier),
+        mutator_tls,
+        config,
+        plan,
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

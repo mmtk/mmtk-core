@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["LongCounter",""]],"type":[["Timer",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["LongCounter",""]],"type":[["Timer",""]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_gencopy_mutator",""],["gencopy_mutator_prepare",""],["gencopy_mutator_release",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["create_gencopy_mutator",""],["gencopy_mutator_prepare",""],["gencopy_mutator_release",""]]};

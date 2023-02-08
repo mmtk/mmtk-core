@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -61,67 +59,66 @@
 <span id="59">59</span>
 <span id="60">60</span>
 <span id="61">61</span>
-</pre><pre class="rust"><code><span class="doccomment">//! GC algorithms from the MMTk suite.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This module provides various GC plans, each of which implements a GC algorithm.</span>
-<span class="doccomment">//! Generally a plan consists of a few parts:</span>
-<span class="doccomment">//! * A plan type that implements the [`Plan`](crate::plan::Plan) trait, which defines</span>
-<span class="doccomment">//!   spaces used in the plan, and their behaviors in GC and page accounting.</span>
-<span class="doccomment">//! * A mutator definition, which describes the mapping between allocators and allocation semantics,</span>
-<span class="doccomment">//!   and the mapping between allocators and spaces. If the plan needs barrier, the barrier definition is</span>
-<span class="doccomment">//!   also included here.</span>
-<span class="doccomment">//! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines</span>
-<span class="doccomment">//!   plan-specific constants.</span>
-<span class="doccomment">//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).</span>
+</pre><pre class="rust"><code><span class="doccomment">//! GC algorithms from the MMTk suite.
+//!
+//! This module provides various GC plans, each of which implements a GC algorithm.
+//! Generally a plan consists of a few parts:
+//! * A plan type that implements the [`Plan`](crate::plan::Plan) trait, which defines
+//!   spaces used in the plan, and their behaviors in GC and page accounting.
+//! * A mutator definition, which describes the mapping between allocators and allocation semantics,
+//!   and the mapping between allocators and spaces. If the plan needs barrier, the barrier definition is
+//!   also included here.
+//! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines
+//!   plan-specific constants.
+//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC.
+//!
+//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
-<span class="kw">mod</span> <span class="ident">barriers</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">barriers::BarrierSelector</span>;
+</span><span class="kw">mod </span>barriers;
+<span class="kw">pub use </span>barriers::BarrierSelector;
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">gc_requester</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>gc_requester;
 
-<span class="kw">mod</span> <span class="ident">global</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::create_gc_worker_context</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::create_mutator</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::create_plan</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global::AllocationSemantics</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::GcStatus</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global::Plan</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::PlanTraceObject</span>;
+<span class="kw">mod </span>global;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::create_gc_worker_context;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::create_mutator;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::create_plan;
+<span class="kw">pub use </span>global::AllocationSemantics;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::GcStatus;
+<span class="kw">pub use </span>global::Plan;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::PlanTraceObject;
 
-<span class="kw">mod</span> <span class="ident">mutator_context</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mutator_context::Mutator</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">mutator_context::MutatorContext</span>;
+<span class="kw">mod </span>mutator_context;
+<span class="kw">pub use </span>mutator_context::Mutator;
+<span class="kw">pub use </span>mutator_context::MutatorContext;
 
-<span class="kw">mod</span> <span class="ident">plan_constraints</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">plan_constraints::PlanConstraints</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">plan_constraints::DEFAULT_PLAN_CONSTRAINTS</span>;
+<span class="kw">mod </span>plan_constraints;
+<span class="kw">pub use </span>plan_constraints::PlanConstraints;
+<span class="kw">pub use </span>plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
-<span class="kw">mod</span> <span class="ident">tracing</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tracing</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">ObjectsClosure</span>, <span class="ident">VectorObjectQueue</span>, <span class="ident">VectorQueue</span>};
+<span class="kw">mod </span>tracing;
+<span class="kw">pub use </span>tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};
 
-<span class="kw">mod</span> <span class="ident">generational</span>;
-<span class="kw">mod</span> <span class="ident">immix</span>;
-<span class="kw">mod</span> <span class="ident">markcompact</span>;
-<span class="kw">mod</span> <span class="ident">marksweep</span>;
-<span class="kw">mod</span> <span class="ident">nogc</span>;
-<span class="kw">mod</span> <span class="ident">pageprotect</span>;
-<span class="kw">mod</span> <span class="ident">semispace</span>;
+<span class="kw">mod </span>generational;
+<span class="kw">mod </span>immix;
+<span class="kw">mod </span>markcompact;
+<span class="kw">mod </span>marksweep;
+<span class="kw">mod </span>nogc;
+<span class="kw">mod </span>pageprotect;
+<span class="kw">mod </span>semispace;
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">generational::global::is_nursery_gc</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">generational::global::GenerationalPlan</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>generational::global::is_nursery_gc;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>generational::global::GenerationalPlan;
 
-<span class="comment">// Expose plan constraints as public. Though a binding can get them from plan.constraints(),</span>
-<span class="comment">// it is possible for performance reasons that they want the constraints as constants.</span>
+<span class="comment">// Expose plan constraints as public. Though a binding can get them from plan.constraints(),
+// it is possible for performance reasons that they want the constraints as constants.
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">generational::copying::GENCOPY_CONSTRAINTS</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">immix::IMMIX_CONSTRAINTS</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">markcompact::MARKCOMPACT_CONSTRAINTS</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">marksweep::MS_CONSTRAINTS</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">nogc::NOGC_CONSTRAINTS</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">pageprotect::PP_CONSTRAINTS</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">semispace::SS_CONSTRAINTS</span>;
+</span><span class="kw">pub use </span>generational::copying::GENCOPY_CONSTRAINTS;
+<span class="kw">pub use </span>immix::IMMIX_CONSTRAINTS;
+<span class="kw">pub use </span>markcompact::MARKCOMPACT_CONSTRAINTS;
+<span class="kw">pub use </span>marksweep::MS_CONSTRAINTS;
+<span class="kw">pub use </span>nogc::NOGC_CONSTRAINTS;
+<span class="kw">pub use </span>pageprotect::PP_CONSTRAINTS;
+<span class="kw">pub use </span>semispace::SS_CONSTRAINTS;
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

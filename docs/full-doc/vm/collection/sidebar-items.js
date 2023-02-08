@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["GCThreadContext","Thread context for the spawned GC thread.  It is used by spawn_gc_thread."]],"trait":[["Collection","VM-specific methods for garbage collection."]]});
+window.SIDEBAR_ITEMS = {"enum":[["GCThreadContext","Thread context for the spawned GC thread.  It is used by spawn_gc_thread."]],"trait":[["Collection","VM-specific methods for garbage collection."]]};

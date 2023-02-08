@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;generational&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/generational/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -89,95 +87,94 @@
 <span id="87">87</span>
 <span id="88">88</span>
 <span id="89">89</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>enum_map::EnumMap;
 
-<span class="doccomment">///! Generational plans</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::BarrierSelector</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copyspace::CopySpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::AllocatorSelector</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Plan</span>;
+<span class="doccomment">///! Generational plans
+</span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSelector;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping;
+<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocatorSelector;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
+<span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::Plan;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator_context::create_space_mapping</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator_context::ReservedAllocators</span>;
+<span class="kw">use </span><span class="kw">super</span>::mutator_context::create_space_mapping;
+<span class="kw">use </span><span class="kw">super</span>::mutator_context::ReservedAllocators;
 
-<span class="comment">// Generational plans:</span>
+<span class="comment">// Generational plans:
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">barrier</span>;
-<span class="doccomment">/// Generational copying (GenCopy)</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">copying</span>;
-<span class="doccomment">/// Generational immix (GenImmix)</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">immix</span>;
+</span><span class="kw">pub mod </span>barrier;
+<span class="doccomment">/// Generational copying (GenCopy)
+</span><span class="kw">pub mod </span>copying;
+<span class="doccomment">/// Generational immix (GenImmix)
+</span><span class="kw">pub mod </span>immix;
 
-<span class="comment">// Common generational code</span>
+<span class="comment">// Common generational code
 
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod</span> <span class="ident">gc_work</span>;
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod</span> <span class="ident">global</span>;
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod </span>gc_work;
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod </span>global;
 
-<span class="doccomment">/// # Barrier overhead measurement:</span>
-<span class="doccomment">///  - Set `FULL_NURSERY_GC` to `true`.</span>
-<span class="doccomment">/// ## 1. Baseline: No barrier</span>
-<span class="doccomment">///  - Set `ACTIVE_BARRIER` to `BarrierSelector::NoBarrier`.</span>
-<span class="doccomment">/// ## 2. Object barrier</span>
-<span class="doccomment">///  - Set `ACTIVE_BARRIER` to `BarrierSelector::ObjectBarrier`.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ACTIVE_BARRIER</span>: <span class="ident">BarrierSelector</span> <span class="op">=</span> <span class="ident">BarrierSelector::ObjectBarrier</span>;
-<span class="doccomment">/// Full heap collection as nursery GC.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FULL_NURSERY_GC</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
+<span class="doccomment">/// # Barrier overhead measurement:
+///  - Set `FULL_NURSERY_GC` to `true`.
+/// ## 1. Baseline: No barrier
+///  - Set `ACTIVE_BARRIER` to `BarrierSelector::NoBarrier`.
+/// ## 2. Object barrier
+///  - Set `ACTIVE_BARRIER` to `BarrierSelector::ObjectBarrier`.
+</span><span class="kw">pub const </span>ACTIVE_BARRIER: BarrierSelector = BarrierSelector::ObjectBarrier;
+<span class="doccomment">/// Full heap collection as nursery GC.
+</span><span class="kw">pub const </span>FULL_NURSERY_GC: bool = <span class="bool-val">false</span>;
 
-<span class="doccomment">/// Constraints for generational plans. Each generational plan should overwrite based on this constant.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GEN_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident">PlanConstraints</span> {
-    <span class="ident">moves_objects</span>: <span class="bool-val">true</span>,
-    <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
-    <span class="ident">gc_header_words</span>: <span class="number">0</span>,
-    <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
-    <span class="ident">needs_log_bit</span>: <span class="ident">ACTIVE_BARRIER</span>.<span class="ident">equals</span>(<span class="ident">BarrierSelector::ObjectBarrier</span>),
-    <span class="ident">barrier</span>: <span class="ident">ACTIVE_BARRIER</span>,
-    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident"><span class="kw">crate</span>::util::rust_util::min_of_usize</span>(
-        <span class="ident"><span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN</span>,
-        <span class="ident"><span class="kw">crate</span>::util::options::NURSERY_SIZE</span>,
+<span class="doccomment">/// Constraints for generational plans. Each generational plan should overwrite based on this constant.
+</span><span class="kw">pub const </span>GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: <span class="bool-val">true</span>,
+    gc_header_bits: <span class="number">2</span>,
+    gc_header_words: <span class="number">0</span>,
+    num_specialized_scans: <span class="number">1</span>,
+    needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
+    barrier: ACTIVE_BARRIER,
+    max_non_los_default_alloc_bytes: <span class="kw">crate</span>::util::rust_util::min_of_usize(
+        <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+        <span class="kw">crate</span>::util::options::NURSERY_SIZE,
     ),
-    ..<span class="ident">PlanConstraints::default</span>()
+    ..PlanConstraints::default()
 };
 
-<span class="doccomment">/// Create global side metadata specs for generational plans. This will call SideMetadataContext::new_global_specs().</span>
-<span class="doccomment">/// So if a plan calls this, it should not call SideMetadataContext::new_global_specs() again.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_generational_global_metadata_specs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">specs</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">ACTIVE_BARRIER</span> <span class="op">==</span> <span class="ident">BarrierSelector::ObjectBarrier</span> {
-        <span class="ident"><span class="kw">crate</span>::util::metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">*</span><span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>])
-    } <span class="kw">else</span> {
+<span class="doccomment">/// Create global side metadata specs for generational plans. This will call SideMetadataContext::new_global_specs().
+/// So if a plan calls this, it should not call SideMetadataContext::new_global_specs() again.
+</span><span class="kw">pub fn </span>new_generational_global_metadata_specs&lt;VM: VMBinding&gt;() -&gt; Vec&lt;SideMetadataSpec&gt; {
+    <span class="kw">let </span>specs = <span class="kw">if </span>ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        <span class="kw">crate</span>::util::metadata::extract_side_metadata(<span class="kw-2">&amp;</span>[<span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
+    } <span class="kw">else </span>{
         <span class="macro">vec!</span>[]
     };
-    <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span><span class="ident">specs</span>)
+    SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>specs)
 }
 
-<span class="kw">const</span> <span class="ident">RESERVED_ALLOCATORS</span>: <span class="ident">ReservedAllocators</span> <span class="op">=</span> <span class="ident">ReservedAllocators</span> {
-    <span class="ident">n_bump_pointer</span>: <span class="number">1</span>,
-    ..<span class="ident">ReservedAllocators::DEFAULT</span>
+<span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: <span class="number">1</span>,
+    ..ReservedAllocators::DEFAULT
 };
 
-<span class="macro">lazy_static!</span> {
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">create_allocator_mapping</span>(<span class="ident">RESERVED_ALLOCATORS</span>, <span class="bool-val">true</span>);
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::Default</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>);
-        <span class="ident">map</span>
+<span class="macro">lazy_static! </span>{
+    <span class="kw">static </span><span class="kw-2">ref </span>ALLOCATOR_MAPPING: EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; = {
+        <span class="kw">let </span><span class="kw-2">mut </span>map = create_allocator_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>);
+        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(<span class="number">0</span>);
+        map
     };
 }
 
-<span class="kw">fn</span> <span class="ident">create_gen_space_mapping</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">nursery</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">AllocatorSelector</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="ident">create_space_mapping</span>(<span class="ident">RESERVED_ALLOCATORS</span>, <span class="bool-val">true</span>, <span class="ident">plan</span>);
-    <span class="ident">vec</span>.<span class="ident">push</span>((<span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>), <span class="ident">nursery</span>));
-    <span class="ident">vec</span>
+<span class="kw">fn </span>create_gen_space_mapping&lt;VM: VMBinding&gt;(
+    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    nursery: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CopySpace&lt;VM&gt;,
+) -&gt; Vec&lt;(AllocatorSelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>vec = create_space_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>, plan);
+    vec.push((AllocatorSelector::BumpPointer(<span class="number">0</span>), nursery));
+    vec
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

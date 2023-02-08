@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;sft.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sft.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/sft.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sft.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -185,151 +183,151 @@
 <span id="183">183</span>
 <span id="184">184</span>
 <span id="185">185</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
+<span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>std::marker::PhantomData;
 
-<span class="doccomment">/// Space Function Table (SFT).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This trait captures functions that reflect _space-specific per-object</span>
-<span class="doccomment">/// semantics_.   These functions are implemented for each object via a special</span>
-<span class="doccomment">/// space-based dynamic dispatch mechanism where the semantics are _not_</span>
-<span class="doccomment">/// determined by the object&#39;s _type_, but rather, are determined by the _space_</span>
-<span class="doccomment">/// that the object is in.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The underlying mechanism exploits the fact that spaces use the address space</span>
-<span class="doccomment">/// at an MMTk chunk granularity with the consequence that each chunk maps to</span>
-<span class="doccomment">/// exactluy one space, so knowing the chunk for an object reveals its space.</span>
-<span class="doccomment">/// The dispatch then works by performing simple address arithmetic on the object</span>
-<span class="doccomment">/// reference to find a chunk index which is used to index a table which returns</span>
-<span class="doccomment">/// the space.   The relevant function is then dispatched against that space</span>
-<span class="doccomment">/// object.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// We use the SFT trait to simplify typing for Rust, so our table is a</span>
-<span class="doccomment">/// table of SFT rather than Space.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">SFT</span> {
-    <span class="doccomment">/// The space name</span>
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span>;
+<span class="doccomment">/// Space Function Table (SFT).
+///
+/// This trait captures functions that reflect _space-specific per-object
+/// semantics_.   These functions are implemented for each object via a special
+/// space-based dynamic dispatch mechanism where the semantics are _not_
+/// determined by the object&#39;s _type_, but rather, are determined by the _space_
+/// that the object is in.
+///
+/// The underlying mechanism exploits the fact that spaces use the address space
+/// at an MMTk chunk granularity with the consequence that each chunk maps to
+/// exactluy one space, so knowing the chunk for an object reveals its space.
+/// The dispatch then works by performing simple address arithmetic on the object
+/// reference to find a chunk index which is used to index a table which returns
+/// the space.   The relevant function is then dispatched against that space
+/// object.
+///
+/// We use the SFT trait to simplify typing for Rust, so our table is a
+/// table of SFT rather than Space.
+</span><span class="kw">pub trait </span>SFT {
+    <span class="doccomment">/// The space name
+    </span><span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str;
 
-    <span class="doccomment">/// Get forwarding pointer if the object is forwarded.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">get_forwarded_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
+    <span class="doccomment">/// Get forwarding pointer if the object is forwarded.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="prelude-val">None
+    </span>}
+
+    <span class="doccomment">/// Is the object live, determined by the policy?
+    </span><span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool;
+
+    <span class="doccomment">/// Is the object reachable, determined by the policy?
+    /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>is_reachable(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
+        <span class="self">self</span>.is_live(object)
     }
 
-    <span class="doccomment">/// Is the object live, determined by the policy?</span>
-    <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span>;
+    <span class="comment">// Functions for pinning/unpining and checking if an object is pinned
+    // For non moving policies, all the objects are considered as forever pinned,
+    // thus attempting to pin or unpin them will not succeed and will always return false.
+    // For policies where moving is compusory, pin/unpin is impossible and will panic (is_object_pinned will return false).
+    // For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the
+    // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
+    // is currently pinned.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    </span><span class="kw">fn </span>unpin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    </span><span class="kw">fn </span>is_object_pinned(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool;
 
-    <span class="doccomment">/// Is the object reachable, determined by the policy?</span>
-    <span class="doccomment">/// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_reachable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">is_live</span>(<span class="ident">object</span>)
-    }
+    <span class="doccomment">/// Is the object movable, determined by the policy? E.g. the policy is non-moving,
+    /// or the object is pinned.
+    </span><span class="kw">fn </span>is_movable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 
-    <span class="comment">// Functions for pinning/unpining and checking if an object is pinned</span>
-    <span class="comment">// For non moving policies, all the objects are considered as forever pinned,</span>
-    <span class="comment">// thus attempting to pin or unpin them will not succeed and will always return false.</span>
-    <span class="comment">// For policies where moving is compusory, pin/unpin is impossible and will panic (is_object_pinned will return false).</span>
-    <span class="comment">// For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the</span>
-    <span class="comment">// pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object</span>
-    <span class="comment">// is currently pinned.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">pin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">unpin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_object_pinned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Is the object sane? A policy should return false if there is any abnormality about
+    /// object - the sanity checker will fail if an object is not sane.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 
-    <span class="doccomment">/// Is the object movable, determined by the policy? E.g. the policy is non-moving,</span>
-    <span class="doccomment">/// or the object is pinned.</span>
-    <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Is the object managed by MMTk? For most cases, if we find the sft for an object, that means
+    /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
+    /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
+    /// in the space contain actual MMTk objects. So they need a further check.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+        <span class="bool-val">true
+    </span>}
 
-    <span class="doccomment">/// Is the object sane? A policy should return false if there is any abnormality about</span>
-    <span class="doccomment">/// object - the sanity checker will fail if an object is not sane.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Is `addr` a valid object reference to an object allocated in this space?
+    /// This default implementation works for all spaces that use MMTk&#39;s mapper to allocate memory.
+    /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
+    /// Such spaces needs to override this method.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool;
 
-    <span class="doccomment">/// Is the object managed by MMTk? For most cases, if we find the sft for an object, that means</span>
-    <span class="doccomment">/// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,</span>
-    <span class="doccomment">/// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses</span>
-    <span class="doccomment">/// in the space contain actual MMTk objects. So they need a further check.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">true</span>
-    }
+    <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).
+    </span><span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, alloc: bool);
 
-    <span class="doccomment">/// Is `addr` a valid object reference to an object allocated in this space?</span>
-    <span class="doccomment">/// This default implementation works for all spaces that use MMTk&#39;s mapper to allocate memory.</span>
-    <span class="doccomment">/// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.</span>
-    <span class="doccomment">/// Such spaces needs to override this method.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span>;
-
-    <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).</span>
-    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
-
-    <span class="doccomment">/// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)</span>
-    <span class="doccomment">/// provides an easy way for most plans to trace objects without the need to implement any plan-specific</span>
-    <span class="doccomment">/// code. However, tracing objects for some policies are more complicated, and they do not provide an</span>
-    <span class="doccomment">/// implementation of this method. For example, mark compact space requires trace twice in each GC.</span>
-    <span class="doccomment">/// Immix has defrag trace and fast trace.</span>
-    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+    <span class="doccomment">/// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
+    /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
+    /// code. However, tracing objects for some policies are more complicated, and they do not provide an
+    /// implementation of this method. For example, mark compact space requires trace twice in each GC.
+    /// Immix has defrag trace and fast trace.
+    </span><span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="comment">// We use concrete type for `queue` because SFT doesn&#39;t support generic parameters,</span>
-        <span class="comment">// and SFTProcessEdges uses `VectorObjectQueue`.</span>
-        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">worker</span>: <span class="ident">GCWorkerMutRef</span>,
-    ) -&gt; <span class="ident">ObjectReference</span>;
+        <span class="comment">// We use concrete type for `queue` because SFT doesn&#39;t support generic parameters,
+        // and SFTProcessEdges uses `VectorObjectQueue`.
+        </span>queue: <span class="kw-2">&amp;mut </span>VectorObjectQueue,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -&gt; ObjectReference;
 }
 
-<span class="comment">// Create erased VM refs for these types that will be used in `sft_trace_object()`.</span>
-<span class="comment">// In this way, we can store the refs with &lt;VM&gt; in SFT (which cannot have parameters with generic type parameters)</span>
+<span class="comment">// Create erased VM refs for these types that will be used in `sft_trace_object()`.
+// In this way, we can store the refs with &lt;VM&gt; in SFT (which cannot have parameters with generic type parameters)
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::erase_vm::define_erased_vm_mut_ref</span>;
-<span class="macro">define_erased_vm_mut_ref!</span>(<span class="ident">GCWorkerMutRef</span> <span class="op">=</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+</span><span class="kw">use </span><span class="kw">crate</span>::util::erase_vm::define_erased_vm_mut_ref;
+<span class="macro">define_erased_vm_mut_ref!</span>(GCWorkerMutRef = GCWorker&lt;VM&gt;);
 
-<span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEBUG_SFT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
+<span class="doccomment">/// Print debug info for SFT. Should be false when committed.
+</span><span class="kw">pub const </span>DEBUG_SFT: bool = <span class="macro">cfg!</span>(debug_assertions) &amp;&amp; <span class="bool-val">false</span>;
 
-<span class="doccomment">/// An empty entry for SFT.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EmptySpaceSFT</span> {}
+<span class="doccomment">/// An empty entry for SFT.
+</span><span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>EmptySpaceSFT {}
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EMPTY_SFT_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;empty&quot;</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EMPTY_SPACE_SFT</span>: <span class="ident">EmptySpaceSFT</span> <span class="op">=</span> <span class="ident">EmptySpaceSFT</span> {};
+<span class="kw">pub const </span>EMPTY_SFT_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;empty&quot;</span>;
+<span class="kw">pub const </span>EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
-<span class="kw">impl</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">EmptySpaceSFT</span> {
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
-        <span class="ident">EMPTY_SFT_NAME</span>
+<span class="kw">impl </span>SFT <span class="kw">for </span>EmptySpaceSFT {
+    <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
+        EMPTY_SFT_NAME
     }
-    <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
         <span class="macro">panic!</span>(
             <span class="string">&quot;Called is_live() on {:x}, which maps to an empty space&quot;</span>,
-            <span class="ident">object</span>
+            object
         )
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">warn!</span>(<span class="string">&quot;Object in empty space!&quot;</span>);
-        <span class="bool-val">false</span>
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">pin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false
+    </span>}
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="macro">panic!</span>(<span class="string">&quot;Cannot pin/unpin objects of EmptySpace.&quot;</span>)
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">unpin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    </span><span class="kw">fn </span>unpin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="macro">panic!</span>(<span class="string">&quot;Cannot pin/unpin objects of EmptySpace.&quot;</span>)
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_object_pinned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">false</span>
-    }
-    <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    </span><span class="kw">fn </span>is_object_pinned(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+        <span class="bool-val">false
+    </span>}
+    <span class="kw">fn </span>is_movable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="comment">/*
          * FIXME steveb I think this should panic (ie the function should not
          * be invoked on an empty space).   However, JikesRVM currently does
@@ -337,39 +335,38 @@
          * addresses.  So until that is fixed upstream, we&#39;ll return false here.
          *
          * panic!(&quot;called is_movable() on empty space&quot;)
-         */</span>
-        <span class="bool-val">false</span>
-    }
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">false</span>
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">false</span>
-    }
+         */
+        </span><span class="bool-val">false
+    </span>}
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+        <span class="bool-val">false
+    </span>}
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+    #[inline(always)]
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
+        <span class="bool-val">false
+    </span>}
 
-    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
         <span class="macro">panic!</span>(
             <span class="string">&quot;Called initialize_object_metadata() on {:x}, which maps to an empty space&quot;</span>,
-            <span class="ident">object</span>
+            object
         )
     }
 
-    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+    <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
-    ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="comment">// We do not have the `VM` type parameter here, so we cannot forward the call to the VM.</span>
-        <span class="macro">panic!</span>(
+        _queue: <span class="kw-2">&amp;mut </span>VectorObjectQueue,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -&gt; ObjectReference {
+        <span class="comment">// We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
+        </span><span class="macro">panic!</span>(
             <span class="string">&quot;Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().&quot;</span>,
-            <span class="ident">object</span>,
+            object,
         )
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

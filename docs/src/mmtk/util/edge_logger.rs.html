@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;edge_logger.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>edge_logger.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/edge_logger.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>edge_logger.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -57,63 +55,62 @@
 <span id="55">55</span>
 <span id="56">56</span>
 <span id="57">57</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This is a simple module to log edges and check for duplicate edges.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! It uses a hash-set to keep track of edge, and is so very expensive.</span>
-<span class="doccomment">//! We currently only use this as part of the `extreme_assertions` feature.</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This is a simple module to log edges and check for duplicate edges.
+//!
+//! It uses a hash-set to keep track of edge, and is so very expensive.
+//! We currently only use this as part of the `extreme_assertions` feature.
+//!
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::edge_shape::Edge</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
-<span class="kw">use</span> <span class="ident">std::sync::RwLock</span>;
+</span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::Edge;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>std::collections::HashSet;
+<span class="kw">use </span>std::sync::RwLock;
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> {
-    <span class="comment">// A private hash-set to keep track of edges.</span>
-    <span class="ident">edge_log</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="kw">pub struct </span>EdgeLogger&lt;ES: Edge&gt; {
+    <span class="comment">// A private hash-set to keep track of edges.
+    </span>edge_log: RwLock&lt;HashSet&lt;ES&gt;&gt;,
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span> {}
+<span class="kw">unsafe impl</span>&lt;ES: Edge&gt; Sync <span class="kw">for </span>EdgeLogger&lt;ES&gt; {}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">edge_log</span>: <span class="ident">Default::default</span>(),
+<span class="kw">impl</span>&lt;ES: Edge&gt; EdgeLogger&lt;ES&gt; {
+    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            edge_log: Default::default(),
         }
     }
 
-    <span class="doccomment">/// Logs an edge.</span>
-    <span class="doccomment">/// Panics if the edge was already logged.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// * `edge` - The edge to log.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_edge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">ES</span>) {
-        <span class="macro">trace!</span>(<span class="string">&quot;log_edge({:?})&quot;</span>, <span class="ident">edge</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edge_log</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">edge_log</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
+    <span class="doccomment">/// Logs an edge.
+    /// Panics if the edge was already logged.
+    ///
+    /// # Arguments
+    ///
+    /// * `edge` - The edge to log.
+    ///
+    </span><span class="kw">pub fn </span>log_edge(<span class="kw-2">&amp;</span><span class="self">self</span>, edge: ES) {
+        <span class="macro">trace!</span>(<span class="string">&quot;log_edge({:?})&quot;</span>, edge);
+        <span class="kw">let </span><span class="kw-2">mut </span>edge_log = <span class="self">self</span>.edge_log.write().unwrap();
         <span class="macro">assert!</span>(
-            <span class="ident">edge_log</span>.<span class="ident">insert</span>(<span class="ident">edge</span>),
+            edge_log.insert(edge),
             <span class="string">&quot;duplicate edge ({:?}) detected&quot;</span>,
-            <span class="ident">edge</span>
+            edge
         );
     }
 
-    <span class="doccomment">/// Reset the edge logger by clearing the hash-set of edges.</span>
-    <span class="doccomment">/// This function is called at the end of each GC iteration.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edge_log</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">edge_log</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-        <span class="ident">edge_log</span>.<span class="ident">clear</span>();
+    <span class="doccomment">/// Reset the edge logger by clearing the hash-set of edges.
+    /// This function is called at the end of each GC iteration.
+    ///
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>edge_log = <span class="self">self</span>.edge_log.write().unwrap();
+        edge_log.clear();
     }
 }
 
-<span class="doccomment">/// Whether we should check duplicate edges. This depends on the actual plan.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_check_duplicate_edges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-    <span class="comment">// If a plan allows tracing duplicate edges, we should not run this check.</span>
-    <span class="op">!</span><span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">may_trace_duplicate_edges</span>
+<span class="doccomment">/// Whether we should check duplicate edges. This depends on the actual plan.
+</span><span class="kw">pub fn </span>should_check_duplicate_edges&lt;VM: VMBinding&gt;(plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
+    <span class="comment">// If a plan allows tracing duplicate edges, we should not run this check.
+    </span>!plan.constraints().may_trace_duplicate_edges
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;mutator_context.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutator_context.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/mutator_context.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutator_context.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -361,367 +359,366 @@
 <span id="359">359</span>
 <span id="360">360</span>
 <span id="361">361</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::Barrier</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators</span>::{<span class="ident">AllocatorSelector</span>, <span class="ident">Allocators</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+</span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::Barrier;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
+<span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
+<span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type</span> <span class="ident">SpaceMapping</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">AllocatorSelector</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>)<span class="op">&gt;</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>SpaceMapping&lt;VM&gt; = Vec&lt;(AllocatorSelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt;;
 
-<span class="comment">// This struct is part of the Mutator struct.</span>
-<span class="comment">// We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MutatorConfig</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Mapping between allocation semantics and allocator selector</span>
-    <span class="kw">pub</span> <span class="ident">allocator_mapping</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Mapping between allocator selector and spaces. Each pair represents a mapping.</span>
-    <span class="doccomment">/// Put this behind a box, so it is a pointer-sized field.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::box_collection</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">space_mapping</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">SpaceMapping</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Plan-specific code for mutator prepare. The VMWorkerThread is the worker thread that executes this prepare function.</span>
-    <span class="kw">pub</span> <span class="ident">prepare_func</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> (<span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">VMWorkerThread</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>),
-    <span class="doccomment">/// Plan-specific code for mutator release. The VMWorkerThread is the worker thread that executes this release function.</span>
-    <span class="kw">pub</span> <span class="ident">release_func</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> (<span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">VMWorkerThread</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>),
+<span class="comment">// This struct is part of the Mutator struct.
+// We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
+</span><span class="attribute">#[repr(C)]
+</span><span class="kw">pub struct </span>MutatorConfig&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Mapping between allocation semantics and allocator selector
+    </span><span class="kw">pub </span>allocator_mapping: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;,
+    <span class="doccomment">/// Mapping between allocator selector and spaces. Each pair represents a mapping.
+    /// Put this behind a box, so it is a pointer-sized field.
+    </span><span class="attribute">#[allow(clippy::box_collection)]
+    </span><span class="kw">pub </span>space_mapping: Box&lt;SpaceMapping&lt;VM&gt;&gt;,
+    <span class="doccomment">/// Plan-specific code for mutator prepare. The VMWorkerThread is the worker thread that executes this prepare function.
+    </span><span class="kw">pub </span>prepare_func: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>(<span class="kw">dyn </span>Fn(<span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, VMWorkerThread) + Send + Sync),
+    <span class="doccomment">/// Plan-specific code for mutator release. The VMWorkerThread is the worker thread that executes this release function.
+    </span><span class="kw">pub </span>release_func: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>(<span class="kw">dyn </span>Fn(<span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, VMWorkerThread) + Send + Sync),
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">std::fmt::Debug</span> <span class="kw">for</span> <span class="ident">MutatorConfig</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;MutatorConfig:\n&quot;</span>)<span class="question-mark">?</span>;
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;Semantics mapping:\n&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">for</span> (<span class="ident">semantic</span>, <span class="ident">selector</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">allocator_mapping</span>.<span class="ident">iter</span>() {
-            <span class="kw">let</span> <span class="ident">space_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>
-                .<span class="ident">space_mapping</span>
-                .<span class="ident">iter</span>()
-                .<span class="ident">find</span>(<span class="op">|</span>(<span class="ident">selector_to_find</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">selector_to_find</span> <span class="op">==</span> <span class="ident">selector</span>)
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; std::fmt::Debug <span class="kw">for </span>MutatorConfig&lt;VM&gt; {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; std::fmt::Result {
+        f.write_str(<span class="string">&quot;MutatorConfig:\n&quot;</span>)<span class="question-mark">?</span>;
+        f.write_str(<span class="string">&quot;Semantics mapping:\n&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">for </span>(semantic, selector) <span class="kw">in </span><span class="self">self</span>.allocator_mapping.iter() {
+            <span class="kw">let </span>space_name: <span class="kw-2">&amp;</span>str = <span class="kw">match </span><span class="self">self
+                </span>.space_mapping
+                .iter()
+                .find(|(selector_to_find, <span class="kw">_</span>)| selector_to_find == selector)
             {
-                <span class="prelude-val">Some</span>((<span class="kw">_</span>, <span class="ident">space</span>)) =&gt; <span class="ident">space</span>.<span class="ident">name</span>(),
-                <span class="prelude-val">None</span> =&gt; <span class="string">&quot;!!!missing space here!!!&quot;</span>,
+                <span class="prelude-val">Some</span>((<span class="kw">_</span>, space)) =&gt; space.name(),
+                <span class="prelude-val">None </span>=&gt; <span class="string">&quot;!!!missing space here!!!&quot;</span>,
             };
-            <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(
+            f.write_fmt(<span class="macro">format_args!</span>(
                 <span class="string">&quot;- {:?} = {:?} ({:?})\n&quot;</span>,
-                <span class="ident">semantic</span>, <span class="ident">selector</span>, <span class="ident">space_name</span>
+                semantic, selector, space_name
             ))<span class="question-mark">?</span>;
         }
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;Space mapping:\n&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">for</span> (<span class="ident">selector</span>, <span class="ident">space</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">space_mapping</span>.<span class="ident">iter</span>() {
-            <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;- {:?} = {:?}\n&quot;</span>, <span class="ident">selector</span>, <span class="ident">space</span>.<span class="ident">name</span>()))<span class="question-mark">?</span>;
+        f.write_str(<span class="string">&quot;Space mapping:\n&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">for </span>(selector, space) <span class="kw">in </span><span class="self">self</span>.space_mapping.iter() {
+            f.write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;- {:?} = {:?}\n&quot;</span>, selector, space.name()))<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.</span>
-<span class="doccomment">/// It is recommended for MMTk users 1) to have a mutator struct of the same layout in the thread local storage that can be accessed efficiently,</span>
-<span class="doccomment">/// and 2) to implement fastpath allocation and barriers for the mutator in the VM side.</span>
+<span class="doccomment">/// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.
+/// It is recommended for MMTk users 1) to have a mutator struct of the same layout in the thread local storage that can be accessed efficiently,
+/// and 2) to implement fastpath allocation and barriers for the mutator in the VM side.
 
-<span class="comment">// We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.</span>
-<span class="comment">// Currently Mutator is fixed sized, and we should try keep this invariant:</span>
-<span class="comment">// - Allocators are fixed-length arrays of allocators.</span>
-<span class="comment">// - MutatorConfig only has pointers/refs (including fat pointers), and is fixed sized.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">allocators</span>: <span class="ident">Allocators</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">barrier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The mutator thread that is bound with this Mutator struct.</span>
-    <span class="kw">pub</span> <span class="ident">mutator_tls</span>: <span class="ident">VMMutatorThread</span>,
-    <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">config</span>: <span class="ident">MutatorConfig</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+</span><span class="comment">// We are trying to make this struct fixed-sized so that VM bindings can easily define a type to have the exact same layout as this struct.
+// Currently Mutator is fixed sized, and we should try keep this invariant:
+// - Allocators are fixed-length arrays of allocators.
+// - MutatorConfig only has pointers/refs (including fat pointers), and is fixed sized.
+</span><span class="attribute">#[repr(C)]
+</span><span class="kw">pub struct </span>Mutator&lt;VM: VMBinding&gt; {
+    <span class="kw">pub </span>allocators: Allocators&lt;VM&gt;,
+    <span class="kw">pub </span>barrier: Box&lt;<span class="kw">dyn </span>Barrier&lt;VM&gt;&gt;,
+    <span class="doccomment">/// The mutator thread that is bound with this Mutator struct.
+    </span><span class="kw">pub </span>mutator_tls: VMMutatorThread,
+    <span class="kw">pub </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    <span class="kw">pub </span>config: MutatorConfig&lt;VM&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MutatorContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">prepare_func</span>)(<span class="self">self</span>, <span class="ident">tls</span>)
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; MutatorContext&lt;VM&gt; <span class="kw">for </span>Mutator&lt;VM&gt; {
+    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        (<span class="kw-2">*</span><span class="self">self</span>.config.prepare_func)(<span class="self">self</span>, tls)
     }
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">release_func</span>)(<span class="self">self</span>, <span class="ident">tls</span>)
+    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        (<span class="kw-2">*</span><span class="self">self</span>.config.release_func)(<span class="self">self</span>, tls)
     }
 
-    <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.</span>
-    <span class="kw">fn</span> <span class="ident">alloc</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">size</span>: <span class="ident">usize</span>,
-        <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">allocator</span>: <span class="ident">AllocationSemantics</span>,
-    ) -&gt; <span class="ident">Address</span> {
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">allocators</span>
-                .<span class="ident">get_allocator_mut</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">allocator_mapping</span>[<span class="ident">allocator</span>])
+    <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
+    </span><span class="kw">fn </span>alloc(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: isize,
+        allocator: AllocationSemantics,
+    ) -&gt; Address {
+        <span class="kw">unsafe </span>{
+            <span class="self">self</span>.allocators
+                .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
         }
-        .<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+        .alloc(size, align, offset)
     }
 
-    <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.</span>
-    <span class="kw">fn</span> <span class="ident">post_alloc</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">refer</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">_bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">allocator</span>: <span class="ident">AllocationSemantics</span>,
+    <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
+    </span><span class="kw">fn </span>post_alloc(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        refer: ObjectReference,
+        _bytes: usize,
+        allocator: AllocationSemantics,
     ) {
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">allocators</span>
-                .<span class="ident">get_allocator_mut</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">allocator_mapping</span>[<span class="ident">allocator</span>])
+        <span class="kw">unsafe </span>{
+            <span class="self">self</span>.allocators
+                .get_allocator_mut(<span class="self">self</span>.config.allocator_mapping[allocator])
         }
-        .<span class="ident">get_space</span>()
-        .<span class="ident">initialize_object_metadata</span>(<span class="ident">refer</span>, <span class="bool-val">true</span>)
+        .get_space()
+        .initialize_object_metadata(refer, <span class="bool-val">true</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMMutatorThread</span> {
-        <span class="self">self</span>.<span class="ident">mutator_tls</span>
+    <span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMMutatorThread {
+        <span class="self">self</span>.mutator_tls
     }
 
-    <span class="doccomment">/// Used by specialized barrier slow-path calls to avoid dynamic dispatches.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">barrier_impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">B</span> {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">is</span>::<span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>());
-        <span class="kw">let</span> (<span class="ident">payload</span>, <span class="ident">_vptr</span>) <span class="op">=</span> <span class="ident">std::mem::transmute</span>::<span class="op">&lt;</span><span class="kw">_</span>, (<span class="kw-2">*mut</span> <span class="ident">B</span>, <span class="kw-2">*mut</span> ())<span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">barrier</span>());
-        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">payload</span>
+    <span class="doccomment">/// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">unsafe fn </span>barrier_impl&lt;B: Barrier&lt;VM&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>B {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.barrier().is::&lt;B&gt;());
+        <span class="kw">let </span>(payload, _vptr) = std::mem::transmute::&lt;<span class="kw">_</span>, (<span class="kw-2">*mut </span>B, <span class="kw-2">*mut </span>())&gt;(<span class="self">self</span>.barrier());
+        <span class="kw-2">&amp;mut *</span>payload
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">barrier</span>
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>barrier(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Barrier&lt;VM&gt; {
+        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.barrier
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Get all the valid allocator selector (no duplicate)</span>
-    <span class="kw">fn</span> <span class="ident">get_all_allocator_selectors</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
-        <span class="kw">use</span> <span class="ident">itertools::Itertools</span>;
-        <span class="self">self</span>.<span class="ident">config</span>
-            .<span class="ident">allocator_mapping</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="kw">_</span>, <span class="ident">selector</span>)<span class="op">|</span> <span class="kw-2">*</span><span class="ident">selector</span>)
-            .<span class="ident">sorted</span>()
-            .<span class="ident">dedup</span>()
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">selector</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">selector</span> <span class="op">!</span><span class="op">=</span> <span class="ident">AllocatorSelector::None</span>)
-            .<span class="ident">collect</span>()
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Mutator&lt;VM&gt; {
+    <span class="doccomment">/// Get all the valid allocator selector (no duplicate)
+    </span><span class="kw">fn </span>get_all_allocator_selectors(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;AllocatorSelector&gt; {
+        <span class="kw">use </span>itertools::Itertools;
+        <span class="self">self</span>.config
+            .allocator_mapping
+            .iter()
+            .map(|(<span class="kw">_</span>, selector)| <span class="kw-2">*</span>selector)
+            .sorted()
+            .dedup()
+            .filter(|selector| <span class="kw-2">*</span>selector != AllocatorSelector::None)
+            .collect()
     }
 
-    <span class="doccomment">/// Inform each allocator about destroying. Call allocator-specific on destroy methods.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_destroy</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">for</span> <span class="ident">selector</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">get_all_allocator_selectors</span>() {
-            <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">allocators</span>.<span class="ident">get_allocator_mut</span>(<span class="ident">selector</span>) }.<span class="ident">on_mutator_destroy</span>();
+    <span class="doccomment">/// Inform each allocator about destroying. Call allocator-specific on destroy methods.
+    </span><span class="kw">pub fn </span>on_destroy(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">for </span>selector <span class="kw">in </span><span class="self">self</span>.get_all_allocator_selectors() {
+            <span class="kw">unsafe </span>{ <span class="self">self</span>.allocators.get_allocator_mut(selector) }.on_mutator_destroy();
         }
     }
 }
 
-<span class="doccomment">/// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed</span>
-<span class="doccomment">/// per-plan mutator implementation and we will remove this trait as well in the future.*</span>
+<span class="doccomment">/// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
+/// per-plan mutator implementation and we will remove this trait as well in the future.*
 
-<span class="comment">// TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.</span>
-<span class="comment">// The Mutator struct above is the only type that implements this trait. We should be able to merge them.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">MutatorContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
-    <span class="kw">fn</span> <span class="ident">alloc</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">size</span>: <span class="ident">usize</span>,
-        <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">allocator</span>: <span class="ident">AllocationSemantics</span>,
-    ) -&gt; <span class="ident">Address</span>;
-    <span class="kw">fn</span> <span class="ident">post_alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">refer</span>: <span class="ident">ObjectReference</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">allocator</span>: <span class="ident">AllocationSemantics</span>);
-    <span class="kw">fn</span> <span class="ident">flush_remembered_sets</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">flush</span>();
+</span><span class="comment">// TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
+// The Mutator struct above is the only type that implements this trait. We should be able to merge them.
+</span><span class="kw">pub trait </span>MutatorContext&lt;VM: VMBinding&gt;: Send + <span class="lifetime">&#39;static </span>{
+    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread);
+    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread);
+    <span class="kw">fn </span>alloc(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: isize,
+        allocator: AllocationSemantics,
+    ) -&gt; Address;
+    <span class="kw">fn </span>post_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, refer: ObjectReference, bytes: usize, allocator: AllocationSemantics);
+    <span class="kw">fn </span>flush_remembered_sets(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.barrier().flush();
     }
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">flush_remembered_sets</span>();
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.flush_remembered_sets();
     }
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMMutatorThread</span>;
-    <span class="doccomment">/// Get active barrier trait object</span>
-    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
-    <span class="doccomment">/// Force cast the barrier trait object to a concrete implementation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The safety of this function is ensured by a down-cast check.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">barrier_impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">B</span>;
+    <span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMMutatorThread;
+    <span class="doccomment">/// Get active barrier trait object
+    </span><span class="kw">fn </span>barrier(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Barrier&lt;VM&gt;;
+    <span class="doccomment">/// Force cast the barrier trait object to a concrete implementation.
+    ///
+    /// # Safety
+    /// The safety of this function is ensured by a down-cast check.
+    </span><span class="kw">unsafe fn </span>barrier_impl&lt;B: Barrier&lt;VM&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>B;
 }
 
-<span class="doccomment">/// This is used for plans to indicate the number of allocators reserved for the plan.</span>
-<span class="doccomment">/// This is used as a parameter for creating allocator/space mapping.</span>
-<span class="doccomment">/// A plan is required to reserve the first few allocators. For example, if n_bump_pointer is 1,</span>
-<span class="doccomment">/// it means the first bump pointer allocator will be reserved for the plan (and the plan should</span>
-<span class="doccomment">/// initialize its mapping itself), and the spaces in common/base plan will use the following bump</span>
-<span class="doccomment">/// pointer allocators.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">ReservedAllocators</span> {
-    <span class="kw">pub</span> <span class="ident">n_bump_pointer</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">n_large_object</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">n_malloc</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">n_immix</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">n_mark_compact</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">n_free_list</span>: <span class="ident">u8</span>,
+<span class="doccomment">/// This is used for plans to indicate the number of allocators reserved for the plan.
+/// This is used as a parameter for creating allocator/space mapping.
+/// A plan is required to reserve the first few allocators. For example, if n_bump_pointer is 1,
+/// it means the first bump pointer allocator will be reserved for the plan (and the plan should
+/// initialize its mapping itself), and the spaces in common/base plan will use the following bump
+/// pointer allocators.
+</span><span class="attribute">#[allow(dead_code)]
+#[derive(Default)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ReservedAllocators {
+    <span class="kw">pub </span>n_bump_pointer: u8,
+    <span class="kw">pub </span>n_large_object: u8,
+    <span class="kw">pub </span>n_malloc: u8,
+    <span class="kw">pub </span>n_immix: u8,
+    <span class="kw">pub </span>n_mark_compact: u8,
+    <span class="kw">pub </span>n_free_list: u8,
 }
 
-<span class="kw">impl</span> <span class="ident">ReservedAllocators</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT</span>: <span class="self">Self</span> <span class="op">=</span> <span class="ident">ReservedAllocators</span> {
-        <span class="ident">n_bump_pointer</span>: <span class="number">0</span>,
-        <span class="ident">n_large_object</span>: <span class="number">0</span>,
-        <span class="ident">n_malloc</span>: <span class="number">0</span>,
-        <span class="ident">n_immix</span>: <span class="number">0</span>,
-        <span class="ident">n_mark_compact</span>: <span class="number">0</span>,
-        <span class="ident">n_free_list</span>: <span class="number">0</span>,
+<span class="kw">impl </span>ReservedAllocators {
+    <span class="kw">pub const </span>DEFAULT: <span class="self">Self </span>= ReservedAllocators {
+        n_bump_pointer: <span class="number">0</span>,
+        n_large_object: <span class="number">0</span>,
+        n_malloc: <span class="number">0</span>,
+        n_immix: <span class="number">0</span>,
+        n_mark_compact: <span class="number">0</span>,
+        n_free_list: <span class="number">0</span>,
     };
-    <span class="doccomment">/// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.</span>
-    <span class="kw">fn</span> <span class="ident">validate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators</span>::<span class="kw-2">*</span>;
+    <span class="doccomment">/// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.
+    </span><span class="kw">fn </span>validate(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::<span class="kw-2">*</span>;
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">n_bump_pointer</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_BUMP_ALLOCATORS</span>,
-            <span class="string">&quot;Allocator mapping declared more bump pointer allocators than the max allowed.&quot;</span>
-        );
+            <span class="self">self</span>.n_bump_pointer <span class="kw">as </span>usize &lt;= MAX_BUMP_ALLOCATORS,
+            <span class="string">&quot;Allocator mapping declared more bump pointer allocators than the max allowed.&quot;
+        </span>);
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">n_large_object</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_LARGE_OBJECT_ALLOCATORS</span>,
-            <span class="string">&quot;Allocator mapping declared more large object allocators than the max allowed.&quot;</span>
-        );
+            <span class="self">self</span>.n_large_object <span class="kw">as </span>usize &lt;= MAX_LARGE_OBJECT_ALLOCATORS,
+            <span class="string">&quot;Allocator mapping declared more large object allocators than the max allowed.&quot;
+        </span>);
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">n_malloc</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_MALLOC_ALLOCATORS</span>,
-            <span class="string">&quot;Allocator mapping declared more malloc allocators than the max allowed.&quot;</span>
-        );
+            <span class="self">self</span>.n_malloc <span class="kw">as </span>usize &lt;= MAX_MALLOC_ALLOCATORS,
+            <span class="string">&quot;Allocator mapping declared more malloc allocators than the max allowed.&quot;
+        </span>);
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">n_immix</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_IMMIX_ALLOCATORS</span>,
-            <span class="string">&quot;Allocator mapping declared more immix allocators than the max allowed.&quot;</span>
-        );
+            <span class="self">self</span>.n_immix <span class="kw">as </span>usize &lt;= MAX_IMMIX_ALLOCATORS,
+            <span class="string">&quot;Allocator mapping declared more immix allocators than the max allowed.&quot;
+        </span>);
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">n_mark_compact</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_MARK_COMPACT_ALLOCATORS</span>,
-            <span class="string">&quot;Allocator mapping declared more mark compact allocators than the max allowed.&quot;</span>
-        );
+            <span class="self">self</span>.n_mark_compact <span class="kw">as </span>usize &lt;= MAX_MARK_COMPACT_ALLOCATORS,
+            <span class="string">&quot;Allocator mapping declared more mark compact allocators than the max allowed.&quot;
+        </span>);
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">n_free_list</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_FREE_LIST_ALLOCATORS</span>,
-            <span class="string">&quot;Allocator mapping declared more free list allocators than the max allowed.&quot;</span>
-        );
+            <span class="self">self</span>.n_free_list <span class="kw">as </span>usize &lt;= MAX_FREE_LIST_ALLOCATORS,
+            <span class="string">&quot;Allocator mapping declared more free list allocators than the max allowed.&quot;
+        </span>);
     }
 }
 
-<span class="doccomment">/// Create an allocator mapping for spaces in Common/BasePlan for a plan. A plan should reserve its own allocators.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `reserved`: the number of reserved allocators for the plan specific policies.</span>
-<span class="doccomment">/// * `include_common_plan`: whether the plan uses common plan. If a plan uses CommonPlan, we will initialize allocator mapping for spaces in CommonPlan.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">create_allocator_mapping</span>(
-    <span class="kw-2">mut</span> <span class="ident">reserved</span>: <span class="ident">ReservedAllocators</span>,
-    <span class="ident">include_common_plan</span>: <span class="ident">bool</span>,
-) -&gt; <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
-    <span class="comment">// If we need to add new allocators, or new spaces, we need to make sure the allocator we assign here matches the allocator</span>
-    <span class="comment">// we used in create_space_mapping(). The easiest way is to add the space/allocator mapping in the same order. So for any modification to this</span>
-    <span class="comment">// function, please check the other function.</span>
+<span class="doccomment">/// Create an allocator mapping for spaces in Common/BasePlan for a plan. A plan should reserve its own allocators.
+///
+/// # Arguments
+/// * `reserved`: the number of reserved allocators for the plan specific policies.
+/// * `include_common_plan`: whether the plan uses common plan. If a plan uses CommonPlan, we will initialize allocator mapping for spaces in CommonPlan.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>create_allocator_mapping(
+    <span class="kw-2">mut </span>reserved: ReservedAllocators,
+    include_common_plan: bool,
+) -&gt; EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
+    <span class="comment">// If we need to add new allocators, or new spaces, we need to make sure the allocator we assign here matches the allocator
+    // we used in create_space_mapping(). The easiest way is to add the space/allocator mapping in the same order. So for any modification to this
+    // function, please check the other function.
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">EnumMap</span>::<span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span><span class="ident">::default</span>();
+    </span><span class="kw">let </span><span class="kw-2">mut </span>map = EnumMap::&lt;AllocationSemantics, AllocatorSelector&gt;::default();
 
-    <span class="comment">// spaces in base plan</span>
+    <span class="comment">// spaces in base plan
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-    {
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::Code</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>);
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+    </span>{
+        map[AllocationSemantics::Code] = AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += <span class="number">1</span>;
 
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::LargeCode</span>] <span class="op">=</span>
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>);
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        map[AllocationSemantics::LargeCode] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
-    {
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::ReadOnly</span>] <span class="op">=</span>
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>);
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+    </span>{
+        map[AllocationSemantics::ReadOnly] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
-    <span class="comment">// spaces in common plan</span>
+    <span class="comment">// spaces in common plan
 
-    <span class="kw">if</span> <span class="ident">include_common_plan</span> {
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::Immortal</span>] <span class="op">=</span>
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>);
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+    </span><span class="kw">if </span>include_common_plan {
+        map[AllocationSemantics::Immortal] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += <span class="number">1</span>;
 
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::Los</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::LargeObject</span>(<span class="ident">reserved</span>.<span class="ident">n_large_object</span>);
-        <span class="ident">reserved</span>.<span class="ident">n_large_object</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
+        reserved.n_large_object += <span class="number">1</span>;
 
-        <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.</span>
-        <span class="ident">map</span>[<span class="ident">AllocationSemantics::NonMoving</span>] <span class="op">=</span>
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>);
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.
+        </span>map[AllocationSemantics::NonMoving] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
-    <span class="ident">reserved</span>.<span class="ident">validate</span>();
-    <span class="ident">map</span>
+    reserved.validate();
+    map
 }
 
-<span class="doccomment">/// Create a space mapping for spaces in Common/BasePlan for a plan. A plan should reserve its own allocators.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `reserved`: the number of reserved allocators for the plan specific policies.</span>
-<span class="doccomment">/// * `include_common_plan`: whether the plan uses common plan. If a plan uses CommonPlan, we will initialize allocator mapping for spaces in CommonPlan.</span>
-<span class="doccomment">/// * `plan`: the reference to the plan.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">create_space_mapping</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="kw-2">mut</span> <span class="ident">reserved</span>: <span class="ident">ReservedAllocators</span>,
-    <span class="ident">include_common_plan</span>: <span class="ident">bool</span>,
-    <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">AllocatorSelector</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
-    <span class="comment">// If we need to add new allocators, or new spaces, we need to make sure the allocator we assign here matches the allocator</span>
-    <span class="comment">// we used in create_space_mapping(). The easiest way is to add the space/allocator mapping in the same order. So for any modification to this</span>
-    <span class="comment">// function, please check the other function.</span>
+<span class="doccomment">/// Create a space mapping for spaces in Common/BasePlan for a plan. A plan should reserve its own allocators.
+///
+/// # Arguments
+/// * `reserved`: the number of reserved allocators for the plan specific policies.
+/// * `include_common_plan`: whether the plan uses common plan. If a plan uses CommonPlan, we will initialize allocator mapping for spaces in CommonPlan.
+/// * `plan`: the reference to the plan.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>create_space_mapping&lt;VM: VMBinding&gt;(
+    <span class="kw-2">mut </span>reserved: ReservedAllocators,
+    include_common_plan: bool,
+    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+) -&gt; Vec&lt;(AllocatorSelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt; {
+    <span class="comment">// If we need to add new allocators, or new spaces, we need to make sure the allocator we assign here matches the allocator
+    // we used in create_space_mapping(). The easiest way is to add the space/allocator mapping in the same order. So for any modification to this
+    // function, please check the other function.
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">AllocatorSelector</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+    </span><span class="kw">let </span><span class="kw-2">mut </span>vec: Vec&lt;(AllocatorSelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt; = <span class="macro">vec!</span>[];
 
-    <span class="comment">// spaces in BasePlan</span>
+    <span class="comment">// spaces in BasePlan
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-    {
-        <span class="ident">vec</span>.<span class="ident">push</span>((
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>),
-            <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">code_space</span>,
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+    </span>{
+        vec.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            <span class="kw-2">&amp;</span>plan.base().code_space,
         ));
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">vec</span>.<span class="ident">push</span>((
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>),
-            <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">code_lo_space</span>,
+        reserved.n_bump_pointer += <span class="number">1</span>;
+        vec.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            <span class="kw-2">&amp;</span>plan.base().code_lo_space,
         ));
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
-    {
-        <span class="ident">vec</span>.<span class="ident">push</span>((
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>),
-            <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">ro_space</span>,
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+    </span>{
+        vec.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            <span class="kw-2">&amp;</span>plan.base().ro_space,
         ));
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
-    <span class="comment">// spaces in CommonPlan</span>
+    <span class="comment">// spaces in CommonPlan
 
-    <span class="kw">if</span> <span class="ident">include_common_plan</span> {
-        <span class="ident">vec</span>.<span class="ident">push</span>((
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>),
-            <span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">get_immortal</span>(),
+    </span><span class="kw">if </span>include_common_plan {
+        vec.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            plan.common().get_immortal(),
         ));
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">vec</span>.<span class="ident">push</span>((
-            <span class="ident">AllocatorSelector::LargeObject</span>(<span class="ident">reserved</span>.<span class="ident">n_large_object</span>),
-            <span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">get_los</span>(),
+        reserved.n_bump_pointer += <span class="number">1</span>;
+        vec.push((
+            AllocatorSelector::LargeObject(reserved.n_large_object),
+            plan.common().get_los(),
         ));
-        <span class="ident">reserved</span>.<span class="ident">n_large_object</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.</span>
-        <span class="ident">vec</span>.<span class="ident">push</span>((
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>),
-            <span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">get_nonmoving</span>(),
+        reserved.n_large_object += <span class="number">1</span>;
+        <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.
+        </span>vec.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            plan.common().get_nonmoving(),
         ));
-        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        reserved.n_bump_pointer += <span class="number">1</span>;
     }
 
-    <span class="ident">reserved</span>.<span class="ident">validate</span>();
-    <span class="ident">vec</span>
+    reserved.validate();
+    vec
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

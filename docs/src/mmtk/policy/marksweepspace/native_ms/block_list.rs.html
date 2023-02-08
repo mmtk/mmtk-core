@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;marksweepspace&#x2F;native_ms&#x2F;block_list.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block_list.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/marksweepspace/native_ms/block_list.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block_list.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -322,328 +320,327 @@
 <span id="320">320</span>
 <span id="321">321</span>
 <span id="322">322</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::Block</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocator</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::Region</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::Block;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator;
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>std::sync::atomic::AtomicBool;
+<span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="doccomment">/// List of blocks owned by the allocator</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BlockList</span> {
-    <span class="kw">pub</span> <span class="ident">first</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">last</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="kw">pub</span> <span class="ident">lock</span>: <span class="ident">AtomicBool</span>,
+<span class="doccomment">/// List of blocks owned by the allocator
+</span><span class="attribute">#[derive(Debug)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>BlockList {
+    <span class="kw">pub </span>first: <span class="prelude-ty">Option</span>&lt;Block&gt;,
+    <span class="kw">pub </span>last: <span class="prelude-ty">Option</span>&lt;Block&gt;,
+    <span class="kw">pub </span>size: usize,
+    <span class="kw">pub </span>lock: AtomicBool,
 }
 
-<span class="kw">impl</span> <span class="ident">BlockList</span> {
-    <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">BlockList</span> {
-        <span class="ident">BlockList</span> {
-            <span class="ident">first</span>: <span class="prelude-val">None</span>,
-            <span class="ident">last</span>: <span class="prelude-val">None</span>,
-            <span class="ident">size</span>,
-            <span class="ident">lock</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+<span class="kw">impl </span>BlockList {
+    <span class="kw">const fn </span>new(size: usize) -&gt; BlockList {
+        BlockList {
+            first: <span class="prelude-val">None</span>,
+            last: <span class="prelude-val">None</span>,
+            size,
+            lock: AtomicBool::new(<span class="bool-val">false</span>),
         }
     }
 
-    <span class="doccomment">/// List has no blocks</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">first</span>.<span class="ident">is_none</span>()
+    <span class="doccomment">/// List has no blocks
+    </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.first.is_none()
     }
 
-    <span class="doccomment">/// Remove a block from the list</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">block</span>: <span class="ident">Block</span>) {
-        <span class="kw">match</span> (<span class="ident">block</span>.<span class="ident">load_prev_block</span>(), <span class="ident">block</span>.<span class="ident">load_next_block</span>()) {
+    <span class="doccomment">/// Remove a block from the list
+    </span><span class="kw">pub fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, block: Block) {
+        <span class="kw">match </span>(block.load_prev_block(), block.load_next_block()) {
             (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+                <span class="self">self</span>.first = <span class="prelude-val">None</span>;
+                <span class="self">self</span>.last = <span class="prelude-val">None</span>;
             }
-            (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">next</span>)) =&gt; {
-                <span class="ident">next</span>.<span class="ident">clear_prev_block</span>();
-                <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>);
-                <span class="ident">next</span>.<span class="ident">store_block_list</span>(<span class="self">self</span>);
+            (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(next)) =&gt; {
+                next.clear_prev_block();
+                <span class="self">self</span>.first = <span class="prelude-val">Some</span>(next);
+                next.store_block_list(<span class="self">self</span>);
             }
-            (<span class="prelude-val">Some</span>(<span class="ident">prev</span>), <span class="prelude-val">None</span>) =&gt; {
-                <span class="ident">prev</span>.<span class="ident">clear_next_block</span>();
-                <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">prev</span>);
-                <span class="ident">prev</span>.<span class="ident">store_block_list</span>(<span class="self">self</span>);
+            (<span class="prelude-val">Some</span>(prev), <span class="prelude-val">None</span>) =&gt; {
+                prev.clear_next_block();
+                <span class="self">self</span>.last = <span class="prelude-val">Some</span>(prev);
+                prev.store_block_list(<span class="self">self</span>);
             }
-            (<span class="prelude-val">Some</span>(<span class="ident">prev</span>), <span class="prelude-val">Some</span>(<span class="ident">next</span>)) =&gt; {
-                <span class="ident">prev</span>.<span class="ident">store_next_block</span>(<span class="ident">next</span>);
-                <span class="ident">next</span>.<span class="ident">store_prev_block</span>(<span class="ident">prev</span>);
+            (<span class="prelude-val">Some</span>(prev), <span class="prelude-val">Some</span>(next)) =&gt; {
+                prev.store_next_block(next);
+                next.store_prev_block(prev);
             }
         }
     }
 
-    <span class="doccomment">/// Pop the first block in the list</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">head</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">first</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>) <span class="op">=</span> <span class="ident">head</span>.<span class="ident">load_next_block</span>() {
-                <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>);
-                <span class="ident">next</span>.<span class="ident">clear_prev_block</span>();
-                <span class="ident">next</span>.<span class="ident">store_block_list</span>(<span class="self">self</span>);
-            } <span class="kw">else</span> {
-                <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="doccomment">/// Pop the first block in the list
+    </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(head) = <span class="self">self</span>.first {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(next) = head.load_next_block() {
+                <span class="self">self</span>.first = <span class="prelude-val">Some</span>(next);
+                next.clear_prev_block();
+                next.store_block_list(<span class="self">self</span>);
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.first = <span class="prelude-val">None</span>;
+                <span class="self">self</span>.last = <span class="prelude-val">None</span>;
             }
-            <span class="ident">head</span>.<span class="ident">clear_next_block</span>();
-            <span class="ident">head</span>.<span class="ident">clear_prev_block</span>();
-            <span class="prelude-val">Some</span>(<span class="ident">head</span>)
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+            head.clear_next_block();
+            head.clear_prev_block();
+            <span class="prelude-val">Some</span>(head)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 
-    <span class="doccomment">/// Push block to the front of the list</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">block</span>: <span class="ident">Block</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_empty</span>() {
-            <span class="ident">block</span>.<span class="ident">clear_next_block</span>();
-            <span class="ident">block</span>.<span class="ident">clear_prev_block</span>();
-            <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>);
-            <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>);
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">self_head</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>();
-            <span class="ident">block</span>.<span class="ident">store_next_block</span>(<span class="ident">self_head</span>);
-            <span class="ident">self_head</span>.<span class="ident">store_prev_block</span>(<span class="ident">block</span>);
-            <span class="ident">block</span>.<span class="ident">clear_prev_block</span>();
-            <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>);
+    <span class="doccomment">/// Push block to the front of the list
+    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, block: Block) {
+        <span class="kw">if </span><span class="self">self</span>.is_empty() {
+            block.clear_next_block();
+            block.clear_prev_block();
+            <span class="self">self</span>.first = <span class="prelude-val">Some</span>(block);
+            <span class="self">self</span>.last = <span class="prelude-val">Some</span>(block);
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>self_head = <span class="self">self</span>.first.unwrap();
+            block.store_next_block(self_head);
+            self_head.store_prev_block(block);
+            block.clear_prev_block();
+            <span class="self">self</span>.first = <span class="prelude-val">Some</span>(block);
         }
-        <span class="ident">block</span>.<span class="ident">store_block_list</span>(<span class="self">self</span>);
+        block.store_block_list(<span class="self">self</span>);
     }
 
-    <span class="doccomment">/// Moves all the blocks of `other` into `self`, leaving `other` empty.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BlockList</span>) {
-        <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">other</span>.<span class="ident">size</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">other</span>.<span class="ident">is_empty</span>() {
+    <span class="doccomment">/// Moves all the blocks of `other` into `self`, leaving `other` empty.
+    </span><span class="kw">pub fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;mut </span>BlockList) {
+        <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.size, other.size);
+        <span class="kw">if </span>!other.is_empty() {
             <span class="macro">debug_assert!</span>(
-                <span class="ident">other</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>().<span class="ident">load_prev_block</span>().<span class="ident">is_none</span>(),
+                other.first.unwrap().load_prev_block().is_none(),
                 <span class="string">&quot;The other list&#39;s head has prev block: prev{} -&gt; head{}&quot;</span>,
-                <span class="ident">other</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>().<span class="ident">load_prev_block</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>(),
-                <span class="ident">other</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>().<span class="ident">start</span>()
+                other.first.unwrap().load_prev_block().unwrap().start(),
+                other.first.unwrap().start()
             );
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_empty</span>() {
-                <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">first</span>;
-                <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">last</span>;
-            } <span class="kw">else</span> {
+            <span class="kw">if </span><span class="self">self</span>.is_empty() {
+                <span class="self">self</span>.first = other.first;
+                <span class="self">self</span>.last = other.last;
+            } <span class="kw">else </span>{
                 <span class="macro">debug_assert!</span>(
-                    <span class="self">self</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>().<span class="ident">load_prev_block</span>().<span class="ident">is_none</span>(),
+                    <span class="self">self</span>.first.unwrap().load_prev_block().is_none(),
                     <span class="string">&quot;Current list&#39;s head has prev block: prev{} -&gt; head{}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>().<span class="ident">load_prev_block</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>(),
-                    <span class="self">self</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>().<span class="ident">start</span>()
+                    <span class="self">self</span>.first.unwrap().load_prev_block().unwrap().start(),
+                    <span class="self">self</span>.first.unwrap().start()
                 );
-                <span class="kw">let</span> <span class="ident">self_tail</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">last</span>.<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">other_head</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">first</span>.<span class="ident">unwrap</span>();
-                <span class="ident">self_tail</span>.<span class="ident">store_next_block</span>(<span class="ident">other_head</span>);
-                <span class="ident">other_head</span>.<span class="ident">store_prev_block</span>(<span class="ident">self_tail</span>);
-                <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">last</span>;
+                <span class="kw">let </span>self_tail = <span class="self">self</span>.last.unwrap();
+                <span class="kw">let </span>other_head = other.first.unwrap();
+                self_tail.store_next_block(other_head);
+                other_head.store_prev_block(self_tail);
+                <span class="self">self</span>.last = other.last;
             }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">first</span>;
-            <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="ident">cursor</span> {
-                <span class="ident">block</span>.<span class="ident">store_block_list</span>(<span class="self">self</span>);
-                <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">load_next_block</span>();
+            <span class="kw">let </span><span class="kw-2">mut </span>cursor = other.first;
+            <span class="kw">while let </span><span class="prelude-val">Some</span>(block) = cursor {
+                block.store_block_list(<span class="self">self</span>);
+                cursor = block.load_next_block();
             }
-            <span class="ident">other</span>.<span class="ident">reset</span>();
+            other.reset();
         }
     }
 
-    <span class="doccomment">/// Remove all blocks</span>
-    <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">first</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="doccomment">/// Remove all blocks
+    </span><span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.first = <span class="prelude-val">None</span>;
+        <span class="self">self</span>.last = <span class="prelude-val">None</span>;
     }
 
-    <span class="doccomment">/// Lock the list. The MiMalloc allocator mostly uses thread-local block lists, and those operations on the list</span>
-    <span class="doccomment">/// do not need synchronisation. However, in cases where a block list may be accessed by multiple threads, we need</span>
-    <span class="doccomment">/// to lock the list before accessing it.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Our current sole use for locking is parallel sweeping. During the Release phase, multiple GC worker threads can</span>
-    <span class="doccomment">/// sweep chunks and release mutators at the same time, and the same `BlockList` can be reached by traversing blocks in a chunk,</span>
-    <span class="doccomment">/// and also by traversing blocks held by a mutator.  This lock is necessary to prevent</span>
-    <span class="doccomment">/// multiple GC workers from mutating the same `BlockList` instance.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">success</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">while</span> <span class="op">!</span><span class="ident">success</span> {
-            <span class="ident">success</span> <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">lock</span>
-                .<span class="ident">compare_exchange</span>(<span class="bool-val">false</span>, <span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>, <span class="ident">Ordering::SeqCst</span>)
-                .<span class="ident">is_ok</span>();
+    <span class="doccomment">/// Lock the list. The MiMalloc allocator mostly uses thread-local block lists, and those operations on the list
+    /// do not need synchronisation. However, in cases where a block list may be accessed by multiple threads, we need
+    /// to lock the list before accessing it.
+    ///
+    /// Our current sole use for locking is parallel sweeping. During the Release phase, multiple GC worker threads can
+    /// sweep chunks and release mutators at the same time, and the same `BlockList` can be reached by traversing blocks in a chunk,
+    /// and also by traversing blocks held by a mutator.  This lock is necessary to prevent
+    /// multiple GC workers from mutating the same `BlockList` instance.
+    </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>success = <span class="bool-val">false</span>;
+        <span class="kw">while </span>!success {
+            success = <span class="self">self
+                </span>.lock
+                .compare_exchange(<span class="bool-val">false</span>, <span class="bool-val">true</span>, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok();
         }
     }
 
-    <span class="doccomment">/// Unlock list. See the comments on the lock method.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Unlock list. See the comments on the lock method.
+    </span><span class="kw">pub fn </span>unlock(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.lock.store(<span class="bool-val">false</span>, Ordering::SeqCst);
     }
 }
 
-<span class="doccomment">/// Log2 of pointer size</span>
-<span class="kw">const</span> <span class="ident">MI_INTPTR_SHIFT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_ADDRESS</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="doccomment">/// pointer size in bytes</span>
-<span class="kw">const</span> <span class="ident">MI_INTPTR_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">MI_INTPTR_SHIFT</span>;
-<span class="doccomment">/// pointer size in bits</span>
-<span class="kw">const</span> <span class="ident">MI_INTPTR_BITS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MI_INTPTR_SIZE</span> <span class="op">*</span> <span class="number">8</span>;
-<span class="doccomment">/// Number of bins in BlockLists. Reserve bin0 as an empty bin.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">MI_BIN_FULL</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MAX_BIN</span> <span class="op">+</span> <span class="number">1</span>;
-<span class="doccomment">/// The largest valid bin.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">MAX_BIN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">48</span>;
+<span class="doccomment">/// Log2 of pointer size
+</span><span class="kw">const </span>MI_INTPTR_SHIFT: usize = <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize;
+<span class="doccomment">/// pointer size in bytes
+</span><span class="kw">const </span>MI_INTPTR_SIZE: usize = <span class="number">1 </span>&lt;&lt; MI_INTPTR_SHIFT;
+<span class="doccomment">/// pointer size in bits
+</span><span class="kw">const </span>MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * <span class="number">8</span>;
+<span class="doccomment">/// Number of bins in BlockLists. Reserve bin0 as an empty bin.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MI_BIN_FULL: usize = MAX_BIN + <span class="number">1</span>;
+<span class="doccomment">/// The largest valid bin.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MAX_BIN: usize = <span class="number">48</span>;
 
-<span class="doccomment">/// Largest object size allowed with our mimalloc implementation, in bytes</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">MI_LARGE_OBJ_SIZE_MAX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MAX_BIN_SIZE</span>;
-<span class="doccomment">/// Largest object size in words</span>
-<span class="kw">const</span> <span class="ident">MI_LARGE_OBJ_WSIZE_MAX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MI_LARGE_OBJ_SIZE_MAX</span> <span class="op">/</span> <span class="ident">MI_INTPTR_SIZE</span>;
-<span class="doccomment">/// The object size for the last bin. We should not try allocate objects larger than this with the allocator.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">MAX_BIN_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8192</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>;
+<span class="doccomment">/// Largest object size allowed with our mimalloc implementation, in bytes
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MI_LARGE_OBJ_SIZE_MAX: usize = MAX_BIN_SIZE;
+<span class="doccomment">/// Largest object size in words
+</span><span class="kw">const </span>MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
+<span class="doccomment">/// The object size for the last bin. We should not try allocate objects larger than this with the allocator.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MAX_BIN_SIZE: usize = <span class="number">8192 </span>* MI_INTPTR_SIZE;
 
-<span class="doccomment">/// All the bins for the block lists</span>
-<span class="comment">// Each block list takes roughly 8bytes * 4 * 49 = 1658 bytes. It is more reasonable to heap allocate them, and</span>
-<span class="comment">// just put them behind a boxed pointer.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">BlockLists</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">BlockList</span>; <span class="ident">MAX_BIN</span> <span class="op">+</span> <span class="number">1</span>]<span class="op">&gt;</span>;
+<span class="doccomment">/// All the bins for the block lists
+</span><span class="comment">// Each block list takes roughly 8bytes * 4 * 49 = 1658 bytes. It is more reasonable to heap allocate them, and
+// just put them behind a boxed pointer.
+</span><span class="kw">pub type </span>BlockLists = Box&lt;[BlockList; MAX_BIN + <span class="number">1</span>]&gt;;
 
-<span class="doccomment">/// Create an empty set of block lists of different size classes (bins)</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">new_empty_block_lists</span>() -&gt; <span class="ident">BlockLists</span> {
-    <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">Box::new</span>([
-        <span class="ident">BlockList::new</span>(<span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">2</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">3</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">4</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">5</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">6</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">7</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">8</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>), <span class="comment">/* 8 */</span>
-        <span class="ident">BlockList::new</span>(<span class="number">10</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">12</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">14</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">16</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">20</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">24</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">28</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">32</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>), <span class="comment">/* 16 */</span>
-        <span class="ident">BlockList::new</span>(<span class="number">40</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">48</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">56</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">64</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">80</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">96</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">112</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">128</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>), <span class="comment">/* 24 */</span>
-        <span class="ident">BlockList::new</span>(<span class="number">160</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">192</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">224</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">256</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">320</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">384</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">448</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">512</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>), <span class="comment">/* 32 */</span>
-        <span class="ident">BlockList::new</span>(<span class="number">640</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">768</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">896</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">1024</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">1280</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">1536</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">1792</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">2048</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>), <span class="comment">/* 40 */</span>
-        <span class="ident">BlockList::new</span>(<span class="number">2560</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">3072</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">3584</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">4096</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">5120</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">6144</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">7168</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>),
-        <span class="ident">BlockList::new</span>(<span class="number">8192</span> <span class="op">*</span> <span class="ident">MI_INTPTR_SIZE</span>), <span class="comment">/* 48 */</span>
-    ]);
+<span class="doccomment">/// Create an empty set of block lists of different size classes (bins)
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new_empty_block_lists() -&gt; BlockLists {
+    <span class="kw">let </span>ret = Box::new([
+        BlockList::new(MI_INTPTR_SIZE),
+        BlockList::new(MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">2 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">3 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">4 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">5 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">6 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">7 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">8 </span>* MI_INTPTR_SIZE), <span class="comment">/* 8 */
+        </span>BlockList::new(<span class="number">10 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">12 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">14 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">16 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">20 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">24 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">28 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">32 </span>* MI_INTPTR_SIZE), <span class="comment">/* 16 */
+        </span>BlockList::new(<span class="number">40 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">48 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">56 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">64 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">80 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">96 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">112 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">128 </span>* MI_INTPTR_SIZE), <span class="comment">/* 24 */
+        </span>BlockList::new(<span class="number">160 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">192 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">224 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">256 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">320 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">384 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">448 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">512 </span>* MI_INTPTR_SIZE), <span class="comment">/* 32 */
+        </span>BlockList::new(<span class="number">640 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">768 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">896 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">1024 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">1280 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">1536 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">1792 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">2048 </span>* MI_INTPTR_SIZE), <span class="comment">/* 40 */
+        </span>BlockList::new(<span class="number">2560 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">3072 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">3584 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">4096 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">5120 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">6144 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">7168 </span>* MI_INTPTR_SIZE),
+        BlockList::new(<span class="number">8192 </span>* MI_INTPTR_SIZE), <span class="comment">/* 48 */
+    </span>]);
 
     <span class="macro">debug_assert_eq!</span>(
-        <span class="ident">ret</span>[<span class="ident">MAX_BIN</span>].<span class="ident">size</span>, <span class="ident">MAX_BIN_SIZE</span>,
+        ret[MAX_BIN].size, MAX_BIN_SIZE,
         <span class="string">&quot;MAX_BIN_SIZE = {}, actual max bin size  = {}, please update the constants&quot;</span>,
-        <span class="ident">MAX_BIN_SIZE</span>, <span class="ident">ret</span>[<span class="ident">MAX_BIN</span>].<span class="ident">size</span>
+        MAX_BIN_SIZE, ret[MAX_BIN].size
     );
 
-    <span class="ident">ret</span>
+    ret
 }
 
-<span class="doccomment">/// Returns how many pages the block lists uses.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">pages_used_by_blocklists</span>(<span class="ident">lists</span>: <span class="kw-2">&amp;</span><span class="ident">BlockLists</span>) -&gt; <span class="ident">usize</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pages</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">for</span> <span class="ident">bin</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="ident">MAX_BIN</span> {
-        <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">lists</span>[<span class="ident">bin</span>];
+<span class="doccomment">/// Returns how many pages the block lists uses.
+</span><span class="attribute">#[allow(unused)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>pages_used_by_blocklists(lists: <span class="kw-2">&amp;</span>BlockLists) -&gt; usize {
+    <span class="kw">let </span><span class="kw-2">mut </span>pages = <span class="number">0</span>;
+    <span class="kw">for </span>bin <span class="kw">in </span><span class="number">1</span>..=MAX_BIN {
+        <span class="kw">let </span>list = <span class="kw-2">&amp;</span>lists[bin];
 
-        <span class="comment">// walk the blocks</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">list</span>.<span class="ident">first</span>;
-        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="ident">cursor</span> {
-            <span class="ident">pages</span> <span class="op">+</span><span class="op">=</span> <span class="ident">Block::BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE</span>;
-            <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">load_next_block</span>();
+        <span class="comment">// walk the blocks
+        </span><span class="kw">let </span><span class="kw-2">mut </span>cursor = list.first;
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(block) = cursor {
+            pages += Block::BYTES &gt;&gt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
+            cursor = block.load_next_block();
         }
     }
 
-    <span class="ident">pages</span>
+    pages
 }
 
-<span class="doccomment">/// Align a byte size to a size in machine words</span>
-<span class="doccomment">/// i.e. byte size == `wsize*sizeof(void*)`</span>
-<span class="doccomment">/// adapted from _mi_wsize_from_size in mimalloc</span>
-<span class="kw">fn</span> <span class="ident">mi_wsize_from_size</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    (<span class="ident">size</span> <span class="op">+</span> <span class="ident">MI_INTPTR_SIZE</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">/</span> <span class="ident">MI_INTPTR_SIZE</span>
+<span class="doccomment">/// Align a byte size to a size in machine words
+/// i.e. byte size == `wsize*sizeof(void*)`
+/// adapted from _mi_wsize_from_size in mimalloc
+</span><span class="kw">fn </span>mi_wsize_from_size(size: usize) -&gt; usize {
+    (size + MI_INTPTR_SIZE - <span class="number">1</span>) / MI_INTPTR_SIZE
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mi_bin</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">allocator::get_maximum_aligned_size</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span>, <span class="ident">align</span>);
-    <span class="ident">mi_bin_from_size</span>(<span class="ident">size</span>)
+<span class="kw">pub fn </span>mi_bin&lt;VM: VMBinding&gt;(size: usize, align: usize) -&gt; usize {
+    <span class="kw">let </span>size = allocator::get_maximum_aligned_size::&lt;VM&gt;(size, align);
+    mi_bin_from_size(size)
 }
 
-<span class="kw">fn</span> <span class="ident">mi_bin_from_size</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="comment">// adapted from _mi_bin in mimalloc</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wsize</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">mi_wsize_from_size</span>(<span class="ident">size</span>);
-    <span class="macro">debug_assert!</span>(<span class="ident">wsize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MI_LARGE_OBJ_WSIZE_MAX</span>);
-    <span class="kw">let</span> <span class="ident">bin</span>: <span class="ident">u8</span>;
-    <span class="kw">if</span> <span class="ident">wsize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">1</span> {
-        <span class="ident">bin</span> <span class="op">=</span> <span class="number">1</span>;
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">wsize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">8</span> {
-        <span class="ident">bin</span> <span class="op">=</span> <span class="ident">wsize</span> <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="comment">// bin = ((wsize + 1) &amp; !1) as u8; // round to double word sizes</span>
-    } <span class="kw">else</span> {
-        <span class="ident">wsize</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> (<span class="ident">MI_INTPTR_BITS</span> <span class="op">-</span> <span class="number">1</span> <span class="op">-</span> <span class="ident">usize::leading_zeros</span>(<span class="ident">wsize</span>) <span class="kw">as</span> <span class="ident">usize</span>) <span class="kw">as</span> <span class="ident">u8</span>; <span class="comment">// note: wsize != 0</span>
-        <span class="ident">bin</span> <span class="op">=</span> ((<span class="ident">b</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>) <span class="op">+</span> ((<span class="ident">wsize</span> <span class="op">&gt;</span><span class="op">&gt;</span> (<span class="ident">b</span> <span class="op">-</span> <span class="number">2</span>)) <span class="op">&amp;</span> <span class="number">0x03</span>) <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">-</span> <span class="number">3</span>;
+<span class="kw">fn </span>mi_bin_from_size(size: usize) -&gt; usize {
+    <span class="comment">// adapted from _mi_bin in mimalloc
+    </span><span class="kw">let </span><span class="kw-2">mut </span>wsize: usize = mi_wsize_from_size(size);
+    <span class="macro">debug_assert!</span>(wsize &lt;= MI_LARGE_OBJ_WSIZE_MAX);
+    <span class="kw">let </span>bin: u8;
+    <span class="kw">if </span>wsize &lt;= <span class="number">1 </span>{
+        bin = <span class="number">1</span>;
+    } <span class="kw">else if </span>wsize &lt;= <span class="number">8 </span>{
+        bin = wsize <span class="kw">as </span>u8;
+        <span class="comment">// bin = ((wsize + 1) &amp; !1) as u8; // round to double word sizes
+    </span>} <span class="kw">else </span>{
+        wsize -= <span class="number">1</span>;
+        <span class="kw">let </span>b = (MI_INTPTR_BITS - <span class="number">1 </span>- usize::leading_zeros(wsize) <span class="kw">as </span>usize) <span class="kw">as </span>u8; <span class="comment">// note: wsize != 0
+        </span>bin = ((b &lt;&lt; <span class="number">2</span>) + ((wsize &gt;&gt; (b - <span class="number">2</span>)) &amp; <span class="number">0x03</span>) <span class="kw">as </span>u8) - <span class="number">3</span>;
     }
-    <span class="ident">bin</span> <span class="kw">as</span> <span class="ident">usize</span>
+    bin <span class="kw">as </span>usize
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">fn</span> <span class="ident">get_bin_size_range</span>(<span class="ident">bin</span>: <span class="ident">usize</span>, <span class="ident">bins</span>: <span class="kw-2">&amp;</span><span class="ident">BlockLists</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">bin</span> <span class="op">==</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">bin</span> <span class="op">&gt;</span> <span class="ident">MAX_BIN</span> {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">bin</span> <span class="op">==</span> <span class="number">1</span> {
-            <span class="prelude-val">Some</span>((<span class="number">0</span>, <span class="ident">bins</span>[<span class="number">1</span>].<span class="ident">size</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>((<span class="ident">bins</span>[<span class="ident">bin</span> <span class="op">-</span> <span class="number">1</span>].<span class="ident">size</span>, <span class="ident">bins</span>[<span class="ident">bin</span>].<span class="ident">size</span>))
+    <span class="kw">fn </span>get_bin_size_range(bin: usize, bins: <span class="kw-2">&amp;</span>BlockLists) -&gt; <span class="prelude-ty">Option</span>&lt;(usize, usize)&gt; {
+        <span class="kw">if </span>bin == <span class="number">0 </span>|| bin &gt; MAX_BIN {
+            <span class="prelude-val">None
+        </span>} <span class="kw">else if </span>bin == <span class="number">1 </span>{
+            <span class="prelude-val">Some</span>((<span class="number">0</span>, bins[<span class="number">1</span>].size))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Some</span>((bins[bin - <span class="number">1</span>].size, bins[bin].size))
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_mi_bin</span>() {
-        <span class="kw">let</span> <span class="ident">block_lists</span> <span class="op">=</span> <span class="ident">new_empty_block_lists</span>();
-        <span class="kw">for</span> <span class="ident">size</span> <span class="kw">in</span> <span class="number">0</span>..<span class="op">=</span><span class="ident">MAX_BIN_SIZE</span> {
-            <span class="kw">let</span> <span class="ident">bin</span> <span class="op">=</span> <span class="ident">mi_bin_from_size</span>(<span class="ident">size</span>);
-            <span class="kw">let</span> <span class="ident">bin_range</span> <span class="op">=</span> <span class="ident">get_bin_size_range</span>(<span class="ident">bin</span>, <span class="kw-2">&amp;</span><span class="ident">block_lists</span>);
-            <span class="macro">assert!</span>(<span class="ident">bin_range</span>.<span class="ident">is_some</span>(), <span class="string">&quot;Invalid bin {} for size {}&quot;</span>, <span class="ident">bin</span>, <span class="ident">size</span>);
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_mi_bin() {
+        <span class="kw">let </span>block_lists = new_empty_block_lists();
+        <span class="kw">for </span>size <span class="kw">in </span><span class="number">0</span>..=MAX_BIN_SIZE {
+            <span class="kw">let </span>bin = mi_bin_from_size(size);
+            <span class="kw">let </span>bin_range = get_bin_size_range(bin, <span class="kw-2">&amp;</span>block_lists);
+            <span class="macro">assert!</span>(bin_range.is_some(), <span class="string">&quot;Invalid bin {} for size {}&quot;</span>, bin, size);
             <span class="macro">assert!</span>(
-                <span class="ident">size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">bin_range</span>.<span class="ident">unwrap</span>().<span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">bin</span> <span class="op">&lt;</span> <span class="ident">bin_range</span>.<span class="ident">unwrap</span>().<span class="number">1</span>,
+                size &gt;= bin_range.unwrap().<span class="number">0 </span>&amp;&amp; bin &lt; bin_range.unwrap().<span class="number">1</span>,
                 <span class="string">&quot;Assigning size={} to bin={} ({:?}) incorrect&quot;</span>,
-                <span class="ident">size</span>,
-                <span class="ident">bin</span>,
-                <span class="ident">bin_range</span>.<span class="ident">unwrap</span>()
+                size,
+                bin,
+                bin_range.unwrap()
             );
         }
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

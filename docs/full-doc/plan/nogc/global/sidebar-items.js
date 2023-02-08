@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["NOGC_CONSTRAINTS",""]],"struct":[["NoGC",""]]});
+window.SIDEBAR_ITEMS = {"constant":[["NOGC_CONSTRAINTS",""]],"struct":[["NoGC",""]]};

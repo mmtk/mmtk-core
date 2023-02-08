@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;malloc&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/malloc/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -89,95 +87,94 @@
 <span id="87">87</span>
 <span id="88">88</span>
 <span id="89">89</span>
-</pre><pre class="rust"><code><span class="doccomment">/// Malloc provided by libraries</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">library</span>;
-<span class="doccomment">/// Using malloc as mark sweep free-list allocator</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">malloc_ms_util</span>;
+</pre><pre class="rust"><code><span class="doccomment">/// Malloc provided by libraries
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>library;
+<span class="doccomment">/// Using malloc as mark sweep free-list allocator
+</span><span class="kw">pub mod </span>malloc_ms_util;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::MMTK;
 
-<span class="comment">// The following expose a set of malloc API. They are currently implemented with</span>
-<span class="comment">// the library malloc. When we have native malloc implementation, we should change</span>
-<span class="comment">// their implementation to point to our native malloc.</span>
+<span class="comment">// The following expose a set of malloc API. They are currently implemented with
+// the library malloc. When we have native malloc implementation, we should change
+// their implementation to point to our native malloc.
 
-<span class="comment">// We have two versions for each function:</span>
-<span class="comment">// * a normal version: it has the signature that is compatible with the standard malloc library.</span>
-<span class="comment">// * a counted version: the allocated/freed bytes are calculated into MMTk&#39;s heap. So extra arguments</span>
-<span class="comment">//   are needed to maintain allocated bytes properly. The API is inspired by Julia&#39;s counted malloc.</span>
-<span class="comment">//   The counted version is only available with the feature `malloc_counted_size`.</span>
+// We have two versions for each function:
+// * a normal version: it has the signature that is compatible with the standard malloc library.
+// * a counted version: the allocated/freed bytes are calculated into MMTk&#39;s heap. So extra arguments
+//   are needed to maintain allocated bytes properly. The API is inspired by Julia&#39;s counted malloc.
+//   The counted version is only available with the feature `malloc_counted_size`.
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">malloc</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">Address::from_mut_ptr</span>(<span class="kw">unsafe</span> { <span class="ident"><span class="self">self</span>::library::malloc</span>(<span class="ident">size</span>) })
+</span><span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>malloc(size: usize) -&gt; Address {
+    Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::malloc(size) })
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">counted_malloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">malloc</span>(<span class="ident">size</span>);
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">res</span>.<span class="ident">is_zero</span>() {
-        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">increase_malloc_bytes_by</span>(<span class="ident">size</span>);
+<span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+#[inline(always)]
+</span><span class="kw">pub fn </span>counted_malloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, size: usize) -&gt; Address {
+    <span class="kw">let </span>res = malloc(size);
+    <span class="kw">if </span>!res.is_zero() {
+        mmtk.plan.base().increase_malloc_bytes_by(size);
     }
-    <span class="ident">res</span>
+    res
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">calloc</span>(<span class="ident">num</span>: <span class="ident">usize</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">Address::from_mut_ptr</span>(<span class="kw">unsafe</span> { <span class="ident"><span class="self">self</span>::library::calloc</span>(<span class="ident">num</span>, <span class="ident">size</span>) })
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>calloc(num: usize, size: usize) -&gt; Address {
+    Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::calloc(num, size) })
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">counted_calloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">num</span>: <span class="ident">usize</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">calloc</span>(<span class="ident">num</span>, <span class="ident">size</span>);
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">res</span>.<span class="ident">is_zero</span>() {
-        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">increase_malloc_bytes_by</span>(<span class="ident">num</span> <span class="op">*</span> <span class="ident">size</span>);
+<span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+#[inline(always)]
+</span><span class="kw">pub fn </span>counted_calloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, num: usize, size: usize) -&gt; Address {
+    <span class="kw">let </span>res = calloc(num, size);
+    <span class="kw">if </span>!res.is_zero() {
+        mmtk.plan.base().increase_malloc_bytes_by(num * size);
     }
-    <span class="ident">res</span>
+    res
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">realloc</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">Address::from_mut_ptr</span>(<span class="kw">unsafe</span> { <span class="ident"><span class="self">self</span>::library::realloc</span>(<span class="ident">addr</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>) })
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>realloc(addr: Address, size: usize) -&gt; Address {
+    Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::realloc(addr.to_mut_ptr(), size) })
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">realloc_with_old_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">addr</span>: <span class="ident">Address</span>,
-    <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="ident">old_size</span>: <span class="ident">usize</span>,
-) -&gt; <span class="ident">Address</span> {
-    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">realloc</span>(<span class="ident">addr</span>, <span class="ident">size</span>);
+<span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+#[inline(always)]
+</span><span class="kw">pub fn </span>realloc_with_old_size&lt;VM: VMBinding&gt;(
+    mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;,
+    addr: Address,
+    size: usize,
+    old_size: usize,
+) -&gt; Address {
+    <span class="kw">let </span>res = realloc(addr, size);
 
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_zero</span>() {
-        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">decrease_malloc_bytes_by</span>(<span class="ident">old_size</span>);
+    <span class="kw">if </span>!addr.is_zero() {
+        mmtk.plan.base().decrease_malloc_bytes_by(old_size);
     }
-    <span class="kw">if</span> <span class="ident">size</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">res</span>.<span class="ident">is_zero</span>() {
-        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">increase_malloc_bytes_by</span>(<span class="ident">size</span>);
+    <span class="kw">if </span>size != <span class="number">0 </span>&amp;&amp; !res.is_zero() {
+        mmtk.plan.base().increase_malloc_bytes_by(size);
     }
 
-    <span class="ident">res</span>
+    res
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) {
-    <span class="kw">unsafe</span> { <span class="ident"><span class="self">self</span>::library::free</span>(<span class="ident">addr</span>.<span class="ident">to_mut_ptr</span>()) }
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>free(addr: Address) {
+    <span class="kw">unsafe </span>{ <span class="self">self</span>::library::free(addr.to_mut_ptr()) }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free_with_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">old_size</span>: <span class="ident">usize</span>) {
-    <span class="ident">free</span>(<span class="ident">addr</span>);
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_zero</span>() {
-        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">decrease_malloc_bytes_by</span>(<span class="ident">old_size</span>);
+<span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+#[inline(always)]
+</span><span class="kw">pub fn </span>free_with_size&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, addr: Address, old_size: usize) {
+    free(addr);
+    <span class="kw">if </span>!addr.is_zero() {
+        mmtk.plan.base().decrease_malloc_bytes_by(old_size);
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

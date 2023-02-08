@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;metadata&#x2F;side_metadata&#x2F;side_metadata_tests.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>side_metadata_tests.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/metadata/side_metadata/side_metadata_tests.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>side_metadata_tests.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -736,742 +734,741 @@
 <span id="734">734</span>
 <span id="735">735</span>
 <span id="736">736</span>
-</pre><pre class="rust"><code><span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use </span>atomic::Ordering;
 
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::test_util</span>::{<span class="ident">serial_test</span>, <span class="ident">with_cleanup</span>};
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::util::constants;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants;
+    <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
+    <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
+    <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::util::test_util::{serial_test, with_cleanup};
+    <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_address_to_meta_address</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;gspec&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_address_to_meta_address() {
+        <span class="kw">let </span><span class="kw-2">mut </span>gspec = SideMetadataSpec {
+            name: <span class="string">&quot;gspec&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
-        };
-
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+        </span><span class="kw">let </span><span class="kw-2">mut </span>lspec = SideMetadataSpec {
+            name: <span class="string">&quot;lspec&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        </span><span class="kw">let </span><span class="kw-2">mut </span>lspec = SideMetadataSpec {
+            name: <span class="string">&quot;lspec&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::rel(<span class="number">0</span>),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
+        };
+
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">7</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">7</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">7</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">7</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">27</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">3usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">27</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">3usize
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">129</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">16usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">129</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">16usize
+        </span>);
 
-        <span class="ident">gspec</span>.<span class="ident">log_bytes_in_region</span> <span class="op">=</span> <span class="number">2</span>;
-        <span class="ident">lspec</span>.<span class="ident">log_bytes_in_region</span> <span class="op">=</span> <span class="number">1</span>;
-
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
-        );
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
-        );
+        gspec.log_bytes_in_region = <span class="number">2</span>;
+        lspec.log_bytes_in_region = <span class="number">1</span>;
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">1usize</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">2usize</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">9usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">32</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">1usize
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">19usize</span>
-        );
-
-        <span class="ident">gspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">lspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">3</span>;
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">32</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">2usize
+        </span>);
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">316</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">9usize
+        </span>);
+        <span class="macro">assert_eq!</span>(
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">316</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">19usize
+        </span>);
+
+        gspec.log_num_of_bits = <span class="number">1</span>;
+        lspec.log_num_of_bits = <span class="number">3</span>;
+
+        <span class="macro">assert_eq!</span>(
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS
         );
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS
         );
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">2usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">32</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">2usize
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">32</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">16usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">32</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">16usize
+        </span>);
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">316</span>) }),
-            <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">19usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>gspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">316</span>) }),
+            GLOBAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">19usize
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">318</span>) }),
-            <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span> <span class="number">159usize</span>
-        );
+            address_to_meta_address(<span class="kw-2">&amp;</span>lspec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">318</span>) }),
+            LOCAL_SIDE_METADATA_BASE_ADDRESS + <span class="number">159usize
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_mask</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;test_spec&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_meta_byte_mask() {
+        <span class="kw">let </span><span class="kw-2">mut </span>spec = SideMetadataSpec {
+            name: <span class="string">&quot;test_spec&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert_eq!</span>(<span class="ident">meta_byte_mask</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(meta_byte_mask(<span class="kw-2">&amp;</span>spec), <span class="number">1</span>);
 
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="macro">assert_eq!</span>(<span class="ident">meta_byte_mask</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>), <span class="number">3</span>);
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">2</span>;
-        <span class="macro">assert_eq!</span>(<span class="ident">meta_byte_mask</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>), <span class="number">15</span>);
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">3</span>;
-        <span class="macro">assert_eq!</span>(<span class="ident">meta_byte_mask</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>), <span class="number">255</span>);
+        spec.log_num_of_bits = <span class="number">1</span>;
+        <span class="macro">assert_eq!</span>(meta_byte_mask(<span class="kw-2">&amp;</span>spec), <span class="number">3</span>);
+        spec.log_num_of_bits = <span class="number">2</span>;
+        <span class="macro">assert_eq!</span>(meta_byte_mask(<span class="kw-2">&amp;</span>spec), <span class="number">15</span>);
+        spec.log_num_of_bits = <span class="number">3</span>;
+        <span class="macro">assert_eq!</span>(meta_byte_mask(<span class="kw-2">&amp;</span>spec), <span class="number">255</span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_lshift</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;test_spec&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_meta_byte_lshift() {
+        <span class="kw">let </span><span class="kw-2">mut </span>spec = SideMetadataSpec {
+            name: <span class="string">&quot;test_spec&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="number">0</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            <span class="number">0
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">5</span>) }),
-            <span class="number">5</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">5</span>) }),
+            <span class="number">5
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">15</span>) }),
-            <span class="number">7</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">15</span>) }),
+            <span class="number">7
+        </span>);
 
-        <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">2</span>;
+        spec.log_num_of_bits = <span class="number">2</span>;
 
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0</span>) }),
-            <span class="number">0</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0</span>) }),
+            <span class="number">0
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">5</span>) }),
-            <span class="number">4</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">5</span>) }),
+            <span class="number">4
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">15</span>) }),
-            <span class="number">4</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">15</span>) }),
+            <span class="number">4
+        </span>);
         <span class="macro">assert_eq!</span>(
-            <span class="ident">meta_byte_lshift</span>(<span class="kw-2">&amp;</span><span class="ident">spec</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x10010</span>) }),
-            <span class="number">0</span>
-        );
+            meta_byte_lshift(<span class="kw-2">&amp;</span>spec, <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x10010</span>) }),
+            <span class="number">0
+        </span>);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_try_mmap_metadata</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="comment">// We need to do this because of the static NO_METADATA</span>
-                    <span class="comment">// sanity::reset();</span>
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;gspec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">1</span>,
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_try_mmap_metadata() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="comment">// We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    </span><span class="kw">let </span><span class="kw-2">mut </span>gspec = SideMetadataSpec {
+                        name: <span class="string">&quot;gspec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">1</span>,
+                        log_bytes_in_region: <span class="number">1</span>,
                     };
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">1</span>,
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                    </span><span class="kw">let </span><span class="kw-2">mut </span>lspec = SideMetadataSpec {
+                        name: <span class="string">&quot;lspec&quot;</span>,
+                        is_global: <span class="bool-val">false</span>,
+                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">1</span>,
+                        log_bytes_in_region: <span class="number">1</span>,
                     };
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">1</span>,
-                    };
-
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">gspec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[<span class="ident">lspec</span>],
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+                    </span><span class="kw">let </span><span class="kw-2">mut </span>lspec = SideMetadataSpec {
+                        name: <span class="string">&quot;lspec&quot;</span>,
+                        is_global: <span class="bool-val">false</span>,
+                        offset: SideMetadataOffset::rel(<span class="number">0</span>),
+                        log_num_of_bits: <span class="number">1</span>,
+                        log_bytes_in_region: <span class="number">1</span>,
                     };
 
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[gspec],
+                        local: <span class="macro">vec!</span>[lspec],
+                    };
 
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(
-                            <span class="ident">vm_layout_constants::HEAP_START</span>,
-                            <span class="ident">constants::BYTES_IN_PAGE</span>,
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
+
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(
+                            vm_layout_constants::HEAP_START,
+                            constants::BYTES_IN_PAGE,
                         )
-                        .<span class="ident">is_ok</span>());
+                        .is_ok());
 
-                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(<span class="ident">vm_layout_constants::HEAP_START</span>);
-                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(<span class="ident">vm_layout_constants::HEAP_START</span>);
-                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">constants::BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>,
+                    gspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
+                    lspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
+                    gspec.assert_metadata_mapped(
+                        vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - <span class="number">1</span>,
                     );
-                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">constants::BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>,
-                    );
-
-                    <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span>,
-                        <span class="ident">constants::BYTES_IN_PAGE</span>,
+                    lspec.assert_metadata_mapped(
+                        vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - <span class="number">1</span>,
                     );
 
-                    <span class="ident">gspec</span>.<span class="ident">log_bytes_in_region</span> <span class="op">=</span> <span class="number">4</span>;
-                    <span class="ident">gspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">4</span>;
-                    <span class="ident">lspec</span>.<span class="ident">log_bytes_in_region</span> <span class="op">=</span> <span class="number">4</span>;
-                    <span class="ident">lspec</span>.<span class="ident">log_num_of_bits</span> <span class="op">=</span> <span class="number">4</span>;
+                    metadata.ensure_unmap_metadata_space(
+                        vm_layout_constants::HEAP_START,
+                        constants::BYTES_IN_PAGE,
+                    );
 
-                    <span class="ident">metadata_sanity</span>.<span class="ident">reset</span>();
+                    gspec.log_bytes_in_region = <span class="number">4</span>;
+                    gspec.log_num_of_bits = <span class="number">4</span>;
+                    lspec.log_bytes_in_region = <span class="number">4</span>;
+                    lspec.log_num_of_bits = <span class="number">4</span>;
 
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">gspec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[<span class="ident">lspec</span>],
+                    metadata_sanity.reset();
+
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[gspec],
+                        local: <span class="macro">vec!</span>[lspec],
                     };
 
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
-                    <span class="ident">metadata_sanity</span>.<span class="ident">reset</span>();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
+                    metadata_sanity.reset();
 
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(
-                            <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
-                            <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(
+                            vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+                            vm_layout_constants::BYTES_IN_CHUNK,
                         )
-                        .<span class="ident">is_ok</span>());
+                        .is_ok());
 
-                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
+                    gspec.assert_metadata_mapped(
+                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
-                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
+                    lspec.assert_metadata_mapped(
+                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
-                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">2</span>
-                            <span class="op">-</span> <span class="number">8</span>,
+                    gspec.assert_metadata_mapped(
+                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * <span class="number">2
+                            </span>- <span class="number">8</span>,
                     );
-                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">2</span>
-                            <span class="op">-</span> <span class="number">16</span>,
+                    lspec.assert_metadata_mapped(
+                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * <span class="number">2
+                            </span>- <span class="number">16</span>,
                     );
 
-                    <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(
-                        <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
-                        <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
+                    metadata.ensure_unmap_metadata_space(
+                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
+                        vm_layout_constants::BYTES_IN_CHUNK,
                     );
                 },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
+                || {
+                    sanity::reset();
                 },
             );
         })
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_atomic_fetch_add_sub_ge8bits</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="comment">// We need to do this because of the static NO_METADATA</span>
-                    <span class="comment">// sanity::reset();</span>
-                    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>;
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_atomic_fetch_add_sub_ge8bits() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="comment">// We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
 
-                    <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">6</span>,
+                    <span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_1_spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">4</span>,
+                        log_bytes_in_region: <span class="number">6</span>,
                     };
 
-                    <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_2_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">7</span>,
+                    <span class="kw">let </span>metadata_2_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_2_spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>metadata_1_spec),
+                        log_num_of_bits: <span class="number">3</span>,
+                        log_bytes_in_region: <span class="number">7</span>,
                     };
 
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">metadata_1_spec</span>, <span class="ident">metadata_2_spec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[metadata_1_spec, metadata_2_spec],
+                        local: <span class="macro">vec!</span>[],
                     };
 
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
 
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
-                        .<span class="ident">is_ok</span>());
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+                    <span class="kw">let </span>zero =
+                        metadata_1_spec.fetch_add_atomic::&lt;u16&gt;(data_addr, <span class="number">5</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(zero, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+                    <span class="kw">let </span>five = metadata_1_spec.load_atomic::&lt;u16&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
-                        <span class="ident">metadata_2_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+                    <span class="kw">let </span>zero =
+                        metadata_2_spec.fetch_add_atomic::&lt;u8&gt;(data_addr, <span class="number">5</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(zero, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
+                    <span class="kw">let </span>five = metadata_2_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_sub_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
+                    <span class="kw">let </span>another_five =
+                        metadata_1_spec.fetch_sub_atomic::&lt;u16&gt;(data_addr, <span class="number">2</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(another_five, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">three</span>, <span class="number">3</span>);
+                    <span class="kw">let </span>three = metadata_1_spec.load_atomic::&lt;u16&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(three, <span class="number">3</span>);
 
-                    <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span>
-                        <span class="ident">metadata_2_spec</span>.<span class="ident">fetch_sub_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
+                    <span class="kw">let </span>another_five =
+                        metadata_2_spec.fetch_sub_atomic::&lt;u8&gt;(data_addr, <span class="number">2</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(another_five, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">three</span>, <span class="number">3</span>);
+                    <span class="kw">let </span>three = metadata_2_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(three, <span class="number">3</span>);
 
-                    <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
-                    <span class="ident">metadata_sanity</span>.<span class="ident">reset</span>();
+                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+                    metadata_sanity.reset();
                 },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
-                },
-            );
-        });
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_atomic_fetch_add_sub_2bits</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="comment">// We need to do this because of the static NO_METADATA</span>
-                    <span class="comment">// sanity::reset();</span>
-                    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>
-                        <span class="op">+</span> (<span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>) <span class="op">*</span> <span class="number">2</span>;
-
-                    <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="ident">constants::LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
-                    };
-
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">metadata_1_spec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[],
-                    };
-
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
-
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
-                        .<span class="ident">is_ok</span>());
-
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
-
-                    <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">two</span>, <span class="number">2</span>);
-
-                    <span class="kw">let</span> <span class="ident">another_two</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_sub_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">another_two</span>, <span class="number">2</span>);
-
-                    <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">one</span>, <span class="number">1</span>);
-
-                    <span class="ident">metadata_1_spec</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
-
-                    <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
-
-                    <span class="ident">metadata_sanity</span>.<span class="ident">reset</span>();
-                },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
+                || {
+                    sanity::reset();
                 },
             );
         });
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_atomic_fetch_and_or_2bits</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="comment">// We need to do this because of the static NO_METADATA</span>
-                    <span class="comment">// sanity::reset();</span>
-                    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>
-                        <span class="op">+</span> (<span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>);
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_atomic_fetch_add_sub_2bits() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="comment">// We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START
+                        + (vm_layout_constants::BYTES_IN_CHUNK &lt;&lt; <span class="number">1</span>) * <span class="number">2</span>;
 
-                    <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="ident">constants::LOG_BYTES_IN_WORD</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                    <span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_1_spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">1</span>,
+                        log_bytes_in_region: constants::LOG_BYTES_IN_WORD <span class="kw">as </span>usize,
                     };
 
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">metadata_1_spec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[metadata_1_spec],
+                        local: <span class="macro">vec!</span>[],
                     };
 
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
 
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
-                        .<span class="ident">is_ok</span>());
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_or_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">0b11</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
+                    <span class="kw">let </span>zero =
+                        metadata_1_spec.fetch_add_atomic::&lt;u8&gt;(data_addr, <span class="number">2</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(zero, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">value_11</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">value_11</span>, <span class="number">0b11</span>);
+                    <span class="kw">let </span>two = metadata_1_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(two, <span class="number">2</span>);
 
-                    <span class="kw">let</span> <span class="ident">another_value_11</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_and_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">0b01</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">another_value_11</span>, <span class="number">0b11</span>);
+                    <span class="kw">let </span>another_two =
+                        metadata_1_spec.fetch_sub_atomic::&lt;u8&gt;(data_addr, <span class="number">1</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(another_two, <span class="number">2</span>);
 
-                    <span class="kw">let</span> <span class="ident">value_01</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">value_01</span>, <span class="number">0b01</span>);
+                    <span class="kw">let </span>one = metadata_1_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(one, <span class="number">1</span>);
 
-                    <span class="ident">metadata_1_spec</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
+                    metadata_1_spec.store_atomic::&lt;u8&gt;(data_addr, <span class="number">0</span>, Ordering::SeqCst);
 
-                    <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
+                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
 
-                    <span class="ident">metadata_sanity</span>.<span class="ident">reset</span>();
+                    metadata_sanity.reset();
                 },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
-                },
-            );
-        });
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_bzero_metadata</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="comment">// We need to do this because of the static NO_METADATA</span>
-                    <span class="comment">// sanity::reset();</span>
-                    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>
-                        <span class="op">+</span> (<span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>);
-
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-                    <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">9</span>,
-                    };
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-                    <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_2_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">7</span>,
-                    };
-
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-                    <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">9</span>,
-                    };
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-                    <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;metadata_2_spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">7</span>,
-                    };
-
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[<span class="ident">metadata_1_spec</span>, <span class="ident">metadata_2_spec</span>],
-                    };
-
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
-
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
-                        .<span class="ident">is_ok</span>());
-
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
-                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
-
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
-
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
-                        <span class="ident">metadata_2_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
-
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
-
-                    <span class="ident">metadata_2_spec</span>.<span class="ident">bzero_metadata</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
-
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">0</span>);
-
-                    <span class="ident">metadata_1_spec</span>.<span class="ident">bzero_metadata</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
-
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">0</span>);
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">0</span>);
-
-                    <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
-
-                    <span class="ident">metadata_sanity</span>.<span class="ident">reset</span>();
-                },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
+                || {
+                    sanity::reset();
                 },
             );
         });
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_bzero_by_bytes</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>;
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_atomic_fetch_and_or_2bits() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="comment">// We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START
+                        + (vm_layout_constants::BYTES_IN_CHUNK &lt;&lt; <span class="number">1</span>);
 
-                    <span class="comment">// 1 bit per 8 bytes</span>
-                    <span class="kw">let</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;test spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>,
-                    };
-                    <span class="kw">let</span> <span class="ident">region_size</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>;
-
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">spec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_1_spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">1</span>,
+                        log_bytes_in_region: constants::LOG_BYTES_IN_WORD <span class="kw">as </span>usize,
                     };
 
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[metadata_1_spec],
+                        local: <span class="macro">vec!</span>[],
+                    };
 
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
-                        .<span class="ident">is_ok</span>());
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
 
-                    <span class="comment">// First 9 regions</span>
-                    <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> (<span class="number">0</span>..<span class="number">9</span>)
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">data_addr</span> <span class="op">+</span> (<span class="ident">region_size</span> <span class="op">*</span> <span class="ident">i</span>) <span class="kw">as</span> <span class="ident">usize</span>)
-                        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span>();
-                    <span class="comment">// Set metadata for the regions</span>
-                    <span class="ident">regions</span>
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>, <span class="number">1</span>) });
-                    <span class="ident">regions</span>
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="macro">assert!</span>(<span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>) } <span class="op">==</span> <span class="number">1</span>));
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
 
-                    <span class="comment">// bulk zero the 8 regions (1 bit for each, in total 1 byte)</span>
-                    <span class="ident">spec</span>.<span class="ident">bzero_metadata</span>(<span class="ident">regions</span>[<span class="number">0</span>], <span class="ident">region_size</span> <span class="op">*</span> <span class="number">8</span>);
-                    <span class="comment">// Check if the first 8 regions are set to 0</span>
-                    <span class="ident">regions</span>[<span class="number">0</span>..<span class="number">8</span>]
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="macro">assert!</span>(<span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>) } <span class="op">==</span> <span class="number">0</span>));
-                    <span class="comment">// Check if the 9th region is still 1</span>
-                    <span class="macro">assert!</span>(<span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">regions</span>[<span class="number">8</span>]) } <span class="op">==</span> <span class="number">1</span>);
+                    <span class="kw">let </span>zero =
+                        metadata_1_spec.fetch_or_atomic::&lt;u8&gt;(data_addr, <span class="number">0b11</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(zero, <span class="number">0</span>);
+
+                    <span class="kw">let </span>value_11 = metadata_1_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(value_11, <span class="number">0b11</span>);
+
+                    <span class="kw">let </span>another_value_11 =
+                        metadata_1_spec.fetch_and_atomic::&lt;u8&gt;(data_addr, <span class="number">0b01</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(another_value_11, <span class="number">0b11</span>);
+
+                    <span class="kw">let </span>value_01 = metadata_1_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(value_01, <span class="number">0b01</span>);
+
+                    metadata_1_spec.store_atomic::&lt;u8&gt;(data_addr, <span class="number">0</span>, Ordering::SeqCst);
+
+                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+                    metadata_sanity.reset();
                 },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
+                || {
+                    sanity::reset();
+                },
+            );
+        });
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_bzero_metadata() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="comment">// We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START
+                        + (vm_layout_constants::BYTES_IN_CHUNK &lt;&lt; <span class="number">2</span>);
+
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                    </span><span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_1_spec&quot;</span>,
+                        is_global: <span class="bool-val">false</span>,
+                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">4</span>,
+                        log_bytes_in_region: <span class="number">9</span>,
+                    };
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                    </span><span class="kw">let </span>metadata_2_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_2_spec&quot;</span>,
+                        is_global: <span class="bool-val">false</span>,
+                        offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>metadata_1_spec),
+                        log_num_of_bits: <span class="number">3</span>,
+                        log_bytes_in_region: <span class="number">7</span>,
+                    };
+
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+                    </span><span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_1_spec&quot;</span>,
+                        is_global: <span class="bool-val">false</span>,
+                        offset: SideMetadataOffset::rel(<span class="number">0</span>),
+                        log_num_of_bits: <span class="number">4</span>,
+                        log_bytes_in_region: <span class="number">9</span>,
+                    };
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+                    </span><span class="kw">let </span>metadata_2_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_2_spec&quot;</span>,
+                        is_global: <span class="bool-val">false</span>,
+                        offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>metadata_1_spec),
+                        log_num_of_bits: <span class="number">3</span>,
+                        log_bytes_in_region: <span class="number">7</span>,
+                    };
+
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[],
+                        local: <span class="macro">vec!</span>[metadata_1_spec, metadata_2_spec],
+                    };
+
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
+
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
+
+                    <span class="kw">let </span>zero =
+                        metadata_1_spec.fetch_add_atomic::&lt;u16&gt;(data_addr, <span class="number">5</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(zero, <span class="number">0</span>);
+
+                    <span class="kw">let </span>five = metadata_1_spec.load_atomic::&lt;u16&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">5</span>);
+
+                    <span class="kw">let </span>zero =
+                        metadata_2_spec.fetch_add_atomic::&lt;u8&gt;(data_addr, <span class="number">5</span>, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(zero, <span class="number">0</span>);
+
+                    <span class="kw">let </span>five = metadata_2_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">5</span>);
+
+                    metadata_2_spec.bzero_metadata(data_addr, constants::BYTES_IN_PAGE);
+
+                    <span class="kw">let </span>five = metadata_1_spec.load_atomic::&lt;u16&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">5</span>);
+                    <span class="kw">let </span>five = metadata_2_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">0</span>);
+
+                    metadata_1_spec.bzero_metadata(data_addr, constants::BYTES_IN_PAGE);
+
+                    <span class="kw">let </span>five = metadata_1_spec.load_atomic::&lt;u16&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">0</span>);
+                    <span class="kw">let </span>five = metadata_2_spec.load_atomic::&lt;u8&gt;(data_addr, Ordering::SeqCst);
+                    <span class="macro">assert_eq!</span>(five, <span class="number">0</span>);
+
+                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+                    metadata_sanity.reset();
+                },
+                || {
+                    sanity::reset();
+                },
+            );
+        });
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_bzero_by_bytes() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+
+                    <span class="comment">// 1 bit per 8 bytes
+                    </span><span class="kw">let </span>spec = SideMetadataSpec {
+                        name: <span class="string">&quot;test spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">0</span>,
+                        log_bytes_in_region: <span class="number">3</span>,
+                    };
+                    <span class="kw">let </span>region_size: usize = <span class="number">1 </span>&lt;&lt; spec.log_bytes_in_region;
+
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[spec],
+                        local: <span class="macro">vec!</span>[],
+                    };
+
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
+
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
+
+                    <span class="comment">// First 9 regions
+                    </span><span class="kw">let </span>regions = (<span class="number">0</span>..<span class="number">9</span>)
+                        .map(|i| data_addr + (region_size * i))
+                        .collect::&lt;Vec&lt;Address&gt;&gt;();
+                    <span class="comment">// Set metadata for the regions
+                    </span>regions
+                        .iter()
+                        .for_each(|addr| <span class="kw">unsafe </span>{ spec.store::&lt;u8&gt;(<span class="kw-2">*</span>addr, <span class="number">1</span>) });
+                    regions
+                        .iter()
+                        .for_each(|addr| <span class="macro">assert!</span>(<span class="kw">unsafe </span>{ spec.load::&lt;u8&gt;(<span class="kw-2">*</span>addr) } == <span class="number">1</span>));
+
+                    <span class="comment">// bulk zero the 8 regions (1 bit for each, in total 1 byte)
+                    </span>spec.bzero_metadata(regions[<span class="number">0</span>], region_size * <span class="number">8</span>);
+                    <span class="comment">// Check if the first 8 regions are set to 0
+                    </span>regions[<span class="number">0</span>..<span class="number">8</span>]
+                        .iter()
+                        .for_each(|addr| <span class="macro">assert!</span>(<span class="kw">unsafe </span>{ spec.load::&lt;u8&gt;(<span class="kw-2">*</span>addr) } == <span class="number">0</span>));
+                    <span class="comment">// Check if the 9th region is still 1
+                    </span><span class="macro">assert!</span>(<span class="kw">unsafe </span>{ spec.load::&lt;u8&gt;(regions[<span class="number">8</span>]) } == <span class="number">1</span>);
+                },
+                || {
+                    sanity::reset();
                 },
             )
         })
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_bzero_by_fraction_of_bytes</span>() {
-        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">with_cleanup</span>(
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>;
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_bzero_by_fraction_of_bytes() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
 
-                    <span class="comment">// 1 bit per 8 bytes</span>
-                    <span class="kw">let</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-                        <span class="ident">name</span>: <span class="string">&quot;test spec&quot;</span>,
-                        <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-                        <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
-                        <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-                        <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>,
+                    <span class="comment">// 1 bit per 8 bytes
+                    </span><span class="kw">let </span>spec = SideMetadataSpec {
+                        name: <span class="string">&quot;test spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: <span class="number">0</span>,
+                        log_bytes_in_region: <span class="number">3</span>,
                     };
-                    <span class="kw">let</span> <span class="ident">region_size</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>;
+                    <span class="kw">let </span>region_size: usize = <span class="number">1 </span>&lt;&lt; spec.log_bytes_in_region;
 
-                    <span class="kw">let</span> <span class="ident">metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-                        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">spec</span>],
-                        <span class="ident">local</span>: <span class="macro">vec!</span>[],
+                    <span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[spec],
+                        local: <span class="macro">vec!</span>[],
                     };
 
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metadata_sanity</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-                    <span class="ident">metadata_sanity</span>.<span class="ident">verify_metadata_context</span>(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">metadata</span>);
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
 
-                    <span class="macro">assert!</span>(<span class="ident">metadata</span>
-                        .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
-                        .<span class="ident">is_ok</span>());
+                    <span class="macro">assert!</span>(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
 
-                    <span class="comment">// First 9 regions</span>
-                    <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> (<span class="number">0</span>..<span class="number">9</span>)
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">data_addr</span> <span class="op">+</span> (<span class="ident">region_size</span> <span class="op">*</span> <span class="ident">i</span>) <span class="kw">as</span> <span class="ident">usize</span>)
-                        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span>();
-                    <span class="comment">// Set metadata for the regions</span>
-                    <span class="ident">regions</span>
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>, <span class="number">1</span>) });
-                    <span class="ident">regions</span>
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="macro">assert!</span>(<span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>) } <span class="op">==</span> <span class="number">1</span>));
+                    <span class="comment">// First 9 regions
+                    </span><span class="kw">let </span>regions = (<span class="number">0</span>..<span class="number">9</span>)
+                        .map(|i| data_addr + (region_size * i))
+                        .collect::&lt;Vec&lt;Address&gt;&gt;();
+                    <span class="comment">// Set metadata for the regions
+                    </span>regions
+                        .iter()
+                        .for_each(|addr| <span class="kw">unsafe </span>{ spec.store::&lt;u8&gt;(<span class="kw-2">*</span>addr, <span class="number">1</span>) });
+                    regions
+                        .iter()
+                        .for_each(|addr| <span class="macro">assert!</span>(<span class="kw">unsafe </span>{ spec.load::&lt;u8&gt;(<span class="kw-2">*</span>addr) } == <span class="number">1</span>));
 
-                    <span class="comment">// bulk zero the first 4 regions (1 bit for each, in total 4 bits)</span>
-                    <span class="ident">spec</span>.<span class="ident">bzero_metadata</span>(<span class="ident">regions</span>[<span class="number">0</span>], <span class="ident">region_size</span> <span class="op">*</span> <span class="number">4</span>);
-                    <span class="comment">// Check if the first 4 regions are set to 0</span>
-                    <span class="ident">regions</span>[<span class="number">0</span>..<span class="number">4</span>]
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="macro">assert!</span>(<span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>) } <span class="op">==</span> <span class="number">0</span>));
-                    <span class="comment">// Check if the rest regions is still 1</span>
-                    <span class="ident">regions</span>[<span class="number">4</span>..<span class="number">9</span>]
-                        .<span class="ident">iter</span>()
-                        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="macro">assert!</span>(<span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">addr</span>) } <span class="op">==</span> <span class="number">1</span>));
+                    <span class="comment">// bulk zero the first 4 regions (1 bit for each, in total 4 bits)
+                    </span>spec.bzero_metadata(regions[<span class="number">0</span>], region_size * <span class="number">4</span>);
+                    <span class="comment">// Check if the first 4 regions are set to 0
+                    </span>regions[<span class="number">0</span>..<span class="number">4</span>]
+                        .iter()
+                        .for_each(|addr| <span class="macro">assert!</span>(<span class="kw">unsafe </span>{ spec.load::&lt;u8&gt;(<span class="kw-2">*</span>addr) } == <span class="number">0</span>));
+                    <span class="comment">// Check if the rest regions is still 1
+                    </span>regions[<span class="number">4</span>..<span class="number">9</span>]
+                        .iter()
+                        .for_each(|addr| <span class="macro">assert!</span>(<span class="kw">unsafe </span>{ spec.load::&lt;u8&gt;(<span class="kw-2">*</span>addr) } == <span class="number">1</span>));
                 },
-                <span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">sanity::reset</span>();
+                || {
+                    sanity::reset();
                 },
             )
         })
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_zero_meta_bits</span>() {
-        <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="number">4usize</span>;
-        <span class="kw">let</span> <span class="ident">allocate_u32</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> -&gt; <span class="ident">Address</span> {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-                <span class="ident">std::alloc::alloc_zeroed</span>(<span class="ident">std::alloc::Layout::from_size_align</span>(<span class="ident">size</span>, <span class="number">4</span>).<span class="ident">unwrap</span>())
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_zero_meta_bits() {
+        <span class="kw">let </span>size = <span class="number">4usize</span>;
+        <span class="kw">let </span>allocate_u32 = || -&gt; Address {
+            <span class="kw">let </span>ptr = <span class="kw">unsafe </span>{
+                std::alloc::alloc_zeroed(std::alloc::Layout::from_size_align(size, <span class="number">4</span>).unwrap())
             };
-            <span class="ident">Address::from_mut_ptr</span>(<span class="ident">ptr</span>)
+            Address::from_mut_ptr(ptr)
         };
-        <span class="kw">let</span> <span class="ident">fill_1</span> <span class="op">=</span> <span class="op">|</span><span class="ident">addr</span>: <span class="ident">Address</span><span class="op">|</span> <span class="kw">unsafe</span> {
-            <span class="ident">addr</span>.<span class="ident">store</span>(<span class="ident">u32::MAX</span>);
+        <span class="kw">let </span>fill_1 = |addr: Address| <span class="kw">unsafe </span>{
+            addr.store(u32::MAX);
         };
 
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">allocate_u32</span>();
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">size</span>;
+        <span class="kw">let </span>start = allocate_u32();
+        <span class="kw">let </span>end = start + size;
 
-        <span class="ident">fill_1</span>(<span class="ident">start</span>);
-        <span class="comment">// zero the word</span>
-        <span class="ident">SideMetadataSpec::zero_meta_bits</span>(<span class="ident">start</span>, <span class="number">0</span>, <span class="ident">end</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="ident">start</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>() }, <span class="number">0</span>);
+        fill_1(start);
+        <span class="comment">// zero the word
+        </span>SideMetadataSpec::zero_meta_bits(start, <span class="number">0</span>, end, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ start.load::&lt;u32&gt;() }, <span class="number">0</span>);
 
-        <span class="ident">fill_1</span>(<span class="ident">start</span>);
-        <span class="comment">// zero first 2 bits</span>
-        <span class="ident">SideMetadataSpec::zero_meta_bits</span>(<span class="ident">start</span>, <span class="number">0</span>, <span class="ident">start</span>, <span class="number">2</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="ident">start</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>() }, <span class="number">0xFFFF_FFFC</span>); <span class="comment">// ....1100</span>
+        fill_1(start);
+        <span class="comment">// zero first 2 bits
+        </span>SideMetadataSpec::zero_meta_bits(start, <span class="number">0</span>, start, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ start.load::&lt;u32&gt;() }, <span class="number">0xFFFF_FFFC</span>); <span class="comment">// ....1100
 
-        <span class="ident">fill_1</span>(<span class="ident">start</span>);
-        <span class="comment">// zero last 2 bits</span>
-        <span class="ident">SideMetadataSpec::zero_meta_bits</span>(<span class="ident">end</span> <span class="op">-</span> <span class="number">1</span>, <span class="number">6</span>, <span class="ident">end</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="ident">start</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>() }, <span class="number">0x3FFF_FFFF</span>); <span class="comment">// 0011....</span>
+        </span>fill_1(start);
+        <span class="comment">// zero last 2 bits
+        </span>SideMetadataSpec::zero_meta_bits(end - <span class="number">1</span>, <span class="number">6</span>, end, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ start.load::&lt;u32&gt;() }, <span class="number">0x3FFF_FFFF</span>); <span class="comment">// 0011....
 
-        <span class="ident">fill_1</span>(<span class="ident">start</span>);
-        <span class="comment">// zero everything except first 2 bits and last 2 bits</span>
-        <span class="ident">SideMetadataSpec::zero_meta_bits</span>(<span class="ident">start</span>, <span class="number">2</span>, <span class="ident">end</span> <span class="op">-</span> <span class="number">1</span>, <span class="number">6</span>);
-        <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="ident">start</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>() }, <span class="number">0xC000_0003</span>); <span class="comment">// 1100....0011</span>
-    }
+        </span>fill_1(start);
+        <span class="comment">// zero everything except first 2 bits and last 2 bits
+        </span>SideMetadataSpec::zero_meta_bits(start, <span class="number">2</span>, end - <span class="number">1</span>, <span class="number">6</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ start.load::&lt;u32&gt;() }, <span class="number">0xC000_0003</span>); <span class="comment">// 1100....0011
+    </span>}
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

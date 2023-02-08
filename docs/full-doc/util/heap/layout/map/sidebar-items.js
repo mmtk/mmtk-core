@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["Map",""]]});
+window.SIDEBAR_ITEMS = {"trait":[["Map",""]]};

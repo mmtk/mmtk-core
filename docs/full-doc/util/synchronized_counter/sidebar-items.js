@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SynchronizedCounter",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["SynchronizedCounter",""]]};

@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;statistics&#x2F;counter&#x2F;size_counter.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>size_counter.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/statistics/counter/size_counter.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>size_counter.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -74,13 +72,13 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
+</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span>std::sync::Arc;
+<span class="kw">use </span>std::sync::Mutex;
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SizeCounter</span> {
-    <span class="ident">units</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">volume</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="kw">pub struct </span>SizeCounter {
+    units: Arc&lt;Mutex&lt;EventCounter&gt;&gt;,
+    volume: Arc&lt;Mutex&lt;EventCounter&gt;&gt;,
 }
 
 <span class="doccomment">/**
@@ -90,64 +88,63 @@
  *
  * The counter is trivially composed from two event counters (one for
  * counting the number of events, the other for counting the volume).
- */</span>
-<span class="kw">impl</span> <span class="ident">SizeCounter</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">units</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">volume</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">SizeCounter</span> { <span class="ident">units</span>, <span class="ident">volume</span> }
+ */
+</span><span class="kw">impl </span>SizeCounter {
+    <span class="kw">pub fn </span>new(units: Arc&lt;Mutex&lt;EventCounter&gt;&gt;, volume: Arc&lt;Mutex&lt;EventCounter&gt;&gt;) -&gt; <span class="self">Self </span>{
+        SizeCounter { units, volume }
     }
 
     <span class="doccomment">/**
      * Increment the event counter by provided value
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">u64</span>) {
-        <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc</span>();
-        <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc_by</span>(<span class="ident">size</span>);
+     */
+    </span><span class="kw">pub fn </span>inc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: u64) {
+        <span class="self">self</span>.units.lock().unwrap().inc();
+        <span class="self">self</span>.volume.lock().unwrap().inc_by(size);
     }
 
     <span class="doccomment">/**
      * Start this counter
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>();
-        <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>();
+     */
+    </span><span class="kw">pub fn </span>start(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.units.lock().unwrap().start();
+        <span class="self">self</span>.volume.lock().unwrap().start();
     }
 
     <span class="doccomment">/**
      * Stop this counter
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">stop</span>();
-        <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">stop</span>();
+     */
+    </span><span class="kw">pub fn </span>stop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.units.lock().unwrap().stop();
+        <span class="self">self</span>.volume.lock().unwrap().stop();
     }
 
     <span class="doccomment">/**
      * Print current (mid-phase) units
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_current_units</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">print_current</span>();
+     */
+    </span><span class="kw">pub fn </span>print_current_units(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.units.lock().unwrap().print_current();
     }
 
     <span class="doccomment">/**
      * Print (mid-phase) volume
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_current_volume</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">print_current</span>();
+     */
+    </span><span class="kw">pub fn </span>print_current_volume(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.volume.lock().unwrap().print_current();
     }
 
     <span class="doccomment">/**
      * Print units
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_units</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">print_total</span>(<span class="prelude-val">None</span>);
+     */
+    </span><span class="kw">pub fn </span>print_units(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.units.lock().unwrap().print_total(<span class="prelude-val">None</span>);
     }
 
     <span class="doccomment">/**
      * Print volume
-     */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_volume</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">print_total</span>(<span class="prelude-val">None</span>);
+     */
+    </span><span class="kw">pub fn </span>print_volume(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.volume.lock().unwrap().print_total(<span class="prelude-val">None</span>);
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

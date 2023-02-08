@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["GC_MARK_BIT_MASK",""]],"struct":[["ImmortalSpace","This type implements a simple immortal collection policy. Under this policy all that is required is for the “collector” to propagate marks in a liveness trace.  It does not actually collect."]]});
+window.SIDEBAR_ITEMS = {"constant":[["GC_MARK_BIT_MASK",""]],"struct":[["ImmortalSpace","This type implements a simple immortal collection policy. Under this policy all that is required is for the “collector” to propagate marks in a liveness trace.  It does not actually collect."]]};

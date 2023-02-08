@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;address.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>address.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/address.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>address.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -615,621 +613,620 @@
 <span id="613">613</span>
 <span id="614">614</span>
 <span id="615">615</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic_traits::Atomic</span>;
-<span class="kw">use</span> <span class="ident">std::fmt</span>;
-<span class="kw">use</span> <span class="ident">std::mem</span>;
-<span class="kw">use</span> <span class="ident">std::ops</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
+<span class="kw">use </span>std::fmt;
+<span class="kw">use </span>std::mem;
+<span class="kw">use </span>std::ops::<span class="kw-2">*</span>;
+<span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk</span>::{<span class="ident">MMAPPER</span>, <span class="ident">SFT_MAP</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::mmapper::Mmapper</span>;
+<span class="kw">use </span><span class="kw">crate</span>::mmtk::{MMAPPER, SFT_MAP};
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::mmapper::Mmapper;
 
-<span class="doccomment">/// size in bytes</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ByteSize</span> <span class="op">=</span> <span class="ident">usize</span>;
-<span class="doccomment">/// offset in byte</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ByteOffset</span> <span class="op">=</span> <span class="ident">isize</span>;
+<span class="doccomment">/// size in bytes
+</span><span class="kw">pub type </span>ByteSize = usize;
+<span class="doccomment">/// offset in byte
+</span><span class="kw">pub type </span>ByteOffset = isize;
 
-<span class="doccomment">/// Address represents an arbitrary address. This is designed to represent</span>
-<span class="doccomment">/// address and do address arithmetic mostly in a safe way, and to allow</span>
-<span class="doccomment">/// mark some operations as unsafe. This type needs to be zero overhead</span>
-<span class="doccomment">/// (memory wise and time wise). The idea is from the paper</span>
-<span class="doccomment">/// High-level Low-level Programming (VEE09) and JikesRVM.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Address</span>(<span class="ident">usize</span>);
+<span class="doccomment">/// Address represents an arbitrary address. This is designed to represent
+/// address and do address arithmetic mostly in a safe way, and to allow
+/// mark some operations as unsafe. This type needs to be zero overhead
+/// (memory wise and time wise). The idea is from the paper
+/// High-level Low-level Programming (VEE09) and JikesRVM.
+</span><span class="attribute">#[repr(transparent)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
+</span><span class="kw">pub struct </span>Address(usize);
 
-<span class="doccomment">/// Address + ByteSize (positive)</span>
-<span class="kw">impl</span> <span class="ident">Add</span><span class="op">&lt;</span><span class="ident">ByteSize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">Address</span>;
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span> <span class="op">+</span> <span class="ident">offset</span>)
+<span class="doccomment">/// Address + ByteSize (positive)
+</span><span class="kw">impl </span>Add&lt;ByteSize&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = Address;
+    <span class="kw">fn </span>add(<span class="self">self</span>, offset: ByteSize) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0 </span>+ offset)
     }
 }
 
-<span class="doccomment">/// Address += ByteSize (positive)</span>
-<span class="kw">impl</span> <span class="ident">AddAssign</span><span class="op">&lt;</span><span class="ident">ByteSize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">ByteSize</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">+</span><span class="op">=</span> <span class="ident">offset</span>;
+<span class="doccomment">/// Address += ByteSize (positive)
+</span><span class="kw">impl </span>AddAssign&lt;ByteSize&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>add_assign(<span class="kw-2">&amp;mut </span><span class="self">self</span>, offset: ByteSize) {
+        <span class="self">self</span>.<span class="number">0 </span>+= offset;
     }
 }
 
-<span class="doccomment">/// Address + ByteOffset (positive or negative)</span>
-<span class="kw">impl</span> <span class="ident">Add</span><span class="op">&lt;</span><span class="ident">ByteOffset</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">Address</span>;
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">ByteOffset</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>((<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+<span class="doccomment">/// Address + ByteOffset (positive or negative)
+</span><span class="kw">impl </span>Add&lt;ByteOffset&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = Address;
+    <span class="kw">fn </span>add(<span class="self">self</span>, offset: ByteOffset) -&gt; Address {
+        Address((<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>isize + offset) <span class="kw">as </span>usize)
     }
 }
 
-<span class="doccomment">/// Address += ByteOffset (positive or negative)</span>
-<span class="kw">impl</span> <span class="ident">AddAssign</span><span class="op">&lt;</span><span class="ident">ByteOffset</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">ByteOffset</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> (<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="ident">usize</span>
+<span class="doccomment">/// Address += ByteOffset (positive or negative)
+</span><span class="kw">impl </span>AddAssign&lt;ByteOffset&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>add_assign(<span class="kw-2">&amp;mut </span><span class="self">self</span>, offset: ByteOffset) {
+        <span class="self">self</span>.<span class="number">0 </span>= (<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>isize + offset) <span class="kw">as </span>usize
     }
 }
 
-<span class="doccomment">/// Address - ByteSize (positive)</span>
-<span class="kw">impl</span> <span class="ident">Sub</span><span class="op">&lt;</span><span class="ident">ByteSize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">Address</span>;
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span> <span class="op">-</span> <span class="ident">offset</span>)
+<span class="doccomment">/// Address - ByteSize (positive)
+</span><span class="kw">impl </span>Sub&lt;ByteSize&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = Address;
+    <span class="kw">fn </span>sub(<span class="self">self</span>, offset: ByteSize) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0 </span>- offset)
     }
 }
 
-<span class="doccomment">/// Address -= ByteSize (positive)</span>
-<span class="kw">impl</span> <span class="ident">SubAssign</span><span class="op">&lt;</span><span class="ident">ByteSize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">sub_assign</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">ByteSize</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">-</span><span class="op">=</span> <span class="ident">offset</span>;
+<span class="doccomment">/// Address -= ByteSize (positive)
+</span><span class="kw">impl </span>SubAssign&lt;ByteSize&gt; <span class="kw">for </span>Address {
+    <span class="kw">fn </span>sub_assign(<span class="kw-2">&amp;mut </span><span class="self">self</span>, offset: ByteSize) {
+        <span class="self">self</span>.<span class="number">0 </span>-= offset;
     }
 }
 
-<span class="doccomment">/// Address - Address (the first address must be higher)</span>
-<span class="kw">impl</span> <span class="ident">Sub</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">ByteSize</span>;
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ByteSize</span> {
+<span class="doccomment">/// Address - Address (the first address must be higher)
+</span><span class="kw">impl </span>Sub&lt;Address&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = ByteSize;
+    <span class="kw">fn </span>sub(<span class="self">self</span>, other: Address) -&gt; ByteSize {
         <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">other</span>.<span class="number">0</span>,
+            <span class="self">self</span>.<span class="number">0 </span>&gt;= other.<span class="number">0</span>,
             <span class="string">&quot;for (addr_a - addr_b), a({}) needs to be larger than b({})&quot;</span>,
             <span class="self">self</span>,
-            <span class="ident">other</span>
+            other
         );
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">-</span> <span class="ident">other</span>.<span class="number">0</span>
+        <span class="self">self</span>.<span class="number">0 </span>- other.<span class="number">0
+    </span>}
+}
+
+<span class="doccomment">/// Address &amp; mask
+</span><span class="kw">impl </span>BitAnd&lt;usize&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = usize;
+    <span class="kw">fn </span>bitand(<span class="self">self</span>, other: usize) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0 </span>&amp; other
+    }
+}
+<span class="comment">// Be careful about the return type here. Address &amp; u8 = u8
+// This is different from Address | u8 = usize
+</span><span class="kw">impl </span>BitAnd&lt;u8&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = u8;
+    <span class="kw">fn </span>bitand(<span class="self">self</span>, other: u8) -&gt; u8 {
+        (<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>u8) &amp; other
     }
 }
 
-<span class="doccomment">/// Address &amp; mask</span>
-<span class="kw">impl</span> <span class="ident">BitAnd</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
-    <span class="kw">fn</span> <span class="ident">bitand</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">other</span>
+<span class="doccomment">/// Address | mask
+</span><span class="kw">impl </span>BitOr&lt;usize&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = usize;
+    <span class="kw">fn </span>bitor(<span class="self">self</span>, other: usize) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0 </span>| other
     }
 }
-<span class="comment">// Be careful about the return type here. Address &amp; u8 = u8</span>
-<span class="comment">// This is different from Address | u8 = usize</span>
-<span class="kw">impl</span> <span class="ident">BitAnd</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">u8</span>;
-    <span class="kw">fn</span> <span class="ident">bitand</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">u8</span>) -&gt; <span class="ident">u8</span> {
-        (<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&amp;</span> <span class="ident">other</span>
-    }
-}
-
-<span class="doccomment">/// Address | mask</span>
-<span class="kw">impl</span> <span class="ident">BitOr</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
-    <span class="kw">fn</span> <span class="ident">bitor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">|</span> <span class="ident">other</span>
-    }
-}
-<span class="comment">// Be careful about the return type here. Address | u8 = size</span>
-<span class="comment">// This is different from Address &amp; u8 = u8</span>
-<span class="kw">impl</span> <span class="ident">BitOr</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
-    <span class="kw">fn</span> <span class="ident">bitor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">u8</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">|</span> (<span class="ident">other</span> <span class="kw">as</span> <span class="ident">usize</span>)
+<span class="comment">// Be careful about the return type here. Address | u8 = size
+// This is different from Address &amp; u8 = u8
+</span><span class="kw">impl </span>BitOr&lt;u8&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = usize;
+    <span class="kw">fn </span>bitor(<span class="self">self</span>, other: u8) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0 </span>| (other <span class="kw">as </span>usize)
     }
 }
 
-<span class="doccomment">/// Address &gt;&gt; shift (get an index)</span>
-<span class="kw">impl</span> <span class="ident">Shr</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
-    <span class="kw">fn</span> <span class="ident">shr</span>(<span class="self">self</span>, <span class="ident">shift</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">shift</span>
+<span class="doccomment">/// Address &gt;&gt; shift (get an index)
+</span><span class="kw">impl </span>Shr&lt;usize&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = usize;
+    <span class="kw">fn </span>shr(<span class="self">self</span>, shift: usize) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0 </span>&gt;&gt; shift
     }
 }
 
-<span class="doccomment">/// Address &lt;&lt; shift (get an index)</span>
-<span class="kw">impl</span> <span class="ident">Shl</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span>;
-    <span class="kw">fn</span> <span class="ident">shl</span>(<span class="self">self</span>, <span class="ident">shift</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">shift</span>
+<span class="doccomment">/// Address &lt;&lt; shift (get an index)
+</span><span class="kw">impl </span>Shl&lt;usize&gt; <span class="kw">for </span>Address {
+    <span class="kw">type </span>Output = usize;
+    <span class="kw">fn </span>shl(<span class="self">self</span>, shift: usize) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0 </span>&lt;&lt; shift
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Address</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ZERO</span>: <span class="self">Self</span> <span class="op">=</span> <span class="ident">Address</span>(<span class="number">0</span>);
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX</span>: <span class="self">Self</span> <span class="op">=</span> <span class="ident">Address</span>(<span class="ident">usize::max_value</span>());
+<span class="kw">impl </span>Address {
+    <span class="kw">pub const </span>ZERO: <span class="self">Self </span>= Address(<span class="number">0</span>);
+    <span class="kw">pub const </span>MAX: <span class="self">Self </span>= Address(usize::max_value());
 
-    <span class="doccomment">/// creates Address from a pointer</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">ptr</span>: <span class="kw-2">*const</span> <span class="ident">T</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="ident">ptr</span> <span class="kw">as</span> <span class="ident">usize</span>)
+    <span class="doccomment">/// creates Address from a pointer
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>from_ptr&lt;T&gt;(ptr: <span class="kw-2">*const </span>T) -&gt; Address {
+        Address(ptr <span class="kw">as </span>usize)
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_ref</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">r</span>: <span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="ident">r</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span> <span class="kw">as</span> <span class="ident">usize</span>)
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>from_ref&lt;T&gt;(r: <span class="kw-2">&amp;</span>T) -&gt; Address {
+        Address(r <span class="kw">as </span><span class="kw-2">*const </span>T <span class="kw">as </span>usize)
     }
 
-    <span class="doccomment">/// creates Address from a mutable pointer</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_mut_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">T</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="ident">ptr</span> <span class="kw">as</span> <span class="ident">usize</span>)
+    <span class="doccomment">/// creates Address from a mutable pointer
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>from_mut_ptr&lt;T&gt;(ptr: <span class="kw-2">*mut </span>T) -&gt; Address {
+        Address(ptr <span class="kw">as </span>usize)
     }
 
-    <span class="doccomment">/// creates a null Address (0)</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// It is unsafe and the user needs to be aware that they are creating an invalid address.</span>
-    <span class="doccomment">/// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">zero</span>() -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="number">0</span>)
+    <span class="doccomment">/// creates a null Address (0)
+    /// # Safety
+    /// It is unsafe and the user needs to be aware that they are creating an invalid address.
+    /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const unsafe fn </span>zero() -&gt; Address {
+        Address(<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// creates an Address of (usize::MAX)</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// It is unsafe and the user needs to be aware that they are creating an invalid address.</span>
-    <span class="doccomment">/// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">max</span>() -&gt; <span class="ident">Address</span> {
-        <span class="kw">use</span> <span class="ident">std::usize</span>;
-        <span class="ident">Address</span>(<span class="ident">usize::MAX</span>)
+    <span class="doccomment">/// creates an Address of (usize::MAX)
+    /// # Safety
+    /// It is unsafe and the user needs to be aware that they are creating an invalid address.
+    /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>max() -&gt; Address {
+        <span class="kw">use </span>std::usize;
+        Address(usize::MAX)
     }
 
-    <span class="doccomment">/// creates an arbitrary Address</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// It is unsafe and the user needs to be aware that they may create an invalid address.</span>
-    <span class="doccomment">/// This creates arbitrary addresses which may not be valid. This should only be used for hard-coded addresses. Any other uses of this function could be</span>
-    <span class="doccomment">/// replaced with more proper alternatives.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">from_usize</span>(<span class="ident">raw</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="ident">raw</span>)
+    <span class="doccomment">/// creates an arbitrary Address
+    /// # Safety
+    /// It is unsafe and the user needs to be aware that they may create an invalid address.
+    /// This creates arbitrary addresses which may not be valid. This should only be used for hard-coded addresses. Any other uses of this function could be
+    /// replaced with more proper alternatives.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const unsafe fn </span>from_usize(raw: usize) -&gt; Address {
+        Address(raw)
     }
 
-    <span class="doccomment">/// shifts the address by N T-typed objects (returns addr + N * size_of(T))</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">shift</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">self</span> <span class="op">+</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">isize</span> <span class="op">*</span> <span class="ident">offset</span>
+    <span class="doccomment">/// shifts the address by N T-typed objects (returns addr + N * size_of(T))
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>shift&lt;T&gt;(<span class="self">self</span>, offset: isize) -&gt; <span class="self">Self </span>{
+        <span class="self">self </span>+ mem::size_of::&lt;T&gt;() <span class="kw">as </span>isize * offset
     }
 
-    <span class="comment">// These const functions are duplicated with the operator traits. But we need them,</span>
-    <span class="comment">// as we need them to declare constants.</span>
+    <span class="comment">// These const functions are duplicated with the operator traits. But we need them,
+    // as we need them to declare constants.
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">get_extent</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ByteSize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">-</span> <span class="ident">other</span>.<span class="number">0</span>
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const fn </span>get_extent(<span class="self">self</span>, other: Address) -&gt; ByteSize {
+        <span class="self">self</span>.<span class="number">0 </span>- other.<span class="number">0
+    </span>}
+
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const fn </span>get_offset(<span class="self">self</span>, other: Address) -&gt; ByteOffset {
+        <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>isize - other.<span class="number">0 </span><span class="kw">as </span>isize
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">get_offset</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ByteOffset</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="ident">other</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">isize</span>
+    <span class="comment">// We implemented the Add trait but we still keep this add function.
+    // The add() function is const fn, and we can use it to declare Address constants.
+    // The Add trait function cannot be const.
+    </span><span class="attribute">#[allow(clippy::should_implement_trait)]
+    #[inline(always)]
+    </span><span class="kw">pub const fn </span>add(<span class="self">self</span>, size: usize) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0 </span>+ size)
     }
 
-    <span class="comment">// We implemented the Add trait but we still keep this add function.</span>
-    <span class="comment">// The add() function is const fn, and we can use it to declare Address constants.</span>
-    <span class="comment">// The Add trait function cannot be const.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::should_implement_trait</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span> <span class="op">+</span> <span class="ident">size</span>)
+    <span class="comment">// We implemented the Sub trait but we still keep this sub function.
+    // The sub() function is const fn, and we can use it to declare Address constants.
+    // The Sub trait function cannot be const.
+    </span><span class="attribute">#[allow(clippy::should_implement_trait)]
+    #[inline(always)]
+    </span><span class="kw">pub const fn </span>sub(<span class="self">self</span>, size: usize) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0 </span>- size)
     }
 
-    <span class="comment">// We implemented the Sub trait but we still keep this sub function.</span>
-    <span class="comment">// The sub() function is const fn, and we can use it to declare Address constants.</span>
-    <span class="comment">// The Sub trait function cannot be const.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::should_implement_trait</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span> <span class="op">-</span> <span class="ident">size</span>)
+    <span class="kw">pub const fn </span>and(<span class="self">self</span>, mask: usize) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0 </span>&amp; mask
     }
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">and</span>(<span class="self">self</span>, <span class="ident">mask</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">mask</span>
+    <span class="comment">// Perform a saturating subtract on the Address
+    </span><span class="kw">pub const fn </span>saturating_sub(<span class="self">self</span>, size: usize) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0</span>.saturating_sub(size))
     }
 
-    <span class="comment">// Perform a saturating subtract on the Address</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">saturating_sub</span>(<span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">size</span>))
+    <span class="doccomment">/// loads a value of type T from the address
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>load&lt;T: Copy&gt;(<span class="self">self</span>) -&gt; T {
+        <span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>T)
     }
 
-    <span class="doccomment">/// loads a value of type T from the address</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> {
-        <span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>)
+    <span class="doccomment">/// stores a value of type T to the address
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>store&lt;T&gt;(<span class="self">self</span>, value: T) {
+        <span class="comment">// We use a ptr.write() operation as directly setting the pointer would drop the old value
+        // which may result in unexpected behaviour
+        </span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>T).write(value);
     }
 
-    <span class="doccomment">/// stores a value of type T to the address</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>) {
-        <span class="comment">// We use a ptr.write() operation as directly setting the pointer would drop the old value</span>
-        <span class="comment">// which may result in unexpected behaviour</span>
-        (<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>).<span class="ident">write</span>(<span class="ident">value</span>);
+    <span class="doccomment">/// atomic operation: load
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>atomic_load&lt;T: Atomic&gt;(<span class="self">self</span>, order: Ordering) -&gt; T::Type {
+        <span class="kw">let </span>loc = <span class="kw-2">&amp;*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T);
+        loc.load(order)
     }
 
-    <span class="doccomment">/// atomic operation: load</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">atomic_load</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Atomic</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">T::Type</span> {
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>);
-        <span class="ident">loc</span>.<span class="ident">load</span>(<span class="ident">order</span>)
+    <span class="doccomment">/// atomic operation: store
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>atomic_store&lt;T: Atomic&gt;(<span class="self">self</span>, val: T::Type, order: Ordering) {
+        <span class="kw">let </span>loc = <span class="kw-2">&amp;*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T);
+        loc.store(val, order)
     }
 
-    <span class="doccomment">/// atomic operation: store</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">atomic_store</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Atomic</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">val</span>: <span class="ident">T::Type</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) {
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>);
-        <span class="ident">loc</span>.<span class="ident">store</span>(<span class="ident">val</span>, <span class="ident">order</span>)
-    }
-
-    <span class="doccomment">/// atomic operation: compare and exchange usize</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">compare_exchange</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Atomic</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// atomic operation: compare and exchange usize
+    /// # Safety
+    /// This could throw a segment fault if the address is invalid
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>compare_exchange&lt;T: Atomic&gt;(
         <span class="self">self</span>,
-        <span class="ident">old</span>: <span class="ident">T::Type</span>,
-        <span class="ident">new</span>: <span class="ident">T::Type</span>,
-        <span class="ident">success</span>: <span class="ident">Ordering</span>,
-        <span class="ident">failure</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T::Type</span>, <span class="ident">T::Type</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>);
-        <span class="ident">loc</span>.<span class="ident">compare_exchange</span>(<span class="ident">old</span>, <span class="ident">new</span>, <span class="ident">success</span>, <span class="ident">failure</span>)
+        old: T::Type,
+        new: T::Type,
+        success: Ordering,
+        failure: Ordering,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;T::Type, T::Type&gt; {
+        <span class="kw">let </span>loc = <span class="kw-2">&amp;*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T);
+        loc.compare_exchange(old, new, success, failure)
     }
 
-    <span class="doccomment">/// is this address zero?</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_zero</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">==</span> <span class="number">0</span>
+    <span class="doccomment">/// is this address zero?
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>is_zero(<span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
+    </span>}
+
+    <span class="doccomment">/// aligns up the address to the given alignment
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const fn </span>align_up(<span class="self">self</span>, align: ByteSize) -&gt; Address {
+        <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+        Address(conversions::raw_align_up(<span class="self">self</span>.<span class="number">0</span>, align))
     }
 
-    <span class="doccomment">/// aligns up the address to the given alignment</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align_up</span>(<span class="self">self</span>, <span class="ident">align</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
-        <span class="ident">Address</span>(<span class="ident">conversions::raw_align_up</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">align</span>))
+    <span class="doccomment">/// aligns down the address to the given alignment
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const fn </span>align_down(<span class="self">self</span>, align: ByteSize) -&gt; Address {
+        <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+        Address(conversions::raw_align_down(<span class="self">self</span>.<span class="number">0</span>, align))
     }
 
-    <span class="doccomment">/// aligns down the address to the given alignment</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align_down</span>(<span class="self">self</span>, <span class="ident">align</span>: <span class="ident">ByteSize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
-        <span class="ident">Address</span>(<span class="ident">conversions::raw_align_down</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">align</span>))
+    <span class="doccomment">/// is this address aligned to the given alignment
+    </span><span class="kw">pub fn </span>is_aligned_to(<span class="self">self</span>, align: usize) -&gt; bool {
+        <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+        conversions::raw_is_aligned(<span class="self">self</span>.<span class="number">0</span>, align)
     }
 
-    <span class="doccomment">/// is this address aligned to the given alignment</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_aligned_to</span>(<span class="self">self</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
-        <span class="ident">conversions::raw_is_aligned</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">align</span>)
+    <span class="doccomment">/// converts the Address to a pointer
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>to_ptr&lt;T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">*const </span>T {
+        <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T
     }
 
-    <span class="doccomment">/// converts the Address to a pointer</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="kw-2">*const</span> <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>
+    <span class="doccomment">/// converts the Address to a mutable pointer
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>to_mut_ptr&lt;T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">*mut </span>T {
+        <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>T
     }
 
-    <span class="doccomment">/// converts the Address to a mutable pointer</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_mut_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>
+    <span class="doccomment">/// converts the Address to a Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub unsafe fn </span>as_ref&lt;<span class="lifetime">&#39;a</span>, T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T {
+        <span class="kw-2">&amp;*</span><span class="self">self</span>.to_mut_ptr()
     }
 
-    <span class="doccomment">/// converts the Address to a Rust reference</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller must guarantee the address actually points to a Rust object.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_ref</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">T</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">to_mut_ptr</span>()
+    <span class="doccomment">/// converts the Address to a pointer-sized integer
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub const fn </span>as_usize(<span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
+
+    <span class="doccomment">/// returns the chunk index for this address
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>chunk_index(<span class="self">self</span>) -&gt; usize {
+        <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+        conversions::address_to_chunk_index(<span class="self">self</span>)
     }
 
-    <span class="doccomment">/// converts the Address to a pointer-sized integer</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">as_usize</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
-
-    <span class="doccomment">/// returns the chunk index for this address</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk_index</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
-        <span class="ident">conversions::address_to_chunk_index</span>(<span class="self">self</span>)
-    }
-
-    <span class="doccomment">/// return true if the referenced memory is mapped</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="number">0</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="bool-val">false</span>
-        } <span class="kw">else</span> {
-            <span class="ident">MMAPPER</span>.<span class="ident">is_mapped_address</span>(<span class="self">self</span>)
+    <span class="doccomment">/// return true if the referenced memory is mapped
+    </span><span class="kw">pub fn </span>is_mapped(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.<span class="number">0 </span>== <span class="number">0 </span>{
+            <span class="bool-val">false
+        </span>} <span class="kw">else </span>{
+            MMAPPER.is_mapped_address(<span class="self">self</span>)
         }
     }
 }
 
-<span class="doccomment">/// allows print Address as upper-case hex value</span>
-<span class="kw">impl</span> <span class="ident">fmt::UpperHex</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:X}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows print Address as upper-case hex value
+</span><span class="kw">impl </span>fmt::UpperHex <span class="kw">for </span>Address {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:X}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="doccomment">/// allows print Address as lower-case hex value</span>
-<span class="kw">impl</span> <span class="ident">fmt::LowerHex</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows print Address as lower-case hex value
+</span><span class="kw">impl </span>fmt::LowerHex <span class="kw">for </span>Address {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="doccomment">/// allows Display format the Address (as upper-case hex value with 0x prefix)</span>
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows Display format the Address (as upper-case hex value with 0x prefix)
+</span><span class="kw">impl </span>fmt::Display <span class="kw">for </span>Address {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="doccomment">/// allows Debug format the Address (as upper-case hex value with 0x prefix)</span>
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows Debug format the Address (as upper-case hex value with 0x prefix)
+</span><span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Address {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">align_up</span>() {
-        <span class="kw">unsafe</span> {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>align_up() {
+        <span class="kw">unsafe </span>{
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0x10</span>).<span class="ident">align_up</span>(<span class="number">0x10</span>),
-                <span class="ident">Address::from_usize</span>(<span class="number">0x10</span>)
+                Address::from_usize(<span class="number">0x10</span>).align_up(<span class="number">0x10</span>),
+                Address::from_usize(<span class="number">0x10</span>)
             );
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0x11</span>).<span class="ident">align_up</span>(<span class="number">0x10</span>),
-                <span class="ident">Address::from_usize</span>(<span class="number">0x20</span>)
+                Address::from_usize(<span class="number">0x11</span>).align_up(<span class="number">0x10</span>),
+                Address::from_usize(<span class="number">0x20</span>)
             );
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0x20</span>).<span class="ident">align_up</span>(<span class="number">0x10</span>),
-                <span class="ident">Address::from_usize</span>(<span class="number">0x20</span>)
+                Address::from_usize(<span class="number">0x20</span>).align_up(<span class="number">0x10</span>),
+                Address::from_usize(<span class="number">0x20</span>)
             );
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">align_down</span>() {
-        <span class="kw">unsafe</span> {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>align_down() {
+        <span class="kw">unsafe </span>{
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0x10</span>).<span class="ident">align_down</span>(<span class="number">0x10</span>),
-                <span class="ident">Address::from_usize</span>(<span class="number">0x10</span>)
+                Address::from_usize(<span class="number">0x10</span>).align_down(<span class="number">0x10</span>),
+                Address::from_usize(<span class="number">0x10</span>)
             );
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0x11</span>).<span class="ident">align_down</span>(<span class="number">0x10</span>),
-                <span class="ident">Address::from_usize</span>(<span class="number">0x10</span>)
+                Address::from_usize(<span class="number">0x11</span>).align_down(<span class="number">0x10</span>),
+                Address::from_usize(<span class="number">0x10</span>)
             );
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0x20</span>).<span class="ident">align_down</span>(<span class="number">0x10</span>),
-                <span class="ident">Address::from_usize</span>(<span class="number">0x20</span>)
-            );
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">is_aligned_to</span>() {
-        <span class="kw">unsafe</span> {
-            <span class="macro">assert!</span>(<span class="ident">Address::from_usize</span>(<span class="number">0x10</span>).<span class="ident">is_aligned_to</span>(<span class="number">0x10</span>));
-            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">Address::from_usize</span>(<span class="number">0x11</span>).<span class="ident">is_aligned_to</span>(<span class="number">0x10</span>));
-            <span class="macro">assert!</span>(<span class="ident">Address::from_usize</span>(<span class="number">0x10</span>).<span class="ident">is_aligned_to</span>(<span class="number">0x8</span>));
-            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">Address::from_usize</span>(<span class="number">0x10</span>).<span class="ident">is_aligned_to</span>(<span class="number">0x20</span>));
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">bit_and</span>() {
-        <span class="kw">unsafe</span> {
-            <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0b1111_1111_1100usize</span>) <span class="op">&amp;</span> <span class="number">0b1010u8</span>,
-                <span class="number">0b1000u8</span>
-            );
-            <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0b1111_1111_1100usize</span>) <span class="op">&amp;</span> <span class="number">0b1000_0000_1010usize</span>,
-                <span class="number">0b1000_0000_1000usize</span>
+                Address::from_usize(<span class="number">0x20</span>).align_down(<span class="number">0x10</span>),
+                Address::from_usize(<span class="number">0x20</span>)
             );
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">bit_or</span>() {
-        <span class="kw">unsafe</span> {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>is_aligned_to() {
+        <span class="kw">unsafe </span>{
+            <span class="macro">assert!</span>(Address::from_usize(<span class="number">0x10</span>).is_aligned_to(<span class="number">0x10</span>));
+            <span class="macro">assert!</span>(!Address::from_usize(<span class="number">0x11</span>).is_aligned_to(<span class="number">0x10</span>));
+            <span class="macro">assert!</span>(Address::from_usize(<span class="number">0x10</span>).is_aligned_to(<span class="number">0x8</span>));
+            <span class="macro">assert!</span>(!Address::from_usize(<span class="number">0x10</span>).is_aligned_to(<span class="number">0x20</span>));
+        }
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>bit_and() {
+        <span class="kw">unsafe </span>{
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0b1111_1111_1100usize</span>) <span class="op">|</span> <span class="number">0b1010u8</span>,
-                <span class="number">0b1111_1111_1110usize</span>
-            );
+                Address::from_usize(<span class="number">0b1111_1111_1100usize</span>) &amp; <span class="number">0b1010u8</span>,
+                <span class="number">0b1000u8
+            </span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">Address::from_usize</span>(<span class="number">0b1111_1111_1100usize</span>) <span class="op">|</span> <span class="number">0b1000_0000_1010usize</span>,
-                <span class="number">0b1111_1111_1110usize</span>
-            );
+                Address::from_usize(<span class="number">0b1111_1111_1100usize</span>) &amp; <span class="number">0b1000_0000_1010usize</span>,
+                <span class="number">0b1000_0000_1000usize
+            </span>);
+        }
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>bit_or() {
+        <span class="kw">unsafe </span>{
+            <span class="macro">assert_eq!</span>(
+                Address::from_usize(<span class="number">0b1111_1111_1100usize</span>) | <span class="number">0b1010u8</span>,
+                <span class="number">0b1111_1111_1110usize
+            </span>);
+            <span class="macro">assert_eq!</span>(
+                Address::from_usize(<span class="number">0b1111_1111_1100usize</span>) | <span class="number">0b1000_0000_1010usize</span>,
+                <span class="number">0b1111_1111_1110usize
+            </span>);
         }
     }
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="doccomment">/// ObjectReference represents address for an object. Compared with Address,</span>
-<span class="doccomment">/// operations allowed on ObjectReference are very limited. No address arithmetics</span>
-<span class="doccomment">/// are allowed for ObjectReference. The idea is from the paper</span>
-<span class="doccomment">/// High-level Low-level Programming (VEE09) and JikesRVM.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// A runtime may define its &quot;object references&quot; differently. It may define an object reference as</span>
-<span class="doccomment">/// the address of an object, a handle that points to an indirection table entry where a pointer to</span>
-<span class="doccomment">/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a</span>
-<span class="doccomment">/// pointer to the object (an address) in each object reference, and that address should be used</span>
-<span class="doccomment">/// for this `ObjectReference` type.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// We currently do not allow an opaque `ObjectReference` type for which a binding can define</span>
-<span class="doccomment">/// their layout. We now only allow a binding to define their semantics through a set of</span>
-<span class="doccomment">/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow</span>
-<span class="doccomment">/// the opaque `ObjectReference` type, and we haven&#39;t seen a use case for now.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectReference</span>(<span class="ident">usize</span>);
+<span class="doccomment">/// ObjectReference represents address for an object. Compared with Address,
+/// operations allowed on ObjectReference are very limited. No address arithmetics
+/// are allowed for ObjectReference. The idea is from the paper
+/// High-level Low-level Programming (VEE09) and JikesRVM.
+///
+/// A runtime may define its &quot;object references&quot; differently. It may define an object reference as
+/// the address of an object, a handle that points to an indirection table entry where a pointer to
+/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a
+/// pointer to the object (an address) in each object reference, and that address should be used
+/// for this `ObjectReference` type.
+///
+/// We currently do not allow an opaque `ObjectReference` type for which a binding can define
+/// their layout. We now only allow a binding to define their semantics through a set of
+/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
+/// the opaque `ObjectReference` type, and we haven&#39;t seen a use case for now.
+</span><span class="attribute">#[repr(transparent)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
+</span><span class="kw">pub struct </span>ObjectReference(usize);
 
-<span class="kw">impl</span> <span class="ident">ObjectReference</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NULL</span>: <span class="ident">ObjectReference</span> <span class="op">=</span> <span class="ident">ObjectReference</span>(<span class="number">0</span>);
+<span class="kw">impl </span>ObjectReference {
+    <span class="kw">pub const </span>NULL: ObjectReference = ObjectReference(<span class="number">0</span>);
 
-    <span class="doccomment">/// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// MMTk should not make any assumption on the actual location of the address with the object reference.</span>
-    <span class="doccomment">/// MMTk should not assume the address returned by this method is in our allocation. For the purposes of</span>
-    <span class="doccomment">/// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_raw_address</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)
+    <span class="doccomment">/// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
+    ///
+    /// MMTk should not make any assumption on the actual location of the address with the object reference.
+    /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
+    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>to_raw_address(<span class="self">self</span>) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.</span>
-    <span class="doccomment">/// This is how a binding creates `ObjectReference` instances.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]</span>
-    <span class="doccomment">/// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_raw_address</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="ident">ObjectReference</span>(<span class="ident">addr</span>.<span class="number">0</span>)
+    <span class="doccomment">/// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
+    /// This is how a binding creates `ObjectReference` instances.
+    ///
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>from_raw_address(addr: Address) -&gt; ObjectReference {
+        ObjectReference(addr.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address</span>
-    <span class="doccomment">/// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the</span>
-    <span class="doccomment">/// comments on [`crate::vm::ObjectModel::ref_to_address`].</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_address</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-        <span class="kw">let</span> <span class="ident">to_address</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="self">self</span>);
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS</span> <span class="op">|</span><span class="op">|</span> <span class="ident">to_address</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">to_raw_address</span>(), <span class="string">&quot;The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}&quot;</span>, <span class="self">self</span>, <span class="ident">to_address</span>);
-        <span class="ident">to_address</span>
+    <span class="doccomment">/// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
+    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
+    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>to_address&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
+        <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+        <span class="kw">let </span>to_address = VM::VMObjectModel::ref_to_address(<span class="self">self</span>);
+        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == <span class="self">self</span>.to_raw_address(), <span class="string">&quot;The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}&quot;</span>, <span class="self">self</span>, to_address);
+        to_address
     }
 
-    <span class="doccomment">/// Get the header base address from an object reference. This method is used by MMTk to get a base address for the</span>
-    <span class="doccomment">/// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].</span>
-    <span class="doccomment">/// See the comments on [`crate::vm::ObjectModel::ref_to_header`].</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_header</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-        <span class="ident">VM::VMObjectModel::ref_to_header</span>(<span class="self">self</span>)
+    <span class="doccomment">/// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
+    /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
+    /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>to_header&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
+        <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+        VM::VMObjectModel::ref_to_header(<span class="self">self</span>)
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_object_start</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-        <span class="kw">let</span> <span class="ident">object_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="self">self</span>);
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS</span> <span class="op">|</span><span class="op">|</span> <span class="ident">object_start</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">to_raw_address</span>(), <span class="string">&quot;The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}&quot;</span>, <span class="self">self</span>, <span class="ident">object_start</span>);
-        <span class="ident">object_start</span>
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>to_object_start&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
+        <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+        <span class="kw">let </span>object_start = VM::VMObjectModel::ref_to_object_start(<span class="self">self</span>);
+        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == <span class="self">self</span>.to_raw_address(), <span class="string">&quot;The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}&quot;</span>, <span class="self">self</span>, object_start);
+        object_start
     }
 
-    <span class="doccomment">/// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]</span>
-    <span class="doccomment">/// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].</span>
-    <span class="doccomment">/// See the comments on [`crate::vm::ObjectModel::address_to_ref`].</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_address</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-        <span class="kw">let</span> <span class="ident">obj</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::address_to_ref</span>(<span class="ident">addr</span>);
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS</span> <span class="op">|</span><span class="op">|</span> <span class="ident">addr</span> <span class="op">==</span> <span class="ident">obj</span>.<span class="ident">to_raw_address</span>(), <span class="string">&quot;The binding claims unified object reference address, but for address {}, address_to_ref() returns {}&quot;</span>, <span class="ident">addr</span>, <span class="ident">obj</span>);
-        <span class="ident">obj</span>
+    <span class="doccomment">/// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
+    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
+    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>from_address&lt;VM: VMBinding&gt;(addr: Address) -&gt; ObjectReference {
+        <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+        <span class="kw">let </span>obj = VM::VMObjectModel::address_to_ref(addr);
+        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), <span class="string">&quot;The binding claims unified object reference address, but for address {}, address_to_ref() returns {}&quot;</span>, addr, obj);
+        obj
     }
 
-    <span class="doccomment">/// is this object reference null reference?</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_null</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">==</span> <span class="number">0</span>
-    }
+    <span class="doccomment">/// is this object reference null reference?
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>is_null(<span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
+    </span>}
 
-    <span class="doccomment">/// returns the ObjectReference</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">value</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="doccomment">/// returns the ObjectReference
+    </span><span class="kw">pub fn </span>value(<span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
 
-    <span class="doccomment">/// Is the object reachable, determined by the policy?</span>
-    <span class="doccomment">/// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_reachable</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_null</span>() {
-            <span class="bool-val">false</span>
-        } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)) }.<span class="ident">is_reachable</span>(<span class="self">self</span>)
+    <span class="doccomment">/// Is the object reachable, determined by the policy?
+    /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>is_reachable(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.is_null() {
+            <span class="bool-val">false
+        </span>} <span class="kw">else </span>{
+            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_reachable(<span class="self">self</span>)
         }
     }
 
-    <span class="doccomment">/// Is the object live, determined by the policy?</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="number">0</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="bool-val">false</span>
-        } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)) }.<span class="ident">is_live</span>(<span class="self">self</span>)
+    <span class="doccomment">/// Is the object live, determined by the policy?
+    </span><span class="kw">pub fn </span>is_live(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.<span class="number">0 </span>== <span class="number">0 </span>{
+            <span class="bool-val">false
+        </span>} <span class="kw">else </span>{
+            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_live(<span class="self">self</span>)
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">unsafe</span> { <span class="ident">SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)) }.<span class="ident">is_movable</span>()
+    <span class="kw">pub fn </span>is_movable(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_movable()
     }
 
-    <span class="doccomment">/// Get forwarding pointer if the object is forwarded.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_forwarded_object</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">unsafe</span> { <span class="ident">SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)) }.<span class="ident">get_forwarded_object</span>(<span class="self">self</span>)
+    <span class="doccomment">/// Get forwarding pointer if the object is forwarded.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>get_forwarded_object(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.get_forwarded_object(<span class="self">self</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_any_space</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">unsafe</span> { <span class="ident">SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)) }.<span class="ident">is_in_space</span>(<span class="self">self</span>)
+    <span class="kw">pub fn </span>is_in_any_space(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_in_space(<span class="self">self</span>)
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">unsafe</span> { <span class="ident">SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)) }.<span class="ident">is_sane</span>()
-    }
-}
-
-<span class="doccomment">/// allows print Address as upper-case hex value</span>
-<span class="kw">impl</span> <span class="ident">fmt::UpperHex</span> <span class="kw">for</span> <span class="ident">ObjectReference</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:X}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    </span><span class="kw">pub fn </span>is_sane(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_sane()
     }
 }
 
-<span class="doccomment">/// allows print Address as lower-case hex value</span>
-<span class="kw">impl</span> <span class="ident">fmt::LowerHex</span> <span class="kw">for</span> <span class="ident">ObjectReference</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows print Address as upper-case hex value
+</span><span class="kw">impl </span>fmt::UpperHex <span class="kw">for </span>ObjectReference {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:X}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="doccomment">/// allows Display format the Address (as upper-case hex value with 0x prefix)</span>
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">ObjectReference</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows print Address as lower-case hex value
+</span><span class="kw">impl </span>fmt::LowerHex <span class="kw">for </span>ObjectReference {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 
-<span class="doccomment">/// allows Debug format the Address (as upper-case hex value with 0x prefix)</span>
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ObjectReference</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+<span class="doccomment">/// allows Display format the Address (as upper-case hex value with 0x prefix)
+</span><span class="kw">impl </span>fmt::Display <span class="kw">for </span>ObjectReference {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
+}
+
+<span class="doccomment">/// allows Debug format the Address (as upper-case hex value with 0x prefix)
+</span><span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ObjectReference {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:#x}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

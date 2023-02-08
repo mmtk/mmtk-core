@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["IntArrayFreeList",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["IntArrayFreeList",""]]};

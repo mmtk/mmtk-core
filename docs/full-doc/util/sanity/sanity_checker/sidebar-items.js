@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SanityChecker",""],["SanityGCProcessEdges",""],["SanityPrepare",""],["SanityRelease",""],["ScheduleSanityGC",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["SanityChecker",""],["SanityGCProcessEdges",""],["SanityPrepare",""],["SanityRelease",""],["ScheduleSanityGC",""]]};

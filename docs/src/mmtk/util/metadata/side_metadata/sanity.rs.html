@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;metadata&#x2F;side_metadata&#x2F;sanity.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sanity.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/metadata/side_metadata/sanity.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sanity.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -767,97 +765,97 @@
 <span id="765">765</span>
 <span id="766">766</span>
 <span id="767">767</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
-<span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Error</span>, <span class="ident">ErrorKind</span>, <span class="prelude-ty">Result</span>};
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">RwLock</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>std::io::{Error, ErrorKind, <span class="prelude-ty">Result</span>};
+<span class="kw">use </span>std::sync::{Mutex, RwLock};
 
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::constants</span>::{
-    <span class="ident">LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO</span>, <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>,
+<span class="kw">use </span><span class="kw">super</span>::constants::{
+    LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK</span>;
+<span class="kw">use super</span>::{SideMetadataContext, SideMetadataSpec};
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 
-<span class="doccomment">/// An internal enum to enhance code style for add/sub</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">enum</span> <span class="ident">MathOp</span> {
-    <span class="ident">Add</span>,
-    <span class="ident">Sub</span>,
+<span class="doccomment">/// An internal enum to enhance code style for add/sub
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">enum </span>MathOp {
+    Add,
+    Sub,
 }
 
-<span class="doccomment">/// An internal str used as a name for global side metadata</span>
-<span class="doccomment">/// (policy-specific metadata is named after the policy who own it)</span>
-<span class="kw">static</span> <span class="ident">GLOBAL_META_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;Global&quot;</span>;
+<span class="doccomment">/// An internal str used as a name for global side metadata
+/// (policy-specific metadata is named after the policy who own it)
+</span><span class="kw">static </span>GLOBAL_META_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;Global&quot;</span>;
 
-<span class="doccomment">/// This struct includes a hashmap to store the metadata specs information for policy-specific and global metadata for each plan.</span>
-<span class="doccomment">/// It uses policy name (or GLOBAL_META_NAME for globals) as the key and keeps a vector of specs as the value.</span>
-<span class="doccomment">/// Each plan needs its exclusive instance of this struct to use side metadata specification and content sanity checker.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// NOTE:</span>
-<span class="doccomment">/// Content sanity check is expensive and is only activated with the `extreme_assertions` feature.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// FIXME: This struct should be pub(crate) visible, but changing its scope will need changing other scopes, such as the Space trait&#39;s. For now, I will not do that.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SideMetadataSanity</span> {
-    <span class="ident">specs_sanity_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// This struct includes a hashmap to store the metadata specs information for policy-specific and global metadata for each plan.
+/// It uses policy name (or GLOBAL_META_NAME for globals) as the key and keeps a vector of specs as the value.
+/// Each plan needs its exclusive instance of this struct to use side metadata specification and content sanity checker.
+///
+/// NOTE:
+/// Content sanity check is expensive and is only activated with the `extreme_assertions` feature.
+///
+/// FIXME: This struct should be pub(crate) visible, but changing its scope will need changing other scopes, such as the Space trait&#39;s. For now, I will not do that.
+</span><span class="kw">pub struct </span>SideMetadataSanity {
+    specs_sanity_map: HashMap&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str, Vec&lt;SideMetadataSpec&gt;&gt;,
 }
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// This is a two-level hashmap to store the metadata content for verification purposes.</span>
-    <span class="doccomment">/// It keeps a map from side metadata specifications to a second hashmap</span>
-    <span class="doccomment">/// which maps data addresses to their current metadata content.</span>
-    <span class="doccomment">/// Use u64 to store side metadata values, as u64 is the max length of side metadata we support.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">CONTENT_SANITY_MAP</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Address</span>, <span class="ident">u64</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>
-        <span class="ident">RwLock::new</span>(<span class="ident">HashMap::new</span>());
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">SANITY_LOCK</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(());
+<span class="macro">lazy_static! </span>{
+    <span class="doccomment">/// This is a two-level hashmap to store the metadata content for verification purposes.
+    /// It keeps a map from side metadata specifications to a second hashmap
+    /// which maps data addresses to their current metadata content.
+    /// Use u64 to store side metadata values, as u64 is the max length of side metadata we support.
+    </span><span class="kw">static </span><span class="kw-2">ref </span>CONTENT_SANITY_MAP: RwLock&lt;HashMap&lt;SideMetadataSpec, HashMap&lt;Address, u64&gt;&gt;&gt; =
+        RwLock::new(HashMap::new());
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span><span class="kw-2">ref </span>SANITY_LOCK: Mutex&lt;()&gt; = Mutex::new(());
 }
 
-<span class="doccomment">/// A test helper function which resets contents map to prevent propagation of test failure</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">reset</span>() {
-    <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>().<span class="ident">clear</span>()
+<span class="doccomment">/// A test helper function which resets contents map to prevent propagation of test failure
+</span><span class="attribute">#[cfg(test)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>reset() {
+    CONTENT_SANITY_MAP.write().unwrap().clear()
 }
 
-<span class="doccomment">/// Checks whether the input global specifications fit within the current upper bound for all global metadata (limited by `metadata::constants::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO`).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns `Ok` if all global specs fit and `Err` otherwise.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `g_specs`: a slice of global specs to be checked.</span>
-<span class="doccomment">///</span>
-<span class="kw">fn</span> <span class="ident">verify_global_specs_total_size</span>(<span class="ident">g_specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_size</span> <span class="op">=</span> <span class="number">0usize</span>;
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">g_specs</span> {
-        <span class="ident">total_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident"><span class="kw">super</span>::metadata_address_range_size</span>(<span class="ident">spec</span>);
+<span class="doccomment">/// Checks whether the input global specifications fit within the current upper bound for all global metadata (limited by `metadata::constants::LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO`).
+///
+/// Returns `Ok` if all global specs fit and `Err` otherwise.
+///
+/// Arguments:
+/// * `g_specs`: a slice of global specs to be checked.
+///
+</span><span class="kw">fn </span>verify_global_specs_total_size(g_specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>total_size = <span class="number">0usize</span>;
+    <span class="kw">for </span>spec <span class="kw">in </span>g_specs {
+        total_size += <span class="kw">super</span>::metadata_address_range_size(spec);
     }
 
-    <span class="kw">if</span> <span class="ident">total_size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_ADDRESS_SPACE</span> <span class="op">-</span> <span class="ident">LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO</span>) {
+    <span class="kw">if </span>total_size &lt;= <span class="number">1usize </span>&lt;&lt; (LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO) {
         <span class="prelude-val">Ok</span>(())
-    } <span class="kw">else</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">Error::new</span>(
-            <span class="ident">ErrorKind::InvalidInput</span>,
-            <span class="macro">format!</span>(<span class="string">&quot;Not enough global metadata space for: \n{:?}&quot;</span>, <span class="ident">g_specs</span>),
+    } <span class="kw">else </span>{
+        <span class="prelude-val">Err</span>(Error::new(
+            ErrorKind::InvalidInput,
+            <span class="macro">format!</span>(<span class="string">&quot;Not enough global metadata space for: \n{:?}&quot;</span>, g_specs),
         ))
     }
 }
 
-<span class="doccomment">/// (For 64-bits targets) Checks whether the input local specifications fit within the current upper bound for each local metadata (limited for each local metadata by `metadata::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO`).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns `Ok` if all local specs fit and `Err` otherwise.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `l_specs`: a slice of local specs to be checked.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">fn</span> <span class="ident">verify_local_specs_size</span>(<span class="ident">l_specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">l_specs</span> {
-        <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::metadata_address_range_size</span>(<span class="ident">spec</span>)
-            <span class="op">&gt;</span> <span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_ADDRESS_SPACE</span> <span class="op">-</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>)
+<span class="doccomment">/// (For 64-bits targets) Checks whether the input local specifications fit within the current upper bound for each local metadata (limited for each local metadata by `metadata::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO`).
+///
+/// Returns `Ok` if all local specs fit and `Err` otherwise.
+///
+/// Arguments:
+/// * `l_specs`: a slice of local specs to be checked.
+///
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">fn </span>verify_local_specs_size(l_specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">for </span>spec <span class="kw">in </span>l_specs {
+        <span class="kw">if </span><span class="kw">super</span>::metadata_address_range_size(spec)
+            &gt; <span class="number">1usize </span>&lt;&lt; (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
         {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::new</span>(
-                <span class="ident">ErrorKind::InvalidInput</span>,
-                <span class="macro">format!</span>(<span class="string">&quot;Local metadata is too big: \n{:?}&quot;</span>, <span class="ident">spec</span>),
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
+                ErrorKind::InvalidInput,
+                <span class="macro">format!</span>(<span class="string">&quot;Local metadata is too big: \n{:?}&quot;</span>, spec),
             ));
         }
     }
@@ -865,27 +863,27 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// (For 32-bits targets) Checks whether the input local specifications fit within the current upper bound for all chunked local metadata (limited for all chunked local metadata by `metadata::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO`).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns `Ok` if all local specs fit and `Err` otherwise.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `l_specs`: a slice of local specs to be checked.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">fn</span> <span class="ident">verify_local_specs_size</span>(<span class="ident">l_specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_size</span> <span class="op">=</span> <span class="number">0usize</span>;
-    <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">l_specs</span> {
-        <span class="ident">total_size</span> <span class="op">+</span><span class="op">=</span>
-            <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
+<span class="doccomment">/// (For 32-bits targets) Checks whether the input local specifications fit within the current upper bound for all chunked local metadata (limited for all chunked local metadata by `metadata::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO`).
+///
+/// Returns `Ok` if all local specs fit and `Err` otherwise.
+///
+/// Arguments:
+/// * `l_specs`: a slice of local specs to be checked.
+///
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">fn </span>verify_local_specs_size(l_specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>total_size = <span class="number">0usize</span>;
+    <span class="kw">for </span>spec <span class="kw">in </span>l_specs {
+        total_size +=
+            <span class="kw">super</span>::metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
     }
 
-    <span class="kw">if</span> <span class="ident">total_size</span> <span class="op">&gt;</span> <span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::new</span>(
-            <span class="ident">ErrorKind::InvalidInput</span>,
+    <span class="kw">if </span>total_size &gt; <span class="number">1usize </span>&lt;&lt; (LOG_BYTES_IN_CHUNK - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
+            ErrorKind::InvalidInput,
             <span class="macro">format!</span>(
                 <span class="string">&quot;Not enough local metadata space per chunk for: \n{:?}&quot;</span>,
-                <span class="ident">l_specs</span>
+                l_specs
             ),
         ));
     }
@@ -893,74 +891,74 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// (For contiguous metadata) Checks whether two input specifications overlap, considering their offsets and maximum size.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns `Err` if overlap is detected.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `spec_1`: first target specification</span>
-<span class="doccomment">/// * `spec_2`: second target specification</span>
-<span class="doccomment">///</span>
-<span class="kw">fn</span> <span class="ident">verify_no_overlap_contiguous</span>(
-    <span class="ident">spec_1</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
-    <span class="ident">spec_2</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">end_1</span> <span class="op">=</span> <span class="ident">spec_1</span>.<span class="ident">get_absolute_offset</span>() <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_address_range_size</span>(<span class="ident">spec_1</span>);
-    <span class="kw">let</span> <span class="ident">end_2</span> <span class="op">=</span> <span class="ident">spec_2</span>.<span class="ident">get_absolute_offset</span>() <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_address_range_size</span>(<span class="ident">spec_2</span>);
+<span class="doccomment">/// (For contiguous metadata) Checks whether two input specifications overlap, considering their offsets and maximum size.
+///
+/// Returns `Err` if overlap is detected.
+///
+/// Arguments:
+/// * `spec_1`: first target specification
+/// * `spec_2`: second target specification
+///
+</span><span class="kw">fn </span>verify_no_overlap_contiguous(
+    spec_1: <span class="kw-2">&amp;</span>SideMetadataSpec,
+    spec_2: <span class="kw-2">&amp;</span>SideMetadataSpec,
+) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span>end_1 = spec_1.get_absolute_offset() + <span class="kw">super</span>::metadata_address_range_size(spec_1);
+    <span class="kw">let </span>end_2 = spec_2.get_absolute_offset() + <span class="kw">super</span>::metadata_address_range_size(spec_2);
 
-    <span class="kw">if</span> <span class="op">!</span>(<span class="ident">spec_1</span>.<span class="ident">get_absolute_offset</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">end_2</span> <span class="op">|</span><span class="op">|</span> <span class="ident">spec_2</span>.<span class="ident">get_absolute_offset</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">end_1</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::new</span>(
-            <span class="ident">ErrorKind::InvalidInput</span>,
+    <span class="kw">if </span>!(spec_1.get_absolute_offset() &gt;= end_2 || spec_2.get_absolute_offset() &gt;= end_1) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
+            ErrorKind::InvalidInput,
             <span class="macro">format!</span>(
                 <span class="string">&quot;Overlapping metadata specs detected:\nTHIS:\n{:#?}\nAND:\n{:#?}&quot;</span>,
-                <span class="ident">spec_1</span>, <span class="ident">spec_2</span>
+                spec_1, spec_2
             ),
         ));
     }
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// (For chunked metadata) Checks whether two input specifications overlap, considering their offsets and maximum per-chunk size.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns `Err` if overlap is detected.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `spec_1`: first target specification</span>
-<span class="doccomment">/// * `spec_2`: second target specification</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">fn</span> <span class="ident">verify_no_overlap_chunked</span>(<span class="ident">spec_1</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">spec_2</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">end_1</span> <span class="op">=</span> <span class="ident">spec_1</span>.<span class="ident">get_rel_offset</span>()
-        <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec_1</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec_1</span>.<span class="ident">log_num_of_bits</span>);
-    <span class="kw">let</span> <span class="ident">end_2</span> <span class="op">=</span> <span class="ident">spec_2</span>.<span class="ident">get_rel_offset</span>()
-        <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec_2</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec_2</span>.<span class="ident">log_num_of_bits</span>);
+<span class="doccomment">/// (For chunked metadata) Checks whether two input specifications overlap, considering their offsets and maximum per-chunk size.
+///
+/// Returns `Err` if overlap is detected.
+///
+/// Arguments:
+/// * `spec_1`: first target specification
+/// * `spec_2`: second target specification
+///
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">fn </span>verify_no_overlap_chunked(spec_1: <span class="kw-2">&amp;</span>SideMetadataSpec, spec_2: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span>end_1 = spec_1.get_rel_offset()
+        + <span class="kw">super</span>::metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits);
+    <span class="kw">let </span>end_2 = spec_2.get_rel_offset()
+        + <span class="kw">super</span>::metadata_bytes_per_chunk(spec_2.log_bytes_in_region, spec_2.log_num_of_bits);
 
-    <span class="kw">if</span> <span class="op">!</span>(<span class="ident">spec_1</span>.<span class="ident">get_rel_offset</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">end_2</span> <span class="op">|</span><span class="op">|</span> <span class="ident">spec_2</span>.<span class="ident">get_rel_offset</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">end_1</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::new</span>(
-            <span class="ident">ErrorKind::InvalidInput</span>,
+    <span class="kw">if </span>!(spec_1.get_rel_offset() &gt;= end_2 || spec_2.get_rel_offset() &gt;= end_1) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
+            ErrorKind::InvalidInput,
             <span class="macro">format!</span>(
                 <span class="string">&quot;Overlapping metadata specs detected:\nTHIS:\n{:#?}\nAND:\n{:#?}&quot;</span>,
-                <span class="ident">spec_1</span>, <span class="ident">spec_2</span>
+                spec_1, spec_2
             ),
         ));
     }
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// Checks whether a slice of global specifications fit within the memory limits and don&#39;t overlap.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns `Ok` if no issue is detected, or otherwise an `Err` explaining the issue.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `g_specs`: the slice of global specifications to be checked</span>
-<span class="doccomment">///</span>
-<span class="kw">fn</span> <span class="ident">verify_global_specs</span>(<span class="ident">g_specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="ident">verify_global_specs_total_size</span>(<span class="ident">g_specs</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Checks whether a slice of global specifications fit within the memory limits and don&#39;t overlap.
+///
+/// Returns `Ok` if no issue is detected, or otherwise an `Err` explaining the issue.
+///
+/// Arguments:
+/// * `g_specs`: the slice of global specifications to be checked
+///
+</span><span class="kw">fn </span>verify_global_specs(g_specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    verify_global_specs_total_size(g_specs)<span class="question-mark">?</span>;
 
-    <span class="kw">for</span> <span class="ident">spec_1</span> <span class="kw">in</span> <span class="ident">g_specs</span> {
-        <span class="kw">for</span> <span class="ident">spec_2</span> <span class="kw">in</span> <span class="ident">g_specs</span> {
-            <span class="kw">if</span> <span class="ident">spec_1</span> <span class="op">!</span><span class="op">=</span> <span class="ident">spec_2</span> {
-                <span class="ident">verify_no_overlap_contiguous</span>(<span class="ident">spec_1</span>, <span class="ident">spec_2</span>)<span class="question-mark">?</span>;
+    <span class="kw">for </span>spec_1 <span class="kw">in </span>g_specs {
+        <span class="kw">for </span>spec_2 <span class="kw">in </span>g_specs {
+            <span class="kw">if </span>spec_1 != spec_2 {
+                verify_no_overlap_contiguous(spec_1, spec_2)<span class="question-mark">?</span>;
             }
         }
     }
@@ -968,572 +966,571 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="comment">// Clippy likes this</span>
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">SideMetadataSanity</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::new</span>()
+<span class="comment">// Clippy likes this
+</span><span class="kw">impl </span>Default <span class="kw">for </span>SideMetadataSanity {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">SideMetadataSanity</span> {
-    <span class="doccomment">/// Creates a new SideMetadataSanity instance.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">SideMetadataSanity</span> {
-        <span class="ident">SideMetadataSanity</span> {
-            <span class="ident">specs_sanity_map</span>: <span class="ident">HashMap::new</span>(),
+<span class="kw">impl </span>SideMetadataSanity {
+    <span class="doccomment">/// Creates a new SideMetadataSanity instance.
+    </span><span class="kw">pub fn </span>new() -&gt; SideMetadataSanity {
+        SideMetadataSanity {
+            specs_sanity_map: HashMap::new(),
         }
     }
-    <span class="doccomment">/// Returns all global or policy-specific specs based-on the input argument.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns a vector of globals if `global` is true and a vector of locals otherwise.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `global`: a boolean to show whether global (`true`) or policy-specific (`false`) specs are required.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">get_all_specs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">global</span>: <span class="ident">bool</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">specs</span> <span class="op">=</span> <span class="macro">vec!</span>[];
-        <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">specs_sanity_map</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="op">!</span>(<span class="ident">global</span> <span class="op">^</span> (<span class="kw-2">*</span><span class="ident">k</span> <span class="op">==</span> <span class="ident">GLOBAL_META_NAME</span>)) {
-                <span class="ident">specs</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> (<span class="kw-2">*</span><span class="ident">v</span>).<span class="ident">clone</span>());
+    <span class="doccomment">/// Returns all global or policy-specific specs based-on the input argument.
+    ///
+    /// Returns a vector of globals if `global` is true and a vector of locals otherwise.
+    ///
+    /// Arguments:
+    /// * `global`: a boolean to show whether global (`true`) or policy-specific (`false`) specs are required.
+    ///
+    </span><span class="kw">fn </span>get_all_specs(<span class="kw-2">&amp;</span><span class="self">self</span>, global: bool) -&gt; Vec&lt;SideMetadataSpec&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>specs = <span class="macro">vec!</span>[];
+        <span class="kw">for </span>(k, v) <span class="kw">in </span><span class="self">self</span>.specs_sanity_map.iter() {
+            <span class="kw">if </span>!(global ^ (<span class="kw-2">*</span>k == GLOBAL_META_NAME)) {
+                specs.append(<span class="kw-2">&amp;mut </span>(<span class="kw-2">*</span>v).clone());
             }
         }
 
-        <span class="ident">specs</span>
+        specs
     }
 
-    <span class="doccomment">/// Verifies that all local side metadata specs:</span>
-    <span class="doccomment">/// 1 - are not too big,</span>
-    <span class="doccomment">/// 2 - do not overlap.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns `Ok(())` if no issue is detected, or `Err` otherwise.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">verify_local_specs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">local_specs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_all_specs</span>(<span class="bool-val">false</span>);
+    <span class="doccomment">/// Verifies that all local side metadata specs:
+    /// 1 - are not too big,
+    /// 2 - do not overlap.
+    ///
+    /// Returns `Ok(())` if no issue is detected, or `Err` otherwise.
+    ///
+    </span><span class="kw">fn </span>verify_local_specs(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>local_specs = <span class="self">self</span>.get_all_specs(<span class="bool-val">false</span>);
 
-        <span class="ident">verify_local_specs_size</span>(<span class="kw-2">&amp;</span><span class="ident">local_specs</span>)<span class="question-mark">?</span>;
+        verify_local_specs_size(<span class="kw-2">&amp;</span>local_specs)<span class="question-mark">?</span>;
 
-        <span class="kw">for</span> <span class="ident">spec_1</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">local_specs</span> {
-            <span class="kw">for</span> <span class="ident">spec_2</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">local_specs</span> {
-                <span class="kw">if</span> <span class="ident">spec_1</span> <span class="op">!</span><span class="op">=</span> <span class="ident">spec_2</span> {
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-                    <span class="ident">verify_no_overlap_contiguous</span>(<span class="ident">spec_1</span>, <span class="ident">spec_2</span>)<span class="question-mark">?</span>;
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-                    <span class="ident">verify_no_overlap_chunked</span>(<span class="ident">spec_1</span>, <span class="ident">spec_2</span>)<span class="question-mark">?</span>;
+        <span class="kw">for </span>spec_1 <span class="kw">in </span><span class="kw-2">&amp;</span>local_specs {
+            <span class="kw">for </span>spec_2 <span class="kw">in </span><span class="kw-2">&amp;</span>local_specs {
+                <span class="kw">if </span>spec_1 != spec_2 {
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                    </span>verify_no_overlap_contiguous(spec_1, spec_2)<span class="question-mark">?</span>;
+                    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+                    </span>verify_no_overlap_chunked(spec_1, spec_2)<span class="question-mark">?</span>;
                 }
             }
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// An internal method to ensure that a metadata context does not have any issues.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `policy_name`: name of the policy of the calling space</span>
-    <span class="doccomment">/// * `metadata_context`: the metadata context to examine</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// NOTE:</span>
-    <span class="doccomment">/// Any unit test using metadata directly or indirectly may need to make sure:</span>
-    <span class="doccomment">/// 1 - it uses `util::test_util::serial_test` to prevent metadata sanity conflicts,</span>
-    <span class="doccomment">/// 2 - uses exclusive SideMetadata instances (v.s. static instances), and</span>
-    <span class="doccomment">/// 3 - uses `util::test_util::with_cleanup` to call `sanity::reset` to cleanup the metadata sanity states to prevent future conflicts.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">verify_metadata_context</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">policy_name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
-        <span class="ident">metadata_context</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataContext</span>,
+    <span class="doccomment">/// An internal method to ensure that a metadata context does not have any issues.
+    ///
+    /// Arguments:
+    /// * `policy_name`: name of the policy of the calling space
+    /// * `metadata_context`: the metadata context to examine
+    ///
+    /// NOTE:
+    /// Any unit test using metadata directly or indirectly may need to make sure:
+    /// 1 - it uses `util::test_util::serial_test` to prevent metadata sanity conflicts,
+    /// 2 - uses exclusive SideMetadata instances (v.s. static instances), and
+    /// 3 - uses `util::test_util::with_cleanup` to call `sanity::reset` to cleanup the metadata sanity states to prevent future conflicts.
+    ///
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>verify_metadata_context(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        policy_name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+        metadata_context: <span class="kw-2">&amp;</span>SideMetadataContext,
     ) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">content_sanity_map</span> <span class="op">=</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
 
-        <span class="comment">// is this the first call of this function?</span>
-        <span class="kw">let</span> <span class="ident">first_call</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">specs_sanity_map</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">GLOBAL_META_NAME</span>);
+        <span class="comment">// is this the first call of this function?
+        </span><span class="kw">let </span>first_call = !<span class="self">self</span>.specs_sanity_map.contains_key(<span class="kw-2">&amp;</span>GLOBAL_META_NAME);
 
-        <span class="kw">if</span> <span class="ident">first_call</span> {
-            <span class="comment">// global metadata combination is the same for all contexts</span>
-            <span class="ident">verify_global_specs</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_context</span>.<span class="ident">global</span>).<span class="ident">unwrap</span>();
-            <span class="self">self</span>.<span class="ident">specs_sanity_map</span>
-                .<span class="ident">insert</span>(<span class="ident">GLOBAL_META_NAME</span>, <span class="ident">metadata_context</span>.<span class="ident">global</span>.<span class="ident">clone</span>());
-        } <span class="kw">else</span> {
-            <span class="comment">// make sure the global metadata in the current context has the same length as before</span>
-            <span class="kw">let</span> <span class="ident">g_specs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">specs_sanity_map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">GLOBAL_META_NAME</span>).<span class="ident">unwrap</span>();
+        <span class="kw">if </span>first_call {
+            <span class="comment">// global metadata combination is the same for all contexts
+            </span>verify_global_specs(<span class="kw-2">&amp;</span>metadata_context.global).unwrap();
+            <span class="self">self</span>.specs_sanity_map
+                .insert(GLOBAL_META_NAME, metadata_context.global.clone());
+        } <span class="kw">else </span>{
+            <span class="comment">// make sure the global metadata in the current context has the same length as before
+            </span><span class="kw">let </span>g_specs = <span class="self">self</span>.specs_sanity_map.get(<span class="kw-2">&amp;</span>GLOBAL_META_NAME).unwrap();
             <span class="macro">assert!</span>(
-            <span class="ident">g_specs</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="ident">metadata_context</span>.<span class="ident">global</span>.<span class="ident">len</span>(),
+            g_specs.len() == metadata_context.global.len(),
             <span class="string">&quot;Global metadata must not change between policies! NEW SPECS: {:#?} OLD SPECS: {:#?}&quot;</span>,
-            <span class="ident">metadata_context</span>.<span class="ident">global</span>,
-            <span class="ident">g_specs</span>
+            metadata_context.global,
+            g_specs
         );
         }
 
-        <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">metadata_context</span>.<span class="ident">global</span> {
-            <span class="comment">// Make sure all input global specs are actually global</span>
-            <span class="macro">assert!</span>(
-                <span class="ident">spec</span>.<span class="ident">is_global</span>,
+        <span class="kw">for </span>spec <span class="kw">in </span><span class="kw-2">&amp;</span>metadata_context.global {
+            <span class="comment">// Make sure all input global specs are actually global
+            </span><span class="macro">assert!</span>(
+                spec.is_global,
                 <span class="string">&quot;Policy-specific spec {:#?} detected in the global specs: {:#?}&quot;</span>,
-                <span class="ident">spec</span>, <span class="ident">metadata_context</span>.<span class="ident">global</span>
+                spec, metadata_context.global
             );
-            <span class="comment">// On the first call to the function, initialise the content sanity map, and</span>
-            <span class="comment">// on the future calls, checks the global metadata specs have not changed</span>
-            <span class="kw">if</span> <span class="ident">first_call</span> {
-                <span class="comment">// initialise the related hashmap</span>
-                <span class="ident">content_sanity_map</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">spec</span>, <span class="ident">HashMap::new</span>());
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>
-                .<span class="ident">specs_sanity_map</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">GLOBAL_META_NAME</span>)
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">contains</span>(<span class="ident">spec</span>)
+            <span class="comment">// On the first call to the function, initialise the content sanity map, and
+            // on the future calls, checks the global metadata specs have not changed
+            </span><span class="kw">if </span>first_call {
+                <span class="comment">// initialise the related hashmap
+                </span>content_sanity_map.insert(<span class="kw-2">*</span>spec, HashMap::new());
+            } <span class="kw">else if </span>!<span class="self">self
+                </span>.specs_sanity_map
+                .get(<span class="kw-2">&amp;</span>GLOBAL_META_NAME)
+                .unwrap()
+                .contains(spec)
             {
-                <span class="macro">panic!</span>(<span class="string">&quot;Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}&quot;</span>, <span class="ident">spec</span>, <span class="self">self</span>.<span class="ident">get_all_specs</span>(<span class="bool-val">true</span>));
+                <span class="macro">panic!</span>(<span class="string">&quot;Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}&quot;</span>, spec, <span class="self">self</span>.get_all_specs(<span class="bool-val">true</span>));
             }
         }
 
-        <span class="comment">// Is this the first time this function is called by any space of a policy?</span>
-        <span class="kw">let</span> <span class="ident">first_call</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">specs_sanity_map</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">policy_name</span>);
+        <span class="comment">// Is this the first time this function is called by any space of a policy?
+        </span><span class="kw">let </span>first_call = !<span class="self">self</span>.specs_sanity_map.contains_key(<span class="kw-2">&amp;</span>policy_name);
 
-        <span class="kw">if</span> <span class="ident">first_call</span> {
-            <span class="self">self</span>.<span class="ident">specs_sanity_map</span>
-                .<span class="ident">insert</span>(<span class="ident">policy_name</span>, <span class="ident">metadata_context</span>.<span class="ident">local</span>.<span class="ident">clone</span>());
+        <span class="kw">if </span>first_call {
+            <span class="self">self</span>.specs_sanity_map
+                .insert(policy_name, metadata_context.local.clone());
         }
 
-        <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">metadata_context</span>.<span class="ident">local</span> {
-            <span class="comment">// Make sure all input local specs are actually local</span>
-            <span class="macro">assert!</span>(
-                <span class="op">!</span><span class="ident">spec</span>.<span class="ident">is_global</span>,
+        <span class="kw">for </span>spec <span class="kw">in </span><span class="kw-2">&amp;</span>metadata_context.local {
+            <span class="comment">// Make sure all input local specs are actually local
+            </span><span class="macro">assert!</span>(
+                !spec.is_global,
                 <span class="string">&quot;Global spec {:#?} detected in the policy-specific specs: {:#?}&quot;</span>,
-                <span class="ident">spec</span>, <span class="ident">metadata_context</span>.<span class="ident">local</span>
+                spec, metadata_context.local
             );
-            <span class="comment">// The first call from each policy inserts the relevant (spec, hashmap) pair.</span>
-            <span class="comment">// Future calls only check that the metadata specs have not changed.</span>
-            <span class="comment">// This should work with multi mmtk instances, because the local side metadata specs are assumed to be constant per policy.</span>
-            <span class="kw">if</span> <span class="ident">first_call</span> {
-                <span class="comment">// initialise the related hashmap</span>
-                <span class="ident">content_sanity_map</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">spec</span>, <span class="ident">HashMap::new</span>());
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>
-                .<span class="ident">specs_sanity_map</span>
-                .<span class="ident">get</span>(<span class="ident">policy_name</span>)
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">contains</span>(<span class="ident">spec</span>)
+            <span class="comment">// The first call from each policy inserts the relevant (spec, hashmap) pair.
+            // Future calls only check that the metadata specs have not changed.
+            // This should work with multi mmtk instances, because the local side metadata specs are assumed to be constant per policy.
+            </span><span class="kw">if </span>first_call {
+                <span class="comment">// initialise the related hashmap
+                </span>content_sanity_map.insert(<span class="kw-2">*</span>spec, HashMap::new());
+            } <span class="kw">else if </span>!<span class="self">self
+                </span>.specs_sanity_map
+                .get(policy_name)
+                .unwrap()
+                .contains(spec)
             {
                 <span class="macro">panic!</span>(
                     <span class="string">&quot;Policy-specific metadata for -{}- changed from {:#?} to {:#?}&quot;</span>,
-                    <span class="ident">policy_name</span>,
-                    <span class="self">self</span>.<span class="ident">specs_sanity_map</span>.<span class="ident">get</span>(<span class="ident">policy_name</span>).<span class="ident">unwrap</span>(),
-                    <span class="ident">metadata_context</span>.<span class="ident">local</span>
+                    policy_name,
+                    <span class="self">self</span>.specs_sanity_map.get(policy_name).unwrap(),
+                    metadata_context.local
                 )
             }
         }
 
-        <span class="self">self</span>.<span class="ident">verify_local_specs</span>().<span class="ident">unwrap</span>();
+        <span class="self">self</span>.verify_local_specs().unwrap();
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">content_sanity_map</span> <span class="op">=</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-        <span class="self">self</span>.<span class="ident">specs_sanity_map</span>.<span class="ident">clear</span>();
-        <span class="ident">content_sanity_map</span>.<span class="ident">clear</span>();
+    <span class="attribute">#[cfg(test)]
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>content_sanity_map = CONTENT_SANITY_MAP.write().unwrap();
+        <span class="self">self</span>.specs_sanity_map.clear();
+        content_sanity_map.clear();
     }
 }
 
-<span class="doccomment">/// This verifies two things:</span>
-<span class="doccomment">/// 1. Check if data_addr is within the address space that we are supposed to use (LOG_ADDRESS_SPACE). If this fails, we log a warning.</span>
-<span class="doccomment">/// 2. Check if metadata address is out of bounds. If this fails, we will panic.</span>
-<span class="kw">fn</span> <span class="ident">verify_metadata_address_bound</span>(<span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="macro">assert_eq!</span>(<span class="ident">LOG_ADDRESS_SPACE</span>, <span class="number">32</span>, <span class="string">&quot;We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.&quot;</span>);
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">data_addr_in_address_space</span> <span class="op">=</span> <span class="bool-val">true</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">data_addr_in_address_space</span> <span class="op">=</span>
-        <span class="ident">data_addr</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_ADDRESS_SPACE</span>) };
+<span class="doccomment">/// This verifies two things:
+/// 1. Check if data_addr is within the address space that we are supposed to use (LOG_ADDRESS_SPACE). If this fails, we log a warning.
+/// 2. Check if metadata address is out of bounds. If this fails, we will panic.
+</span><span class="kw">fn </span>verify_metadata_address_bound(spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) {
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="macro">assert_eq!</span>(LOG_ADDRESS_SPACE, <span class="number">32</span>, <span class="string">&quot;We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.&quot;</span>);
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="kw">let </span>data_addr_in_address_space = <span class="bool-val">true</span>;
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+    </span><span class="kw">let </span>data_addr_in_address_space =
+        data_addr &lt;= <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">1usize </span>&lt;&lt; LOG_ADDRESS_SPACE) };
 
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">data_addr_in_address_space</span> {
+    <span class="kw">if </span>!data_addr_in_address_space {
         <span class="macro">warn!</span>(
             <span class="string">&quot;We try get metadata {} for {}, which is not within the address space we should use&quot;</span>,
-            <span class="ident">data_addr</span>, <span class="ident">spec</span>.<span class="ident">name</span>
+            data_addr, spec.name
         );
     }
 
-    <span class="kw">let</span> <span class="ident">metadata_addr</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::address_to_meta_address</span>(<span class="ident">spec</span>, <span class="ident">data_addr</span>);
-    <span class="kw">let</span> <span class="ident">metadata_addr_bound</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">spec</span>.<span class="ident">is_absolute_offset</span>() {
-        <span class="ident">spec</span>.<span class="ident">upper_bound_address_for_contiguous</span>()
-    } <span class="kw">else</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-        {
-            <span class="ident">spec</span>.<span class="ident">upper_bound_address_for_chunked</span>(<span class="ident">data_addr</span>)
+    <span class="kw">let </span>metadata_addr =
+        <span class="kw">crate</span>::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
+    <span class="kw">let </span>metadata_addr_bound = <span class="kw">if </span>spec.is_absolute_offset() {
+        spec.upper_bound_address_for_contiguous()
+    } <span class="kw">else </span>{
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        </span>{
+            spec.upper_bound_address_for_chunked(data_addr)
         }
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        {
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+        </span>{
             <span class="macro">unreachable!</span>()
         }
     };
     <span class="macro">assert!</span>(
-        <span class="ident">metadata_addr</span> <span class="op">&lt;</span> <span class="ident">metadata_addr_bound</span>,
+        metadata_addr &lt; metadata_addr_bound,
         <span class="string">&quot;We try access metadata address for address {} of spec {} that is not within the bound {}.&quot;</span>,
-        <span class="ident">data_addr</span>,
-        <span class="ident">spec</span>.<span class="ident">name</span>,
-        <span class="ident">metadata_addr_bound</span>
+        data_addr,
+        spec.name,
+        metadata_addr_bound
     );
 }
 
-<span class="doccomment">/// Commits a side metadata bulk zero operation.</span>
-<span class="doccomment">/// Panics if the metadata spec is not valid.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `metadata_spec`: the metadata spec to perform the bulk zeroing on</span>
-<span class="doccomment">/// * `start`: the starting address of the source data</span>
-<span class="doccomment">/// * `size`: size of the source data</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_bzero</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
-    <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">align_to_region_start</span>(<span class="ident">metadata_spec</span>, <span class="ident">start</span>);
-    <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">align_to_region_start</span>(<span class="ident">metadata_spec</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">size</span>);
-    <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get_mut</span>(<span class="ident">metadata_spec</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) =&gt; {
-            <span class="comment">// zero entries where the key (data_addr) is in the range (start, start+size)</span>
-            <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="ident">spec_sanity_map</span>.<span class="ident">iter_mut</span>() {
-                <span class="comment">// If the source address is in the bzero&#39;s range</span>
-                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">k</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">start</span> <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="ident">k</span> <span class="op">&lt;</span> <span class="ident">end</span> {
-                    <span class="kw-2">*</span><span class="ident">v</span> <span class="op">=</span> <span class="number">0</span>;
+<span class="doccomment">/// Commits a side metadata bulk zero operation.
+/// Panics if the metadata spec is not valid.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to perform the bulk zeroing on
+/// * `start`: the starting address of the source data
+/// * `size`: size of the source data
+///
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">pub fn </span>verify_bzero(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, start: Address, size: usize) {
+    <span class="kw">let </span>sanity_map = <span class="kw-2">&amp;mut </span>CONTENT_SANITY_MAP.write().unwrap();
+    <span class="kw">let </span>start = align_to_region_start(metadata_spec, start);
+    <span class="kw">let </span>end = align_to_region_start(metadata_spec, start + size);
+    <span class="kw">match </span>sanity_map.get_mut(metadata_spec) {
+        <span class="prelude-val">Some</span>(spec_sanity_map) =&gt; {
+            <span class="comment">// zero entries where the key (data_addr) is in the range (start, start+size)
+            </span><span class="kw">for </span>(k, v) <span class="kw">in </span>spec_sanity_map.iter_mut() {
+                <span class="comment">// If the source address is in the bzero&#39;s range
+                </span><span class="kw">if </span><span class="kw-2">*</span>k &gt;= start &amp;&amp; <span class="kw-2">*</span>k &lt; end {
+                    <span class="kw-2">*</span>v = <span class="number">0</span>;
                 }
             }
         }
-        <span class="prelude-val">None</span> =&gt; {
+        <span class="prelude-val">None </span>=&gt; {
             <span class="macro">panic!</span>(<span class="string">&quot;Invalid Metadata Spec!&quot;</span>);
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::metadata_val_traits</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">fn</span> <span class="ident">truncate_value</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(<span class="ident">log_num_of_bits</span>: <span class="ident">usize</span>, <span class="ident">val</span>: <span class="ident">u64</span>) -&gt; <span class="ident">u64</span> {
-    <span class="comment">// truncate the val if metadata&#39;s bits is fewer than the type&#39;s bits</span>
-    <span class="kw">if</span> <span class="ident">log_num_of_bits</span> <span class="op">&lt;</span> <span class="ident">T::LOG2</span> <span class="kw">as</span> <span class="ident">usize</span> {
-        <span class="ident">val</span> <span class="op">&amp;</span> ((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">log_num_of_bits</span>)) <span class="op">-</span> <span class="number">1</span>)
-    } <span class="kw">else</span> {
-        <span class="ident">val</span>
+<span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">fn </span>truncate_value&lt;T: MetadataValue&gt;(log_num_of_bits: usize, val: u64) -&gt; u64 {
+    <span class="comment">// truncate the val if metadata&#39;s bits is fewer than the type&#39;s bits
+    </span><span class="kw">if </span>log_num_of_bits &lt; T::LOG2 <span class="kw">as </span>usize {
+        val &amp; ((<span class="number">1 </span>&lt;&lt; (<span class="number">1 </span>&lt;&lt; log_num_of_bits)) - <span class="number">1</span>)
+    } <span class="kw">else </span>{
+        val
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">truncate_tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+#[cfg(test)]
+</span><span class="kw">mod </span>truncate_tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_truncate</span>() {
-        <span class="macro">assert_eq!</span>(<span class="ident">truncate_value</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">2</span>, <span class="number">0</span>), <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">truncate_value</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">2</span>, <span class="number">15</span>), <span class="number">15</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">truncate_value</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">2</span>, <span class="number">16</span>), <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">truncate_value</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">2</span>, <span class="number">17</span>), <span class="number">1</span>);
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_truncate() {
+        <span class="macro">assert_eq!</span>(truncate_value::&lt;u8&gt;(<span class="number">2</span>, <span class="number">0</span>), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(truncate_value::&lt;u8&gt;(<span class="number">2</span>, <span class="number">15</span>), <span class="number">15</span>);
+        <span class="macro">assert_eq!</span>(truncate_value::&lt;u8&gt;(<span class="number">2</span>, <span class="number">16</span>), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(truncate_value::&lt;u8&gt;(<span class="number">2</span>, <span class="number">17</span>), <span class="number">1</span>);
     }
 }
 
-<span class="comment">// When storing a value for a data address, we align the data address to the region start.</span>
-<span class="comment">// So when accessing any data address in the region, we will use the same data address to fetch the metadata value.</span>
-<span class="kw">fn</span> <span class="ident">align_to_region_start</span>(<span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">data_addr</span>.<span class="ident">align_down</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>)
+<span class="comment">// When storing a value for a data address, we align the data address to the region start.
+// So when accessing any data address in the region, we will use the same data address to fetch the metadata value.
+</span><span class="kw">fn </span>align_to_region_start(spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; Address {
+    data_addr.align_down(<span class="number">1 </span>&lt;&lt; spec.log_bytes_in_region)
 }
 
-<span class="doccomment">/// Ensures a side metadata load operation returns the correct side metadata content.</span>
-<span class="doccomment">/// Panics if:</span>
-<span class="doccomment">/// 1 - the metadata spec is not valid,</span>
-<span class="doccomment">/// 2 - data address is not valid,</span>
-<span class="doccomment">/// 3 - the loaded side metadata content is not equal to the correct content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `metadata_spec`: the metadata spec to verify the loaded content for</span>
-<span class="doccomment">/// * `data_addr`: the address of the source data</span>
-<span class="doccomment">/// * `actual_val`: the actual content returned by the side metadata load operation</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_load</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
-    <span class="ident">data_addr</span>: <span class="ident">Address</span>,
-    <span class="ident">actual_val</span>: <span class="ident">T</span>,
+<span class="doccomment">/// Ensures a side metadata load operation returns the correct side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - data address is not valid,
+/// 3 - the loaded side metadata content is not equal to the correct content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the loaded content for
+/// * `data_addr`: the address of the source data
+/// * `actual_val`: the actual content returned by the side metadata load operation
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">pub fn </span>verify_load&lt;T: MetadataValue&gt;(
+    metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
+    data_addr: Address,
+    actual_val: T,
 ) {
-    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">align_to_region_start</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    <span class="kw">let</span> <span class="ident">actual_val</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="ident">actual_val</span>.<span class="ident">to_u64</span>().<span class="ident">unwrap</span>();
-    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-    <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get</span>(<span class="ident">metadata_spec</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) =&gt; {
-            <span class="comment">// A content of None is Ok because we may load before store</span>
-            <span class="kw">let</span> <span class="ident">expected_val</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">expected_val</span>) <span class="op">=</span> <span class="ident">spec_sanity_map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">data_addr</span>) {
-                <span class="kw-2">*</span><span class="ident">expected_val</span>
-            } <span class="kw">else</span> {
-                <span class="number">0u64</span>
-            };
+    <span class="kw">let </span>data_addr = align_to_region_start(metadata_spec, data_addr);
+    <span class="kw">let </span>actual_val: u64 = actual_val.to_u64().unwrap();
+    verify_metadata_address_bound(metadata_spec, data_addr);
+    <span class="kw">let </span>sanity_map = <span class="kw-2">&amp;mut </span>CONTENT_SANITY_MAP.read().unwrap();
+    <span class="kw">match </span>sanity_map.get(metadata_spec) {
+        <span class="prelude-val">Some</span>(spec_sanity_map) =&gt; {
+            <span class="comment">// A content of None is Ok because we may load before store
+            </span><span class="kw">let </span>expected_val = <span class="kw">if let </span><span class="prelude-val">Some</span>(expected_val) = spec_sanity_map.get(<span class="kw-2">&amp;</span>data_addr) {
+                <span class="kw-2">*</span>expected_val
+            } <span class="kw">else </span>{
+                <span class="number">0u64
+            </span>};
             <span class="macro">assert!</span>(
-                <span class="ident">expected_val</span> <span class="op">==</span> <span class="ident">actual_val</span>,
+                expected_val == actual_val,
                 <span class="string">&quot;verify_load({:#?}, {}) -&gt; Expected (0x{:x}) but found (0x{:x})&quot;</span>,
-                <span class="ident">metadata_spec</span>,
-                <span class="ident">data_addr</span>,
-                <span class="ident">expected_val</span>,
-                <span class="ident">actual_val</span>
+                metadata_spec,
+                data_addr,
+                expected_val,
+                actual_val
             );
         }
-        <span class="prelude-val">None</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Metadata Spec: {:#?}&quot;</span>, <span class="ident">metadata_spec</span>),
+        <span class="prelude-val">None </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Metadata Spec: {:#?}&quot;</span>, metadata_spec),
     }
 }
 
-<span class="doccomment">/// Commits a side metadata store operation.</span>
-<span class="doccomment">/// Panics if:</span>
-<span class="doccomment">/// 1 - the loaded side metadata content is not equal to the correct content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `metadata_spec`: the metadata spec to commit the store operation for</span>
-<span class="doccomment">/// * `data_addr`: the address of the source data</span>
-<span class="doccomment">/// * `metadata`: the metadata content to store</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_store</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
-    <span class="ident">data_addr</span>: <span class="ident">Address</span>,
-    <span class="ident">metadata</span>: <span class="ident">T</span>,
+<span class="doccomment">/// Commits a side metadata store operation.
+/// Panics if:
+/// 1 - the loaded side metadata content is not equal to the correct content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to commit the store operation for
+/// * `data_addr`: the address of the source data
+/// * `metadata`: the metadata content to store
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">pub fn </span>verify_store&lt;T: MetadataValue&gt;(
+    metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
+    data_addr: Address,
+    metadata: T,
 ) {
-    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">align_to_region_start</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    <span class="kw">let</span> <span class="ident">metadata</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="ident">metadata</span>.<span class="ident">to_u64</span>().<span class="ident">unwrap</span>();
-    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    <span class="kw">let</span> <span class="ident">new_val_wrapped</span> <span class="op">=</span> <span class="ident">truncate_value</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>, <span class="ident">metadata</span>);
-    <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-    <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get_mut</span>(<span class="ident">metadata_spec</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) =&gt; {
-            <span class="comment">// Newly mapped memory including the side metadata memory is zeroed</span>
-            <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="ident">spec_sanity_map</span>.<span class="ident">entry</span>(<span class="ident">data_addr</span>).<span class="ident">or_insert</span>(<span class="number">0</span>);
-            <span class="kw-2">*</span><span class="ident">content</span> <span class="op">=</span> <span class="ident">new_val_wrapped</span>;
+    <span class="kw">let </span>data_addr = align_to_region_start(metadata_spec, data_addr);
+    <span class="kw">let </span>metadata: u64 = metadata.to_u64().unwrap();
+    verify_metadata_address_bound(metadata_spec, data_addr);
+    <span class="kw">let </span>new_val_wrapped = truncate_value::&lt;T&gt;(metadata_spec.log_num_of_bits, metadata);
+    <span class="kw">let </span>sanity_map = <span class="kw-2">&amp;mut </span>CONTENT_SANITY_MAP.write().unwrap();
+    <span class="kw">match </span>sanity_map.get_mut(metadata_spec) {
+        <span class="prelude-val">Some</span>(spec_sanity_map) =&gt; {
+            <span class="comment">// Newly mapped memory including the side metadata memory is zeroed
+            </span><span class="kw">let </span>content = spec_sanity_map.entry(data_addr).or_insert(<span class="number">0</span>);
+            <span class="kw-2">*</span>content = new_val_wrapped;
         }
-        <span class="prelude-val">None</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Metadata Spec: {:#?}&quot;</span>, <span class="ident">metadata_spec</span>),
+        <span class="prelude-val">None </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Metadata Spec: {:#?}&quot;</span>, metadata_spec),
     }
 }
 
-<span class="doccomment">/// Commits an update operation and ensures it returns the correct old side metadata content.</span>
-<span class="doccomment">/// Panics if:</span>
-<span class="doccomment">/// 1 - the metadata spec is not valid,</span>
-<span class="doccomment">/// 2 - the old side metadata content is not equal to the correct old content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `metadata_spec`: the metadata spec to verify the old content for</span>
-<span class="doccomment">/// * `data_addr`: the address of the source data</span>
-<span class="doccomment">/// * `old_val`: the expected old value</span>
-<span class="doccomment">/// * `new_val`: the new value the metadata should hold.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_update</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>,
-    <span class="ident">data_addr</span>: <span class="ident">Address</span>,
-    <span class="ident">old_val</span>: <span class="ident">T</span>,
-    <span class="ident">new_val</span>: <span class="ident">T</span>,
+<span class="doccomment">/// Commits an update operation and ensures it returns the correct old side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - the old side metadata content is not equal to the correct old content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the old content for
+/// * `data_addr`: the address of the source data
+/// * `old_val`: the expected old value
+/// * `new_val`: the new value the metadata should hold.
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">pub fn </span>verify_update&lt;T: MetadataValue&gt;(
+    metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
+    data_addr: Address,
+    old_val: T,
+    new_val: T,
 ) {
-    <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">align_to_region_start</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
+    <span class="kw">let </span>data_addr = align_to_region_start(metadata_spec, data_addr);
+    verify_metadata_address_bound(metadata_spec, data_addr);
 
-    <span class="comment">// truncate the new_val if metadata&#39;s bits is fewer than the type&#39;s bits</span>
-    <span class="kw">let</span> <span class="ident">new_val_wrapped</span> <span class="op">=</span>
-        <span class="ident">truncate_value</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>, <span class="ident">new_val</span>.<span class="ident">to_u64</span>().<span class="ident">unwrap</span>());
+    <span class="comment">// truncate the new_val if metadata&#39;s bits is fewer than the type&#39;s bits
+    </span><span class="kw">let </span>new_val_wrapped =
+        truncate_value::&lt;T&gt;(metadata_spec.log_num_of_bits, new_val.to_u64().unwrap());
     <span class="macro">println!</span>(
         <span class="string">&quot;verify_update old = {} new = {} wrapped = {:x}&quot;</span>,
-        <span class="ident">old_val</span>, <span class="ident">new_val</span>, <span class="ident">new_val_wrapped</span>
+        old_val, new_val, new_val_wrapped
     );
 
-    <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-    <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get_mut</span>(<span class="ident">metadata_spec</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) =&gt; {
-            <span class="kw">let</span> <span class="ident">cur_val</span> <span class="op">=</span> <span class="ident">spec_sanity_map</span>.<span class="ident">entry</span>(<span class="ident">data_addr</span>).<span class="ident">or_insert</span>(<span class="number">0</span>);
+    <span class="kw">let </span>sanity_map = <span class="kw-2">&amp;mut </span>CONTENT_SANITY_MAP.write().unwrap();
+    <span class="kw">match </span>sanity_map.get_mut(metadata_spec) {
+        <span class="prelude-val">Some</span>(spec_sanity_map) =&gt; {
+            <span class="kw">let </span>cur_val = spec_sanity_map.entry(data_addr).or_insert(<span class="number">0</span>);
             <span class="macro">assert_eq!</span>(
-                <span class="ident">old_val</span>.<span class="ident">to_u64</span>().<span class="ident">unwrap</span>(),
-                <span class="kw-2">*</span><span class="ident">cur_val</span>,
+                old_val.to_u64().unwrap(),
+                <span class="kw-2">*</span>cur_val,
                 <span class="string">&quot;Expected old value: {} but found {}&quot;</span>,
-                <span class="ident">old_val</span>,
-                <span class="ident">cur_val</span>
+                old_val,
+                cur_val
             );
-            <span class="kw-2">*</span><span class="ident">cur_val</span> <span class="op">=</span> <span class="ident">new_val_wrapped</span>;
+            <span class="kw-2">*</span>cur_val = new_val_wrapped;
         }
-        <span class="prelude-val">None</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid metadata spec: {:#?}&quot;</span>, <span class="ident">metadata_spec</span>),
+        <span class="prelude-val">None </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid metadata spec: {:#?}&quot;</span>, metadata_spec),
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::<span class="kw">super</span></span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use </span><span class="kw">super</span>::<span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_sanity_verify_global_specs_total_size</span>() {
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_sanity_verify_global_specs_total_size() {
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(Address::ZERO),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
-        };
-
-        <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>]).<span class="ident">is_ok</span>());
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>]).<span class="ident">is_ok</span>());
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-        <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>]).<span class="ident">is_err</span>());
-
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">1</span>,
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>spec_1),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>]).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_global_specs_total_size(<span class="kw-2">&amp;</span>[spec_1]).is_ok());
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+        </span><span class="macro">assert!</span>(verify_global_specs_total_size(<span class="kw-2">&amp;</span>[spec_1, spec_2]).is_ok());
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        </span><span class="macro">assert!</span>(verify_global_specs_total_size(<span class="kw-2">&amp;</span>[spec_1, spec_2]).is_err());
 
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-            <span class="ident">log_bytes_in_region</span>: <span class="number">2</span>,
-        };
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-            <span class="ident">log_bytes_in_region</span>: <span class="number">2</span>,
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-            <span class="ident">log_bytes_in_region</span>: <span class="number">4</span>,
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>spec_1),
+            log_num_of_bits: <span class="number">3</span>,
+            log_bytes_in_region: <span class="number">1</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>]).<span class="ident">is_ok</span>());
-        <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>, <span class="ident">spec_1</span>]).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_global_specs_total_size(<span class="kw-2">&amp;</span>[spec_1, spec_2]).is_err());
+
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(Address::ZERO),
+            log_num_of_bits: <span class="number">1</span>,
+            <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+            </span>log_bytes_in_region: <span class="number">0</span>,
+            <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+            </span>log_bytes_in_region: <span class="number">2</span>,
+        };
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>spec_1),
+            log_num_of_bits: <span class="number">3</span>,
+            <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+            </span>log_bytes_in_region: <span class="number">2</span>,
+            <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+            </span>log_bytes_in_region: <span class="number">4</span>,
+        };
+
+        <span class="macro">assert!</span>(verify_global_specs_total_size(<span class="kw-2">&amp;</span>[spec_1, spec_2]).is_ok());
+        <span class="macro">assert!</span>(verify_global_specs_total_size(<span class="kw-2">&amp;</span>[spec_1, spec_2, spec_1]).is_err());
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_sanity_verify_no_overlap_contiguous</span>() {
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_sanity_verify_no_overlap_contiguous() {
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(Address::ZERO),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
-        };
-
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_1</span>).<span class="ident">is_err</span>());
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_ok</span>());
-
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">1</span>) }),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>spec_1),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_no_overlap_contiguous(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_1).is_err());
+        <span class="macro">assert!</span>(verify_no_overlap_contiguous(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_2).is_ok());
 
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">1</span>) }),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">true</span>,
-            <span class="comment">// We specifically make up an invalid offset</span>
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(
-                <span class="ident">spec_1</span>.<span class="ident">get_absolute_offset</span>() <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>) <span class="op">-</span> <span class="number">1</span>,
+
+        <span class="macro">assert!</span>(verify_no_overlap_contiguous(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_2).is_err());
+
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            offset: SideMetadataOffset::addr(Address::ZERO),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
+        };
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">true</span>,
+            <span class="comment">// We specifically make up an invalid offset
+            </span>offset: SideMetadataOffset::addr(
+                spec_1.get_absolute_offset() + metadata_address_range_size(<span class="kw-2">&amp;</span>spec_1) - <span class="number">1</span>,
             ),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_no_overlap_contiguous(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_2).is_err());
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_sanity_verify_no_overlap_chunked</span>() {
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    #[test]
+    </span><span class="kw">fn </span>test_side_metadata_sanity_verify_no_overlap_chunked() {
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::rel(<span class="number">0</span>),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
-        };
-
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_1</span>).<span class="ident">is_err</span>());
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_ok</span>());
-
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">1</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>spec_1),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_no_overlap_chunked(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_1).is_err());
+        <span class="macro">assert!</span>(verify_no_overlap_chunked(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_2).is_ok());
 
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::rel(<span class="number">1</span>),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
-        <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="comment">// We make up an invalid offset</span>
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(
-                <span class="ident">spec_1</span>.<span class="ident">get_rel_offset</span>()
-                    <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">spec_1</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec_1</span>.<span class="ident">log_num_of_bits</span>)
-                    <span class="op">-</span> <span class="number">1</span>,
+
+        <span class="macro">assert!</span>(verify_no_overlap_chunked(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_2).is_err());
+
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::rel(<span class="number">0</span>),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
+        };
+        <span class="kw">let </span>spec_2 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_2&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            <span class="comment">// We make up an invalid offset
+            </span>offset: SideMetadataOffset::rel(
+                spec_1.get_rel_offset()
+                    + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
+                    - <span class="number">1</span>,
             ),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_no_overlap_chunked(<span class="kw-2">&amp;</span>spec_1, <span class="kw-2">&amp;</span>spec_2).is_err());
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_side_metadata_sanity_verify_local_specs_size</span>() {
-        <span class="kw">let</span> <span class="ident">spec_1</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="string">&quot;spec_1&quot;</span>,
-            <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    #[test]
+    </span><span class="kw">fn </span>test_side_metadata_sanity_verify_local_specs_size() {
+        <span class="kw">let </span>spec_1 = SideMetadataSpec {
+            name: <span class="string">&quot;spec_1&quot;</span>,
+            is_global: <span class="bool-val">false</span>,
+            offset: SideMetadataOffset::rel(<span class="number">0</span>),
+            log_num_of_bits: <span class="number">0</span>,
+            log_bytes_in_region: <span class="number">0</span>,
         };
 
-        <span class="macro">assert!</span>(<span class="ident">verify_local_specs_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>]).<span class="ident">is_ok</span>());
-        <span class="macro">assert!</span>(<span class="ident">verify_local_specs_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_1</span>]).<span class="ident">is_err</span>());
-        <span class="macro">assert!</span>(<span class="ident">verify_local_specs_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_1</span>, <span class="ident">spec_1</span>, <span class="ident">spec_1</span>, <span class="ident">spec_1</span>]).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(verify_local_specs_size(<span class="kw-2">&amp;</span>[spec_1]).is_ok());
+        <span class="macro">assert!</span>(verify_local_specs_size(<span class="kw-2">&amp;</span>[spec_1, spec_1]).is_err());
+        <span class="macro">assert!</span>(verify_local_specs_size(<span class="kw-2">&amp;</span>[spec_1, spec_1, spec_1, spec_1, spec_1]).is_err());
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

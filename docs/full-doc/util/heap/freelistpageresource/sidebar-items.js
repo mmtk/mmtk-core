@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["UNINITIALIZED_WATER_MARK",""]],"struct":[["CommonFreeListPageResource",""],["FreeListPageResource",""],["FreeListPageResourceSync",""]]});
+window.SIDEBAR_ITEMS = {"constant":[["UNINITIALIZED_WATER_MARK",""]],"struct":[["CommonFreeListPageResource",""],["FreeListPageResource",""],["FreeListPageResourceSync",""]]};

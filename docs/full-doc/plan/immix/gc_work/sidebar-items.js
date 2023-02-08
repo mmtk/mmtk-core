@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ImmixGCWorkContext",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["ImmixGCWorkContext",""]]};

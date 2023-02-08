@@ -1,205 +1,202 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;malloc&#x2F;malloc_ms_util.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>malloc_ms_util.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/malloc/malloc_ms_util.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>malloc_ms_util.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc::library</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS;
+<span class="kw">use </span><span class="kw">crate</span>::util::malloc::library::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="doccomment">/// Allocate with alignment. This also guarantees the memory is zero initialized.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">std::ptr::null_mut</span>::<span class="op">&lt;</span><span class="ident">libc::c_void</span><span class="op">&gt;</span>();
-    <span class="kw">let</span> <span class="ident">ptr_ptr</span> <span class="op">=</span> <span class="macro">std::ptr::addr_of_mut!</span>(<span class="ident">ptr</span>);
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">posix_memalign</span>(<span class="ident">ptr_ptr</span>, <span class="ident">align</span>, <span class="ident">size</span>) };
-    <span class="kw">if</span> <span class="ident">result</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-        <span class="kw">return</span> <span class="ident">Address::ZERO</span>;
+<span class="doccomment">/// Allocate with alignment. This also guarantees the memory is zero initialized.
+</span><span class="kw">pub fn </span>align_alloc&lt;VM: VMBinding&gt;(size: usize, align: usize) -&gt; Address {
+    <span class="kw">let </span><span class="kw-2">mut </span>ptr = std::ptr::null_mut::&lt;libc::c_void&gt;();
+    <span class="kw">let </span>ptr_ptr = <span class="macro">std::ptr::addr_of_mut!</span>(ptr);
+    <span class="kw">let </span>result = <span class="kw">unsafe </span>{ posix_memalign(ptr_ptr, align, size) };
+    <span class="kw">if </span>result != <span class="number">0 </span>{
+        <span class="kw">return </span>Address::ZERO;
     }
-    <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">Address::from_mut_ptr</span>(<span class="ident">ptr</span>);
-    <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">address</span>, <span class="ident">size</span>);
-    <span class="ident">address</span>
+    <span class="kw">let </span>address = Address::from_mut_ptr(ptr);
+    <span class="kw">crate</span>::util::memory::zero(address, size);
+    address
 }
 
-<span class="comment">// Beside returning the allocation result,</span>
-<span class="comment">// this will store the malloc result at (result - BYTES_IN_ADDRESS)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_offset_alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="comment">// we allocate extra `align` bytes here, so we are able to handle offset</span>
-    <span class="kw">let</span> <span class="ident">actual_size</span> <span class="op">=</span> <span class="ident">size</span> <span class="op">+</span> <span class="ident">align</span> <span class="op">+</span> <span class="ident">BYTES_IN_ADDRESS</span>;
-    <span class="kw">let</span> <span class="ident">raw</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">calloc</span>(<span class="number">1</span>, <span class="ident">actual_size</span>) };
-    <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">Address::from_mut_ptr</span>(<span class="ident">raw</span>);
-    <span class="kw">if</span> <span class="ident">address</span>.<span class="ident">is_zero</span>() {
-        <span class="kw">return</span> <span class="ident">address</span>;
+<span class="comment">// Beside returning the allocation result,
+// this will store the malloc result at (result - BYTES_IN_ADDRESS)
+</span><span class="kw">pub fn </span>align_offset_alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: isize) -&gt; Address {
+    <span class="comment">// we allocate extra `align` bytes here, so we are able to handle offset
+    </span><span class="kw">let </span>actual_size = size + align + BYTES_IN_ADDRESS;
+    <span class="kw">let </span>raw = <span class="kw">unsafe </span>{ calloc(<span class="number">1</span>, actual_size) };
+    <span class="kw">let </span>address = Address::from_mut_ptr(raw);
+    <span class="kw">if </span>address.is_zero() {
+        <span class="kw">return </span>address;
     }
-    <span class="kw">let</span> <span class="ident">mod_offset</span> <span class="op">=</span> (<span class="ident">offset</span> <span class="op">%</span> (<span class="ident">align</span> <span class="kw">as</span> <span class="ident">isize</span>)) <span class="kw">as</span> <span class="ident">isize</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">result</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="ident">align</span>, <span class="ident">mod_offset</span>);
-    <span class="kw">if</span> <span class="ident">result</span> <span class="op">-</span> <span class="ident">BYTES_IN_ADDRESS</span> <span class="op">&lt;</span> <span class="ident">address</span> {
-        <span class="ident">result</span> <span class="op">+</span><span class="op">=</span> <span class="ident">align</span>;
+    <span class="kw">let </span>mod_offset = offset % (align <span class="kw">as </span>isize);
+    <span class="kw">let </span><span class="kw-2">mut </span>result =
+        <span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill::&lt;VM&gt;(address, align, mod_offset);
+    <span class="kw">if </span>result - BYTES_IN_ADDRESS &lt; address {
+        result += align;
     }
-    <span class="kw">let</span> <span class="ident">malloc_res_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">usize</span> <span class="op">=</span> (<span class="ident">result</span> <span class="op">-</span> <span class="ident">BYTES_IN_ADDRESS</span>).<span class="ident">to_mut_ptr</span>();
-    <span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="ident">malloc_res_ptr</span> <span class="op">=</span> <span class="ident">address</span>.<span class="ident">as_usize</span>() };
-    <span class="ident">result</span>
+    <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (result - BYTES_IN_ADDRESS).to_mut_ptr();
+    <span class="kw">unsafe </span>{ <span class="kw-2">*</span>malloc_res_ptr = address.as_usize() };
+    result
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">offset_malloc_usable_size</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">usize</span> {
-    <span class="kw">let</span> <span class="ident">malloc_res_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">usize</span> <span class="op">=</span> (<span class="ident">address</span> <span class="op">-</span> <span class="ident">BYTES_IN_ADDRESS</span>).<span class="ident">to_mut_ptr</span>();
-    <span class="kw">let</span> <span class="ident">malloc_res</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="ident">malloc_res_ptr</span> } <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">libc::c_void</span>;
-    <span class="kw">unsafe</span> { <span class="ident">malloc_usable_size</span>(<span class="ident">malloc_res</span>) }
+<span class="kw">pub fn </span>offset_malloc_usable_size(address: Address) -&gt; usize {
+    <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
+    <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>malloc_res_ptr } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
+    <span class="kw">unsafe </span>{ malloc_usable_size(malloc_res) }
 }
 
-<span class="doccomment">/// free an address that is allocated with some offset</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">offset_free</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
-    <span class="kw">let</span> <span class="ident">malloc_res_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">usize</span> <span class="op">=</span> (<span class="ident">address</span> <span class="op">-</span> <span class="ident">BYTES_IN_ADDRESS</span>).<span class="ident">to_mut_ptr</span>();
-    <span class="kw">let</span> <span class="ident">malloc_res</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="ident">malloc_res_ptr</span> } <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">libc::c_void</span>;
-    <span class="kw">unsafe</span> { <span class="ident">free</span>(<span class="ident">malloc_res</span>) };
+<span class="doccomment">/// free an address that is allocated with some offset
+</span><span class="kw">pub fn </span>offset_free(address: Address) {
+    <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
+    <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>malloc_res_ptr } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
+    <span class="kw">unsafe </span>{ free(malloc_res) };
 }
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc::library::free</span>;
+<span class="kw">pub use </span><span class="kw">crate</span>::util::malloc::library::free;
 
-<span class="doccomment">/// get malloc usable size of an address</span>
-<span class="doccomment">/// is_offset_malloc: whether the address is allocated with some offset</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">address</span>: <span class="ident">Address</span>, <span class="ident">is_offset_malloc</span>: <span class="ident">bool</span>) -&gt; <span class="ident">usize</span> {
-    <span class="kw">if</span> <span class="ident">is_offset_malloc</span> {
-        <span class="ident">offset_malloc_usable_size</span>(<span class="ident">address</span>)
-    } <span class="kw">else</span> {
-        <span class="kw">unsafe</span> { <span class="ident">malloc_usable_size</span>(<span class="ident">address</span>.<span class="ident">to_mut_ptr</span>()) }
+<span class="doccomment">/// get malloc usable size of an address
+/// is_offset_malloc: whether the address is allocated with some offset
+</span><span class="kw">pub fn </span>get_malloc_usable_size(address: Address, is_offset_malloc: bool) -&gt; usize {
+    <span class="kw">if </span>is_offset_malloc {
+        offset_malloc_usable_size(address)
+    } <span class="kw">else </span>{
+        <span class="kw">unsafe </span>{ malloc_usable_size(address.to_mut_ptr()) }
     }
 }
 
-<span class="doccomment">/// allocate `size` bytes, which is aligned to `align` at `offset`</span>
-<span class="doccomment">/// return the address, and whether it is an offset allocation</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; (<span class="ident">Address</span>, <span class="ident">bool</span>) {
-    <span class="kw">let</span> <span class="ident">address</span>: <span class="ident">Address</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">is_offset_malloc</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="comment">// malloc returns 16 bytes aligned address.</span>
-    <span class="comment">// So if the alignment is smaller than 16 bytes, we do not need to align.</span>
-    <span class="kw">if</span> <span class="ident">align</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">16</span> <span class="op">&amp;&amp;</span> <span class="ident">offset</span> <span class="op">==</span> <span class="number">0</span> {
-        <span class="kw">let</span> <span class="ident">raw</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">calloc</span>(<span class="number">1</span>, <span class="ident">size</span>) };
-        <span class="ident">address</span> <span class="op">=</span> <span class="ident">Address::from_mut_ptr</span>(<span class="ident">raw</span>);
-        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident">align</span>));
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">align</span> <span class="op">&gt;</span> <span class="number">16</span> <span class="op">&amp;&amp;</span> <span class="ident">offset</span> <span class="op">==</span> <span class="number">0</span> {
-        <span class="ident">address</span> <span class="op">=</span> <span class="ident">align_alloc</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span>, <span class="ident">align</span>);
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_hoard&quot;</span>)]</span>
-        {
-            <span class="ident">is_offset_malloc</span> <span class="op">=</span> <span class="bool-val">true</span>;
+<span class="doccomment">/// allocate `size` bytes, which is aligned to `align` at `offset`
+/// return the address, and whether it is an offset allocation
+</span><span class="kw">pub fn </span>alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: isize) -&gt; (Address, bool) {
+    <span class="kw">let </span>address: Address;
+    <span class="kw">let </span><span class="kw-2">mut </span>is_offset_malloc = <span class="bool-val">false</span>;
+    <span class="comment">// malloc returns 16 bytes aligned address.
+    // So if the alignment is smaller than 16 bytes, we do not need to align.
+    </span><span class="kw">if </span>align &lt;= <span class="number">16 </span>&amp;&amp; offset == <span class="number">0 </span>{
+        <span class="kw">let </span>raw = <span class="kw">unsafe </span>{ calloc(<span class="number">1</span>, size) };
+        address = Address::from_mut_ptr(raw);
+        <span class="macro">debug_assert!</span>(address.is_aligned_to(align));
+    } <span class="kw">else if </span>align &gt; <span class="number">16 </span>&amp;&amp; offset == <span class="number">0 </span>{
+        address = align_alloc::&lt;VM&gt;(size, align);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_hoard&quot;</span>)]
+        </span>{
+            is_offset_malloc = <span class="bool-val">true</span>;
         }
         <span class="macro">debug_assert!</span>(
-            <span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident">align</span>),
+            address.is_aligned_to(align),
             <span class="string">&quot;Address: {:x} is not aligned to the given alignment: {}&quot;</span>,
-            <span class="ident">address</span>,
-            <span class="ident">align</span>
+            address,
+            align
         );
-    } <span class="kw">else</span> {
-        <span class="ident">address</span> <span class="op">=</span> <span class="ident">align_offset_alloc</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-        <span class="ident">is_offset_malloc</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    } <span class="kw">else </span>{
+        address = align_offset_alloc::&lt;VM&gt;(size, align, offset);
+        is_offset_malloc = <span class="bool-val">true</span>;
         <span class="macro">debug_assert!</span>(
-            (<span class="ident">address</span> <span class="op">+</span> <span class="ident">offset</span>).<span class="ident">is_aligned_to</span>(<span class="ident">align</span>),
+            (address + offset).is_aligned_to(align),
             <span class="string">&quot;Address: {:x} is not aligned to the given alignment: {} at offset: {}&quot;</span>,
-            <span class="ident">address</span>,
-            <span class="ident">align</span>,
-            <span class="ident">offset</span>
+            address,
+            align,
+            offset
         );
     }
-    (<span class="ident">address</span>, <span class="ident">is_offset_malloc</span>)
+    (address, is_offset_malloc)
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

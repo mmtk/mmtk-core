@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;rust_util&#x2F;rev_group.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>rev_group.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/rust_util/rev_group.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>rev_group.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -403,218 +401,218 @@
 <span id="401">401</span>
 <span id="402">402</span>
 <span id="403">403</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This module provides an iterator that groups adjacent items with the same key.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! It gives all `Iterator + Clone` iterators a new method: `.revisitable_group_by`. It is similar</span>
-<span class="doccomment">//! to `Itertools::group_by`, but it lets the user know the length of each group before iterating</span>
-<span class="doccomment">//! through the group.  Implementation-wise, it eagerly finds all items with the same key, and</span>
-<span class="doccomment">//! then lets the user traverse the same range of items again using a pre-cloned iterator. This</span>
-<span class="doccomment">//! is why it is named &quot;revisitable&quot; group-by.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This is useful for the memory mapper to coalesce the `mmap` call for adjacent chunks that have</span>
-<span class="doccomment">//! the same `MapState`.  The memory mapper needs to know the size of each group to compute the</span>
-<span class="doccomment">//! memory range the group of `MapState` covers in order to call `mmap`, and then traverse the</span>
-<span class="doccomment">//! group of `MapState` again to update them.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The `.revisitable_group_by` method takes a closure for computing the keys of each item.</span>
-<span class="doccomment">//! Adjacent items with the same key will be put into the same group.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The following example groups adjacent even or odd numbers together.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```rs</span>
-<span class="doccomment">//! let nums = [1, 3, 5, 2, 4, 6, 7, 9];</span>
-<span class="doccomment">//! for group in nums.iter().revisitable_group_by(|x| *x % 2) {</span>
-<span class="doccomment">//!     println!(&quot;key: {}, len: {}&quot;, group.key, group.len);</span>
-<span class="doccomment">//!     for x in group {</span>
-<span class="doccomment">//!         println!(&quot;  x: {}&quot;, *x);</span>
-<span class="doccomment">//!     }</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! It should form three groups, `[1, 3, 5]`, `[2, 4, 6]` and `[7, 9]`, with the keys being 1, 0</span>
-<span class="doccomment">//! and 1, respectively.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! It can be used with the `.flatten()` method to make groups across the boundaries of several</span>
-<span class="doccomment">//! iterable items.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```rs</span>
-<span class="doccomment">//! let slice_of_slices: &amp;[&amp;[i32]] = &amp;[&amp;[10, 20], &amp;[30, 40, 11, 21], &amp;[31, 12, 22]];</span>
-<span class="doccomment">//! let result = slice_of_slices.iter().copied().flatten().copied()</span>
-<span class="doccomment">//!     .revisitable_group_by(|x| x % 10)</span>
-<span class="doccomment">//!     .map(|group| group.collect::&lt;Vec&lt;_&gt;&gt;())</span>
-<span class="doccomment">//!     .collect::&lt;Vec&lt;_&gt;&gt;();</span>
-<span class="doccomment">//! assert_eq!(</span>
-<span class="doccomment">//!     result,</span>
-<span class="doccomment">//!     vec![vec![10, 20, 30, 40], vec![11, 21, 31], vec![12, 22]],</span>
-<span class="doccomment">//! );</span>
-<span class="doccomment">//! ```</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This module provides an iterator that groups adjacent items with the same key.
+//!
+//! It gives all `Iterator + Clone` iterators a new method: `.revisitable_group_by`. It is similar
+//! to `Itertools::group_by`, but it lets the user know the length of each group before iterating
+//! through the group.  Implementation-wise, it eagerly finds all items with the same key, and
+//! then lets the user traverse the same range of items again using a pre-cloned iterator. This
+//! is why it is named &quot;revisitable&quot; group-by.
+//!
+//! This is useful for the memory mapper to coalesce the `mmap` call for adjacent chunks that have
+//! the same `MapState`.  The memory mapper needs to know the size of each group to compute the
+//! memory range the group of `MapState` covers in order to call `mmap`, and then traverse the
+//! group of `MapState` again to update them.
+//!
+//! The `.revisitable_group_by` method takes a closure for computing the keys of each item.
+//! Adjacent items with the same key will be put into the same group.
+//!
+//! The following example groups adjacent even or odd numbers together.
+//!
+//! ```rs
+//! let nums = [1, 3, 5, 2, 4, 6, 7, 9];
+//! for group in nums.iter().revisitable_group_by(|x| *x % 2) {
+//!     println!(&quot;key: {}, len: {}&quot;, group.key, group.len);
+//!     for x in group {
+//!         println!(&quot;  x: {}&quot;, *x);
+//!     }
+//! }
+//! ```
+//!
+//! It should form three groups, `[1, 3, 5]`, `[2, 4, 6]` and `[7, 9]`, with the keys being 1, 0
+//! and 1, respectively.
+//!
+//! It can be used with the `.flatten()` method to make groups across the boundaries of several
+//! iterable items.
+//!
+//! ```rs
+//! let slice_of_slices: &amp;[&amp;[i32]] = &amp;[&amp;[10, 20], &amp;[30, 40, 11, 21], &amp;[31, 12, 22]];
+//! let result = slice_of_slices.iter().copied().flatten().copied()
+//!     .revisitable_group_by(|x| x % 10)
+//!     .map(|group| group.collect::&lt;Vec&lt;_&gt;&gt;())
+//!     .collect::&lt;Vec&lt;_&gt;&gt;();
+//! assert_eq!(
+//!     result,
+//!     vec![vec![10, 20, 30, 40], vec![11, 21, 31], vec![12, 22]],
+//! );
+//! ```
 
-<span class="doccomment">/// This trait provides the `revisitable_group_by` method for all `Iterator` that also implements</span>
-<span class="doccomment">/// `Clone`.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">trait</span> <span class="ident">RevisitableGroupByForIterator</span> {
-    <span class="kw">type</span> <span class="ident">Item</span>;
-    <span class="kw">type</span> <span class="ident">Iter</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>;
+/// This trait provides the `revisitable_group_by` method for all `Iterator` that also implements
+/// `Clone`.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">trait </span>RevisitableGroupByForIterator {
+    <span class="kw">type </span>Item;
+    <span class="kw">type </span>Iter: Iterator&lt;Item = <span class="self">Self</span>::Item&gt; + Clone;
 
-    <span class="doccomment">/// Group adjacent items by key.  `get_key` is a closure that computes the key.</span>
-    <span class="kw">fn</span> <span class="ident">revisitable_group_by</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">F</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// Group adjacent items by key.  `get_key` is a closure that computes the key.
+    </span><span class="kw">fn </span>revisitable_group_by&lt;K, F&gt;(
         <span class="self">self</span>,
-        <span class="ident">get_key</span>: <span class="ident">F</span>,
-    ) -&gt; <span class="ident">RevisitableGroupBy</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span>, <span class="ident">K</span>, <span class="ident"><span class="self">Self</span>::Iter</span>, <span class="ident">F</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Copy</span>,
-        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Item</span>) -&gt; <span class="ident">K</span>;
+        get_key: F,
+    ) -&gt; RevisitableGroupBy&lt;<span class="self">Self</span>::Item, K, <span class="self">Self</span>::Iter, F&gt;
+    <span class="kw">where
+        </span>K: PartialEq + Copy,
+        F: FnMut(<span class="kw-2">&amp;</span><span class="self">Self</span>::Item) -&gt; K;
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">I</span>: <span class="ident">Iterator</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span> <span class="ident">RevisitableGroupByForIterator</span> <span class="kw">for</span> <span class="ident">I</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">I</span> <span class="kw">as</span> <span class="ident">Iterator</span><span class="op">&gt;</span><span class="ident">::Item</span>;
-    <span class="kw">type</span> <span class="ident">Iter</span> <span class="op">=</span> <span class="ident">I</span>;
+<span class="kw">impl</span>&lt;I: Iterator + Clone&gt; RevisitableGroupByForIterator <span class="kw">for </span>I {
+    <span class="kw">type </span>Item = &lt;I <span class="kw">as </span>Iterator&gt;::Item;
+    <span class="kw">type </span>Iter = I;
 
-    <span class="kw">fn</span> <span class="ident">revisitable_group_by</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">F</span><span class="op">&gt;</span>(
+    <span class="kw">fn </span>revisitable_group_by&lt;K, F&gt;(
         <span class="self">self</span>,
-        <span class="ident">get_key</span>: <span class="ident">F</span>,
-    ) -&gt; <span class="ident">RevisitableGroupBy</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span>, <span class="ident">K</span>, <span class="ident"><span class="self">Self</span>::Iter</span>, <span class="ident">F</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Copy</span>,
-        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Item</span>) -&gt; <span class="ident">K</span>,
+        get_key: F,
+    ) -&gt; RevisitableGroupBy&lt;<span class="self">Self</span>::Item, K, <span class="self">Self</span>::Iter, F&gt;
+    <span class="kw">where
+        </span>K: PartialEq + Copy,
+        F: FnMut(<span class="kw-2">&amp;</span><span class="self">Self</span>::Item) -&gt; K,
     {
-        <span class="ident">RevisitableGroupBy</span> {
-            <span class="ident">iter</span>: <span class="self">self</span>,
-            <span class="ident">get_key</span>,
-            <span class="ident">next_group_initial</span>: <span class="prelude-val">None</span>,
+        RevisitableGroupBy {
+            iter: <span class="self">self</span>,
+            get_key,
+            next_group_initial: <span class="prelude-val">None</span>,
         }
     }
 }
 
-<span class="doccomment">/// An iterator through groups of items with the same key.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">RevisitableGroupBy</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span>, <span class="ident">F</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Copy</span>,
-    <span class="ident">I</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
-    <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">K</span>,
+<span class="doccomment">/// An iterator through groups of items with the same key.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>RevisitableGroupBy&lt;T, K, I, F&gt;
+<span class="kw">where
+    </span>K: PartialEq + Copy,
+    I: Iterator&lt;Item = T&gt; + Clone,
+    F: FnMut(<span class="kw-2">&amp;</span>T) -&gt; K,
 {
-    <span class="doccomment">/// The underlying iterator.</span>
-    <span class="ident">iter</span>: <span class="ident">I</span>,
-    <span class="doccomment">/// The function to get the key.</span>
-    <span class="ident">get_key</span>: <span class="ident">F</span>,
-    <span class="doccomment">/// Temporarily save the item and key of the next group when peeking.</span>
-    <span class="ident">next_group_initial</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">T</span>, <span class="ident">K</span>)<span class="op">&gt;</span>,
+    <span class="doccomment">/// The underlying iterator.
+    </span>iter: I,
+    <span class="doccomment">/// The function to get the key.
+    </span>get_key: F,
+    <span class="doccomment">/// Temporarily save the item and key of the next group when peeking.
+    </span>next_group_initial: <span class="prelude-ty">Option</span>&lt;(T, K)&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span>, <span class="ident">F</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">RevisitableGroupBy</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span>, <span class="ident">F</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Copy</span>,
-    <span class="ident">I</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
-    <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">K</span>,
+<span class="kw">impl</span>&lt;T, K, I, F&gt; Iterator <span class="kw">for </span>RevisitableGroupBy&lt;T, K, I, F&gt;
+<span class="kw">where
+    </span>K: PartialEq + Copy,
+    I: Iterator&lt;Item = T&gt; + Clone,
+    F: FnMut(<span class="kw-2">&amp;</span>T) -&gt; K,
 {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">RevisitableGroup</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span><span class="op">&gt;</span>;
+    <span class="kw">type </span>Item = RevisitableGroup&lt;T, K, I&gt;;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">group_head</span>, <span class="ident">group_key</span>) <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">head</span>, <span class="ident">key</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">next_group_initial</span>.<span class="ident">take</span>() {
-            <span class="comment">// We already peeked the item of the next group the last time `next()` was called.</span>
-            <span class="comment">// Count that in.</span>
-            (<span class="ident">head</span>, <span class="ident">key</span>)
-        } <span class="kw">else</span> {
-            <span class="comment">// Either we haven&#39;t start iterating, yet, or we already exhausted the iter.</span>
-            <span class="comment">// Get the next item from the underlying iter.</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">next</span>() {
-                <span class="comment">// The next group has at least one item.</span>
-                <span class="comment">// This is the key of the group.</span>
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">get_key</span>)(<span class="kw-2">&amp;</span><span class="ident">item</span>);
-                (<span class="ident">item</span>, <span class="ident">key</span>)
-            } <span class="kw">else</span> {
-                <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">let </span>(group_head, group_key) = <span class="kw">if let </span><span class="prelude-val">Some</span>((head, key)) = <span class="self">self</span>.next_group_initial.take() {
+            <span class="comment">// We already peeked the item of the next group the last time `next()` was called.
+            // Count that in.
+            </span>(head, key)
+        } <span class="kw">else </span>{
+            <span class="comment">// Either we haven&#39;t start iterating, yet, or we already exhausted the iter.
+            // Get the next item from the underlying iter.
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(item) = <span class="self">self</span>.iter.next() {
+                <span class="comment">// The next group has at least one item.
+                // This is the key of the group.
+                </span><span class="kw">let </span>key = (<span class="self">self</span>.get_key)(<span class="kw-2">&amp;</span>item);
+                (item, key)
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">None</span>;
             }
         };
 
-        <span class="comment">// If reached here, the group must have at least one item.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">group_size</span> <span class="op">=</span> <span class="number">1</span>;
+        <span class="comment">// If reached here, the group must have at least one item.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>group_size = <span class="number">1</span>;
 
-        <span class="comment">// Get the rest of the group.</span>
-        <span class="kw">let</span> <span class="ident">saved_iter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">clone</span>();
-        <span class="kw">loop</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">next</span>() {
-                <span class="comment">// The next item exists. It either belongs to the current group or not.</span>
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">get_key</span>)(<span class="kw-2">&amp;</span><span class="ident">item</span>);
-                <span class="kw">if</span> <span class="ident">key</span> <span class="op">==</span> <span class="ident">group_key</span> {
-                    <span class="comment">// It is in the same group.</span>
-                    <span class="ident">group_size</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                } <span class="kw">else</span> {
-                    <span class="comment">// It belongs to the next group.  Save the item and the key...</span>
-                    <span class="self">self</span>.<span class="ident">next_group_initial</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">item</span>, <span class="ident">key</span>));
-                    <span class="comment">// ... and we have a group now.</span>
-                    <span class="kw">break</span>;
+        <span class="comment">// Get the rest of the group.
+        </span><span class="kw">let </span>saved_iter = <span class="self">self</span>.iter.clone();
+        <span class="kw">loop </span>{
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(item) = <span class="self">self</span>.iter.next() {
+                <span class="comment">// The next item exists. It either belongs to the current group or not.
+                </span><span class="kw">let </span>key = (<span class="self">self</span>.get_key)(<span class="kw-2">&amp;</span>item);
+                <span class="kw">if </span>key == group_key {
+                    <span class="comment">// It is in the same group.
+                    </span>group_size += <span class="number">1</span>;
+                } <span class="kw">else </span>{
+                    <span class="comment">// It belongs to the next group.  Save the item and the key...
+                    </span><span class="self">self</span>.next_group_initial = <span class="prelude-val">Some</span>((item, key));
+                    <span class="comment">// ... and we have a group now.
+                    </span><span class="kw">break</span>;
                 }
-            } <span class="kw">else</span> {
-                <span class="comment">// No more items. This is the last group.</span>
-                <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">next_group_initial</span>.<span class="ident">is_none</span>());
+            } <span class="kw">else </span>{
+                <span class="comment">// No more items. This is the last group.
+                </span><span class="macro">debug_assert!</span>(<span class="self">self</span>.next_group_initial.is_none());
                 <span class="kw">break</span>;
             }
         }
 
-        <span class="prelude-val">Some</span>(<span class="ident">RevisitableGroup</span> {
-            <span class="ident">key</span>: <span class="ident">group_key</span>,
-            <span class="ident">len</span>: <span class="ident">group_size</span>,
-            <span class="ident">head</span>: <span class="prelude-val">Some</span>(<span class="ident">group_head</span>),
-            <span class="ident">iter</span>: <span class="ident">saved_iter</span>,
-            <span class="ident">remaining</span>: <span class="ident">group_size</span>,
+        <span class="prelude-val">Some</span>(RevisitableGroup {
+            key: group_key,
+            len: group_size,
+            head: <span class="prelude-val">Some</span>(group_head),
+            iter: saved_iter,
+            remaining: group_size,
         })
     }
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">RevisitableGroup</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Copy</span>,
-    <span class="ident">I</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span>,
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>RevisitableGroup&lt;T, K, I&gt;
+<span class="kw">where
+    </span>K: PartialEq + Copy,
+    I: Iterator&lt;Item = T&gt;,
 {
-    <span class="doccomment">/// The key of this group.</span>
-    <span class="kw">pub</span> <span class="ident">key</span>: <span class="ident">K</span>,
-    <span class="doccomment">/// The length of this group.</span>
-    <span class="kw">pub</span> <span class="ident">len</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The first item. Note that `iter` starts from the second element due to the way we clone it.</span>
-    <span class="ident">head</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The underlying iterator.</span>
-    <span class="ident">iter</span>: <span class="ident">I</span>,
-    <span class="doccomment">/// The number of items remain to be iterated.</span>
-    <span class="ident">remaining</span>: <span class="ident">usize</span>,
+    <span class="doccomment">/// The key of this group.
+    </span><span class="kw">pub </span>key: K,
+    <span class="doccomment">/// The length of this group.
+    </span><span class="kw">pub </span>len: usize,
+    <span class="doccomment">/// The first item. Note that `iter` starts from the second element due to the way we clone it.
+    </span>head: <span class="prelude-ty">Option</span>&lt;T&gt;,
+    <span class="doccomment">/// The underlying iterator.
+    </span>iter: I,
+    <span class="doccomment">/// The number of items remain to be iterated.
+    </span>remaining: usize,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">RevisitableGroup</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">K</span>, <span class="ident">I</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Copy</span>,
-    <span class="ident">I</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span>,
+<span class="kw">impl</span>&lt;T, K, I&gt; Iterator <span class="kw">for </span>RevisitableGroup&lt;T, K, I&gt;
+<span class="kw">where
+    </span>K: PartialEq + Copy,
+    I: Iterator&lt;Item = T&gt;,
 {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span>;
+    <span class="kw">type </span>Item = T;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">remaining</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">remaining</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">take</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">item</span>)
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">next</span>();
-                <span class="macro">debug_assert!</span>(<span class="ident">result</span>.<span class="ident">is_some</span>());
-                <span class="ident">result</span>
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">if </span><span class="self">self</span>.remaining == <span class="number">0 </span>{
+            <span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="self">self</span>.remaining -= <span class="number">1</span>;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(item) = <span class="self">self</span>.head.take() {
+                <span class="prelude-val">Some</span>(item)
+            } <span class="kw">else </span>{
+                <span class="kw">let </span>result = <span class="self">self</span>.iter.next();
+                <span class="macro">debug_assert!</span>(result.is_some());
+                result
             }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_simple_group_by</span>() {
-        <span class="kw">let</span> <span class="ident">nums</span> <span class="op">=</span> [<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">9</span>];
-        <span class="kw">let</span> <span class="ident">grouped</span> <span class="op">=</span> <span class="ident">nums</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">x</span> <span class="op">%</span> <span class="number">2</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">group</span><span class="op">|</span> (<span class="ident">group</span>.<span class="ident">key</span>, <span class="ident">group</span>.<span class="ident">len</span>, <span class="ident">group</span>.<span class="ident">copied</span>().<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_simple_group_by() {
+        <span class="kw">let </span>nums = [<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">9</span>];
+        <span class="kw">let </span>grouped = nums
+            .iter()
+            .revisitable_group_by(|x| <span class="kw-2">*</span>x % <span class="number">2</span>)
+            .map(|group| (group.key, group.len, group.copied().collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
         <span class="macro">assert_eq!</span>(
-            <span class="ident">grouped</span>,
+            grouped,
             <span class="macro">vec!</span>[
                 (<span class="number">1</span>, <span class="number">3</span>, <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>]),
                 (<span class="number">0</span>, <span class="number">3</span>, <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>]),
@@ -623,61 +621,61 @@
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_empty_outer_slice</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[];
-        <span class="kw">for</span> <span class="ident">_group</span> <span class="kw">in</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="number">42</span>)
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_empty_outer_slice() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[];
+        <span class="kw">for </span>_group <span class="kw">in </span>slice_of_slices
+            .iter()
+            .copied()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|<span class="kw">_</span>| <span class="number">42</span>)
         {
             <span class="macro">panic!</span>(<span class="string">&quot;There is no item!&quot;</span>);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_empty_inner_slice</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[]];
-        <span class="kw">for</span> <span class="ident">_group</span> <span class="kw">in</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="number">42</span>)
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_empty_inner_slice() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[]];
+        <span class="kw">for </span>_group <span class="kw">in </span>slice_of_slices
+            .iter()
+            .copied()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|<span class="kw">_</span>| <span class="number">42</span>)
         {
             <span class="macro">panic!</span>(<span class="string">&quot;There is no item!&quot;</span>);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_single_item</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">1</span>]];
-        <span class="kw">for</span> <span class="ident">group</span> <span class="kw">in</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="number">42</span>)
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_single_item() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">1</span>]];
+        <span class="kw">for </span>group <span class="kw">in </span>slice_of_slices
+            .iter()
+            .copied()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|<span class="kw">_</span>| <span class="number">42</span>)
         {
-            <span class="macro">assert_eq!</span>(<span class="ident">group</span>.<span class="ident">key</span>, <span class="number">42</span>);
+            <span class="macro">assert_eq!</span>(group.key, <span class="number">42</span>);
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_single_slice_multi_item</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>, <span class="number">7</span>]];
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">%</span> <span class="number">2</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">group</span><span class="op">|</span> (<span class="ident">group</span>.<span class="ident">key</span>, <span class="ident">group</span>.<span class="ident">len</span>, <span class="ident">group</span>.<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_single_slice_multi_item() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>, <span class="number">7</span>]];
+        <span class="kw">let </span>result = slice_of_slices
+            .iter()
+            .copied()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|x| x % <span class="number">2</span>)
+            .map(|group| (group.key, group.len, group.collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
         <span class="macro">assert_eq!</span>(
-            <span class="ident">result</span>,
+            result,
             <span class="macro">vec!</span>[
                 (<span class="number">1</span>, <span class="number">3</span>, <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>]),
                 (<span class="number">0</span>, <span class="number">3</span>, <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>]),
@@ -686,19 +684,19 @@
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_multi_slice_multi_item</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">20</span>], <span class="kw-2">&amp;</span>[<span class="number">11</span>, <span class="number">21</span>, <span class="number">31</span>], <span class="kw-2">&amp;</span>[<span class="number">12</span>, <span class="number">22</span>, <span class="number">32</span>, <span class="number">42</span>]];
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">%</span> <span class="number">10</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">group</span><span class="op">|</span> (<span class="ident">group</span>.<span class="ident">key</span>, <span class="ident">group</span>.<span class="ident">len</span>, <span class="ident">group</span>.<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_multi_slice_multi_item() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">20</span>], <span class="kw-2">&amp;</span>[<span class="number">11</span>, <span class="number">21</span>, <span class="number">31</span>], <span class="kw-2">&amp;</span>[<span class="number">12</span>, <span class="number">22</span>, <span class="number">32</span>, <span class="number">42</span>]];
+        <span class="kw">let </span>result = slice_of_slices
+            .iter()
+            .copied()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|x| x % <span class="number">10</span>)
+            .map(|group| (group.key, group.len, group.collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
         <span class="macro">assert_eq!</span>(
-            <span class="ident">result</span>,
+            result,
             <span class="macro">vec!</span>[
                 (<span class="number">0</span>, <span class="number">2</span>, <span class="macro">vec!</span>[<span class="number">10</span>, <span class="number">20</span>]),
                 (<span class="number">1</span>, <span class="number">3</span>, <span class="macro">vec!</span>[<span class="number">11</span>, <span class="number">21</span>, <span class="number">31</span>]),
@@ -707,19 +705,19 @@
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_cross_slice_groups</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">20</span>], <span class="kw-2">&amp;</span>[<span class="number">30</span>, <span class="number">40</span>, <span class="number">11</span>, <span class="number">21</span>], <span class="kw-2">&amp;</span>[<span class="number">31</span>, <span class="number">12</span>, <span class="number">22</span>]];
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">%</span> <span class="number">10</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">group</span><span class="op">|</span> (<span class="ident">group</span>.<span class="ident">key</span>, <span class="ident">group</span>.<span class="ident">len</span>, <span class="ident">group</span>.<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_cross_slice_groups() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">20</span>], <span class="kw-2">&amp;</span>[<span class="number">30</span>, <span class="number">40</span>, <span class="number">11</span>, <span class="number">21</span>], <span class="kw-2">&amp;</span>[<span class="number">31</span>, <span class="number">12</span>, <span class="number">22</span>]];
+        <span class="kw">let </span>result = slice_of_slices
+            .iter()
+            .copied()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|x| x % <span class="number">10</span>)
+            .map(|group| (group.key, group.len, group.collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
         <span class="macro">assert_eq!</span>(
-            <span class="ident">result</span>,
+            result,
             <span class="macro">vec!</span>[
                 (<span class="number">0</span>, <span class="number">4</span>, <span class="macro">vec!</span>[<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>, <span class="number">40</span>]),
                 (<span class="number">1</span>, <span class="number">3</span>, <span class="macro">vec!</span>[<span class="number">11</span>, <span class="number">21</span>, <span class="number">31</span>]),
@@ -728,19 +726,19 @@
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_cross_slice_groups2</span>() {
-        <span class="kw">let</span> <span class="ident">slice_of_slices</span>: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="ident">i32</span>]] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">20</span>, <span class="number">11</span>], <span class="kw-2">&amp;</span>[<span class="number">21</span>, <span class="number">31</span>, <span class="number">41</span>], <span class="kw-2">&amp;</span>[<span class="number">51</span>, <span class="number">61</span>], <span class="kw-2">&amp;</span>[<span class="number">71</span>, <span class="number">12</span>, <span class="number">22</span>]];
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">slice_of_slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">cloned</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">%</span> <span class="number">10</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">group</span><span class="op">|</span> (<span class="ident">group</span>.<span class="ident">key</span>, <span class="ident">group</span>.<span class="ident">len</span>, <span class="ident">group</span>.<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_cross_slice_groups2() {
+        <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[<span class="number">10</span>, <span class="number">20</span>, <span class="number">11</span>], <span class="kw-2">&amp;</span>[<span class="number">21</span>, <span class="number">31</span>, <span class="number">41</span>], <span class="kw-2">&amp;</span>[<span class="number">51</span>, <span class="number">61</span>], <span class="kw-2">&amp;</span>[<span class="number">71</span>, <span class="number">12</span>, <span class="number">22</span>]];
+        <span class="kw">let </span>result = slice_of_slices
+            .iter()
+            .cloned()
+            .flatten()
+            .copied()
+            .revisitable_group_by(|x| x % <span class="number">10</span>)
+            .map(|group| (group.key, group.len, group.collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()))
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
         <span class="macro">assert_eq!</span>(
-            <span class="ident">result</span>,
+            result,
             <span class="macro">vec!</span>[
                 (<span class="number">0</span>, <span class="number">2</span>, <span class="macro">vec!</span>[<span class="number">10</span>, <span class="number">20</span>]),
                 (<span class="number">1</span>, <span class="number">7</span>, <span class="macro">vec!</span>[<span class="number">11</span>, <span class="number">21</span>, <span class="number">31</span>, <span class="number">41</span>, <span class="number">51</span>, <span class="number">61</span>, <span class="number">71</span>]),
@@ -749,63 +747,62 @@
         );
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_internal_mutability</span>() {
-        <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
-        <span class="kw">let</span> <span class="ident">slab0</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="ident">AtomicUsize::new</span>(<span class="number">1</span>),
-            <span class="ident">AtomicUsize::new</span>(<span class="number">3</span>),
-            <span class="ident">AtomicUsize::new</span>(<span class="number">2</span>),
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_internal_mutability() {
+        <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
+        <span class="kw">let </span>slab0 = <span class="macro">vec!</span>[
+            AtomicUsize::new(<span class="number">1</span>),
+            AtomicUsize::new(<span class="number">3</span>),
+            AtomicUsize::new(<span class="number">2</span>),
         ];
-        <span class="kw">let</span> <span class="ident">slab1</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="ident">AtomicUsize::new</span>(<span class="number">4</span>),
-            <span class="ident">AtomicUsize::new</span>(<span class="number">6</span>),
-            <span class="ident">AtomicUsize::new</span>(<span class="number">5</span>),
+        <span class="kw">let </span>slab1 = <span class="macro">vec!</span>[
+            AtomicUsize::new(<span class="number">4</span>),
+            AtomicUsize::new(<span class="number">6</span>),
+            AtomicUsize::new(<span class="number">5</span>),
         ];
-        <span class="kw">let</span> <span class="ident">slab2</span> <span class="op">=</span> <span class="macro">vec!</span>[
-            <span class="ident">AtomicUsize::new</span>(<span class="number">7</span>),
-            <span class="ident">AtomicUsize::new</span>(<span class="number">9</span>),
-            <span class="ident">AtomicUsize::new</span>(<span class="number">10</span>),
+        <span class="kw">let </span>slab2 = <span class="macro">vec!</span>[
+            AtomicUsize::new(<span class="number">7</span>),
+            AtomicUsize::new(<span class="number">9</span>),
+            AtomicUsize::new(<span class="number">10</span>),
         ];
 
-        <span class="comment">// Note: We only take the first two elements from slab2,</span>
-        <span class="comment">// because the mmapper sometimes processes part of a slab.</span>
-        <span class="kw">let</span> <span class="ident">slices</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">AtomicUsize</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="kw-2">&amp;</span><span class="ident">slab0</span>[<span class="number">0</span>..<span class="number">3</span>], <span class="kw-2">&amp;</span><span class="ident">slab1</span>[<span class="number">0</span>..<span class="number">3</span>], <span class="kw-2">&amp;</span><span class="ident">slab2</span>[<span class="number">0</span>..<span class="number">2</span>]];
+        <span class="comment">// Note: We only take the first two elements from slab2,
+        // because the mmapper sometimes processes part of a slab.
+        </span><span class="kw">let </span>slices: Vec&lt;<span class="kw-2">&amp;</span>[AtomicUsize]&gt; = <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>slab0[<span class="number">0</span>..<span class="number">3</span>], <span class="kw-2">&amp;</span>slab1[<span class="number">0</span>..<span class="number">3</span>], <span class="kw-2">&amp;</span>slab2[<span class="number">0</span>..<span class="number">2</span>]];
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">collected</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="kw">let </span><span class="kw-2">mut </span>collected = <span class="macro">vec!</span>[];
 
-        <span class="kw">for</span> <span class="ident">group</span> <span class="kw">in</span> <span class="ident">slices</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">copied</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">revisitable_group_by</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">%</span> <span class="number">2</span>)
+        <span class="kw">for </span>group <span class="kw">in </span>slices
+            .iter()
+            .copied()
+            .flatten()
+            .revisitable_group_by(|x| x.load(Ordering::SeqCst) % <span class="number">2</span>)
         {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">group_collected</span> <span class="op">=</span> <span class="macro">vec!</span>[];
-            <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">group</span>.<span class="ident">key</span>;
-            <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">group</span> {
-                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">elem</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
-                <span class="ident">group_collected</span>.<span class="ident">push</span>(<span class="ident">value</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>group_collected = <span class="macro">vec!</span>[];
+            <span class="kw">let </span>key = group.key;
+            <span class="kw">for </span>elem <span class="kw">in </span>group {
+                <span class="kw">let </span>value = elem.load(Ordering::SeqCst);
+                group_collected.push(value);
 
-                <span class="kw">let</span> <span class="ident">new_value</span> <span class="op">=</span> <span class="ident">value</span> <span class="op">*</span> <span class="number">100</span> <span class="op">+</span> <span class="ident">key</span>;
-                <span class="ident">elem</span>.<span class="ident">store</span>(<span class="ident">new_value</span>, <span class="ident">Ordering::SeqCst</span>);
+                <span class="kw">let </span>new_value = value * <span class="number">100 </span>+ key;
+                elem.store(new_value, Ordering::SeqCst);
             }
 
-            <span class="ident">collected</span>.<span class="ident">push</span>(<span class="ident">group_collected</span>);
+            collected.push(group_collected);
         }
 
-        <span class="macro">assert_eq!</span>(<span class="ident">collected</span>, <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">3</span>], <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>], <span class="macro">vec!</span>[<span class="number">5</span>, <span class="number">7</span>, <span class="number">9</span>]]);
+        <span class="macro">assert_eq!</span>(collected, <span class="macro">vec!</span>[<span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">3</span>], <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">4</span>, <span class="number">6</span>], <span class="macro">vec!</span>[<span class="number">5</span>, <span class="number">7</span>, <span class="number">9</span>]]);
 
-        <span class="kw">let</span> <span class="ident">load_all</span> <span class="op">=</span> <span class="op">|</span><span class="ident">slab</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span><span class="op">|</span> {
-            <span class="ident">slab</span>.<span class="ident">iter</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>))
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+        <span class="kw">let </span>load_all = |slab: Vec&lt;AtomicUsize&gt;| {
+            slab.iter()
+                .map(|x| x.load(Ordering::SeqCst))
+                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
         };
 
-        <span class="macro">assert_eq!</span>(<span class="ident">load_all</span>(<span class="ident">slab0</span>), <span class="macro">vec!</span>[<span class="number">101</span>, <span class="number">301</span>, <span class="number">200</span>]);
-        <span class="macro">assert_eq!</span>(<span class="ident">load_all</span>(<span class="ident">slab1</span>), <span class="macro">vec!</span>[<span class="number">400</span>, <span class="number">600</span>, <span class="number">501</span>]);
-        <span class="macro">assert_eq!</span>(<span class="ident">load_all</span>(<span class="ident">slab2</span>), <span class="macro">vec!</span>[<span class="number">701</span>, <span class="number">901</span>, <span class="number">10</span>]); <span class="comment">// The last item should not be affected.</span>
-    }
+        <span class="macro">assert_eq!</span>(load_all(slab0), <span class="macro">vec!</span>[<span class="number">101</span>, <span class="number">301</span>, <span class="number">200</span>]);
+        <span class="macro">assert_eq!</span>(load_all(slab1), <span class="macro">vec!</span>[<span class="number">400</span>, <span class="number">600</span>, <span class="number">501</span>]);
+        <span class="macro">assert_eq!</span>(load_all(slab2), <span class="macro">vec!</span>[<span class="number">701</span>, <span class="number">901</span>, <span class="number">10</span>]); <span class="comment">// The last item should not be affected.
+    </span>}
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

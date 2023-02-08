@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;alloc_bit.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>alloc_bit.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/alloc_bit.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>alloc_bit.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -97,103 +95,102 @@
 <span id="95">95</span>
 <span id="96">96</span>
 <span id="97">97</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="doccomment">/// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-    <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::ALLOC_BIT</span>;
+<span class="doccomment">/// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec =
+    <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::ALLOC_BIT;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_ADDR</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">get_absolute_offset</span>();
+<span class="kw">pub const </span>ALLOC_SIDE_METADATA_ADDR: Address = ALLOC_SIDE_METADATA_SPEC.get_absolute_offset();
 
-<span class="doccomment">/// Atomically set the alloc bit for an object.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+<span class="doccomment">/// Atomically set the alloc bit for an object.
+</span><span class="kw">pub fn </span>set_alloc_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
     <span class="macro">debug_assert!</span>(
-        <span class="op">!</span><span class="ident">is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
+        !is_alloced::&lt;VM&gt;(object),
         <span class="string">&quot;{:x}: alloc bit already set&quot;</span>,
-        <span class="ident">object</span>
+        object
     );
-    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">1</span>, Ordering::SeqCst);
 }
 
-<span class="doccomment">/// Atomically unset the alloc bit for an object.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="macro">debug_assert!</span>(<span class="ident">is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>), <span class="string">&quot;{:x}: alloc bit not set&quot;</span>, <span class="ident">object</span>);
-    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
+<span class="doccomment">/// Atomically unset the alloc bit for an object.
+</span><span class="kw">pub fn </span>unset_alloc_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    <span class="macro">debug_assert!</span>(is_alloced::&lt;VM&gt;(object), <span class="string">&quot;{:x}: alloc bit not set&quot;</span>, object);
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">0</span>, Ordering::SeqCst);
 }
 
-<span class="doccomment">/// Atomically unset the alloc bit for an object, regardless whether the bit is set or not.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_nocheck</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
+<span class="doccomment">/// Atomically unset the alloc bit for an object, regardless whether the bit is set or not.
+</span><span class="kw">pub fn </span>unset_alloc_bit_nocheck&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">0</span>, Ordering::SeqCst);
 }
 
-<span class="doccomment">/// Non-atomically unset the alloc bit for an object. The caller needs to ensure the side</span>
-<span class="doccomment">/// metadata for the alloc bit for the object is accessed by only one thread.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Safety</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This is unsafe: check the comment on `side_metadata::store`</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_unsafe</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="macro">debug_assert!</span>(<span class="ident">is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>), <span class="string">&quot;{:x}: alloc bit not set&quot;</span>, <span class="ident">object</span>);
-    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="number">0</span>);
+<span class="doccomment">/// Non-atomically unset the alloc bit for an object. The caller needs to ensure the side
+/// metadata for the alloc bit for the object is accessed by only one thread.
+///
+/// # Safety
+///
+/// This is unsafe: check the comment on `side_metadata::store`
+</span><span class="kw">pub unsafe fn </span>unset_alloc_bit_unsafe&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    <span class="macro">debug_assert!</span>(is_alloced::&lt;VM&gt;(object), <span class="string">&quot;{:x}: alloc bit not set&quot;</span>, object);
+    ALLOC_SIDE_METADATA_SPEC.store::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), <span class="number">0</span>);
 }
 
-<span class="doccomment">/// Check if the alloc bit is set for an object.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_alloced</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
-}
+<span class="doccomment">/// Check if the alloc bit is set for an object.
+</span><span class="kw">pub fn </span>is_alloced&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
+    ALLOC_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(object.to_address::&lt;VM&gt;(), Ordering::SeqCst) == <span class="number">1
+</span>}
 
-<span class="doccomment">/// Check if an address can be turned directly into an object reference using the alloc bit.</span>
-<span class="doccomment">/// If so, return `Some(object)`. Otherwise return `None`.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_alloced_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">potential_object</span> <span class="op">=</span> <span class="ident">ObjectReference::from_raw_address</span>(<span class="ident">address</span>);
-    <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">potential_object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
+<span class="doccomment">/// Check if an address can be turned directly into an object reference using the alloc bit.
+/// If so, return `Some(object)`. Otherwise return `None`.
+</span><span class="attribute">#[inline]
+</span><span class="kw">pub fn </span>is_alloced_object&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">let </span>potential_object = ObjectReference::from_raw_address(address);
+    <span class="kw">let </span>addr = potential_object.to_address::&lt;VM&gt;();
 
-    <span class="comment">// If we haven&#39;t mapped alloc bit for the address, it cannot be an object</span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">is_mapped</span>(<span class="ident">addr</span>) {
-        <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="comment">// If we haven&#39;t mapped alloc bit for the address, it cannot be an object
+    </span><span class="kw">if </span>!ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
     }
 
-    <span class="kw">if</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">addr</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">potential_object</span>)
-    } <span class="kw">else</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">if </span>ALLOC_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(addr, Ordering::SeqCst) == <span class="number">1 </span>{
+        <span class="prelude-val">Some</span>(potential_object)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>}
 }
 
-<span class="doccomment">/// Check if an address can be turned directly into an object reference using the alloc bit.</span>
-<span class="doccomment">/// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side</span>
-<span class="doccomment">/// metadata for the alloc bit for the object is accessed by only one thread.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Safety</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This is unsafe: check the comment on `side_metadata::load`</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_alloced_object_unsafe</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">potential_object</span> <span class="op">=</span> <span class="ident">ObjectReference::from_raw_address</span>(<span class="ident">address</span>);
-    <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">potential_object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
+<span class="doccomment">/// Check if an address can be turned directly into an object reference using the alloc bit.
+/// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side
+/// metadata for the alloc bit for the object is accessed by only one thread.
+///
+/// # Safety
+///
+/// This is unsafe: check the comment on `side_metadata::load`
+</span><span class="attribute">#[inline]
+</span><span class="kw">pub unsafe fn </span>is_alloced_object_unsafe&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">let </span>potential_object = ObjectReference::from_raw_address(address);
+    <span class="kw">let </span>addr = potential_object.to_address::&lt;VM&gt;();
 
-    <span class="comment">// If we haven&#39;t mapped alloc bit for the address, it cannot be an object</span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">is_mapped</span>(<span class="ident">addr</span>) {
-        <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="comment">// If we haven&#39;t mapped alloc bit for the address, it cannot be an object
+    </span><span class="kw">if </span>!ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
     }
 
-    <span class="kw">if</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">addr</span>) <span class="op">==</span> <span class="number">1</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">potential_object</span>)
-    } <span class="kw">else</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">if </span>ALLOC_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) == <span class="number">1 </span>{
+        <span class="prelude-val">Some</span>(potential_object)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>}
 }
 
-<span class="doccomment">/// Bulk zero the alloc bit.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bzero_alloc_bit</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
-    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">bzero_metadata</span>(<span class="ident">start</span>, <span class="ident">size</span>);
+<span class="doccomment">/// Bulk zero the alloc bit.
+</span><span class="kw">pub fn </span>bzero_alloc_bit(start: Address, size: usize) {
+    ALLOC_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

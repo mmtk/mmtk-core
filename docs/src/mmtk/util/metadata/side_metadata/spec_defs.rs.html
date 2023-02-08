@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;metadata&#x2F;side_metadata&#x2F;spec_defs.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>spec_defs.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/metadata/side_metadata/spec_defs.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>spec_defs.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -209,215 +207,214 @@
 <span id="207">207</span>
 <span id="208">208</span>
 <span id="209">209</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::Region</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::constants</span>::{
-    <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>, <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>,
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::constants::{
+    GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET,
 };
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataOffset</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataOffset;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 
-<span class="comment">// This macro helps define side metadata specs, and layout their offsets one after another.</span>
-<span class="comment">// The macro is implemented with the incremental TT muncher pattern (see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html).</span>
-<span class="comment">// This should only be used twice within mmtk-core: one for global specs, and one for local specs.</span>
-<span class="comment">// This should not be used to layout VM specs (we have provided side_first()/side_after() for the VM side metadata specs).</span>
-<span class="macro">macro_rules!</span> <span class="ident">define_side_metadata_specs</span> {
-    <span class="comment">// Internal patterns</span>
+<span class="comment">// This macro helps define side metadata specs, and layout their offsets one after another.
+// The macro is implemented with the incremental TT muncher pattern (see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html).
+// This should only be used twice within mmtk-core: one for global specs, and one for local specs.
+// This should not be used to layout VM specs (we have provided side_first()/side_after() for the VM side metadata specs).
+</span><span class="macro">macro_rules! </span>define_side_metadata_specs {
+    <span class="comment">// Internal patterns
 
-    <span class="comment">// Define the first spec with offset at either GLOBAL/LOCAL_SIDE_METADATA_BASE_OFFSET</span>
-    (@<span class="ident">first_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>: <span class="ident">expr</span>)) =&gt; {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),
-            <span class="ident">is_global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>,
-            <span class="ident">offset</span>: <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span> { <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span> } <span class="kw">else</span> { <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span> },
-            <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>,
+    // Define the first spec with offset at either GLOBAL/LOCAL_SIDE_METADATA_BASE_OFFSET
+    </span>(@first_spec <span class="macro-nonterminal">$name</span>: ident = (global: <span class="macro-nonterminal">$is_global</span>: expr, log_num_of_bits: <span class="macro-nonterminal">$log_num_of_bits</span>: expr, log_bytes_in_region: <span class="macro-nonterminal">$log_bytes_in_region</span>: expr)) =&gt; {
+        <span class="kw">pub const </span><span class="macro-nonterminal">$name</span>: SideMetadataSpec = SideMetadataSpec {
+            name: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>),
+            is_global: <span class="macro-nonterminal">$is_global</span>,
+            offset: <span class="kw">if </span><span class="macro-nonterminal">$is_global </span>{ GLOBAL_SIDE_METADATA_BASE_OFFSET } <span class="kw">else </span>{ LOCAL_SIDE_METADATA_BASE_OFFSET },
+            log_num_of_bits: <span class="macro-nonterminal">$log_num_of_bits</span>,
+            log_bytes_in_region: <span class="macro-nonterminal">$log_bytes_in_region</span>,
         };
     };
-    <span class="comment">// Define any spec that follows a previous spec. The new spec will be created and laid out after the previous spec.</span>
-    (@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>: <span class="ident">ident</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>: <span class="ident">expr</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-            <span class="ident">name</span>: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),
-            <span class="ident">is_global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>,
-            <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>),
-            <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>,
-            <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>,
+    <span class="comment">// Define any spec that follows a previous spec. The new spec will be created and laid out after the previous spec.
+    </span>(@prev_spec <span class="macro-nonterminal">$last_spec</span>: ident <span class="kw">as </span><span class="macro-nonterminal">$last_spec_ident</span>: ident, <span class="macro-nonterminal">$name</span>: ident = (global: <span class="macro-nonterminal">$is_global</span>: expr, log_num_of_bits: <span class="macro-nonterminal">$log_num_of_bits</span>: expr, log_bytes_in_region: <span class="macro-nonterminal">$log_bytes_in_region</span>: expr), $(<span class="macro-nonterminal">$tail</span>:tt)<span class="kw-2">*</span>) =&gt; {
+        <span class="kw">pub const </span><span class="macro-nonterminal">$name</span>: SideMetadataSpec = SideMetadataSpec {
+            name: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>),
+            is_global: <span class="macro-nonterminal">$is_global</span>,
+            offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span><span class="macro-nonterminal">$last_spec</span>),
+            log_num_of_bits: <span class="macro-nonterminal">$log_num_of_bits</span>,
+            log_bytes_in_region: <span class="macro-nonterminal">$log_bytes_in_region</span>,
         };
-        <span class="macro">define_side_metadata_specs!</span>(@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>)<span class="kw-2">*</span>);
+        <span class="macro">define_side_metadata_specs!</span>(@prev_spec <span class="macro-nonterminal">$name </span><span class="kw">as </span><span class="macro-nonterminal">$last_spec_ident</span>, $(<span class="macro-nonterminal">$tail</span>)<span class="kw-2">*</span>);
     };
-    <span class="comment">// Define the last spec with the given identifier.</span>
-    (@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>: <span class="ident">ident</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>,) =&gt; {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>;
+    <span class="comment">// Define the last spec with the given identifier.
+    </span>(@prev_spec <span class="macro-nonterminal">$last_spec</span>: ident <span class="kw">as </span><span class="macro-nonterminal">$last_spec_ident</span>: ident,) =&gt; {
+        <span class="kw">pub const </span><span class="macro-nonterminal">$last_spec_ident</span>: SideMetadataSpec = <span class="macro-nonterminal">$last_spec</span>;
     };
 
-    <span class="comment">// The actual macro</span>
+    <span class="comment">// The actual macro
 
-    <span class="comment">// This is the pattern that should be used outside this macro.</span>
-    (<span class="ident">last_spec_as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name0</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global0</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits0</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region0</span>: <span class="ident">expr</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
-        <span class="comment">// Defines the first spec</span>
-        <span class="macro">define_side_metadata_specs!</span>(@<span class="ident">first_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name0</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global0</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits0</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region0</span>));
-        <span class="comment">// The rest specs</span>
-        <span class="macro">define_side_metadata_specs!</span>(@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name0</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>)<span class="kw-2">*</span>);
+    // This is the pattern that should be used outside this macro.
+    </span>(last_spec_as <span class="macro-nonterminal">$last_spec_ident</span>: ident, <span class="macro-nonterminal">$name0</span>: ident = (global: <span class="macro-nonterminal">$is_global0</span>: expr, log_num_of_bits: <span class="macro-nonterminal">$log_num_of_bits0</span>: expr, log_bytes_in_region: <span class="macro-nonterminal">$log_bytes_in_region0</span>: expr), $(<span class="macro-nonterminal">$tail</span>:tt)<span class="kw-2">*</span>) =&gt; {
+        <span class="comment">// Defines the first spec
+        </span><span class="macro">define_side_metadata_specs!</span>(@first_spec <span class="macro-nonterminal">$name0 </span>= (global: <span class="macro-nonterminal">$is_global0</span>, log_num_of_bits: <span class="macro-nonterminal">$log_num_of_bits0</span>, log_bytes_in_region: <span class="macro-nonterminal">$log_bytes_in_region0</span>));
+        <span class="comment">// The rest specs
+        </span><span class="macro">define_side_metadata_specs!</span>(@prev_spec <span class="macro-nonterminal">$name0 </span><span class="kw">as </span><span class="macro-nonterminal">$last_spec_ident</span>, $(<span class="macro-nonterminal">$tail</span>)<span class="kw-2">*</span>);
     };
 }
 
-<span class="comment">// This defines all GLOBAL side metadata used by mmtk-core.</span>
-<span class="macro">define_side_metadata_specs!</span>(
-    <span class="ident">last_spec_as</span> <span class="ident">LAST_GLOBAL_SIDE_METADATA_SPEC</span>,
-    <span class="comment">// Mark the start of an object</span>
-    <span class="ident">ALLOC_BIT</span>       <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>),
-    <span class="comment">// Track chunks used by (malloc) marksweep</span>
-    <span class="ident">MS_ACTIVE_CHUNK</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="kw">as</span> <span class="ident">usize</span>),
-    <span class="comment">// Track the index in SFT map for a chunk (only used for SFT sparse chunk map)</span>
-    <span class="ident">SFT_DENSE_CHUNK_MAP_INDEX</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="kw">as</span> <span class="ident">usize</span>),
+<span class="comment">// This defines all GLOBAL side metadata used by mmtk-core.
+</span><span class="macro">define_side_metadata_specs!</span>(
+    last_spec_as LAST_GLOBAL_SIDE_METADATA_SPEC,
+    <span class="comment">// Mark the start of an object
+    </span>ALLOC_BIT       = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_MIN_OBJECT_SIZE <span class="kw">as </span>usize),
+    <span class="comment">// Track chunks used by (malloc) marksweep
+    </span>MS_ACTIVE_CHUNK = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
+    <span class="comment">// Track the index in SFT map for a chunk (only used for SFT sparse chunk map)
+    </span>SFT_DENSE_CHUNK_MAP_INDEX   = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
 );
 
-<span class="comment">// This defines all LOCAL side metadata used by mmtk-core.</span>
-<span class="macro">define_side_metadata_specs!</span>(
-    <span class="ident">last_spec_as</span> <span class="ident">LAST_LOCAL_SIDE_METADATA_SPEC</span>,
-    <span class="comment">// Mark pages by (malloc) marksweep</span>
-    <span class="ident">MALLOC_MS_ACTIVE_PAGE</span>  <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::util::malloc::library::LOG_BYTES_IN_MALLOC_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>),
-    <span class="comment">// Record objects allocated with some offset</span>
-    <span class="ident">MS_OFFSET_MALLOC</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>),
-    <span class="comment">// Mark lines by immix</span>
-    <span class="ident">IX_LINE_MARK</span>    <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::line::Line::LOG_BYTES</span>),
-    <span class="comment">// Record defrag state for immix blocks</span>
-    <span class="ident">IX_BLOCK_DEFRAG</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block::LOG_BYTES</span>),
-    <span class="comment">// Mark blocks by immix</span>
-    <span class="ident">IX_BLOCK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block::LOG_BYTES</span>),
-    <span class="comment">// Mark chunks (any plan that uses the chunk map should include this spec in their local sidemetadata specs)</span>
-    <span class="ident">CHUNK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::util::heap::chunk_map::Chunk::LOG_BYTES</span>),
-    <span class="comment">// Mark blocks by (native mimalloc) marksweep</span>
-    <span class="ident">MS_BLOCK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// Next block in list for native mimalloc</span>
-    <span class="ident">MS_BLOCK_NEXT</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// Previous block in list for native mimalloc</span>
-    <span class="ident">MS_BLOCK_PREV</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// Pointer to owning list for blocks for native mimalloc</span>
-    <span class="ident">MS_BLOCK_LIST</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// Size of cells in block for native mimalloc FIXME: do we actually need usize?</span>
-    <span class="ident">MS_BLOCK_SIZE</span>         <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// TLS of owning mutator of block for native mimalloc</span>
-    <span class="ident">MS_BLOCK_TLS</span>    <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// First cell of free list in block for native mimalloc</span>
-    <span class="ident">MS_FREE</span>         <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// The following specs are only used for manual malloc/free</span>
-    <span class="comment">// First cell of local free list in block for native mimalloc</span>
-    <span class="ident">MS_LOCAL_FREE</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
-    <span class="comment">// First cell of thread free list in block for native mimalloc</span>
-    <span class="ident">MS_THREAD_FREE</span>  <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+<span class="comment">// This defines all LOCAL side metadata used by mmtk-core.
+</span><span class="macro">define_side_metadata_specs!</span>(
+    last_spec_as LAST_LOCAL_SIDE_METADATA_SPEC,
+    <span class="comment">// Mark pages by (malloc) marksweep
+    </span>MALLOC_MS_ACTIVE_PAGE  = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="kw">crate</span>::util::malloc::library::LOG_BYTES_IN_MALLOC_PAGE <span class="kw">as </span>usize),
+    <span class="comment">// Record objects allocated with some offset
+    </span>MS_OFFSET_MALLOC = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_MIN_OBJECT_SIZE <span class="kw">as </span>usize),
+    <span class="comment">// Mark lines by immix
+    </span>IX_LINE_MARK    = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="kw">crate</span>::policy::immix::line::Line::LOG_BYTES),
+    <span class="comment">// Record defrag state for immix blocks
+    </span>IX_BLOCK_DEFRAG = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="kw">crate</span>::policy::immix::block::Block::LOG_BYTES),
+    <span class="comment">// Mark blocks by immix
+    </span>IX_BLOCK_MARK   = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="kw">crate</span>::policy::immix::block::Block::LOG_BYTES),
+    <span class="comment">// Mark chunks (any plan that uses the chunk map should include this spec in their local sidemetadata specs)
+    </span>CHUNK_MARK   = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="kw">crate</span>::util::heap::chunk_map::Chunk::LOG_BYTES),
+    <span class="comment">// Mark blocks by (native mimalloc) marksweep
+    </span>MS_BLOCK_MARK   = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// Next block in list for native mimalloc
+    </span>MS_BLOCK_NEXT   = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// Previous block in list for native mimalloc
+    </span>MS_BLOCK_PREV   = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// Pointer to owning list for blocks for native mimalloc
+    </span>MS_BLOCK_LIST   = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// Size of cells in block for native mimalloc FIXME: do we actually need usize?
+    </span>MS_BLOCK_SIZE         = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// TLS of owning mutator of block for native mimalloc
+    </span>MS_BLOCK_TLS    = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// First cell of free list in block for native mimalloc
+    </span>MS_FREE         = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// The following specs are only used for manual malloc/free
+    // First cell of local free list in block for native mimalloc
+    </span>MS_LOCAL_FREE   = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
+    <span class="comment">// First cell of thread free list in block for native mimalloc
+    </span>MS_THREAD_FREE  = (global: <span class="bool-val">false</span>, log_num_of_bits: LOG_BITS_IN_ADDRESS, log_bytes_in_region: <span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES),
 );
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">first_global_spec</span>() {
-        <span class="macro">define_side_metadata_specs!</span>(<span class="ident">last_spec_as</span> <span class="ident">LAST_GLOBAL_SPEC</span>, <span class="ident">TEST_SPEC</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>, <span class="ident">LAST_GLOBAL_SPEC</span>);
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>first_global_spec() {
+        <span class="macro">define_side_metadata_specs!</span>(last_spec_as LAST_GLOBAL_SPEC, TEST_SPEC = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: <span class="number">3</span>),);
+        <span class="macro">assert!</span>(TEST_SPEC.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC.offset == GLOBAL_SIDE_METADATA_BASE_OFFSET);
+        <span class="macro">assert_eq!</span>(TEST_SPEC.log_num_of_bits, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC.log_bytes_in_region, <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC, LAST_GLOBAL_SPEC);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">first_local_spec</span>() {
-        <span class="macro">define_side_metadata_specs!</span>(<span class="ident">last_spec_as</span> <span class="ident">LAST_LOCAL_SPEC</span>, <span class="ident">TEST_SPEC</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),);
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">TEST_SPEC</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>, <span class="ident">LAST_LOCAL_SPEC</span>);
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>first_local_spec() {
+        <span class="macro">define_side_metadata_specs!</span>(last_spec_as LAST_LOCAL_SPEC, TEST_SPEC = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: <span class="number">3</span>),);
+        <span class="macro">assert!</span>(!TEST_SPEC.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC.offset == LOCAL_SIDE_METADATA_BASE_OFFSET);
+        <span class="macro">assert_eq!</span>(TEST_SPEC.log_num_of_bits, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC.log_bytes_in_region, <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC, LAST_LOCAL_SPEC);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">two_global_specs</span>() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>two_global_specs() {
         <span class="macro">define_side_metadata_specs!</span>(
-            <span class="ident">last_spec_as</span> <span class="ident">LAST_GLOBAL_SPEC</span>,
-            <span class="ident">TEST_SPEC1</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),
-            <span class="ident">TEST_SPEC2</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">1</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">4</span>),
+            last_spec_as LAST_GLOBAL_SPEC,
+            TEST_SPEC1 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: <span class="number">3</span>),
+            TEST_SPEC2 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">1</span>, log_bytes_in_region: <span class="number">4</span>),
         );
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
+        <span class="macro">assert!</span>(TEST_SPEC1.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC1.offset == GLOBAL_SIDE_METADATA_BASE_OFFSET);
+        <span class="macro">assert_eq!</span>(TEST_SPEC1.log_num_of_bits, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC1.log_bytes_in_region, <span class="number">3</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC1</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">4</span>);
+        <span class="macro">assert!</span>(TEST_SPEC2.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC2.offset == SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>TEST_SPEC1));
+        <span class="macro">assert_eq!</span>(TEST_SPEC2.log_num_of_bits, <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC2.log_bytes_in_region, <span class="number">4</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>, <span class="ident">LAST_GLOBAL_SPEC</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC2, LAST_GLOBAL_SPEC);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">three_global_specs</span>() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>three_global_specs() {
         <span class="macro">define_side_metadata_specs!</span>(
-            <span class="ident">last_spec_as</span> <span class="ident">LAST_GLOBAL_SPEC</span>,
-            <span class="ident">TEST_SPEC1</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),
-            <span class="ident">TEST_SPEC2</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">1</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">4</span>),
-            <span class="ident">TEST_SPEC3</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">2</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">5</span>),
+            last_spec_as LAST_GLOBAL_SPEC,
+            TEST_SPEC1 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: <span class="number">3</span>),
+            TEST_SPEC2 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">1</span>, log_bytes_in_region: <span class="number">4</span>),
+            TEST_SPEC3 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">2</span>, log_bytes_in_region: <span class="number">5</span>),
         );
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
+        <span class="macro">assert!</span>(TEST_SPEC1.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC1.offset == GLOBAL_SIDE_METADATA_BASE_OFFSET);
+        <span class="macro">assert_eq!</span>(TEST_SPEC1.log_num_of_bits, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC1.log_bytes_in_region, <span class="number">3</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC1</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">4</span>);
+        <span class="macro">assert!</span>(TEST_SPEC2.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC2.offset == SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>TEST_SPEC1));
+        <span class="macro">assert_eq!</span>(TEST_SPEC2.log_num_of_bits, <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC2.log_bytes_in_region, <span class="number">4</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC2</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">log_num_of_bits</span>, <span class="number">2</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">5</span>);
+        <span class="macro">assert!</span>(TEST_SPEC3.is_global);
+        <span class="macro">assert!</span>(TEST_SPEC3.offset == SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>TEST_SPEC2));
+        <span class="macro">assert_eq!</span>(TEST_SPEC3.log_num_of_bits, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC3.log_bytes_in_region, <span class="number">5</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC3</span>, <span class="ident">LAST_GLOBAL_SPEC</span>);
+        <span class="macro">assert_eq!</span>(TEST_SPEC3, LAST_GLOBAL_SPEC);
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">both_global_and_local</span>() {
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>both_global_and_local() {
         <span class="macro">define_side_metadata_specs!</span>(
-            <span class="ident">last_spec_as</span> <span class="ident">LAST_GLOBAL_SPEC</span>,
-            <span class="ident">TEST_GSPEC1</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),
-            <span class="ident">TEST_GSPEC2</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">1</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">4</span>),
+            last_spec_as LAST_GLOBAL_SPEC,
+            TEST_GSPEC1 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: <span class="number">3</span>),
+            TEST_GSPEC2 = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">1</span>, log_bytes_in_region: <span class="number">4</span>),
         );
         <span class="macro">define_side_metadata_specs!</span>(
-            <span class="ident">last_spec_as</span> <span class="ident">LAST_LOCAL_SPEC</span>,
-            <span class="ident">TEST_LSPEC1</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">2</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">5</span>),
-            <span class="ident">TEST_LSPEC2</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">6</span>),
+            last_spec_as LAST_LOCAL_SPEC,
+            TEST_LSPEC1 = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">2</span>, log_bytes_in_region: <span class="number">5</span>),
+            TEST_LSPEC2 = (global: <span class="bool-val">false</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: <span class="number">6</span>),
         );
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
+        <span class="macro">assert!</span>(TEST_GSPEC1.is_global);
+        <span class="macro">assert!</span>(TEST_GSPEC1.offset == GLOBAL_SIDE_METADATA_BASE_OFFSET);
+        <span class="macro">assert_eq!</span>(TEST_GSPEC1.log_num_of_bits, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(TEST_GSPEC1.log_bytes_in_region, <span class="number">3</span>);
 
-        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_GSPEC1</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">1</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">4</span>);
+        <span class="macro">assert!</span>(TEST_GSPEC2.is_global);
+        <span class="macro">assert!</span>(TEST_GSPEC2.offset == SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>TEST_GSPEC1));
+        <span class="macro">assert_eq!</span>(TEST_GSPEC2.log_num_of_bits, <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(TEST_GSPEC2.log_bytes_in_region, <span class="number">4</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC2</span>, <span class="ident">LAST_GLOBAL_SPEC</span>);
+        <span class="macro">assert_eq!</span>(TEST_GSPEC2, LAST_GLOBAL_SPEC);
 
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">TEST_LSPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">2</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">5</span>);
+        <span class="macro">assert!</span>(!TEST_LSPEC1.is_global);
+        <span class="macro">assert!</span>(TEST_LSPEC1.offset == LOCAL_SIDE_METADATA_BASE_OFFSET);
+        <span class="macro">assert_eq!</span>(TEST_LSPEC1.log_num_of_bits, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(TEST_LSPEC1.log_bytes_in_region, <span class="number">5</span>);
 
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">TEST_LSPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_LSPEC1</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">3</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">6</span>);
+        <span class="macro">assert!</span>(!TEST_LSPEC2.is_global);
+        <span class="macro">assert!</span>(TEST_LSPEC2.offset == SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>TEST_LSPEC1));
+        <span class="macro">assert_eq!</span>(TEST_LSPEC2.log_num_of_bits, <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(TEST_LSPEC2.log_bytes_in_region, <span class="number">6</span>);
 
-        <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC2</span>, <span class="ident">LAST_LOCAL_SPEC</span>);
+        <span class="macro">assert_eq!</span>(TEST_LSPEC2, LAST_LOCAL_SPEC);
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

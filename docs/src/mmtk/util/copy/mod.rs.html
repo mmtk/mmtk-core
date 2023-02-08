@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;copy&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/copy/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -240,246 +238,245 @@
 <span id="238">238</span>
 <span id="239">239</span>
 <span id="240">240</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::mem::MaybeUninit</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copyspace::CopySpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copyspace::CopySpaceCopyContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ImmixCopyContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ImmixSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::object_forwarding</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
+<span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpaceCopyContext;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixCopyContext;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::VMWorkerThread;
+<span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
+<span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="kw">use</span> <span class="ident">enum_map::Enum</span>;
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use </span>enum_map::Enum;
+<span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">const</span> <span class="ident">MAX_COPYSPACE_COPY_ALLOCATORS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">const</span> <span class="ident">MAX_IMMIX_COPY_ALLOCATORS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
+<span class="kw">const </span>MAX_COPYSPACE_COPY_ALLOCATORS: usize = <span class="number">1</span>;
+<span class="kw">const </span>MAX_IMMIX_COPY_ALLOCATORS: usize = <span class="number">2</span>;
 
-<span class="kw">type</span> <span class="ident">CopySpaceMapping</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">CopySelector</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>)<span class="op">&gt;</span>;
+<span class="kw">type </span>CopySpaceMapping&lt;VM&gt; = Vec&lt;(CopySelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt;;
 
-<span class="doccomment">/// A configuration for GCWorkerCopyContext.</span>
-<span class="doccomment">/// Similar to a `MutatorConfig`,</span>
-<span class="doccomment">/// We expect each copying plan to provide a CopyConfig.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Mapping CopySemantics to the actual copying allocators (CopySelector)</span>
-    <span class="kw">pub</span> <span class="ident">copy_mapping</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">CopySemantics</span>, <span class="ident">CopySelector</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Mapping copying allocators with space</span>
-    <span class="kw">pub</span> <span class="ident">space_mapping</span>: <span class="ident">CopySpaceMapping</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A reference to the plan constraints.</span>
-    <span class="doccomment">/// GCWorkerCopyContext may have plan-specific behaviors dependson the plan constraints.</span>
-    <span class="kw">pub</span> <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
+<span class="doccomment">/// A configuration for GCWorkerCopyContext.
+/// Similar to a `MutatorConfig`,
+/// We expect each copying plan to provide a CopyConfig.
+</span><span class="kw">pub struct </span>CopyConfig&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Mapping CopySemantics to the actual copying allocators (CopySelector)
+    </span><span class="kw">pub </span>copy_mapping: EnumMap&lt;CopySemantics, CopySelector&gt;,
+    <span class="doccomment">/// Mapping copying allocators with space
+    </span><span class="kw">pub </span>space_mapping: CopySpaceMapping&lt;VM&gt;,
+    <span class="doccomment">/// A reference to the plan constraints.
+    /// GCWorkerCopyContext may have plan-specific behaviors dependson the plan constraints.
+    </span><span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">CopyConfig</span> {
-            <span class="ident">copy_mapping</span>: <span class="ident">EnumMap::default</span>(),
-            <span class="ident">space_mapping</span>: <span class="macro">vec!</span>[],
-            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident"><span class="kw">crate</span>::plan::DEFAULT_PLAN_CONSTRAINTS</span>,
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Default <span class="kw">for </span>CopyConfig&lt;VM&gt; {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        CopyConfig {
+            copy_mapping: EnumMap::default(),
+            space_mapping: <span class="macro">vec!</span>[],
+            constraints: <span class="kw-2">&amp;</span><span class="kw">crate</span>::plan::DEFAULT_PLAN_CONSTRAINTS,
         }
     }
 }
 
-<span class="doccomment">/// The thread local struct for each GC worker for copying. Each GC worker should include</span>
-<span class="doccomment">/// one instance of this struct for copying operations.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Copy allocators for CopySpace</span>
-    <span class="kw">pub</span> <span class="ident">copy</span>: [<span class="ident">MaybeUninit</span><span class="op">&lt;</span><span class="ident">CopySpaceCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="ident">MAX_COPYSPACE_COPY_ALLOCATORS</span>],
-    <span class="doccomment">/// Copy allocators for ImmixSpace</span>
-    <span class="kw">pub</span> <span class="ident">immix</span>: [<span class="ident">MaybeUninit</span><span class="op">&lt;</span><span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="ident">MAX_IMMIX_COPY_ALLOCATORS</span>],
-    <span class="doccomment">/// The config for the plan</span>
-    <span class="ident">config</span>: <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The thread local struct for each GC worker for copying. Each GC worker should include
+/// one instance of this struct for copying operations.
+</span><span class="kw">pub struct </span>GCWorkerCopyContext&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Copy allocators for CopySpace
+    </span><span class="kw">pub </span>copy: [MaybeUninit&lt;CopySpaceCopyContext&lt;VM&gt;&gt;; MAX_COPYSPACE_COPY_ALLOCATORS],
+    <span class="doccomment">/// Copy allocators for ImmixSpace
+    </span><span class="kw">pub </span>immix: [MaybeUninit&lt;ImmixCopyContext&lt;VM&gt;&gt;; MAX_IMMIX_COPY_ALLOCATORS],
+    <span class="doccomment">/// The config for the plan
+    </span>config: CopyConfig&lt;VM&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Allocate for the object for GC copying.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `original`: The original object that will be copied.</span>
-    <span class="doccomment">/// * `bytes`: The size in bytes for the allocation.</span>
-    <span class="doccomment">/// * `align`: The alignment in bytes for the allocation.</span>
-    <span class="doccomment">/// * `offset`: The offset in bytes for the allocation.</span>
-    <span class="doccomment">/// * `semantics`: The copy semantic for this coying allocation.</span>
-    <span class="doccomment">///   It determins which copy allocator will be used for the copying.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc_copy</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">original</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
-    ) -&gt; <span class="ident">Address</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-        <span class="kw">if</span> <span class="ident">bytes</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">constraints</span>.<span class="ident">max_non_los_default_alloc_bytes</span> {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerCopyContext&lt;VM&gt; {
+    <span class="doccomment">/// Allocate for the object for GC copying.
+    ///
+    /// Arguments:
+    /// * `original`: The original object that will be copied.
+    /// * `bytes`: The size in bytes for the allocation.
+    /// * `align`: The alignment in bytes for the allocation.
+    /// * `offset`: The offset in bytes for the allocation.
+    /// * `semantics`: The copy semantic for this coying allocation.
+    ///   It determins which copy allocator will be used for the copying.
+    </span><span class="kw">pub fn </span>alloc_copy(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        semantics: CopySemantics,
+    ) -&gt; Address {
+        <span class="attribute">#[cfg(debug_assertions)]
+        </span><span class="kw">if </span>bytes &gt; <span class="self">self</span>.config.constraints.max_non_los_default_alloc_bytes {
             <span class="macro">warn!</span>(
                 <span class="string">&quot;Attempted to copy an object of {} bytes (&gt; {}) which should be allocated with LOS and not be copied.&quot;</span>,
-                <span class="ident">bytes</span>, <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">constraints</span>.<span class="ident">max_non_los_default_alloc_bytes</span>
+                bytes, <span class="self">self</span>.config.constraints.max_non_los_default_alloc_bytes
             );
         }
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">copy_mapping</span>[<span class="ident">semantics</span>] {
-            <span class="ident">CopySelector::CopySpace</span>(<span class="ident">index</span>) =&gt; {
-                <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">copy</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }
-                    .<span class="ident">alloc_copy</span>(<span class="ident">original</span>, <span class="ident">bytes</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+        <span class="kw">match </span><span class="self">self</span>.config.copy_mapping[semantics] {
+            CopySelector::CopySpace(index) =&gt; {
+                <span class="kw">unsafe </span>{ <span class="self">self</span>.copy[index <span class="kw">as </span>usize].assume_init_mut() }
+                    .alloc_copy(original, bytes, align, offset)
             }
-            <span class="ident">CopySelector::Immix</span>(<span class="ident">index</span>) =&gt; <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">immix</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }
-                .<span class="ident">alloc_copy</span>(<span class="ident">original</span>, <span class="ident">bytes</span>, <span class="ident">align</span>, <span class="ident">offset</span>),
-            <span class="ident">CopySelector::Unused</span> =&gt; <span class="macro">unreachable!</span>(),
+            CopySelector::Immix(index) =&gt; <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[index <span class="kw">as </span>usize].assume_init_mut() }
+                .alloc_copy(original, bytes, align, offset),
+            CopySelector::Unused =&gt; <span class="macro">unreachable!</span>(),
         }
     }
 
-    <span class="doccomment">/// Post allocation after allocating an object.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `object`: The newly allocated object (the new object after copying).</span>
-    <span class="doccomment">/// * `bytes`: The size of the object in bytes.</span>
-    <span class="doccomment">/// * `semantics`: The copy semantic used for the copying.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_copy</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>) {
-        <span class="comment">// Clear forwarding bits.</span>
-        <span class="ident">object_forwarding::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-        <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.</span>
-        <span class="kw">if</span> <span class="ident">semantics</span>.<span class="ident">is_mature</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">constraints</span>.<span class="ident">needs_log_bit</span> {
-            <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)</span>
-            <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Post allocation after allocating an object.
+    ///
+    /// Arguments:
+    /// * `object`: The newly allocated object (the new object after copying).
+    /// * `bytes`: The size of the object in bytes.
+    /// * `semantics`: The copy semantic used for the copying.
+    </span><span class="kw">pub fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference, bytes: usize, semantics: CopySemantics) {
+        <span class="comment">// Clear forwarding bits.
+        </span>object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
+        <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.
+        </span><span class="kw">if </span>semantics.is_mature() &amp;&amp; <span class="self">self</span>.config.constraints.needs_log_bit {
+            <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
+            </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         }
-        <span class="comment">// Policy specific post copy.</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">copy_mapping</span>[<span class="ident">semantics</span>] {
-            <span class="ident">CopySelector::CopySpace</span>(<span class="ident">index</span>) =&gt; {
-                <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">copy</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">post_copy</span>(<span class="ident">object</span>, <span class="ident">bytes</span>)
+        <span class="comment">// Policy specific post copy.
+        </span><span class="kw">match </span><span class="self">self</span>.config.copy_mapping[semantics] {
+            CopySelector::CopySpace(index) =&gt; {
+                <span class="kw">unsafe </span>{ <span class="self">self</span>.copy[index <span class="kw">as </span>usize].assume_init_mut() }.post_copy(object, bytes)
             }
-            <span class="ident">CopySelector::Immix</span>(<span class="ident">index</span>) =&gt; {
-                <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">immix</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">post_copy</span>(<span class="ident">object</span>, <span class="ident">bytes</span>)
+            CopySelector::Immix(index) =&gt; {
+                <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[index <span class="kw">as </span>usize].assume_init_mut() }.post_copy(object, bytes)
             }
-            <span class="ident">CopySelector::Unused</span> =&gt; <span class="macro">unreachable!</span>(),
-        }
-    }
-
-    <span class="doccomment">/// Prepare the copying allocators.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// Delegate to prepare() for each policy copy context</span>
-        <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">selector</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">copy_mapping</span>.<span class="ident">iter</span>() {
-            <span class="kw">match</span> <span class="ident">selector</span> {
-                <span class="ident">CopySelector::CopySpace</span>(<span class="ident">index</span>) =&gt; {
-                    <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">copy</span>[<span class="kw-2">*</span><span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">prepare</span>()
-                }
-                <span class="ident">CopySelector::Immix</span>(<span class="ident">index</span>) =&gt; {
-                    <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">immix</span>[<span class="kw-2">*</span><span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">prepare</span>()
-                }
-                <span class="ident">CopySelector::Unused</span> =&gt; {}
-            }
+            CopySelector::Unused =&gt; <span class="macro">unreachable!</span>(),
         }
     }
 
-    <span class="doccomment">/// Release the copying allocators.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// Delegate to release() for each policy copy context</span>
-        <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">selector</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">copy_mapping</span>.<span class="ident">iter</span>() {
-            <span class="kw">match</span> <span class="ident">selector</span> {
-                <span class="ident">CopySelector::CopySpace</span>(<span class="ident">index</span>) =&gt; {
-                    <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">copy</span>[<span class="kw-2">*</span><span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">release</span>()
+    <span class="doccomment">/// Prepare the copying allocators.
+    </span><span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Delegate to prepare() for each policy copy context
+        </span><span class="kw">for </span>(<span class="kw">_</span>, selector) <span class="kw">in </span><span class="self">self</span>.config.copy_mapping.iter() {
+            <span class="kw">match </span>selector {
+                CopySelector::CopySpace(index) =&gt; {
+                    <span class="kw">unsafe </span>{ <span class="self">self</span>.copy[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.prepare()
                 }
-                <span class="ident">CopySelector::Immix</span>(<span class="ident">index</span>) =&gt; {
-                    <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">immix</span>[<span class="kw-2">*</span><span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">assume_init_mut</span>() }.<span class="ident">release</span>()
+                CopySelector::Immix(index) =&gt; {
+                    <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.prepare()
                 }
-                <span class="ident">CopySelector::Unused</span> =&gt; {}
+                CopySelector::Unused =&gt; {}
             }
         }
     }
 
-    <span class="doccomment">/// Create a GCWorkerCopyContext based on the configuration for a copying plan.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `worker_tls`: The worker thread for this copy context.</span>
-    <span class="doccomment">/// * `plan`: A reference to the current plan.</span>
-    <span class="doccomment">/// * `config`: The configuration for the copy context.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">worker_tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">config</span>: <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">GCWorkerCopyContext</span> {
-            <span class="ident">copy</span>: <span class="kw">unsafe</span> { <span class="ident">MaybeUninit::uninit</span>().<span class="ident">assume_init</span>() },
-            <span class="ident">immix</span>: <span class="kw">unsafe</span> { <span class="ident">MaybeUninit::uninit</span>().<span class="ident">assume_init</span>() },
-            <span class="ident">config</span>,
+    <span class="doccomment">/// Release the copying allocators.
+    </span><span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Delegate to release() for each policy copy context
+        </span><span class="kw">for </span>(<span class="kw">_</span>, selector) <span class="kw">in </span><span class="self">self</span>.config.copy_mapping.iter() {
+            <span class="kw">match </span>selector {
+                CopySelector::CopySpace(index) =&gt; {
+                    <span class="kw">unsafe </span>{ <span class="self">self</span>.copy[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.release()
+                }
+                CopySelector::Immix(index) =&gt; {
+                    <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.release()
+                }
+                CopySelector::Unused =&gt; {}
+            }
+        }
+    }
+
+    <span class="doccomment">/// Create a GCWorkerCopyContext based on the configuration for a copying plan.
+    ///
+    /// Arguments:
+    /// * `worker_tls`: The worker thread for this copy context.
+    /// * `plan`: A reference to the current plan.
+    /// * `config`: The configuration for the copy context.
+    </span><span class="kw">pub fn </span>new(
+        worker_tls: VMWorkerThread,
+        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        config: CopyConfig&lt;VM&gt;,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>ret = GCWorkerCopyContext {
+            copy: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
+            immix: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
+            config,
         };
 
-        <span class="comment">// Initiate the copy context for each policy based on the space mapping.</span>
-        <span class="kw">for</span> <span class="kw-2">&amp;</span>(<span class="ident">selector</span>, <span class="ident">space</span>) <span class="kw">in</span> <span class="ident">ret</span>.<span class="ident">config</span>.<span class="ident">space_mapping</span>.<span class="ident">iter</span>() {
-            <span class="kw">match</span> <span class="ident">selector</span> {
-                <span class="ident">CopySelector::CopySpace</span>(<span class="ident">index</span>) =&gt; {
-                    <span class="ident">ret</span>.<span class="ident">copy</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">write</span>(<span class="ident">CopySpaceCopyContext::new</span>(
-                        <span class="ident">worker_tls</span>,
-                        <span class="ident">plan</span>,
-                        <span class="ident">space</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>(),
+        <span class="comment">// Initiate the copy context for each policy based on the space mapping.
+        </span><span class="kw">for </span><span class="kw-2">&amp;</span>(selector, space) <span class="kw">in </span>ret.config.space_mapping.iter() {
+            <span class="kw">match </span>selector {
+                CopySelector::CopySpace(index) =&gt; {
+                    ret.copy[index <span class="kw">as </span>usize].write(CopySpaceCopyContext::new(
+                        worker_tls,
+                        plan,
+                        space.downcast_ref::&lt;CopySpace&lt;VM&gt;&gt;().unwrap(),
                     ));
                 }
-                <span class="ident">CopySelector::Immix</span>(<span class="ident">index</span>) =&gt; {
-                    <span class="ident">ret</span>.<span class="ident">immix</span>[<span class="ident">index</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">write</span>(<span class="ident">ImmixCopyContext::new</span>(
-                        <span class="ident">worker_tls</span>,
-                        <span class="ident">plan</span>,
-                        <span class="ident">space</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>(),
+                CopySelector::Immix(index) =&gt; {
+                    ret.immix[index <span class="kw">as </span>usize].write(ImmixCopyContext::new(
+                        worker_tls,
+                        plan,
+                        space.downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
                     ));
                 }
-                <span class="ident">CopySelector::Unused</span> =&gt; <span class="macro">unreachable!</span>(),
+                CopySelector::Unused =&gt; <span class="macro">unreachable!</span>(),
             }
         }
 
-        <span class="ident">ret</span>
+        ret
     }
 
-    <span class="doccomment">/// Create a stub GCWorkerCopyContext for non copying plans.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_non_copy</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">GCWorkerCopyContext</span> {
-            <span class="ident">copy</span>: <span class="kw">unsafe</span> { <span class="ident">MaybeUninit::uninit</span>().<span class="ident">assume_init</span>() },
-            <span class="ident">immix</span>: <span class="kw">unsafe</span> { <span class="ident">MaybeUninit::uninit</span>().<span class="ident">assume_init</span>() },
-            <span class="ident">config</span>: <span class="ident">CopyConfig::default</span>(),
+    <span class="doccomment">/// Create a stub GCWorkerCopyContext for non copying plans.
+    </span><span class="kw">pub fn </span>new_non_copy() -&gt; <span class="self">Self </span>{
+        GCWorkerCopyContext {
+            copy: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
+            immix: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
+            config: CopyConfig::default(),
         }
     }
 }
 
-<span class="doccomment">/// CopySemantics describes the copying operation. It depends on</span>
-<span class="doccomment">/// the kinds of GC, and the space. For example, in a mature/major GC in</span>
-<span class="doccomment">/// a generational plan, the nursery should have `PromoteToMature` while</span>
-<span class="doccomment">/// the mature space should have `Mature`.</span>
-<span class="doccomment">/// This enum may be expanded in the future to describe more semantics.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Enum</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CopySemantics</span> {
-    <span class="doccomment">/// Copy for non generational plans.</span>
-    <span class="ident">DefaultCopy</span>,
-    <span class="doccomment">/// Copy in nursery generation.</span>
-    <span class="ident">Nursery</span>,
-    <span class="doccomment">/// Promote an object from nursery to mature spaces.</span>
-    <span class="ident">PromoteToMature</span>,
-    <span class="doccomment">/// Copy in mature generation.</span>
-    <span class="ident">Mature</span>,
+<span class="doccomment">/// CopySemantics describes the copying operation. It depends on
+/// the kinds of GC, and the space. For example, in a mature/major GC in
+/// a generational plan, the nursery should have `PromoteToMature` while
+/// the mature space should have `Mature`.
+/// This enum may be expanded in the future to describe more semantics.
+</span><span class="attribute">#[derive(Clone, Copy, Enum, Debug)]
+</span><span class="kw">pub enum </span>CopySemantics {
+    <span class="doccomment">/// Copy for non generational plans.
+    </span>DefaultCopy,
+    <span class="doccomment">/// Copy in nursery generation.
+    </span>Nursery,
+    <span class="doccomment">/// Promote an object from nursery to mature spaces.
+    </span>PromoteToMature,
+    <span class="doccomment">/// Copy in mature generation.
+    </span>Mature,
 }
 
-<span class="kw">impl</span> <span class="ident">CopySemantics</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mature</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident">CopySemantics::PromoteToMature</span> <span class="op">|</span> <span class="ident">CopySemantics::Mature</span>)
+<span class="kw">impl </span>CopySemantics {
+    <span class="kw">pub fn </span>is_mature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(<span class="self">self</span>, CopySemantics::PromoteToMature | CopySemantics::Mature)
     }
 }
 
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">u8</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CopySelector</span> {
-    <span class="ident">CopySpace</span>(<span class="ident">u8</span>),
-    <span class="ident">Immix</span>(<span class="ident">u8</span>),
-    <span class="ident">Unused</span>,
+<span class="attribute">#[repr(C, u8)]
+#[derive(Copy, Clone, Debug)]
+</span><span class="kw">pub enum </span>CopySelector {
+    CopySpace(u8),
+    Immix(u8),
+    Unused,
 }
 
-<span class="kw">impl</span> <span class="ident">std::default::Default</span> <span class="kw">for</span> <span class="ident">CopySelector</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">CopySelector::Unused</span>
+<span class="kw">impl </span>std::default::Default <span class="kw">for </span>CopySelector {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        CopySelector::Unused
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

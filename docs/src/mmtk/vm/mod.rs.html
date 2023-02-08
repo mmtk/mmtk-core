@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;vm&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -74,80 +72,79 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
-</pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.</span>
-<span class="doccomment">//! Each VM binding needs to provide an implementation for each of the traits.</span>
-<span class="doccomment">//! MMTk requires the interfaces to be efficient, as some of the methods are called frequently</span>
-<span class="doccomment">//! during collection (e.g. the methods for `ObjectModel`). We rely on cross-crate *link-time-optimization*</span>
-<span class="doccomment">//! to remove the overhead of MMTk invoking methods on those traits.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! It is recommended for a VM binding that uses mmtk-core to do the following to ensure LTO is enabled for performance.</span>
-<span class="doccomment">//! 1. Add the following section in the manifest file of a VM binding (`Cargo.toml`). This enables LTO for the release build:</span>
-<span class="doccomment">//!    ```</span>
-<span class="doccomment">//!    [profile.release]</span>
-<span class="doccomment">//!    lto = true</span>
-<span class="doccomment">//!    ```</span>
-<span class="doccomment">//! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and</span>
-<span class="doccomment">//! `rlib` does *not* support LTO.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.
+//!
+//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.
+//! Each VM binding needs to provide an implementation for each of the traits.
+//! MMTk requires the interfaces to be efficient, as some of the methods are called frequently
+//! during collection (e.g. the methods for `ObjectModel`). We rely on cross-crate *link-time-optimization*
+//! to remove the overhead of MMTk invoking methods on those traits.
+//!
+//! It is recommended for a VM binding that uses mmtk-core to do the following to ensure LTO is enabled for performance.
+//! 1. Add the following section in the manifest file of a VM binding (`Cargo.toml`). This enables LTO for the release build:
+//!    ```
+//!    [profile.release]
+//!    lto = true
+//!    ```
+//! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
+//! `rlib` does *not* support LTO.
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
+</span><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 
-<span class="kw">mod</span> <span class="ident">active_plan</span>;
-<span class="kw">mod</span> <span class="ident">collection</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">edge_shape</span>;
-<span class="kw">mod</span> <span class="ident">object_model</span>;
-<span class="kw">mod</span> <span class="ident">reference_glue</span>;
-<span class="kw">mod</span> <span class="ident">scanning</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::active_plan::ActivePlan</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::collection::Collection</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::collection::GCThreadContext</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::object_model::specs</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::object_model::ObjectModel</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::reference_glue::Finalizable</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::reference_glue::ReferenceGlue</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::EdgeVisitor</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::ObjectTracer</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::ObjectTracerContext</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::RootsWorkFactory</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::Scanning</span>;
+<span class="kw">mod </span>active_plan;
+<span class="kw">mod </span>collection;
+<span class="kw">pub mod </span>edge_shape;
+<span class="kw">mod </span>object_model;
+<span class="kw">mod </span>reference_glue;
+<span class="kw">mod </span>scanning;
+<span class="kw">pub use </span><span class="self">self</span>::active_plan::ActivePlan;
+<span class="kw">pub use </span><span class="self">self</span>::collection::Collection;
+<span class="kw">pub use </span><span class="self">self</span>::collection::GCThreadContext;
+<span class="kw">pub use </span><span class="self">self</span>::object_model::specs::<span class="kw-2">*</span>;
+<span class="kw">pub use </span><span class="self">self</span>::object_model::ObjectModel;
+<span class="kw">pub use </span><span class="self">self</span>::reference_glue::Finalizable;
+<span class="kw">pub use </span><span class="self">self</span>::reference_glue::ReferenceGlue;
+<span class="kw">pub use </span><span class="self">self</span>::scanning::EdgeVisitor;
+<span class="kw">pub use </span><span class="self">self</span>::scanning::ObjectTracer;
+<span class="kw">pub use </span><span class="self">self</span>::scanning::ObjectTracerContext;
+<span class="kw">pub use </span><span class="self">self</span>::scanning::RootsWorkFactory;
+<span class="kw">pub use </span><span class="self">self</span>::scanning::Scanning;
 
-<span class="kw">const</span> <span class="ident">DEFAULT_LOG_MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
-<span class="kw">const</span> <span class="ident">DEFAULT_LOG_MAX_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_LONG</span> <span class="kw">as</span> <span class="ident">usize</span>;
+<span class="kw">const </span>DEFAULT_LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT <span class="kw">as </span>usize;
+<span class="kw">const </span>DEFAULT_LOG_MAX_ALIGNMENT: usize = LOG_BYTES_IN_LONG <span class="kw">as </span>usize;
 
-<span class="doccomment">/// The `VMBinding` trait associates with each trait, and provides VM-specific constants.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">VMBinding</span>
-<span class="kw">where</span>
-    <span class="self">Self</span>: <span class="ident">Sized</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Default</span>,
+<span class="doccomment">/// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
+</span><span class="kw">pub trait </span>VMBinding
+<span class="kw">where
+    </span><span class="self">Self</span>: Sized + <span class="lifetime">&#39;static </span>+ Send + Sync + Default,
 {
-    <span class="kw">type</span> <span class="ident">VMObjectModel</span>: <span class="ident">ObjectModel</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">VMScanning</span>: <span class="ident">Scanning</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">VMCollection</span>: <span class="ident">Collection</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">VMActivePlan</span>: <span class="ident">ActivePlan</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">VMReferenceGlue</span>: <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">type </span>VMObjectModel: ObjectModel&lt;<span class="self">Self</span>&gt;;
+    <span class="kw">type </span>VMScanning: Scanning&lt;<span class="self">Self</span>&gt;;
+    <span class="kw">type </span>VMCollection: Collection&lt;<span class="self">Self</span>&gt;;
+    <span class="kw">type </span>VMActivePlan: ActivePlan&lt;<span class="self">Self</span>&gt;;
+    <span class="kw">type </span>VMReferenceGlue: ReferenceGlue&lt;<span class="self">Self</span>&gt;;
 
-    <span class="doccomment">/// The type of edges in this VM.</span>
-    <span class="kw">type</span> <span class="ident">VMEdge</span>: <span class="ident">edge_shape::Edge</span>;
-    <span class="doccomment">/// The type of heap memory slice in this VM.</span>
-    <span class="kw">type</span> <span class="ident">VMMemorySlice</span>: <span class="ident">edge_shape::MemorySlice</span><span class="op">&lt;</span><span class="ident">Edge</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::VMEdge</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// The type of edges in this VM.
+    </span><span class="kw">type </span>VMEdge: edge_shape::Edge;
+    <span class="doccomment">/// The type of heap memory slice in this VM.
+    </span><span class="kw">type </span>VMMemorySlice: edge_shape::MemorySlice&lt;Edge = <span class="self">Self</span>::VMEdge&gt;;
 
-    <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging.</span>
-    <span class="kw">const</span> <span class="ident">ALIGNMENT_VALUE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xdead_beef</span>;
-    <span class="doccomment">/// Allowed minimal alignment in bytes.</span>
-    <span class="kw">const</span> <span class="ident">MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">DEFAULT_LOG_MIN_ALIGNMENT</span>;
-    <span class="doccomment">/// Allowed maximum alignment in bytes.</span>
-    <span class="kw">const</span> <span class="ident">MAX_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">DEFAULT_LOG_MAX_ALIGNMENT</span>;
-    <span class="doccomment">/// Does the binding use a non-zero allocation offset? If this is false, we expect the binding</span>
-    <span class="doccomment">/// to always use offset === 0 for allocation, and we are able to do some optimization if we know</span>
-    <span class="doccomment">/// offset === 0.</span>
-    <span class="kw">const</span> <span class="ident">USE_ALLOCATION_OFFSET</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging.
+    </span><span class="kw">const </span>ALIGNMENT_VALUE: usize = <span class="number">0xdead_beef</span>;
+    <span class="doccomment">/// Allowed minimal alignment in bytes.
+    </span><span class="kw">const </span>MIN_ALIGNMENT: usize = <span class="number">1 </span>&lt;&lt; DEFAULT_LOG_MIN_ALIGNMENT;
+    <span class="doccomment">/// Allowed maximum alignment in bytes.
+    </span><span class="kw">const </span>MAX_ALIGNMENT: usize = <span class="number">1 </span>&lt;&lt; DEFAULT_LOG_MAX_ALIGNMENT;
+    <span class="doccomment">/// Does the binding use a non-zero allocation offset? If this is false, we expect the binding
+    /// to always use offset === 0 for allocation, and we are able to do some optimization if we know
+    /// offset === 0.
+    </span><span class="kw">const </span>USE_ALLOCATION_OFFSET: bool = <span class="bool-val">true</span>;
 
-    <span class="doccomment">/// This value is used to assert if the cursor is reasonable after allocations.</span>
-    <span class="doccomment">/// At the end of an allocation, the allocation cursor should be aligned to this value.</span>
-    <span class="doccomment">/// Note that MMTk does not attempt to do anything to align the cursor to this value, but</span>
-    <span class="doccomment">/// it merely asserts with this constant.</span>
-    <span class="kw">const</span> <span class="ident">ALLOC_END_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
+    <span class="doccomment">/// This value is used to assert if the cursor is reasonable after allocations.
+    /// At the end of an allocation, the allocation cursor should be aligned to this value.
+    /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
+    /// it merely asserts with this constant.
+    </span><span class="kw">const </span>ALLOC_END_ALIGNMENT: usize = <span class="number">1</span>;
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

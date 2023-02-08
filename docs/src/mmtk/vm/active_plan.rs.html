@@ -1,205 +1,202 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;vm&#x2F;active_plan.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>active_plan.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/active_plan.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>active_plan.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ObjectQueue</span>;
-<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
-<span class="kw">use</span> <span class="ident">std::sync::MutexGuard</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::ObjectQueue;
+<span class="kw">use </span>std::marker::PhantomData;
+<span class="kw">use </span>std::sync::MutexGuard;
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SynchronizedMutatorIterator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">_guard</span>: <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, ()<span class="op">&gt;</span>,
-    <span class="ident">start</span>: <span class="ident">bool</span>,
-    <span class="ident">phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+<span class="kw">pub struct </span>SynchronizedMutatorIterator&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
+    _guard: MutexGuard&lt;<span class="lifetime">&#39;a</span>, ()&gt;,
+    start: bool,
+    phantom: PhantomData&lt;VM&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">SynchronizedMutatorIterator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; Iterator <span class="kw">for </span>SynchronizedMutatorIterator&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+    <span class="kw">type </span>Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">start</span> {
-            <span class="self">self</span>.<span class="ident">start</span> <span class="op">=</span> <span class="bool-val">false</span>;
-            <span class="ident">VM::VMActivePlan::reset_mutator_iterator</span>();
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">if </span><span class="self">self</span>.start {
+            <span class="self">self</span>.start = <span class="bool-val">false</span>;
+            VM::VMActivePlan::reset_mutator_iterator();
         }
-        <span class="ident">VM::VMActivePlan::get_next_mutator</span>()
+        VM::VMActivePlan::get_next_mutator()
     }
 }
 
-<span class="doccomment">/// VM-specific methods for the current plan.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ActivePlan</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Return a reference to the current plan.</span>
-    <span class="comment">// TODO: I don&#39;t know how this can be implemented when we have multiple MMTk instances.</span>
-    <span class="comment">// This function is used by space and phase to refer to the current plan.</span>
-    <span class="comment">// Possibly we should remove the use of this function, and remove this function?</span>
-    <span class="kw">fn</span> <span class="ident">global</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>;
+<span class="doccomment">/// VM-specific methods for the current plan.
+</span><span class="kw">pub trait </span>ActivePlan&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Return a reference to the current plan.
+    </span><span class="comment">// TODO: I don&#39;t know how this can be implemented when we have multiple MMTk instances.
+    // This function is used by space and phase to refer to the current plan.
+    // Possibly we should remove the use of this function, and remove this function?
+    </span><span class="kw">fn </span>global() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;;
 
-    <span class="doccomment">/// Return whether there is a mutator created and associated with the thread.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The thread to query.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).</span>
-    <span class="kw">fn</span> <span class="ident">is_mutator</span>(<span class="ident">tls</span>: <span class="ident">VMThread</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Return whether there is a mutator created and associated with the thread.
+    ///
+    /// Arguments:
+    /// * `tls`: The thread to query.
+    ///
+    /// # Safety
+    /// The caller needs to make sure that the thread is valid (a value passed in by the VM binding through API).
+    </span><span class="kw">fn </span>is_mutator(tls: VMThread) -&gt; bool;
 
-    <span class="doccomment">/// Return a `Mutator` reference for the thread.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The thread to query.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to make sure that the thread is a mutator thread.</span>
-    <span class="kw">fn</span> <span class="ident">mutator</span>(<span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Return a `Mutator` reference for the thread.
+    ///
+    /// Arguments:
+    /// * `tls`: The thread to query.
+    ///
+    /// # Safety
+    /// The caller needs to make sure that the thread is a mutator thread.
+    </span><span class="kw">fn </span>mutator(tls: VMMutatorThread) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;;
 
-    <span class="doccomment">/// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.</span>
-    <span class="kw">fn</span> <span class="ident">reset_mutator_iterator</span>();
+    <span class="doccomment">/// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
+    </span><span class="kw">fn </span>reset_mutator_iterator();
 
-    <span class="doccomment">/// Return the next mutator if there is any. This method assumes that the VM implements stateful type</span>
-    <span class="doccomment">/// to remember which mutator is returned and guarantees to return the next when called again. This does</span>
-    <span class="doccomment">/// not need to be thread safe.</span>
-    <span class="kw">fn</span> <span class="ident">get_next_mutator</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Return the next mutator if there is any. This method assumes that the VM implements stateful type
+    /// to remember which mutator is returned and guarantees to return the next when called again. This does
+    /// not need to be thread safe.
+    </span><span class="kw">fn </span>get_next_mutator() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;&gt;;
 
-    <span class="doccomment">/// A utility method to provide a thread-safe mutator iterator from `reset_mutator_iterator()` and `get_next_mutator()`.</span>
-    <span class="kw">fn</span> <span class="ident">mutators</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>() -&gt; <span class="ident">SynchronizedMutatorIterator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="ident">SynchronizedMutatorIterator</span> {
-            <span class="ident">_guard</span>: <span class="ident"><span class="self">Self</span>::global</span>().<span class="ident">base</span>().<span class="ident">mutator_iterator_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>(),
-            <span class="ident">start</span>: <span class="bool-val">true</span>,
-            <span class="ident">phantom</span>: <span class="ident">PhantomData</span>,
+    <span class="doccomment">/// A utility method to provide a thread-safe mutator iterator from `reset_mutator_iterator()` and `get_next_mutator()`.
+    </span><span class="kw">fn </span>mutators&lt;<span class="lifetime">&#39;a</span>&gt;() -&gt; SynchronizedMutatorIterator&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+        SynchronizedMutatorIterator {
+            _guard: <span class="self">Self</span>::global().base().mutator_iterator_lock.lock().unwrap(),
+            start: <span class="bool-val">true</span>,
+            phantom: PhantomData,
         }
     }
 
-    <span class="doccomment">/// Return the total count of mutators.</span>
-    <span class="kw">fn</span> <span class="ident">number_of_mutators</span>() -&gt; <span class="ident">usize</span>;
+    <span class="doccomment">/// Return the total count of mutators.
+    </span><span class="kw">fn </span>number_of_mutators() -&gt; usize;
 
-    <span class="doccomment">/// The fallback for object tracing. MMTk generally expects to find an object in one of MMTk&#39;s spaces (if it is allocated by MMTK),</span>
-    <span class="doccomment">/// and apply the corresponding policy to trace the object. Tracing in MMTk means identifying whether we have encountered this object in the</span>
-    <span class="doccomment">/// current GC. For example, for mark sweep, we will check if an object is marked, and if it is not yet marked, mark and enqueue the object</span>
-    <span class="doccomment">/// for later scanning. For copying policies, copying also happens in this step. For example for MMTk&#39;s copying space, we will</span>
-    <span class="doccomment">/// copy an object if it is in &#39;from space&#39;, and enqueue the copied object for later scanning.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If a binding would like to trace objects that are not allocated by MMTk and are not in any MMTk space, they can override this method.</span>
-    <span class="doccomment">/// They should check whether the object is encountered before in this current GC. If not, they should record the object as encountered themselves,</span>
-    <span class="doccomment">/// and enqueue the object reference to the object queue provided by the argument. If a binding moves objects, they should do the copying in the method,</span>
-    <span class="doccomment">/// and enqueue the new object reference instead.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The method should return the new object reference if the method moves the object, otherwise return the original object reference.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `queue`: The object queue. If an object is encountered for the first time in this GC, we expect the implementation to call `queue.enqueue()`</span>
-    <span class="doccomment">///            for the object. If the object is moved during the tracing, the new object reference (after copying) should be enqueued instead.</span>
-    <span class="doccomment">/// * `object`: The object to trace.</span>
-    <span class="doccomment">/// * `worker`: The GC worker that is doing this tracing. This is used to copy object (see [`crate::vm::ObjectModel::copy`])</span>
-    <span class="kw">fn</span> <span class="ident">vm_trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
-        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="macro">panic!</span>(<span class="string">&quot;MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.&quot;</span>, <span class="ident">object</span>)
+    <span class="doccomment">/// The fallback for object tracing. MMTk generally expects to find an object in one of MMTk&#39;s spaces (if it is allocated by MMTK),
+    /// and apply the corresponding policy to trace the object. Tracing in MMTk means identifying whether we have encountered this object in the
+    /// current GC. For example, for mark sweep, we will check if an object is marked, and if it is not yet marked, mark and enqueue the object
+    /// for later scanning. For copying policies, copying also happens in this step. For example for MMTk&#39;s copying space, we will
+    /// copy an object if it is in &#39;from space&#39;, and enqueue the copied object for later scanning.
+    ///
+    /// If a binding would like to trace objects that are not allocated by MMTk and are not in any MMTk space, they can override this method.
+    /// They should check whether the object is encountered before in this current GC. If not, they should record the object as encountered themselves,
+    /// and enqueue the object reference to the object queue provided by the argument. If a binding moves objects, they should do the copying in the method,
+    /// and enqueue the new object reference instead.
+    ///
+    /// The method should return the new object reference if the method moves the object, otherwise return the original object reference.
+    ///
+    /// Arguments:
+    /// * `queue`: The object queue. If an object is encountered for the first time in this GC, we expect the implementation to call `queue.enqueue()`
+    ///            for the object. If the object is moved during the tracing, the new object reference (after copying) should be enqueued instead.
+    /// * `object`: The object to trace.
+    /// * `worker`: The GC worker that is doing this tracing. This is used to copy object (see [`crate::vm::ObjectModel::copy`])
+    </span><span class="kw">fn </span>vm_trace_object&lt;Q: ObjectQueue&gt;(
+        _queue: <span class="kw-2">&amp;mut </span>Q,
+        object: ObjectReference,
+        _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+    ) -&gt; ObjectReference {
+        <span class="macro">panic!</span>(<span class="string">&quot;MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.&quot;</span>, object)
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

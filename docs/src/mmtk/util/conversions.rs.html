@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;conversions.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>conversions.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/conversions.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>conversions.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -150,156 +148,155 @@
 <span id="148">148</span>
 <span id="149">149</span>
 <span id="150">150</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-<span class="comment">/* Alignment */</span>
+<span class="comment">/* Alignment */
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_address_aligned</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">addr</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_ADDRESS</span>)
+</span><span class="kw">pub fn </span>is_address_aligned(addr: Address) -&gt; bool {
+    addr.is_aligned_to(BYTES_IN_ADDRESS)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">page_align_down</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident">BYTES_IN_PAGE</span>)
+<span class="kw">pub fn </span>page_align_down(address: Address) -&gt; Address {
+    address.align_down(BYTES_IN_PAGE)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_page_aligned</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>)
+<span class="kw">pub fn </span>is_page_aligned(address: Address) -&gt; bool {
+    address.is_aligned_to(BYTES_IN_PAGE)
 }
 
-<span class="comment">// const function cannot have conditional expression</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">chunk_align_up</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">addr</span>.<span class="ident">align_up</span>(<span class="ident">BYTES_IN_CHUNK</span>)
+<span class="comment">// const function cannot have conditional expression
+</span><span class="kw">pub const fn </span>chunk_align_up(addr: Address) -&gt; Address {
+    addr.align_up(BYTES_IN_CHUNK)
 }
 
-<span class="comment">// const function cannot have conditional expression</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">chunk_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">addr</span>.<span class="ident">align_down</span>(<span class="ident">BYTES_IN_CHUNK</span>)
+<span class="comment">// const function cannot have conditional expression
+</span><span class="kw">pub const fn </span>chunk_align_down(addr: Address) -&gt; Address {
+    addr.align_down(BYTES_IN_CHUNK)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">mmap_chunk_align_up</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">addr</span>.<span class="ident">align_up</span>(<span class="ident">MMAP_CHUNK_BYTES</span>)
+<span class="kw">pub const fn </span>mmap_chunk_align_up(addr: Address) -&gt; Address {
+    addr.align_up(MMAP_CHUNK_BYTES)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">mmap_chunk_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-    <span class="ident">addr</span>.<span class="ident">align_down</span>(<span class="ident">MMAP_CHUNK_BYTES</span>)
+<span class="kw">pub const fn </span>mmap_chunk_align_down(addr: Address) -&gt; Address {
+    addr.align_down(MMAP_CHUNK_BYTES)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_chunks_up</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    (<span class="ident">bytes</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>
+<span class="kw">pub fn </span>bytes_to_chunks_up(bytes: usize) -&gt; usize {
+    (bytes + BYTES_IN_CHUNK - <span class="number">1</span>) &gt;&gt; LOG_BYTES_IN_CHUNK
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">address_to_chunk_index</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">addr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>
+<span class="kw">pub fn </span>address_to_chunk_index(addr: Address) -&gt; usize {
+    addr &gt;&gt; LOG_BYTES_IN_CHUNK
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">chunk</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
-    <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">chunk</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) }
+<span class="kw">pub fn </span>chunk_index_to_address(chunk: usize) -&gt; Address {
+    <span class="kw">unsafe </span>{ Address::from_usize(chunk &lt;&lt; LOG_BYTES_IN_CHUNK) }
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_align_up</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="comment">// See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192</span>
-    <span class="ident">val</span>.<span class="ident">wrapping_add</span>(<span class="ident">align</span>).<span class="ident">wrapping_sub</span>(<span class="number">1</span>) <span class="op">&amp;</span> <span class="op">!</span><span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>)
+<span class="kw">pub const fn </span>raw_align_up(val: usize, align: usize) -&gt; usize {
+    <span class="comment">// See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
+    </span>val.wrapping_add(align).wrapping_sub(<span class="number">1</span>) &amp; !align.wrapping_sub(<span class="number">1</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_align_down</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">val</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>)
+<span class="kw">pub const fn </span>raw_align_down(val: usize, align: usize) -&gt; usize {
+    val &amp; !align.wrapping_sub(<span class="number">1</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_is_aligned</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">val</span> <span class="op">&amp;</span> <span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>) <span class="op">==</span> <span class="number">0</span>
+<span class="kw">pub const fn </span>raw_is_aligned(val: usize, align: usize) -&gt; bool {
+    val &amp; align.wrapping_sub(<span class="number">1</span>) == <span class="number">0
+</span>}
+
+<span class="comment">/* Conversion */
+
+</span><span class="kw">pub fn </span>pages_to_bytes(pages: usize) -&gt; usize {
+    pages &lt;&lt; LOG_BYTES_IN_PAGE
 }
 
-<span class="comment">/* Conversion */</span>
-
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pages_to_bytes</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">pages</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
+<span class="doccomment">/// Convert size in bytes to the number of pages (aligned up)
+</span><span class="kw">pub fn </span>bytes_to_pages_up(bytes: usize) -&gt; usize {
+    (bytes + BYTES_IN_PAGE - <span class="number">1</span>) &gt;&gt; LOG_BYTES_IN_PAGE
 }
 
-<span class="doccomment">/// Convert size in bytes to the number of pages (aligned up)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_pages_up</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    (<span class="ident">bytes</span> <span class="op">+</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
-}
+<span class="kw">pub fn </span>bytes_to_pages(bytes: usize) -&gt; usize {
+    <span class="kw">let </span>pages = bytes_to_pages_up(bytes);
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_pages</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">bytes_to_pages_up</span>(<span class="ident">bytes</span>);
-
-    <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug</span> <span class="op">=</span> <span class="string">&quot;true&quot;</span>) {
-        <span class="kw">let</span> <span class="ident">computed_extent</span> <span class="op">=</span> <span class="ident">pages</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
-        <span class="kw">let</span> <span class="ident">bytes_match_pages</span> <span class="op">=</span> <span class="ident">computed_extent</span> <span class="op">==</span> <span class="ident">bytes</span>;
+    <span class="kw">if </span><span class="macro">cfg!</span>(debug = <span class="string">&quot;true&quot;</span>) {
+        <span class="kw">let </span>computed_extent = pages &lt;&lt; LOG_BYTES_IN_PAGE;
+        <span class="kw">let </span>bytes_match_pages = computed_extent == bytes;
         <span class="macro">assert!</span>(
-            <span class="ident">bytes_match_pages</span>,
+            bytes_match_pages,
             <span class="string">&quot;ERROR: number of bytes computed from pages must match original byte amount!\
              bytes = {}\
              pages = {}\
              bytes computed from pages = {}&quot;</span>,
-            <span class="ident">bytes</span>, <span class="ident">pages</span>, <span class="ident">computed_extent</span>
+            bytes, pages, computed_extent
         );
     }
 
-    <span class="ident">pages</span>
+    pages
 }
 
-<span class="doccomment">/// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_formatted_string</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">String</span> {
-    <span class="kw">const</span> <span class="ident">UNITS</span>: [<span class="kw-2">&amp;</span><span class="ident">str</span>; <span class="number">6</span>] <span class="op">=</span> [<span class="string">&quot;B&quot;</span>, <span class="string">&quot;KiB&quot;</span>, <span class="string">&quot;MiB&quot;</span>, <span class="string">&quot;GiB&quot;</span>, <span class="string">&quot;TiB&quot;</span>, <span class="string">&quot;PiB&quot;</span>];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num</span> <span class="op">=</span> <span class="ident">bytes</span>;
-    <span class="kw">while</span> <span class="ident">i</span> <span class="op">&lt;</span> <span class="ident">UNITS</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span> {
-        <span class="kw">let</span> <span class="ident">new_num</span> <span class="op">=</span> <span class="ident">num</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">10</span>;
-        <span class="kw">if</span> <span class="ident">new_num</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">num</span>, <span class="ident">UNITS</span>[<span class="ident">i</span>]);
+<span class="doccomment">/// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.
+</span><span class="kw">pub fn </span>bytes_to_formatted_string(bytes: usize) -&gt; String {
+    <span class="kw">const </span>UNITS: [<span class="kw-2">&amp;</span>str; <span class="number">6</span>] = [<span class="string">&quot;B&quot;</span>, <span class="string">&quot;KiB&quot;</span>, <span class="string">&quot;MiB&quot;</span>, <span class="string">&quot;GiB&quot;</span>, <span class="string">&quot;TiB&quot;</span>, <span class="string">&quot;PiB&quot;</span>];
+    <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>num = bytes;
+    <span class="kw">while </span>i &lt; UNITS.len() - <span class="number">1 </span>{
+        <span class="kw">let </span>new_num = num &gt;&gt; <span class="number">10</span>;
+        <span class="kw">if </span>new_num == <span class="number">0 </span>{
+            <span class="kw">return </span><span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, num, UNITS[i]);
         }
-        <span class="ident">num</span> <span class="op">=</span> <span class="ident">new_num</span>;
-        <span class="ident">i</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        num = new_num;
+        i += <span class="number">1</span>;
     }
-    <span class="kw">return</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">num</span>, <span class="ident">UNITS</span>.<span class="ident">last</span>().<span class="ident">unwrap</span>());
+    <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, num, UNITS.last().unwrap())
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
+    <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_page_align</span>() {
-        <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x2345_6789</span>) };
-        <span class="macro">assert_eq!</span>(<span class="ident">page_align_down</span>(<span class="ident">addr</span>), <span class="kw">unsafe</span> {
-            <span class="ident">Address::from_usize</span>(<span class="number">0x2345_6000</span>)
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_page_align() {
+        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2345_6789</span>) };
+        <span class="macro">assert_eq!</span>(page_align_down(addr), <span class="kw">unsafe </span>{
+            Address::from_usize(<span class="number">0x2345_6000</span>)
         });
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">is_page_aligned</span>(<span class="ident">addr</span>));
-        <span class="macro">assert!</span>(<span class="ident">is_page_aligned</span>(<span class="ident">page_align_down</span>(<span class="ident">addr</span>)));
+        <span class="macro">assert!</span>(!is_page_aligned(addr));
+        <span class="macro">assert!</span>(is_page_aligned(page_align_down(addr)));
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_chunk_align</span>() {
-        <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x2345_6789</span>) };
-        <span class="macro">assert_eq!</span>(<span class="ident">chunk_align_down</span>(<span class="ident">addr</span>), <span class="kw">unsafe</span> {
-            <span class="ident">Address::from_usize</span>(<span class="number">0x2340_0000</span>)
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_chunk_align() {
+        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2345_6789</span>) };
+        <span class="macro">assert_eq!</span>(chunk_align_down(addr), <span class="kw">unsafe </span>{
+            Address::from_usize(<span class="number">0x2340_0000</span>)
         });
-        <span class="macro">assert_eq!</span>(<span class="ident">chunk_align_up</span>(<span class="ident">addr</span>), <span class="kw">unsafe</span> {
-            <span class="ident">Address::from_usize</span>(<span class="number">0x2380_0000</span>)
+        <span class="macro">assert_eq!</span>(chunk_align_up(addr), <span class="kw">unsafe </span>{
+            Address::from_usize(<span class="number">0x2380_0000</span>)
         });
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_bytes_to_formatted_string</span>() {
-        <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">0</span>), <span class="string">&quot;0B&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1023</span>), <span class="string">&quot;1023B&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1024</span>), <span class="string">&quot;1KiB&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1025</span>), <span class="string">&quot;1KiB&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">20</span>), <span class="string">&quot;1MiB&quot;</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">30</span>), <span class="string">&quot;1GiB&quot;</span>);
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-        {
-            <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">40</span>), <span class="string">&quot;1TiB&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">50</span>), <span class="string">&quot;1PiB&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">60</span>), <span class="string">&quot;1024PiB&quot;</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">bytes_to_formatted_string</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">63</span>), <span class="string">&quot;8192PiB&quot;</span>);
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_bytes_to_formatted_string() {
+        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">0</span>), <span class="string">&quot;0B&quot;</span>);
+        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1023</span>), <span class="string">&quot;1023B&quot;</span>);
+        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1024</span>), <span class="string">&quot;1KiB&quot;</span>);
+        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1025</span>), <span class="string">&quot;1KiB&quot;</span>);
+        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">20</span>), <span class="string">&quot;1MiB&quot;</span>);
+        <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">30</span>), <span class="string">&quot;1GiB&quot;</span>);
+        <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+        </span>{
+            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">40</span>), <span class="string">&quot;1TiB&quot;</span>);
+            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">50</span>), <span class="string">&quot;1PiB&quot;</span>);
+            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">60</span>), <span class="string">&quot;1024PiB&quot;</span>);
+            <span class="macro">assert_eq!</span>(bytes_to_formatted_string(<span class="number">1 </span>&lt;&lt; <span class="number">63</span>), <span class="string">&quot;8192PiB&quot;</span>);
         }
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

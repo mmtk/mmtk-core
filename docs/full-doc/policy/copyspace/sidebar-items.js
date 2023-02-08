@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CopySpace","This type implements a simple copying space."],["CopySpaceCopyContext","Copy allocator for CopySpace"]]});
+window.SIDEBAR_ITEMS = {"struct":[["CopySpace","This type implements a simple copying space."],["CopySpaceCopyContext","Copy allocator for CopySpace"]]};

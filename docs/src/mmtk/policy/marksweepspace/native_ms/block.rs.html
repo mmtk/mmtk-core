@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;marksweepspace&#x2F;native_ms&#x2F;block.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/marksweepspace/native_ms/block.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -447,453 +445,452 @@
 <span id="445">445</span>
 <span id="446">446</span>
 <span id="447">447</span>
-</pre><pre class="rust"><code><span class="comment">// adapted from Immix</span>
+</pre><pre class="rust"><code><span class="comment">// adapted from Immix
 
-<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+</span><span class="kw">use </span>atomic::Ordering;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::BlockList</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::MarkSweepSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::chunk_map</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::Region</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">util</span>::{
-        <span class="ident">metadata::side_metadata::SideMetadataSpec</span>, <span class="ident">Address</span>, <span class="ident">ObjectReference</span>, <span class="ident">OpaquePointer</span>,
-        <span class="ident">VMThread</span>,
+<span class="kw">use </span><span class="kw">super</span>::BlockList;
+<span class="kw">use </span><span class="kw">super</span>::MarkSweepSpace;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
+<span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
+<span class="kw">use crate</span>::{
+    util::{
+        metadata::side_metadata::SideMetadataSpec, Address, ObjectReference, OpaquePointer,
+        VMThread,
     },
-    <span class="ident">vm::VMBinding</span>,
+    vm::VMBinding,
 };
 
-<span class="kw">use</span> <span class="ident">std::num::NonZeroUsize</span>;
+<span class="kw">use </span>std::num::NonZeroUsize;
 
-<span class="doccomment">/// A 64KB region for MiMalloc.</span>
-<span class="doccomment">/// This is also known as MiMalloc page. We try to avoid getting confused with the OS 4K page. So we call it block.</span>
-<span class="doccomment">/// This type always holds a non-zero address to refer to a block. The underlying `NonZeroUsize` type ensures the</span>
-<span class="doccomment">/// size of `Option&lt;Block&gt;` is the same as `Block` itself.</span>
-<span class="comment">// TODO: If we actually use the first block, we would need to turn the type into `Block(Address)`, and use `None` and</span>
-<span class="comment">// `Block(Address::ZERO)` to differentiate those.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Block</span>(<span class="ident">NonZeroUsize</span>);
+<span class="doccomment">/// A 64KB region for MiMalloc.
+/// This is also known as MiMalloc page. We try to avoid getting confused with the OS 4K page. So we call it block.
+/// This type always holds a non-zero address to refer to a block. The underlying `NonZeroUsize` type ensures the
+/// size of `Option&lt;Block&gt;` is the same as `Block` itself.
+</span><span class="comment">// TODO: If we actually use the first block, we would need to turn the type into `Block(Address)`, and use `None` and
+// `Block(Address::ZERO)` to differentiate those.
+</span><span class="attribute">#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+#[repr(transparent)]
+</span><span class="kw">pub struct </span>Block(NonZeroUsize);
 
-<span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Block</span> {
-    <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span>;
+<span class="kw">impl </span>Region <span class="kw">for </span>Block {
+    <span class="kw">const </span>LOG_BYTES: usize = <span class="number">16</span>;
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from_aligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">address</span>.<span class="ident">is_zero</span>());
-        <span class="self">Self</span>(<span class="kw">unsafe</span> { <span class="ident">NonZeroUsize::new_unchecked</span>(<span class="ident">address</span>.<span class="ident">as_usize</span>()) })
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
+        <span class="macro">debug_assert!</span>(address.is_aligned_to(<span class="self">Self</span>::BYTES));
+        <span class="macro">debug_assert!</span>(!address.is_zero());
+        <span class="self">Self</span>(<span class="kw">unsafe </span>{ NonZeroUsize::new_unchecked(address.as_usize()) })
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>()) }
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.<span class="number">0</span>.get()) }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Block</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">METADATA_SPECS</span>: [<span class="ident">SideMetadataSpec</span>; <span class="number">7</span>] <span class="op">=</span> [
-        <span class="ident"><span class="self">Self</span>::MARK_TABLE</span>,
-        <span class="ident"><span class="self">Self</span>::NEXT_BLOCK_TABLE</span>,
-        <span class="ident"><span class="self">Self</span>::PREV_BLOCK_TABLE</span>,
-        <span class="ident"><span class="self">Self</span>::FREE_LIST_TABLE</span>,
-        <span class="ident"><span class="self">Self</span>::SIZE_TABLE</span>,
-        <span class="ident"><span class="self">Self</span>::BLOCK_LIST_TABLE</span>,
-        <span class="ident"><span class="self">Self</span>::TLS_TABLE</span>,
+<span class="kw">impl </span>Block {
+    <span class="kw">pub const </span>METADATA_SPECS: [SideMetadataSpec; <span class="number">7</span>] = [
+        <span class="self">Self</span>::MARK_TABLE,
+        <span class="self">Self</span>::NEXT_BLOCK_TABLE,
+        <span class="self">Self</span>::PREV_BLOCK_TABLE,
+        <span class="self">Self</span>::FREE_LIST_TABLE,
+        <span class="self">Self</span>::SIZE_TABLE,
+        <span class="self">Self</span>::BLOCK_LIST_TABLE,
+        <span class="self">Self</span>::TLS_TABLE,
     ];
 
-    <span class="doccomment">/// Block mark table (side)</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_MARK</span>;
+    <span class="doccomment">/// Block mark table (side)
+    </span><span class="kw">pub const </span>MARK_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_MARK;
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NEXT_BLOCK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_NEXT</span>;
+    <span class="kw">pub const </span>NEXT_BLOCK_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_NEXT;
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PREV_BLOCK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_PREV</span>;
+    <span class="kw">pub const </span>PREV_BLOCK_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_PREV;
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FREE_LIST_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_FREE</span>;
+    <span class="kw">pub const </span>FREE_LIST_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_FREE;
 
-    <span class="comment">// needed for non GC context</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_FREE_LIST_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE</span>;
+    <span class="comment">// needed for non GC context
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    </span><span class="kw">pub const </span>LOCAL_FREE_LIST_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">THREAD_FREE_LIST_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE</span>;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    </span><span class="kw">pub const </span>THREAD_FREE_LIST_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE;
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SIZE_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_SIZE</span>;
+    <span class="kw">pub const </span>SIZE_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_SIZE;
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCK_LIST_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_LIST</span>;
+    <span class="kw">pub const </span>BLOCK_LIST_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_LIST;
 
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TLS_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS</span>;
+    <span class="kw">pub const </span>TLS_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">Block::FREE_LIST_TABLE</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>())) }
+    <span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>load_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="kw">unsafe </span>{ Address::from_usize(Block::FREE_LIST_TABLE.load::&lt;usize&gt;(<span class="self">self</span>.start())) }
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">free_list</span>: <span class="ident">Address</span>) {
-        <span class="kw">unsafe</span> { <span class="ident">Block::FREE_LIST_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">free_list</span>.<span class="ident">as_usize</span>()) }
+    <span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>store_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, free_list: Address) {
+        <span class="kw">unsafe </span>{ Block::FREE_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), free_list.as_usize()) }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_local_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">Block::LOCAL_FREE_LIST_TABLE</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>())) }
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    #[inline]
+    </span><span class="kw">pub fn </span>load_local_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="kw">unsafe </span>{ Address::from_usize(Block::LOCAL_FREE_LIST_TABLE.load::&lt;usize&gt;(<span class="self">self</span>.start())) }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_local_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">local_free</span>: <span class="ident">Address</span>) {
-        <span class="kw">unsafe</span> { <span class="ident">Block::LOCAL_FREE_LIST_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">local_free</span>.<span class="ident">as_usize</span>()) }
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    #[inline]
+    </span><span class="kw">pub fn </span>store_local_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, local_free: Address) {
+        <span class="kw">unsafe </span>{ Block::LOCAL_FREE_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), local_free.as_usize()) }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_thread_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">unsafe</span> {
-            <span class="ident">Address::from_usize</span>(
-                <span class="ident">Block::THREAD_FREE_LIST_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>),
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    #[inline]
+    </span><span class="kw">pub fn </span>load_thread_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="kw">unsafe </span>{
+            Address::from_usize(
+                Block::THREAD_FREE_LIST_TABLE.load_atomic::&lt;usize&gt;(<span class="self">self</span>.start(), Ordering::SeqCst),
             )
         }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_thread_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">thread_free</span>: <span class="ident">Address</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="ident">Block::THREAD_FREE_LIST_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">thread_free</span>.<span class="ident">as_usize</span>())
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    #[inline]
+    </span><span class="kw">pub fn </span>store_thread_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, thread_free: Address) {
+        <span class="kw">unsafe </span>{
+            Block::THREAD_FREE_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), thread_free.as_usize())
         }
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cas_thread_free_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">old_thread_free</span>: <span class="ident">Address</span>, <span class="ident">new_thread_free</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">Block::THREAD_FREE_LIST_TABLE</span>
-            .<span class="ident">compare_exchange_atomic</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(
-                <span class="self">self</span>.<span class="ident">start</span>(),
-                <span class="ident">old_thread_free</span>.<span class="ident">as_usize</span>(),
-                <span class="ident">new_thread_free</span>.<span class="ident">as_usize</span>(),
-                <span class="ident">Ordering::SeqCst</span>,
-                <span class="ident">Ordering::SeqCst</span>,
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
+    #[inline]
+    </span><span class="kw">pub fn </span>cas_thread_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, old_thread_free: Address, new_thread_free: Address) -&gt; bool {
+        Block::THREAD_FREE_LIST_TABLE
+            .compare_exchange_atomic::&lt;usize&gt;(
+                <span class="self">self</span>.start(),
+                old_thread_free.as_usize(),
+                new_thread_free.as_usize(),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
             )
-            .<span class="ident">is_ok</span>()
+            .is_ok()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_prev_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">prev</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Block::PREV_BLOCK_TABLE</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>()) };
-        <span class="ident">NonZeroUsize::new</span>(<span class="ident">prev</span>).<span class="ident">map</span>(<span class="ident">Block</span>)
+    <span class="kw">pub fn </span>load_prev_block(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
+        <span class="kw">let </span>prev = <span class="kw">unsafe </span>{ Block::PREV_BLOCK_TABLE.load::&lt;usize&gt;(<span class="self">self</span>.start()) };
+        NonZeroUsize::new(prev).map(Block)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_next_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Block::NEXT_BLOCK_TABLE</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>()) };
-        <span class="ident">NonZeroUsize::new</span>(<span class="ident">next</span>).<span class="ident">map</span>(<span class="ident">Block</span>)
+    <span class="kw">pub fn </span>load_next_block(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
+        <span class="kw">let </span>next = <span class="kw">unsafe </span>{ Block::NEXT_BLOCK_TABLE.load::&lt;usize&gt;(<span class="self">self</span>.start()) };
+        NonZeroUsize::new(next).map(Block)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_next_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">next</span>: <span class="ident">Block</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="ident">Block::NEXT_BLOCK_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">next</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>());
+    <span class="kw">pub fn </span>store_next_block(<span class="kw-2">&amp;</span><span class="self">self</span>, next: Block) {
+        <span class="kw">unsafe </span>{
+            Block::NEXT_BLOCK_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), next.start().as_usize());
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_next_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="ident">Block::NEXT_BLOCK_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="number">0</span>);
+    <span class="kw">pub fn </span>clear_next_block(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">unsafe </span>{
+            Block::NEXT_BLOCK_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), <span class="number">0</span>);
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_prev_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">prev</span>: <span class="ident">Block</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="ident">Block::PREV_BLOCK_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">prev</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>());
+    <span class="kw">pub fn </span>store_prev_block(<span class="kw-2">&amp;</span><span class="self">self</span>, prev: Block) {
+        <span class="kw">unsafe </span>{
+            Block::PREV_BLOCK_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), prev.start().as_usize());
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_prev_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="ident">Block::PREV_BLOCK_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="number">0</span>);
+    <span class="kw">pub fn </span>clear_prev_block(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">unsafe </span>{
+            Block::PREV_BLOCK_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), <span class="number">0</span>);
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_block_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block_list</span>: <span class="kw-2">&amp;</span><span class="ident">BlockList</span>) {
-        <span class="kw">let</span> <span class="ident">block_list_usize</span>: <span class="ident">usize</span> <span class="op">=</span>
-            <span class="kw">unsafe</span> { <span class="ident">std::mem::transmute</span>::<span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">BlockList</span>, <span class="ident">usize</span><span class="op">&gt;</span>(<span class="ident">block_list</span>) };
-        <span class="kw">unsafe</span> {
-            <span class="ident">Block::BLOCK_LIST_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">block_list_usize</span>);
+    <span class="kw">pub fn </span>store_block_list(<span class="kw-2">&amp;</span><span class="self">self</span>, block_list: <span class="kw-2">&amp;</span>BlockList) {
+        <span class="kw">let </span>block_list_usize: usize =
+            <span class="kw">unsafe </span>{ std::mem::transmute::&lt;<span class="kw-2">&amp;</span>BlockList, usize&gt;(block_list) };
+        <span class="kw">unsafe </span>{
+            Block::BLOCK_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), block_list_usize);
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_block_list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">BlockList</span> {
-        <span class="kw">let</span> <span class="ident">block_list</span> <span class="op">=</span>
-            <span class="ident">Block::BLOCK_LIST_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="kw">unsafe</span> { <span class="ident">std::mem::transmute</span>::<span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">*mut</span> <span class="ident">BlockList</span><span class="op">&gt;</span>(<span class="ident">block_list</span>) }
+    <span class="kw">pub fn </span>load_block_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">*mut </span>BlockList {
+        <span class="kw">let </span>block_list =
+            Block::BLOCK_LIST_TABLE.load_atomic::&lt;usize&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
+        block_list <span class="kw">as </span><span class="kw-2">*mut </span>BlockList
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_block_cell_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="ident">Block::SIZE_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>)
+    <span class="kw">pub fn </span>load_block_cell_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        Block::SIZE_TABLE.load_atomic::&lt;usize&gt;(<span class="self">self</span>.start(), Ordering::SeqCst)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_block_cell_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
-        <span class="kw">unsafe</span> { <span class="ident">Block::SIZE_TABLE</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">size</span>) }
+    <span class="kw">pub fn </span>store_block_cell_size(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize) {
+        <span class="kw">unsafe </span>{ Block::SIZE_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), size) }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) {
-        <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">std::mem::transmute</span>::<span class="op">&lt;</span><span class="ident">OpaquePointer</span>, <span class="ident">usize</span><span class="op">&gt;</span>(<span class="ident">tls</span>.<span class="number">0</span>) };
-        <span class="kw">unsafe</span> { <span class="ident">Block::TLS_TABLE</span>.<span class="ident">store</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">tls</span>) }
+    <span class="kw">pub fn </span>store_tls(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread) {
+        <span class="kw">let </span>tls = <span class="kw">unsafe </span>{ std::mem::transmute::&lt;OpaquePointer, usize&gt;(tls.<span class="number">0</span>) };
+        <span class="kw">unsafe </span>{ Block::TLS_TABLE.store(<span class="self">self</span>.start(), tls) }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMThread</span> {
-        <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="ident">Block::TLS_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="ident">VMThread</span>(<span class="ident">OpaquePointer::from_address</span>(<span class="kw">unsafe</span> {
-            <span class="ident">Address::from_usize</span>(<span class="ident">tls</span>)
+    <span class="kw">pub fn </span>load_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMThread {
+        <span class="kw">let </span>tls = Block::TLS_TABLE.load_atomic::&lt;usize&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
+        VMThread(OpaquePointer::from_address(<span class="kw">unsafe </span>{
+            Address::from_usize(tls)
         }))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_free_cells</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="op">!</span><span class="self">self</span>.<span class="ident">load_free_list</span>().<span class="ident">is_zero</span>()
+    <span class="kw">pub fn </span>has_free_cells(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.load_free_list().is_zero()
     }
 
-    <span class="doccomment">/// Get block mark state.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">BlockState</span> {
-        <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::MARK_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="ident">byte</span>.<span class="ident">into</span>()
+    <span class="doccomment">/// Get block mark state.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; BlockState {
+        <span class="kw">let </span>byte = <span class="self">Self</span>::MARK_TABLE.load_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
+        byte.into()
     }
 
-    <span class="doccomment">/// Set block mark state.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="ident">BlockState</span>) {
-        <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">u8::from</span>(<span class="ident">state</span>);
-        <span class="ident"><span class="self">Self</span>::MARK_TABLE</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">state</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Set block mark state.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>set_state(<span class="kw-2">&amp;</span><span class="self">self</span>, state: BlockState) {
+        <span class="kw">let </span>state = u8::from(state);
+        <span class="self">Self</span>::MARK_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), state, Ordering::SeqCst);
     }
 
-    <span class="doccomment">/// Release this block if it is unmarked. Return true if the block is release.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attempt_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">MarkSweepSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_state</span>() {
-            <span class="ident">BlockState::Unallocated</span> =&gt; <span class="bool-val">false</span>,
-            <span class="ident">BlockState::Unmarked</span> =&gt; {
-                <span class="kw">unsafe</span> {
-                    <span class="kw">let</span> <span class="ident">block_list</span> <span class="op">=</span> <span class="kw">loop</span> {
-                        <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">load_block_list</span>();
-                        (<span class="kw-2">*</span><span class="ident">list</span>).<span class="ident">lock</span>();
-                        <span class="kw">if</span> <span class="ident">list</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">load_block_list</span>() {
-                            <span class="kw">break</span> <span class="ident">list</span>;
+    <span class="doccomment">/// Release this block if it is unmarked. Return true if the block is release.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>attempt_release&lt;VM: VMBinding&gt;(<span class="self">self</span>, space: <span class="kw-2">&amp;</span>MarkSweepSpace&lt;VM&gt;) -&gt; bool {
+        <span class="kw">match </span><span class="self">self</span>.get_state() {
+            BlockState::Unallocated =&gt; <span class="bool-val">false</span>,
+            BlockState::Unmarked =&gt; {
+                <span class="kw">unsafe </span>{
+                    <span class="kw">let </span>block_list = <span class="kw">loop </span>{
+                        <span class="kw">let </span>list = <span class="self">self</span>.load_block_list();
+                        (<span class="kw-2">*</span>list).lock();
+                        <span class="kw">if </span>list == <span class="self">self</span>.load_block_list() {
+                            <span class="kw">break </span>list;
                         }
-                        (<span class="kw-2">*</span><span class="ident">list</span>).<span class="ident">unlock</span>();
+                        (<span class="kw-2">*</span>list).unlock();
                     };
-                    (<span class="kw-2">*</span><span class="ident">block_list</span>).<span class="ident">remove</span>(<span class="self">self</span>);
-                    (<span class="kw-2">*</span><span class="ident">block_list</span>).<span class="ident">unlock</span>();
+                    (<span class="kw-2">*</span>block_list).remove(<span class="self">self</span>);
+                    (<span class="kw-2">*</span>block_list).unlock();
                 }
-                <span class="ident">space</span>.<span class="ident">release_block</span>(<span class="self">self</span>);
-                <span class="bool-val">true</span>
-            }
-            <span class="ident">BlockState::Marked</span> =&gt; {
-                <span class="comment">// The block is live.</span>
-                <span class="bool-val">false</span>
-            }
+                space.release_block(<span class="self">self</span>);
+                <span class="bool-val">true
+            </span>}
+            BlockState::Marked =&gt; {
+                <span class="comment">// The block is live.
+                </span><span class="bool-val">false
+            </span>}
         }
     }
 
-    <span class="doccomment">/// Sweep the block. This is done either lazily in the allocation phase, or eagerly at the end of a GC.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// The important point here is that we need to distinguish cell address, allocation address, and object reference.</span>
-        <span class="comment">// We only know cell addresses here. We do not know the allocation address, and we also do not know the object reference.</span>
-        <span class="comment">// The mark bit is set for object references, and we need to use the mark bit to decide whether a cell is live or not.</span>
+    <span class="doccomment">/// Sweep the block. This is done either lazily in the allocation phase, or eagerly at the end of a GC.
+    </span><span class="kw">pub fn </span>sweep&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// The important point here is that we need to distinguish cell address, allocation address, and object reference.
+        // We only know cell addresses here. We do not know the allocation address, and we also do not know the object reference.
+        // The mark bit is set for object references, and we need to use the mark bit to decide whether a cell is live or not.
 
-        <span class="comment">// We haven&#39;t implemented for malloc/free cases, for which we do not have mark bit. We could use valid object bit instead.</span>
-        <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_native_mimalloc&quot;</span>) {
+        // We haven&#39;t implemented for malloc/free cases, for which we do not have mark bit. We could use valid object bit instead.
+        </span><span class="kw">if </span><span class="macro">cfg!</span>(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>) {
             <span class="macro">unimplemented!</span>()
         }
 
-        <span class="comment">// Check if we can treat it as the simple case: cell address === object reference.</span>
-        <span class="comment">// If the binding does not use allocation offset, and they use the same allocation alignment which the cell size is aligned to,</span>
-        <span class="comment">// then we have cell address === allocation address.</span>
-        <span class="comment">// Furthermore, if the binding does not have an offset between allocation and object reference, then allocation address === cell address.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">VM::USE_ALLOCATION_OFFSET</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">VM::MAX_ALIGNMENT</span> <span class="op">==</span> <span class="ident">VM::MIN_ALIGNMENT</span>
-            <span class="op">&amp;&amp;</span> <span class="ident"><span class="kw">crate</span>::util::conversions::raw_is_aligned</span>(
-                <span class="self">self</span>.<span class="ident">load_block_cell_size</span>(),
-                <span class="ident">VM::MAX_ALIGNMENT</span>,
+        <span class="comment">// Check if we can treat it as the simple case: cell address === object reference.
+        // If the binding does not use allocation offset, and they use the same allocation alignment which the cell size is aligned to,
+        // then we have cell address === allocation address.
+        // Furthermore, if the binding does not have an offset between allocation and object reference, then allocation address === cell address.
+        </span><span class="kw">if </span>!VM::USE_ALLOCATION_OFFSET
+            &amp;&amp; VM::MAX_ALIGNMENT == VM::MIN_ALIGNMENT
+            &amp;&amp; <span class="kw">crate</span>::util::conversions::raw_is_aligned(
+                <span class="self">self</span>.load_block_cell_size(),
+                VM::MAX_ALIGNMENT,
             )
-            <span class="op">&amp;&amp;</span> <span class="ident">VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS</span>
+            &amp;&amp; VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS
         {
-            <span class="comment">// In this case, we can use the simplest and the most efficicent sweep.</span>
-            <span class="self">self</span>.<span class="ident">simple_sweep</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>()
-        } <span class="kw">else</span> {
-            <span class="comment">// Otherwise we fallback to a generic but slow sweep. This roughly has ~10% mutator overhead for lazy sweeping.</span>
-            <span class="self">self</span>.<span class="ident">naive_brute_force_sweep</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>()
+            <span class="comment">// In this case, we can use the simplest and the most efficicent sweep.
+            </span><span class="self">self</span>.simple_sweep::&lt;VM&gt;()
+        } <span class="kw">else </span>{
+            <span class="comment">// Otherwise we fallback to a generic but slow sweep. This roughly has ~10% mutator overhead for lazy sweeping.
+            </span><span class="self">self</span>.naive_brute_force_sweep::&lt;VM&gt;()
         }
     }
 
-    <span class="doccomment">/// This implementation uses object reference and cell address interchangably. This is not correct for most cases.</span>
-    <span class="doccomment">/// However, in certain cases, such as OpenJDK, this is correct, and efficient. See the sweep method for the invariants</span>
-    <span class="doccomment">/// that we need to use this method correctly.</span>
-    <span class="kw">fn</span> <span class="ident">simple_sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">cell_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">load_block_cell_size</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cell</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() };
-        <span class="kw">while</span> <span class="ident">cell</span> <span class="op">+</span> <span class="ident">cell_size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>() <span class="op">+</span> <span class="ident">Block::BYTES</span> {
-            <span class="comment">// The invariants we checked earlier ensures that we can use cell and object reference interchangably</span>
-            <span class="comment">// We may not really have an object in this cell, but if we do, this object reference is correct.</span>
-            <span class="kw">let</span> <span class="ident">potential_object</span> <span class="op">=</span> <span class="ident">ObjectReference::from_raw_address</span>(<span class="ident">cell</span>);
+    <span class="doccomment">/// This implementation uses object reference and cell address interchangably. This is not correct for most cases.
+    /// However, in certain cases, such as OpenJDK, this is correct, and efficient. See the sweep method for the invariants
+    /// that we need to use this method correctly.
+    </span><span class="kw">fn </span>simple_sweep&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>cell_size = <span class="self">self</span>.load_block_cell_size();
+        <span class="kw">let </span><span class="kw-2">mut </span>cell = <span class="self">self</span>.start();
+        <span class="kw">let </span><span class="kw-2">mut </span>last = <span class="kw">unsafe </span>{ Address::zero() };
+        <span class="kw">while </span>cell + cell_size &lt;= <span class="self">self</span>.start() + Block::BYTES {
+            <span class="comment">// The invariants we checked earlier ensures that we can use cell and object reference interchangably
+            // We may not really have an object in this cell, but if we do, this object reference is correct.
+            </span><span class="kw">let </span>potential_object = ObjectReference::from_raw_address(cell);
 
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>
-                .<span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">potential_object</span>, <span class="ident">Ordering::SeqCst</span>)
+            <span class="kw">if </span>!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .is_marked::&lt;VM&gt;(potential_object, Ordering::SeqCst)
             {
-                <span class="comment">// clear alloc bit if it is ever set. It is possible that the alloc bit is never set for this cell (i.e. there was no object in this cell before this GC),</span>
-                <span class="comment">// we unset the bit anyway.</span>
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit_nocheck</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">potential_object</span>);
-                <span class="kw">unsafe</span> {
-                    <span class="ident">cell</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>(<span class="ident">last</span>);
+                <span class="comment">// clear alloc bit if it is ever set. It is possible that the alloc bit is never set for this cell (i.e. there was no object in this cell before this GC),
+                // we unset the bit anyway.
+                </span><span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+                </span><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit_nocheck::&lt;VM&gt;(potential_object);
+                <span class="kw">unsafe </span>{
+                    cell.store::&lt;Address&gt;(last);
                 }
-                <span class="ident">last</span> <span class="op">=</span> <span class="ident">cell</span>;
+                last = cell;
             }
-            <span class="ident">cell</span> <span class="op">+</span><span class="op">=</span> <span class="ident">cell_size</span>;
+            cell += cell_size;
         }
 
-        <span class="self">self</span>.<span class="ident">store_free_list</span>(<span class="ident">last</span>);
+        <span class="self">self</span>.store_free_list(last);
     }
 
-    <span class="doccomment">/// This is a naive implementation that is inefficient but should be correct.</span>
-    <span class="doccomment">/// In this implementation, we simply go through each possible object</span>
-    <span class="doccomment">/// reference and see if it has the mark bit set. If we find mark bit, that means the cell is alive. If we didn&#39;t find</span>
-    <span class="doccomment">/// the mark bit in the entire cell, it means the cell is dead.</span>
-    <span class="kw">fn</span> <span class="ident">naive_brute_force_sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::MIN_OBJECT_SIZE</span>;
+    <span class="doccomment">/// This is a naive implementation that is inefficient but should be correct.
+    /// In this implementation, we simply go through each possible object
+    /// reference and see if it has the mark bit set. If we find mark bit, that means the cell is alive. If we didn&#39;t find
+    /// the mark bit in the entire cell, it means the cell is dead.
+    </span><span class="kw">fn </span>naive_brute_force_sweep&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">use </span><span class="kw">crate</span>::util::constants::MIN_OBJECT_SIZE;
 
-        <span class="comment">// Cell size for this block.</span>
-        <span class="kw">let</span> <span class="ident">cell_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">load_block_cell_size</span>();
-        <span class="comment">// Current cell</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cell</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>();
-        <span class="comment">// Last free cell in the free list</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last</span> <span class="op">=</span> <span class="ident">Address::ZERO</span>;
-        <span class="comment">// Current cursor</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">cell</span>;
+        <span class="comment">// Cell size for this block.
+        </span><span class="kw">let </span>cell_size = <span class="self">self</span>.load_block_cell_size();
+        <span class="comment">// Current cell
+        </span><span class="kw">let </span><span class="kw-2">mut </span>cell = <span class="self">self</span>.start();
+        <span class="comment">// Last free cell in the free list
+        </span><span class="kw">let </span><span class="kw-2">mut </span>last = Address::ZERO;
+        <span class="comment">// Current cursor
+        </span><span class="kw">let </span><span class="kw-2">mut </span>cursor = cell;
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Sweep block {:?}, cell size {}&quot;</span>, <span class="self">self</span>, <span class="ident">cell_size</span>);
+        <span class="macro">debug!</span>(<span class="string">&quot;Sweep block {:?}, cell size {}&quot;</span>, <span class="self">self</span>, cell_size);
 
-        <span class="kw">while</span> <span class="ident">cell</span> <span class="op">+</span> <span class="ident">cell_size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>() {
-            <span class="comment">// possible object ref</span>
-            <span class="kw">let</span> <span class="ident">potential_object_ref</span> <span class="op">=</span> <span class="ident">ObjectReference::from_raw_address</span>(
-                <span class="ident">cursor</span> <span class="op">+</span> <span class="ident">VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND</span>,
+        <span class="kw">while </span>cell + cell_size &lt;= <span class="self">self</span>.end() {
+            <span class="comment">// possible object ref
+            </span><span class="kw">let </span>potential_object_ref = ObjectReference::from_raw_address(
+                cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
             );
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}&quot;</span>,
                 <span class="self">self</span>,
-                <span class="ident">cell</span>,
-                <span class="ident">last</span>,
-                <span class="ident">cursor</span>,
-                <span class="ident">potential_object_ref</span>
+                cell,
+                last,
+                cursor,
+                potential_object_ref
             );
 
-            <span class="kw">if</span> <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>
-                .<span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">potential_object_ref</span>, <span class="ident">Ordering::SeqCst</span>)
+            <span class="kw">if </span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .is_marked::&lt;VM&gt;(potential_object_ref, Ordering::SeqCst)
             {
-                <span class="macro">debug!</span>(<span class="string">&quot;{:?} Live cell: {}&quot;</span>, <span class="self">self</span>, <span class="ident">cell</span>);
-                <span class="comment">// If the mark bit is set, the cell is alive.</span>
-                <span class="comment">// We directly jump to the end of the cell.</span>
-                <span class="ident">cell</span> <span class="op">+</span><span class="op">=</span> <span class="ident">cell_size</span>;
-                <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">cell</span>;
-            } <span class="kw">else</span> {
-                <span class="comment">// If the mark bit is not set, we don&#39;t know if the cell is alive or not. We keep search for the mark bit.</span>
-                <span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="ident">MIN_OBJECT_SIZE</span>;
+                <span class="macro">debug!</span>(<span class="string">&quot;{:?} Live cell: {}&quot;</span>, <span class="self">self</span>, cell);
+                <span class="comment">// If the mark bit is set, the cell is alive.
+                // We directly jump to the end of the cell.
+                </span>cell += cell_size;
+                cursor = cell;
+            } <span class="kw">else </span>{
+                <span class="comment">// If the mark bit is not set, we don&#39;t know if the cell is alive or not. We keep search for the mark bit.
+                </span>cursor += MIN_OBJECT_SIZE;
 
-                <span class="kw">if</span> <span class="ident">cursor</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">cell</span> <span class="op">+</span> <span class="ident">cell_size</span> {
-                    <span class="comment">// We now stepped to the next cell. This means we did not find mark bit in the current cell, and we can add this cell to free list.</span>
-                    <span class="macro">debug!</span>(
+                <span class="kw">if </span>cursor &gt;= cell + cell_size {
+                    <span class="comment">// We now stepped to the next cell. This means we did not find mark bit in the current cell, and we can add this cell to free list.
+                    </span><span class="macro">debug!</span>(
                         <span class="string">&quot;{:?} Free cell: {}, last cell in freelist is {}&quot;</span>,
-                        <span class="self">self</span>, <span class="ident">cell</span>, <span class="ident">last</span>
+                        <span class="self">self</span>, cell, last
                     );
 
-                    <span class="comment">// Clear alloc bit: we don&#39;t know where the object reference actually is, so we bulk zero the cell.</span>
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-                    <span class="ident"><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit</span>(<span class="ident">cell</span>, <span class="ident">cell_size</span>);
+                    <span class="comment">// Clear alloc bit: we don&#39;t know where the object reference actually is, so we bulk zero the cell.
+                    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+                    </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(cell, cell_size);
 
-                    <span class="comment">// store the previous cell to make the free list</span>
-                    <span class="macro">debug_assert!</span>(<span class="ident">last</span>.<span class="ident">is_zero</span>() <span class="op">|</span><span class="op">|</span> (<span class="ident">last</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">last</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">end</span>()));
-                    <span class="kw">unsafe</span> {
-                        <span class="ident">cell</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>(<span class="ident">last</span>);
+                    <span class="comment">// store the previous cell to make the free list
+                    </span><span class="macro">debug_assert!</span>(last.is_zero() || (last &gt;= <span class="self">self</span>.start() &amp;&amp; last &lt; <span class="self">self</span>.end()));
+                    <span class="kw">unsafe </span>{
+                        cell.store::&lt;Address&gt;(last);
                     }
-                    <span class="ident">last</span> <span class="op">=</span> <span class="ident">cell</span>;
-                    <span class="ident">cell</span> <span class="op">+</span><span class="op">=</span> <span class="ident">cell_size</span>;
-                    <span class="macro">debug_assert_eq!</span>(<span class="ident">cursor</span>, <span class="ident">cell</span>);
+                    last = cell;
+                    cell += cell_size;
+                    <span class="macro">debug_assert_eq!</span>(cursor, cell);
                 }
             }
         }
 
-        <span class="self">self</span>.<span class="ident">store_free_list</span>(<span class="ident">last</span>);
+        <span class="self">self</span>.store_free_list(last);
     }
 
-    <span class="doccomment">/// Get the chunk containing the block.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Chunk</span> {
-        <span class="ident">Chunk::from_unaligned_address</span>(<span class="self">self</span>.<span class="ident">start</span>())
+    <span class="doccomment">/// Get the chunk containing the block.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>chunk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Chunk {
+        Chunk::from_unaligned_address(<span class="self">self</span>.start())
     }
 
-    <span class="doccomment">/// Initialize a clean block after acquired from page-resource.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Unmarked</span>);
+    <span class="doccomment">/// Initialize a clean block after acquired from page-resource.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.set_state(BlockState::Unmarked);
     }
 
-    <span class="doccomment">/// Deinitalize a block before releasing.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deinit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Unallocated</span>);
+    <span class="doccomment">/// Deinitalize a block before releasing.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>deinit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.set_state(BlockState::Unallocated);
     }
 }
 
-<span class="doccomment">/// The block allocation state.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">BlockState</span> {
-    <span class="doccomment">/// the block is not allocated.</span>
-    <span class="ident">Unallocated</span>,
-    <span class="doccomment">/// the block is allocated but not marked.</span>
-    <span class="ident">Unmarked</span>,
-    <span class="doccomment">/// the block is allocated and marked.</span>
-    <span class="ident">Marked</span>,
+<span class="doccomment">/// The block allocation state.
+</span><span class="attribute">#[derive(Debug, PartialEq, Clone, Copy)]
+</span><span class="kw">pub enum </span>BlockState {
+    <span class="doccomment">/// the block is not allocated.
+    </span>Unallocated,
+    <span class="doccomment">/// the block is allocated but not marked.
+    </span>Unmarked,
+    <span class="doccomment">/// the block is allocated and marked.
+    </span>Marked,
 }
 
-<span class="kw">impl</span> <span class="ident">BlockState</span> {
-    <span class="doccomment">/// Private constant</span>
-    <span class="kw">const</span> <span class="ident">MARK_UNALLOCATED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="doccomment">/// Private constant</span>
-    <span class="kw">const</span> <span class="ident">MARK_UNMARKED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">u8::MAX</span>;
-    <span class="doccomment">/// Private constant</span>
-    <span class="kw">const</span> <span class="ident">MARK_MARKED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">u8::MAX</span> <span class="op">-</span> <span class="number">1</span>;
+<span class="kw">impl </span>BlockState {
+    <span class="doccomment">/// Private constant
+    </span><span class="kw">const </span>MARK_UNALLOCATED: u8 = <span class="number">0</span>;
+    <span class="doccomment">/// Private constant
+    </span><span class="kw">const </span>MARK_UNMARKED: u8 = u8::MAX;
+    <span class="doccomment">/// Private constant
+    </span><span class="kw">const </span>MARK_MARKED: u8 = u8::MAX - <span class="number">1</span>;
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BlockState</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">u8</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident"><span class="self">Self</span>::MARK_UNALLOCATED</span> =&gt; <span class="ident">BlockState::Unallocated</span>,
-            <span class="ident"><span class="self">Self</span>::MARK_UNMARKED</span> =&gt; <span class="ident">BlockState::Unmarked</span>,
-            <span class="ident"><span class="self">Self</span>::MARK_MARKED</span> =&gt; <span class="ident">BlockState::Marked</span>,
-            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+<span class="kw">impl </span>From&lt;u8&gt; <span class="kw">for </span>BlockState {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>from(state: u8) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>state {
+            <span class="self">Self</span>::MARK_UNALLOCATED =&gt; BlockState::Unallocated,
+            <span class="self">Self</span>::MARK_UNMARKED =&gt; BlockState::Unmarked,
+            <span class="self">Self</span>::MARK_MARKED =&gt; BlockState::Marked,
+            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">BlockState</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">u8</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">BlockState</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident">BlockState::Unallocated</span> =&gt; <span class="ident">BlockState::MARK_UNALLOCATED</span>,
-            <span class="ident">BlockState::Unmarked</span> =&gt; <span class="ident">BlockState::MARK_UNMARKED</span>,
-            <span class="ident">BlockState::Marked</span> =&gt; <span class="ident">BlockState::MARK_MARKED</span>,
+<span class="kw">impl </span>From&lt;BlockState&gt; <span class="kw">for </span>u8 {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>from(state: BlockState) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>state {
+            BlockState::Unallocated =&gt; BlockState::MARK_UNALLOCATED,
+            BlockState::Unmarked =&gt; BlockState::MARK_UNMARKED,
+            BlockState::Marked =&gt; BlockState::MARK_MARKED,
         }
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

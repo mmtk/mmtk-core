@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["gc_work",""],["global",""],["mutator",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["gc_work",""],["global",""],["mutator",""]]};

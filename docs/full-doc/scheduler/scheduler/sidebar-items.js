@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["CoordinatorMessage",""]],"struct":[["GCWorkScheduler",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["CoordinatorMessage",""]],"struct":[["GCWorkScheduler",""]]};

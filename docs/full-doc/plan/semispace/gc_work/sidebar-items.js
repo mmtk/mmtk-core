@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SSGCWorkContext",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["SSGCWorkContext",""]]};

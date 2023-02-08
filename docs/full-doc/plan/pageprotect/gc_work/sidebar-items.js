@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["PPGCWorkContext",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["PPGCWorkContext",""]]};

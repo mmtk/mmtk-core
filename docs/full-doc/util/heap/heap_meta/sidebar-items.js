@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["HeapMeta",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["HeapMeta",""]]};

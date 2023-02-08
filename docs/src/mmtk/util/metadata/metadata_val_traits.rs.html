@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;metadata&#x2F;metadata_val_traits.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>metadata_val_traits.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/metadata/metadata_val_traits.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>metadata_val_traits.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -209,215 +207,214 @@
 <span id="207">207</span>
 <span id="208">208</span>
 <span id="209">209</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">num_traits</span>::{<span class="ident">FromPrimitive</span>, <span class="ident">ToPrimitive</span>};
-<span class="kw">use</span> <span class="ident">num_traits</span>::{<span class="ident">Unsigned</span>, <span class="ident">WrappingAdd</span>, <span class="ident">WrappingSub</span>, <span class="ident">Zero</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span>core::sync::atomic::<span class="kw-2">*</span>;
+<span class="kw">use </span>num_traits::{FromPrimitive, ToPrimitive};
+<span class="kw">use </span>num_traits::{Unsigned, WrappingAdd, WrappingSub, Zero};
 
-<span class="doccomment">/// Describes bits and log2 bits for the numbers.</span>
-<span class="doccomment">/// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/247&gt;</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Bits</span> {
-    <span class="kw">const</span> <span class="ident">BITS</span>: <span class="ident">u32</span>;
-    <span class="kw">const</span> <span class="ident">LOG2</span>: <span class="ident">u32</span>;
+<span class="doccomment">/// Describes bits and log2 bits for the numbers.
+/// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/247&gt;
+</span><span class="kw">pub trait </span>Bits {
+    <span class="kw">const </span>BITS: u32;
+    <span class="kw">const </span>LOG2: u32;
 }
-<span class="macro">macro_rules!</span> <span class="ident">impl_bits_trait</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>: <span class="ident">ty</span>) =&gt; {
-        <span class="kw">impl</span> <span class="ident">Bits</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> {
-            <span class="kw">const</span> <span class="ident">BITS</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span><span class="ident">::BITS</span>;
-            <span class="kw">const</span> <span class="ident">LOG2</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::BITS</span>.<span class="ident">trailing_zeros</span>();
+<span class="macro">macro_rules! </span>impl_bits_trait {
+    (<span class="macro-nonterminal">$t</span>: ty) =&gt; {
+        <span class="kw">impl </span>Bits <span class="kw">for </span><span class="macro-nonterminal">$t </span>{
+            <span class="kw">const </span>BITS: u32 = &lt;<span class="macro-nonterminal">$t</span>&gt;::BITS;
+            <span class="kw">const </span>LOG2: u32 = <span class="self">Self</span>::BITS.trailing_zeros();
         }
     };
 }
-<span class="macro">impl_bits_trait!</span>(<span class="ident">u8</span>);
-<span class="macro">impl_bits_trait!</span>(<span class="ident">u16</span>);
-<span class="macro">impl_bits_trait!</span>(<span class="ident">u32</span>);
-<span class="macro">impl_bits_trait!</span>(<span class="ident">u64</span>);
-<span class="macro">impl_bits_trait!</span>(<span class="ident">usize</span>);
+<span class="macro">impl_bits_trait!</span>(u8);
+<span class="macro">impl_bits_trait!</span>(u16);
+<span class="macro">impl_bits_trait!</span>(u32);
+<span class="macro">impl_bits_trait!</span>(u64);
+<span class="macro">impl_bits_trait!</span>(usize);
 
-<span class="doccomment">/// Describes bitwise operations.</span>
-<span class="doccomment">/// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/232&gt;</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">BitwiseOps</span> {
-    <span class="kw">fn</span> <span class="ident">bitand</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
-    <span class="kw">fn</span> <span class="ident">bitor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
-    <span class="kw">fn</span> <span class="ident">bitxor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
-    <span class="kw">fn</span> <span class="ident">inv</span>(<span class="self">self</span>) -&gt; <span class="self">Self</span>;
+<span class="doccomment">/// Describes bitwise operations.
+/// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/232&gt;
+</span><span class="kw">pub trait </span>BitwiseOps {
+    <span class="kw">fn </span>bitand(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="kw">fn </span>bitor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="kw">fn </span>bitxor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="kw">fn </span>inv(<span class="self">self</span>) -&gt; <span class="self">Self</span>;
 }
-<span class="macro">macro_rules!</span> <span class="ident">impl_bitwise_ops_trait</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>: <span class="ident">ty</span>) =&gt; {
-        <span class="kw">impl</span> <span class="ident">BitwiseOps</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> {
-            <span class="kw">fn</span> <span class="ident">bitand</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
-                <span class="self">self</span> <span class="op">&amp;</span> <span class="ident">other</span>
+<span class="macro">macro_rules! </span>impl_bitwise_ops_trait {
+    (<span class="macro-nonterminal">$t</span>: ty) =&gt; {
+        <span class="kw">impl </span>BitwiseOps <span class="kw">for </span><span class="macro-nonterminal">$t </span>{
+            <span class="kw">fn </span>bitand(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+                <span class="self">self </span>&amp; other
             }
-            <span class="kw">fn</span> <span class="ident">bitor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
-                <span class="self">self</span> <span class="op">|</span> <span class="ident">other</span>
+            <span class="kw">fn </span>bitor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+                <span class="self">self </span>| other
             }
-            <span class="kw">fn</span> <span class="ident">bitxor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
-                <span class="self">self</span> <span class="op">^</span> <span class="ident">other</span>
+            <span class="kw">fn </span>bitxor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+                <span class="self">self </span>^ other
             }
-            <span class="kw">fn</span> <span class="ident">inv</span>(<span class="self">self</span>) -&gt; <span class="self">Self</span> {
-                <span class="op">!</span><span class="self">self</span>
-            }
+            <span class="kw">fn </span>inv(<span class="self">self</span>) -&gt; <span class="self">Self </span>{
+                !<span class="self">self
+            </span>}
         }
     };
 }
-<span class="macro">impl_bitwise_ops_trait!</span>(<span class="ident">u8</span>);
-<span class="macro">impl_bitwise_ops_trait!</span>(<span class="ident">u16</span>);
-<span class="macro">impl_bitwise_ops_trait!</span>(<span class="ident">u32</span>);
-<span class="macro">impl_bitwise_ops_trait!</span>(<span class="ident">u64</span>);
-<span class="macro">impl_bitwise_ops_trait!</span>(<span class="ident">usize</span>);
+<span class="macro">impl_bitwise_ops_trait!</span>(u8);
+<span class="macro">impl_bitwise_ops_trait!</span>(u16);
+<span class="macro">impl_bitwise_ops_trait!</span>(u32);
+<span class="macro">impl_bitwise_ops_trait!</span>(u64);
+<span class="macro">impl_bitwise_ops_trait!</span>(usize);
 
-<span class="doccomment">/// The number type for accessing metadata.</span>
-<span class="doccomment">/// It requires a few traits from num-traits and a few traits we defined above.</span>
-<span class="doccomment">/// The methods in this trait are mostly about atomically accessing such types.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">MetadataValue</span>:
-    <span class="ident">Unsigned</span>
-    <span class="op">+</span> <span class="ident">Zero</span>
-    <span class="op">+</span> <span class="ident">WrappingAdd</span>
-    <span class="op">+</span> <span class="ident">WrappingSub</span>
-    <span class="op">+</span> <span class="ident">Bits</span>
-    <span class="op">+</span> <span class="ident">BitwiseOps</span>
-    <span class="op">+</span> <span class="ident">ToPrimitive</span>
-    <span class="op">+</span> <span class="ident">Copy</span>
-    <span class="op">+</span> <span class="ident">FromPrimitive</span>
-    <span class="op">+</span> <span class="ident">std::fmt::Display</span>
-    <span class="op">+</span> <span class="ident">std::fmt::Debug</span>
+<span class="doccomment">/// The number type for accessing metadata.
+/// It requires a few traits from num-traits and a few traits we defined above.
+/// The methods in this trait are mostly about atomically accessing such types.
+</span><span class="kw">pub trait </span>MetadataValue:
+    Unsigned
+    + Zero
+    + WrappingAdd
+    + WrappingSub
+    + Bits
+    + BitwiseOps
+    + ToPrimitive
+    + Copy
+    + FromPrimitive
+    + std::fmt::Display
+    + std::fmt::Debug
 {
-    <span class="doccomment">/// Non atomic load</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="doccomment">/// The caller also needs to be aware that the method is not thread safe, as it is a non-atomic operation.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Non atomic load
+    /// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    /// The caller also needs to be aware that the method is not thread safe, as it is a non-atomic operation.
+    </span><span class="kw">unsafe fn </span>load(addr: Address) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// Atomic load</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load_atomic</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Atomic load
+    /// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>load_atomic(addr: Address, order: Ordering) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// Non atomic store</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="doccomment">/// The caller also needs to be aware that the method is not thread safe, as it is a non-atomic operation.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>);
+    <span class="doccomment">/// Non atomic store
+    /// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    /// The caller also needs to be aware that the method is not thread safe, as it is a non-atomic operation.
+    </span><span class="kw">unsafe fn </span>store(addr: Address, value: <span class="self">Self</span>);
 
-    <span class="doccomment">/// Atomic store</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="doccomment">/// The caller also needs to be aware that the method is not thread safe, as it is a non-atomic operation.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store_atomic</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>);
+    <span class="doccomment">/// Atomic store
+    /// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    /// The caller also needs to be aware that the method is not thread safe, as it is a non-atomic operation.
+    </span><span class="kw">unsafe fn </span>store_atomic(addr: Address, value: <span class="self">Self</span>, order: Ordering);
 
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">compare_exchange</span>(
-        <span class="ident">addr</span>: <span class="ident">Address</span>,
-        <span class="ident">current</span>: <span class="self">Self</span>,
-        <span class="ident">new</span>: <span class="self">Self</span>,
-        <span class="ident">success</span>: <span class="ident">Ordering</span>,
-        <span class="ident">failure</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>compare_exchange(
+        addr: Address,
+        current: <span class="self">Self</span>,
+        new: <span class="self">Self</span>,
+        success: Ordering,
+        failure: Ordering,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>&gt;;
 
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_add</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>fetch_add(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_sub</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>fetch_sub(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_and</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>fetch_and(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_or</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>fetch_or(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_update</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(
-        <span class="ident">addr</span>: <span class="ident">Address</span>,
-        <span class="ident">set_order</span>: <span class="ident">Ordering</span>,
-        <span class="ident">fetch_order</span>: <span class="ident">Ordering</span>,
-        <span class="ident">f</span>: <span class="ident">F</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="self">Self</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// # Safety
+    /// The caller needs to guarantee that the address is valid, and can be used as a pointer to the type.
+    </span><span class="kw">unsafe fn </span>fetch_update&lt;F&gt;(
+        addr: Address,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        f: F,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>&gt;
+    <span class="kw">where
+        </span>F: FnMut(<span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt;;
 }
-<span class="macro">macro_rules!</span> <span class="ident">impl_metadata_value_trait</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">non_atomic</span>: <span class="ident">ty</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span>: <span class="ident">ty</span>) =&gt; {
-        <span class="kw">impl</span> <span class="ident">MetadataValue</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">non_atomic</span> {
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-                <span class="ident">addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">non_atomic</span><span class="op">&gt;</span>()
+<span class="macro">macro_rules! </span>impl_metadata_value_trait {
+    (<span class="macro-nonterminal">$non_atomic</span>: ty, <span class="macro-nonterminal">$atomic</span>: ty) =&gt; {
+        <span class="kw">impl </span>MetadataValue <span class="kw">for </span><span class="macro-nonterminal">$non_atomic </span>{
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>load(addr: Address) -&gt; <span class="self">Self </span>{
+                addr.load::&lt;<span class="macro-nonterminal">$non_atomic</span>&gt;()
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load_atomic</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span> {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>().<span class="ident">load</span>(<span class="ident">order</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>load_atomic(addr: Address, order: Ordering) -&gt; <span class="self">Self </span>{
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().load(order)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>) {
-                <span class="ident">addr</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">non_atomic</span><span class="op">&gt;</span>(<span class="ident">value</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>store(addr: Address, value: <span class="self">Self</span>) {
+                addr.store::&lt;<span class="macro-nonterminal">$non_atomic</span>&gt;(value)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store_atomic</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>().<span class="ident">store</span>(<span class="ident">value</span>, <span class="ident">order</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>store_atomic(addr: Address, value: <span class="self">Self</span>, order: Ordering) {
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().store(value, order)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">compare_exchange</span>(
-                <span class="ident">addr</span>: <span class="ident">Address</span>,
-                <span class="ident">current</span>: <span class="self">Self</span>,
-                <span class="ident">new</span>: <span class="self">Self</span>,
-                <span class="ident">success</span>: <span class="ident">Ordering</span>,
-                <span class="ident">failure</span>: <span class="ident">Ordering</span>,
-            ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="self">Self</span><span class="op">&gt;</span> {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>()
-                    .<span class="ident">compare_exchange</span>(<span class="ident">current</span>, <span class="ident">new</span>, <span class="ident">success</span>, <span class="ident">failure</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>compare_exchange(
+                addr: Address,
+                current: <span class="self">Self</span>,
+                new: <span class="self">Self</span>,
+                success: Ordering,
+                failure: Ordering,
+            ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>&gt; {
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;()
+                    .compare_exchange(current, new, success, failure)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_add</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span> {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>().<span class="ident">fetch_add</span>(<span class="ident">value</span>, <span class="ident">order</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>fetch_add(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_add(value, order)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_sub</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span> {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>().<span class="ident">fetch_sub</span>(<span class="ident">value</span>, <span class="ident">order</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>fetch_sub(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_sub(value, order)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_and</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span> {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>().<span class="ident">fetch_and</span>(<span class="ident">value</span>, <span class="ident">order</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>fetch_and(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_and(value, order)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_or</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">value</span>: <span class="self">Self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="self">Self</span> {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>().<span class="ident">fetch_or</span>(<span class="ident">value</span>, <span class="ident">order</span>)
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>fetch_or(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_or(value, order)
             }
 
-            <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">fetch_update</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(
-                <span class="ident">addr</span>: <span class="ident">Address</span>,
-                <span class="ident">set_order</span>: <span class="ident">Ordering</span>,
-                <span class="ident">fetch_order</span>: <span class="ident">Ordering</span>,
-                <span class="ident">f</span>: <span class="ident">F</span>,
-            ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="self">Self</span><span class="op">&gt;</span>
-            <span class="kw">where</span>
-                <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>,
+            <span class="attribute">#[inline(always)]
+            </span><span class="kw">unsafe fn </span>fetch_update&lt;F&gt;(
+                addr: Address,
+                set_order: Ordering,
+                fetch_order: Ordering,
+                f: F,
+            ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>&gt;
+            <span class="kw">where
+                </span>F: FnMut(<span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt;,
             {
-                <span class="ident">addr</span>.<span class="ident">as_ref</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">atomic</span><span class="op">&gt;</span>()
-                    .<span class="ident">fetch_update</span>(<span class="ident">set_order</span>, <span class="ident">fetch_order</span>, <span class="ident">f</span>)
+                addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;()
+                    .fetch_update(set_order, fetch_order, f)
             }
         }
     };
 }
-<span class="macro">impl_metadata_value_trait!</span>(<span class="ident">u8</span>, <span class="ident">AtomicU8</span>);
-<span class="macro">impl_metadata_value_trait!</span>(<span class="ident">u16</span>, <span class="ident">AtomicU16</span>);
-<span class="macro">impl_metadata_value_trait!</span>(<span class="ident">u32</span>, <span class="ident">AtomicU32</span>);
-<span class="macro">impl_metadata_value_trait!</span>(<span class="ident">u64</span>, <span class="ident">AtomicU64</span>);
-<span class="macro">impl_metadata_value_trait!</span>(<span class="ident">usize</span>, <span class="ident">AtomicUsize</span>);
+<span class="macro">impl_metadata_value_trait!</span>(u8, AtomicU8);
+<span class="macro">impl_metadata_value_trait!</span>(u16, AtomicU16);
+<span class="macro">impl_metadata_value_trait!</span>(u32, AtomicU32);
+<span class="macro">impl_metadata_value_trait!</span>(u64, AtomicU64);
+<span class="macro">impl_metadata_value_trait!</span>(usize, AtomicUsize);
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

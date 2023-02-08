@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ImmixAllocator","Immix allocator"]]});
+window.SIDEBAR_ITEMS = {"struct":[["ImmixAllocator","Immix allocator"]]};

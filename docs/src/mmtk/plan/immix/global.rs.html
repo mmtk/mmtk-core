@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;immix&#x2F;global.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/immix/global.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -163,169 +161,168 @@
 <span id="161">161</span>
 <span id="162">162</span>
 <span id="163">163</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::ImmixGCWorkContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix</span>::{<span class="ident">TRACE_KIND_DEFRAG</span>, <span class="ident">TRACE_KIND_FAST</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">policy::immix::ImmixSpace</span>, <span class="ident">util::opaque_pointer::VMWorkerThread</span>};
-<span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
+<span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
+<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
+<span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use crate</span>::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+<span class="kw">use </span>std::sync::atomic::AtomicBool;
 
-<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use </span>atomic::Ordering;
+<span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
+<span class="kw">use </span>mmtk_macros::PlanTraceObject;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PlanTraceObject</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Immix</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">post_scan</span>]</span>
-    <span class="attribute">#[<span class="ident">trace</span>(<span class="ident">CopySemantics::DefaultCopy</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">immix_space</span>: <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
-    <span class="kw">pub</span> <span class="ident">common</span>: <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">last_gc_was_defrag</span>: <span class="ident">AtomicBool</span>,
+<span class="attribute">#[derive(PlanTraceObject)]
+</span><span class="kw">pub struct </span>Immix&lt;VM: VMBinding&gt; {
+    <span class="attribute">#[post_scan]
+    #[trace(CopySemantics::DefaultCopy)]
+    </span><span class="kw">pub </span>immix_space: ImmixSpace&lt;VM&gt;,
+    <span class="attribute">#[fallback_trace]
+    </span><span class="kw">pub </span>common: CommonPlan&lt;VM&gt;,
+    last_gc_was_defrag: AtomicBool,
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IMMIX_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident">PlanConstraints</span> {
-    <span class="ident">moves_objects</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::DEFRAG</span>,
-    <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
-    <span class="ident">gc_header_words</span>: <span class="number">0</span>,
-    <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
-    <span class="doccomment">/// Max immix object size is half of a block.</span>
-    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE</span>,
-    ..<span class="ident">PlanConstraints::default</span>()
+<span class="kw">pub const </span>IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: <span class="kw">crate</span>::policy::immix::DEFRAG,
+    gc_header_bits: <span class="number">2</span>,
+    gc_header_words: <span class="number">0</span>,
+    num_specialized_scans: <span class="number">1</span>,
+    <span class="doccomment">/// Max immix object size is half of a block.
+    </span>max_non_los_default_alloc_bytes: <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE,
+    ..PlanConstraints::default()
 };
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Plan</span> <span class="kw">for</span> <span class="ident">Immix</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>Immix&lt;VM&gt; {
+    <span class="kw">type </span>VM = VM;
 
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">_space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>)
+    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, _space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
+        <span class="self">self</span>.base().collection_required(<span class="self">self</span>, space_full)
     }
 
-    <span class="kw">fn</span> <span class="ident">last_collection_was_exhaustive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">ImmixSpace</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::is_last_gc_exhaustive</span>(<span class="self">self</span>.<span class="ident">last_gc_was_defrag</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>))
+    <span class="kw">fn </span>last_collection_was_exhaustive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        ImmixSpace::&lt;VM&gt;::is_last_gc_exhaustive(<span class="self">self</span>.last_gc_was_defrag.load(Ordering::Relaxed))
     }
 
-    <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span> {
-        <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>
+    <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints {
+        <span class="kw-2">&amp;</span>IMMIX_CONSTRAINTS
     }
 
-    <span class="kw">fn</span> <span class="ident">create_copy_config</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>) -&gt; <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span> {
-        <span class="kw">use</span> <span class="ident">enum_map::enum_map</span>;
-        <span class="ident">CopyConfig</span> {
-            <span class="ident">copy_mapping</span>: <span class="macro">enum_map!</span> {
-                <span class="ident">CopySemantics::DefaultCopy</span> =&gt; <span class="ident">CopySelector::Immix</span>(<span class="number">0</span>),
-                <span class="kw">_</span> =&gt; <span class="ident">CopySelector::Unused</span>,
+    <span class="kw">fn </span>create_copy_config(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) -&gt; CopyConfig&lt;<span class="self">Self</span>::VM&gt; {
+        <span class="kw">use </span>enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: <span class="macro">enum_map! </span>{
+                CopySemantics::DefaultCopy =&gt; CopySelector::Immix(<span class="number">0</span>),
+                <span class="kw">_ </span>=&gt; CopySelector::Unused,
             },
-            <span class="ident">space_mapping</span>: <span class="macro">vec!</span>[(<span class="ident">CopySelector::Immix</span>(<span class="number">0</span>), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immix_space</span>)],
-            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>,
+            space_mapping: <span class="macro">vec!</span>[(CopySelector::Immix(<span class="number">0</span>), <span class="kw-2">&amp;</span><span class="self">self</span>.immix_space)],
+            constraints: <span class="kw-2">&amp;</span>IMMIX_CONSTRAINTS,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_spaces</span>();
-        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immix_space</span>);
-        <span class="ident">ret</span>
+    <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.common.get_spaces();
+        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.immix_space);
+        ret
     }
 
-    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
-        <span class="kw">let</span> <span class="ident">in_defrag</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">decide_whether_to_defrag</span>(
-            <span class="self">self</span>.<span class="ident">is_emergency_collection</span>(),
+    <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
+        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
+        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
+        <span class="kw">let </span>in_defrag = <span class="self">self</span>.immix_space.decide_whether_to_defrag(
+            <span class="self">self</span>.is_emergency_collection(),
             <span class="bool-val">true</span>,
-            <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">cur_collection_attempts</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>),
-            <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">is_user_triggered_collection</span>(),
-            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">full_heap_system_gc</span>,
+            <span class="self">self</span>.base().cur_collection_attempts.load(Ordering::SeqCst),
+            <span class="self">self</span>.base().is_user_triggered_collection(),
+            <span class="kw-2">*</span><span class="self">self</span>.base().options.full_heap_system_gc,
         );
 
-        <span class="comment">// The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::if_same_then_else</span>)]</span>
-        <span class="kw">if</span> <span class="ident">in_defrag</span> {
-            <span class="ident">scheduler</span>.<span class="ident">schedule_common_work</span>::<span class="op">&lt;</span><span class="ident">ImmixGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">TRACE_KIND_DEFRAG</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>);
-        } <span class="kw">else</span> {
-            <span class="ident">scheduler</span>.<span class="ident">schedule_common_work</span>::<span class="op">&lt;</span><span class="ident">ImmixGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">TRACE_KIND_FAST</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>);
+        <span class="comment">// The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
+        </span><span class="attribute">#[allow(clippy::if_same_then_else)]
+        </span><span class="kw">if </span>in_defrag {
+            scheduler.schedule_common_work::&lt;ImmixGCWorkContext&lt;VM, TRACE_KIND_DEFRAG&gt;&gt;(<span class="self">self</span>);
+        } <span class="kw">else </span>{
+            scheduler.schedule_common_work::&lt;ImmixGCWorkContext&lt;VM, TRACE_KIND_FAST&gt;&gt;(<span class="self">self</span>);
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>
+    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
+        <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING
     }
 
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">prepare</span>(<span class="bool-val">true</span>);
+    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="self">self</span>.common.prepare(tls, <span class="bool-val">true</span>);
+        <span class="self">self</span>.immix_space.prepare(<span class="bool-val">true</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
-        <span class="comment">// release the collected region</span>
-        <span class="self">self</span>.<span class="ident">last_gc_was_defrag</span>
-            .<span class="ident">store</span>(<span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">release</span>(<span class="bool-val">true</span>), <span class="ident">Ordering::Relaxed</span>);
+    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="self">self</span>.common.release(tls, <span class="bool-val">true</span>);
+        <span class="comment">// release the collected region
+        </span><span class="self">self</span>.last_gc_was_defrag
+            .store(<span class="self">self</span>.immix_space.release(<span class="bool-val">true</span>), Ordering::Relaxed);
     }
 
-    <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">defrag_headroom_pages</span>()
+    <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.immix_space.defrag_headroom_pages()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_used_pages</span>()
+    <span class="kw">fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.immix_space.reserved_pages() + <span class="self">self</span>.common.get_used_pages()
     }
 
-    <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>
+    <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.common.base
     }
 
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>
+    <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.common
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Immix</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
-            <span class="ident">global_args</span>: <span class="ident">args</span>,
-            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>,
-            <span class="ident">global_side_metadata_specs</span>: <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]),
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Immix&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: <span class="kw-2">&amp;</span>IMMIX_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[]),
         };
-        <span class="kw">let</span> <span class="ident">immix</span> <span class="op">=</span> <span class="ident">Immix</span> {
-            <span class="ident">immix_space</span>: <span class="ident">ImmixSpace::new</span>(<span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(
+        <span class="kw">let </span>immix = Immix {
+            immix_space: ImmixSpace::new(plan_args.get_space_args(
                 <span class="string">&quot;immix&quot;</span>,
                 <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::discontiguous</span>(),
+                VMRequest::discontiguous(),
             )),
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(<span class="ident">plan_args</span>),
-            <span class="ident">last_gc_was_defrag</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+            common: CommonPlan::new(plan_args),
+            last_gc_was_defrag: AtomicBool::new(<span class="bool-val">false</span>),
         };
 
         {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-            <span class="ident">immix</span>
-                .<span class="ident">common</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-            <span class="ident">immix</span>
-                .<span class="ident">immix_space</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
+            immix
+                .common
+                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
+            immix
+                .immix_space
+                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
         }
 
-        <span class="ident">immix</span>
+        immix
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

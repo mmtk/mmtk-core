@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Defrag",""]],"type":[["Histogram",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["Defrag",""]],"type":[["Histogram",""]]};

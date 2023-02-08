@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;heap&#x2F;layout&#x2F;vm_layout_constants.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>vm_layout_constants.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/layout/vm_layout_constants.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>vm_layout_constants.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -164,20 +162,20 @@
 <span id="162">162</span>
 <span id="163">163</span>
 <span id="164">164</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::heap_parameters</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::heap_parameters::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::{<span class="ident">chunk_align_down</span>, <span class="ident">chunk_align_up</span>};
+<span class="kw">use </span><span class="kw">crate</span>::util::conversions::{chunk_align_down, chunk_align_up};
 
-<span class="doccomment">/// log_2 of the addressable virtual space.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="comment">// This used to be LOG_SPACE_SIZE_64 + LOG_MAX_SPACES (45).</span>
-<span class="comment">// We increase this as we also use malloc which may give us addresses that is beyond 1 &lt;&lt; 45.</span>
-<span class="comment">// This affects how much address space we need to reserve for side metadata.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">47</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">32</span>;
+<span class="doccomment">/// log_2 of the addressable virtual space.
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="comment">// This used to be LOG_SPACE_SIZE_64 + LOG_MAX_SPACES (45).
+// We increase this as we also use malloc which may give us addresses that is beyond 1 &lt;&lt; 45.
+// This affects how much address space we need to reserve for side metadata.
+</span><span class="kw">pub const </span>LOG_ADDRESS_SPACE: usize = <span class="number">47</span>;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>LOG_ADDRESS_SPACE: usize = <span class="number">32</span>;
 <span class="doccomment">/**
  * log_2 of the coarsest unit of address space allocation.
  * &lt;p&gt;
@@ -185,103 +183,103 @@
  * allocation in a discontigouous space.  In the 64-bit layout,
  * this determines the growth factor of the large contiguous spaces
  * that we provide.
- */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">22</span>;
+ */
+</span><span class="kw">pub const </span>LOG_BYTES_IN_CHUNK: usize = <span class="number">22</span>;
 
-<span class="doccomment">/** Coarsest unit of address space allocation. */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CHUNK_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) <span class="op">-</span> <span class="number">1</span>;
+<span class="doccomment">/** Coarsest unit of address space allocation. */
+</span><span class="kw">pub const </span>BYTES_IN_CHUNK: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHUNK;
+<span class="kw">pub const </span>CHUNK_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHUNK) - <span class="number">1</span>;
 
-<span class="doccomment">/** Coarsest unit of address space allocation, in pages */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PAGES_IN_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>);
+<span class="doccomment">/** Coarsest unit of address space allocation, in pages */
+</span><span class="kw">pub const </span>PAGES_IN_CHUNK: usize = <span class="number">1 </span>&lt;&lt; (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize);
 
-<span class="doccomment">/** log_2 of the maximum number of chunks we need to track.  Only used in 32-bit layout.*/</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MAX_CHUNKS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_ADDRESS_SPACE</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>;
+<span class="doccomment">/** log_2 of the maximum number of chunks we need to track.  Only used in 32-bit layout.*/
+</span><span class="kw">pub const </span>LOG_MAX_CHUNKS: usize = LOG_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK;
 
-<span class="doccomment">/** Maximum number of chunks we need to track.  Only used in 32-bit layout. */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_CHUNKS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MAX_CHUNKS</span>;
-
-<span class="doccomment">/**
- * An upper bound on the extent of any space in the
- * current memory layout
- */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_SPACE_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_SPACE_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">31</span>;
+<span class="doccomment">/** Maximum number of chunks we need to track.  Only used in 32-bit layout. */
+</span><span class="kw">pub const </span>MAX_CHUNKS: usize = <span class="number">1 </span>&lt;&lt; LOG_MAX_CHUNKS;
 
 <span class="doccomment">/**
  * An upper bound on the extent of any space in the
  * current memory layout
- */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_SPACE_EXTENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_SPACE_EXTENT</span>;
+ */
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>LOG_SPACE_EXTENT: usize = LOG_SPACE_SIZE_64;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>LOG_SPACE_EXTENT: usize = <span class="number">31</span>;
 
-<span class="comment">// FIXME: HEAP_START, HEAP_END are VM-dependent</span>
-<span class="doccomment">/** Lowest virtual address used by the virtual machine */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_START</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">chunk_align_down</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x6000_0000</span>) });
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_START</span>: <span class="ident">Address</span> <span class="op">=</span>
-    <span class="ident">chunk_align_down</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_0200_0000_0000usize</span>) });
+<span class="doccomment">/**
+ * An upper bound on the extent of any space in the
+ * current memory layout
+ */
+</span><span class="kw">pub const </span>MAX_SPACE_EXTENT: usize = <span class="number">1 </span>&lt;&lt; LOG_SPACE_EXTENT;
 
-<span class="doccomment">/** Highest virtual address used by the virtual machine */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0xb000_0000</span>) });
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_START</span>.<span class="ident">add</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_MAX_SPACES</span> <span class="op">+</span> <span class="ident">LOG_SPACE_EXTENT</span>));
+<span class="comment">// FIXME: HEAP_START, HEAP_END are VM-dependent
+</span><span class="doccomment">/** Lowest virtual address used by the virtual machine */
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>HEAP_START: Address = chunk_align_down(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x6000_0000</span>) });
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>HEAP_START: Address =
+    chunk_align_down(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x0000_0200_0000_0000usize</span>) });
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test_heap_range</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_heap_end</span>() {
-        <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-        <span class="comment">// Just to ensure we know if the heap end is changed</span>
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">HEAP_END</span>,
-            <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_2200_0000_0000usize</span>) })
+<span class="doccomment">/** Highest virtual address used by the virtual machine */
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>HEAP_END: Address = chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0xb000_0000</span>) });
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>HEAP_END: Address = HEAP_START.add(<span class="number">1 </span>&lt;&lt; (LOG_MAX_SPACES + LOG_SPACE_EXTENT));
+
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>test_heap_range {
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+    #[test]
+    </span><span class="kw">fn </span>test_heap_end() {
+        <span class="kw">use super</span>::<span class="kw-2">*</span>;
+        <span class="comment">// Just to ensure we know if the heap end is changed
+        </span><span class="macro">assert_eq!</span>(
+            HEAP_END,
+            chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x0000_2200_0000_0000usize</span>) })
         )
     }
 }
 
-<span class="doccomment">/// vm-sapce size (currently only used by jikesrvm)</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">VM_SPACE_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
-    <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x800_0000</span>) }).<span class="ident">as_usize</span>();
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">VM_SPACE_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
-    <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0xdc0_0000</span>) }).<span class="ident">as_usize</span>();
+<span class="doccomment">/// vm-sapce size (currently only used by jikesrvm)
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>VM_SPACE_SIZE: usize =
+    chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x800_0000</span>) }).as_usize();
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>VM_SPACE_SIZE: usize =
+    chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0xdc0_0000</span>) }).as_usize();
 
 <span class="doccomment">/**
  * Lowest virtual address available for MMTk to manage.  The address space between
  * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
  * and not available to MMTk.
- */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_START</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_START</span>.<span class="ident">add</span>(<span class="ident">VM_SPACE_SIZE</span>);
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>))]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_START</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_START</span>;
+ */
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+</span><span class="kw">pub const </span>AVAILABLE_START: Address = HEAP_START.add(VM_SPACE_SIZE);
+<span class="attribute">#[cfg(not(feature = <span class="string">&quot;vm_space&quot;</span>))]
+</span><span class="kw">pub const </span>AVAILABLE_START: Address = HEAP_START;
 
 <span class="doccomment">/**
  * Highest virtual address available for MMTk to manage.  The address space between
  * HEAP_END and AVAILABLE_END comprises memory directly managed by the VM,
  * and not available to MMTk.
-*/</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_END</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_END</span>;
+*/
+</span><span class="kw">pub const </span>AVAILABLE_END: Address = HEAP_END;
 
-<span class="doccomment">/** Size of the address space available to the MMTk heap. */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AVAILABLE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">AVAILABLE_END</span>.<span class="ident">get_extent</span>(<span class="ident">AVAILABLE_START</span>);
+<span class="doccomment">/** Size of the address space available to the MMTk heap. */
+</span><span class="kw">pub const </span>AVAILABLE_BYTES: usize = AVAILABLE_END.get_extent(AVAILABLE_START);
 
-<span class="doccomment">/** Granularity at which we map and unmap virtual address space in the heap */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>;
+<span class="doccomment">/** Granularity at which we map and unmap virtual address space in the heap */
+</span><span class="kw">pub const </span>LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MMAP_CHUNK_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>;
+<span class="kw">pub const </span>MMAP_CHUNK_BYTES: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_CHUNK_BYTES;
 
-<span class="doccomment">/** log_2 of the number of pages in a 64-bit space */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_PAGES_IN_SPACE64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
+<span class="doccomment">/** log_2 of the number of pages in a 64-bit space */
+</span><span class="kw">pub const </span>LOG_PAGES_IN_SPACE64: usize = LOG_SPACE_SIZE_64 - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
 
-<span class="doccomment">/** The number of pages in a 64-bit space */</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PAGES_IN_SPACE64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_PAGES_IN_SPACE64</span>;
+<span class="doccomment">/** The number of pages in a 64-bit space */
+</span><span class="kw">pub const </span>PAGES_IN_SPACE64: usize = <span class="number">1 </span>&lt;&lt; LOG_PAGES_IN_SPACE64;
 
 <span class="comment">/*
  *  The 64-bit VM layout divides address space into LOG_MAX_SPACES (k) fixed size
@@ -292,42 +290,41 @@
  *    00...0SSSSSaaaaaaaaaaa...aaaaaaaa
  *
  * The field &#39;S&#39; identifies the space to which the address points.
- */</span>
+ */
 
-<span class="doccomment">/**
+</span><span class="doccomment">/**
  * Number of bits to shift a space index into/out of a virtual address.
- */</span>
-<span class="comment">/* In a 32-bit model, use a dummy value so that the compiler doesn&#39;t barf. */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SHIFT_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SHIFT_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span>;
+ */
+</span><span class="comment">/* In a 32-bit model, use a dummy value so that the compiler doesn&#39;t barf. */
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>SPACE_SHIFT_64: usize = <span class="number">0</span>;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>SPACE_SHIFT_64: usize = LOG_SPACE_SIZE_64;
 
 <span class="doccomment">/**
  * Bitwise mask to isolate a space index in a virtual address.
  *
  * We can&#39;t express this constant in a 32-bit environment, hence the
  * conditional definition.
- */</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_MASK_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_MASK_64</span>: <span class="ident">usize</span> <span class="op">=</span> ((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MAX_SPACES</span>) <span class="op">-</span> <span class="number">1</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SPACE_SHIFT_64</span>;
+ */
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>SPACE_MASK_64: usize = <span class="number">0</span>;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>SPACE_MASK_64: usize = ((<span class="number">1 </span>&lt;&lt; LOG_MAX_SPACES) - <span class="number">1</span>) &lt;&lt; SPACE_SHIFT_64;
 
 <span class="comment">/*
  * Size of each space in the 64-bit memory layout
  *
  * We can&#39;t express this constant in a 32-bit environment, hence the
  * conditional definition.
- */</span>
-<span class="comment">// FIXME: When Compiling for 32 bits this expression makes no sense</span>
-<span class="comment">// #[allow(const_err)]</span>
-<span class="comment">// pub const SPACE_SIZE_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT,</span>
-<span class="comment">//    1 &lt;&lt; LOG_SPACE_SIZE_64, MAX_SPACE_EXTENT);</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SIZE_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_SPACE_SIZE_64</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPACE_SIZE_64</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MAX_SPACE_EXTENT</span>;
+ */
+// FIXME: When Compiling for 32 bits this expression makes no sense
+// #[allow(const_err)]
+// pub const SPACE_SIZE_64: usize = if_then_else_usize!(HEAP_LAYOUT_64BIT,
+//    1 &lt;&lt; LOG_SPACE_SIZE_64, MAX_SPACE_EXTENT);
+</span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub const </span>SPACE_SIZE_64: usize = <span class="number">1 </span>&lt;&lt; LOG_SPACE_SIZE_64;
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>SPACE_SIZE_64: usize = MAX_SPACE_EXTENT;
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

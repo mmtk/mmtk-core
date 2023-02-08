@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;rust_util&#x2F;zeroed_alloc.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>zeroed_alloc.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/rust_util/zeroed_alloc.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>zeroed_alloc.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -46,52 +44,51 @@
 <span id="44">44</span>
 <span id="45">45</span>
 <span id="46">46</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This module is for allocating large arrays or vectors with initial zero values.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Note: The standard library uses the `IsZero` trait to specialize the intialization of `Vec&lt;T&gt;`</span>
-<span class="doccomment">//! if the initial element values are zero.  Primitive type, such as `i8`, `usize`, `f32`, as well</span>
-<span class="doccomment">//! as types with known representations such as `Option&lt;NonZeroUsize&gt;` implement the `IsZero`</span>
-<span class="doccomment">//! trait.  However, it has several limitations.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! 1.  Composite types, such as `SpaceDescriptor(usize)`, doesn&#39;t implement the `IsZero` trait,</span>
-<span class="doccomment">//!     even if it has the `#[repr(transparent)]` annotation.</span>
-<span class="doccomment">//! 2.  The `IsZero` trait is private to the `std` module, and we cannot use it.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Therefore, `vec![0usize; 33554432]` takes only 4 **microseconds**, while</span>
-<span class="doccomment">//! `vec![SpaceDescriptor(0); 33554432]` will take 22 **milliseconds** to execute on some machine.</span>
-<span class="doccomment">//! If such an allocation happens during start-up, the delay will be noticeable to light-weight</span>
-<span class="doccomment">//! scripting languages, such as Ruby.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! We implement our own fast allocation of large zeroed vectors in this module.  If one day Rust</span>
-<span class="doccomment">//! provides a standard way to optimize for zeroed allocation of vectors of composite types, we</span>
-<span class="doccomment">//! can switch to the standard mechanism.</span>
-<span class="kw">use</span> <span class="ident">std::alloc</span>::{<span class="ident">alloc_zeroed</span>, <span class="ident">Layout</span>};
+</pre><pre class="rust"><code><span class="doccomment">//! This module is for allocating large arrays or vectors with initial zero values.
+//!
+//! Note: The standard library uses the `IsZero` trait to specialize the intialization of `Vec&lt;T&gt;`
+//! if the initial element values are zero.  Primitive type, such as `i8`, `usize`, `f32`, as well
+//! as types with known representations such as `Option&lt;NonZeroUsize&gt;` implement the `IsZero`
+//! trait.  However, it has several limitations.
+//!
+//! 1.  Composite types, such as `SpaceDescriptor(usize)`, doesn&#39;t implement the `IsZero` trait,
+//!     even if it has the `#[repr(transparent)]` annotation.
+//! 2.  The `IsZero` trait is private to the `std` module, and we cannot use it.
+//!
+//! Therefore, `vec![0usize; 33554432]` takes only 4 **microseconds**, while
+//! `vec![SpaceDescriptor(0); 33554432]` will take 22 **milliseconds** to execute on some machine.
+//! If such an allocation happens during start-up, the delay will be noticeable to light-weight
+//! scripting languages, such as Ruby.
+//!
+//! We implement our own fast allocation of large zeroed vectors in this module.  If one day Rust
+//! provides a standard way to optimize for zeroed allocation of vectors of composite types, we
+//! can switch to the standard mechanism.
+</span><span class="kw">use </span>std::alloc::{alloc_zeroed, Layout};
 
-<span class="doccomment">/// Allocate a `Vec&lt;T&gt;` of all-zero values.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This intends to be a faster alternative to `vec![T(0), size]`.  It will allocate pre-zeroed</span>
-<span class="doccomment">/// buffer, and not store zero values to its elements as part of initialization.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It is useful when creating large (hundreds of megabytes) Vecs when the execution time is</span>
-<span class="doccomment">/// critical (such as during start-up, where a 100ms delay is obvious to small applications.)</span>
-<span class="doccomment">/// However, because of its unsafe nature, it should only be used when necessary.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// -   `T`: The element type.</span>
-<span class="doccomment">/// -   `size`: The length and capacity of the created vector.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns the created vector.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Unsafe</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function is unsafe.  It will not call any constructor of `T`.  The user must ensure</span>
-<span class="doccomment">/// that a value with all bits being zero is meaningful for type `T`.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new_zeroed_vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">layout</span> <span class="op">=</span> <span class="ident">Layout::array</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">size</span>).<span class="ident">unwrap</span>();
-    <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">alloc_zeroed</span>(<span class="ident">layout</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>;
-    <span class="ident">Vec::from_raw_parts</span>(<span class="ident">ptr</span>, <span class="ident">size</span>, <span class="ident">size</span>)
+<span class="doccomment">/// Allocate a `Vec&lt;T&gt;` of all-zero values.
+///
+/// This intends to be a faster alternative to `vec![T(0), size]`.  It will allocate pre-zeroed
+/// buffer, and not store zero values to its elements as part of initialization.
+///
+/// It is useful when creating large (hundreds of megabytes) Vecs when the execution time is
+/// critical (such as during start-up, where a 100ms delay is obvious to small applications.)
+/// However, because of its unsafe nature, it should only be used when necessary.
+///
+/// Arguments:
+///
+/// -   `T`: The element type.
+/// -   `size`: The length and capacity of the created vector.
+///
+/// Returns the created vector.
+///
+/// # Unsafe
+///
+/// This function is unsafe.  It will not call any constructor of `T`.  The user must ensure
+/// that a value with all bits being zero is meaningful for type `T`.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe fn </span>new_zeroed_vec&lt;T&gt;(size: usize) -&gt; Vec&lt;T&gt; {
+    <span class="kw">let </span>layout = Layout::array::&lt;T&gt;(size).unwrap();
+    <span class="kw">let </span>ptr = alloc_zeroed(layout) <span class="kw">as </span><span class="kw-2">*mut </span>T;
+    Vec::from_raw_parts(ptr, size, size)
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

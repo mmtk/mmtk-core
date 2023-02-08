@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;plan&#x2F;markcompact&#x2F;global.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/markcompact/global.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -223,229 +221,228 @@
 <span id="221">221</span>
 <span id="222">222</span>
 <span id="223">223</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{
-    <span class="ident">CalculateForwardingAddress</span>, <span class="ident">Compact</span>, <span class="ident">ForwardingProcessEdges</span>, <span class="ident">MarkingProcessEdges</span>,
-    <span class="ident">UpdateReferences</span>,
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
+<span class="kw">use </span><span class="kw">super</span>::gc_work::{
+    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
+    UpdateReferences,
 };
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global</span>::{<span class="ident">BasePlan</span>, <span class="ident">CreateGeneralPlanArgs</span>, <span class="ident">CreateSpecificPlanArgs</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::markcompact::mutator::ALLOCATOR_MAPPING</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
+<span class="kw">use </span><span class="kw">crate</span>::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
+<span class="kw">use </span><span class="kw">crate</span>::plan::markcompact::mutator::ALLOCATOR_MAPPING;
+<span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
+<span class="attribute">#[cfg(not(feature = <span class="string">&quot;global_alloc_bit&quot;</span>))]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
+<span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
+<span class="kw">use </span>mmtk_macros::PlanTraceObject;
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PlanTraceObject</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">trace</span>(<span class="ident">CopySemantics::DefaultCopy</span>)]</span>
-    <span class="kw">pub</span> <span class="ident">mc_space</span>: <span class="ident">MarkCompactSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
-    <span class="kw">pub</span> <span class="ident">common</span>: <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(PlanTraceObject)]
+</span><span class="kw">pub struct </span>MarkCompact&lt;VM: VMBinding&gt; {
+    <span class="attribute">#[trace(CopySemantics::DefaultCopy)]
+    </span><span class="kw">pub </span>mc_space: MarkCompactSpace&lt;VM&gt;,
+    <span class="attribute">#[fallback_trace]
+    </span><span class="kw">pub </span>common: CommonPlan&lt;VM&gt;,
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARKCOMPACT_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident">PlanConstraints</span> {
-    <span class="ident">moves_objects</span>: <span class="bool-val">true</span>,
-    <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
-    <span class="ident">gc_header_words</span>: <span class="number">1</span>,
-    <span class="ident">num_specialized_scans</span>: <span class="number">2</span>,
-    <span class="ident">needs_forward_after_liveness</span>: <span class="bool-val">true</span>,
-    ..<span class="ident">PlanConstraints::default</span>()
+<span class="kw">pub const </span>MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    moves_objects: <span class="bool-val">true</span>,
+    gc_header_bits: <span class="number">2</span>,
+    gc_header_words: <span class="number">1</span>,
+    num_specialized_scans: <span class="number">2</span>,
+    needs_forward_after_liveness: <span class="bool-val">true</span>,
+    ..PlanConstraints::default()
 };
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Plan</span> <span class="kw">for</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>MarkCompact&lt;VM&gt; {
+    <span class="kw">type </span>VM = VM;
 
-    <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span> {
-        <span class="kw-2">&amp;</span><span class="ident">MARKCOMPACT_CONSTRAINTS</span>
+    <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints {
+        <span class="kw-2">&amp;</span>MARKCOMPACT_CONSTRAINTS
     }
 
-    <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_spaces</span>();
-        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mc_space</span>);
-        <span class="ident">ret</span>
+    <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.common.get_spaces();
+        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.mc_space);
+        ret
     }
 
-    <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>
+    <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.common.base
     }
 
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>
+    <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.common
     }
 
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">_tls</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">mc_space</span>.<span class="ident">prepare</span>();
+    <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
+        <span class="self">self</span>.common.prepare(_tls, <span class="bool-val">true</span>);
+        <span class="self">self</span>.mc_space.prepare();
     }
 
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">_tls</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">mc_space</span>.<span class="ident">release</span>();
+    <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
+        <span class="self">self</span>.common.release(_tls, <span class="bool-val">true</span>);
+        <span class="self">self</span>.mc_space.release();
     }
 
-    <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>
+    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
+        <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING
     }
 
-    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
+    <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
+        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
+        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
 
-        <span class="comment">// TODO use schedule_common once it can work with markcompact</span>
-        <span class="comment">// self.common()</span>
-        <span class="comment">//     .schedule_common::&lt;Self, MarkingProcessEdges&lt;VM&gt;, NoCopy&lt;VM&gt;&gt;(</span>
-        <span class="comment">//         self,</span>
-        <span class="comment">//         &amp;MARKCOMPACT_CONSTRAINTS,</span>
-        <span class="comment">//         scheduler,</span>
-        <span class="comment">//     );</span>
+        <span class="comment">// TODO use schedule_common once it can work with markcompact
+        // self.common()
+        //     .schedule_common::&lt;Self, MarkingProcessEdges&lt;VM&gt;, NoCopy&lt;VM&gt;&gt;(
+        //         self,
+        //         &amp;MARKCOMPACT_CONSTRAINTS,
+        //         scheduler,
+        //     );
 
-        <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>]
-            .<span class="ident">add</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        // Stop &amp; scan mutators (mutator scanning can happen before STW)
+        </span>scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
 
-        <span class="comment">// Prepare global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-            .<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="op">&lt;</span><span class="ident">MarkCompactGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
+        <span class="comment">// Prepare global/collectors/mutators
+        </span>scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::&lt;MarkCompactGCWorkContext&lt;VM&gt;&gt;::new(<span class="self">self</span>));
 
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::CalculateForwarding</span>]
-            .<span class="ident">add</span>(<span class="ident">CalculateForwardingAddress</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mc_space</span>));
-        <span class="comment">// do another trace to update references</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::SecondRoots</span>].<span class="ident">add</span>(<span class="ident">UpdateReferences</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>());
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Compact</span>].<span class="ident">add</span>(<span class="ident">Compact</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mc_space</span>));
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
+            .add(CalculateForwardingAddress::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.mc_space));
+        <span class="comment">// do another trace to update references
+        </span>scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::&lt;VM&gt;::new());
+        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.mc_space));
 
-        <span class="comment">// Release global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
-            .<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="ident">MarkCompactGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
+        <span class="comment">// Release global/collectors/mutators
+        </span>scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::&lt;MarkCompactGCWorkContext&lt;VM&gt;&gt;::new(<span class="self">self</span>));
 
-        <span class="comment">// Reference processing</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_reference_types</span> {
-            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor</span>::{
-                <span class="ident">PhantomRefProcessing</span>, <span class="ident">SoftRefProcessing</span>, <span class="ident">WeakRefProcessing</span>,
+        <span class="comment">// Reference processing
+        </span><span class="kw">if </span>!<span class="kw-2">*</span><span class="self">self</span>.base().options.no_reference_types {
+            <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::{
+                PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::SoftRefClosure</span>]
-                .<span class="ident">add</span>(<span class="ident">SoftRefProcessing</span>::<span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::WeakRefClosure</span>]
-                .<span class="ident">add</span>(<span class="ident">WeakRefProcessing</span>::<span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::PhantomRefClosure</span>]
-                .<span class="ident">add</span>(<span class="ident">PhantomRefProcessing</span>::<span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
+                .add(SoftRefProcessing::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
+                .add(WeakRefProcessing::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
+            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
+                .add(PhantomRefProcessing::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
 
-            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::RefForwarding</span>;
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
-                .<span class="ident">add</span>(<span class="ident">RefForwarding</span>::<span class="op">&lt;</span><span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefForwarding;
+            scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                .add(RefForwarding::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;::new());
 
-            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::RefEnqueue</span>;
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">add</span>(<span class="ident">RefEnqueue</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefEnqueue;
+            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::&lt;VM&gt;::new());
         }
 
-        <span class="comment">// Finalization</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
-            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor</span>::{<span class="ident">Finalization</span>, <span class="ident">ForwardFinalization</span>};
-            <span class="comment">// finalization</span>
-            <span class="comment">// treat finalizable objects as roots and perform a closure (marking)</span>
-            <span class="comment">// must be done before calculating forwarding pointers</span>
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::FinalRefClosure</span>]
-                .<span class="ident">add</span>(<span class="ident">Finalization</span>::<span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
-            <span class="comment">// update finalizable object references</span>
-            <span class="comment">// must be done before compacting</span>
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::FinalizableForwarding</span>]
-                .<span class="ident">add</span>(<span class="ident">ForwardFinalization</span>::<span class="op">&lt;</span><span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        <span class="comment">// Finalization
+        </span><span class="kw">if </span>!<span class="kw-2">*</span><span class="self">self</span>.base().options.no_finalizer {
+            <span class="kw">use </span><span class="kw">crate</span>::util::finalizable_processor::{Finalization, ForwardFinalization};
+            <span class="comment">// finalization
+            // treat finalizable objects as roots and perform a closure (marking)
+            // must be done before calculating forwarding pointers
+            </span>scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
+                .add(Finalization::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
+            <span class="comment">// update finalizable object references
+            // must be done before compacting
+            </span>scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
+                .add(ForwardFinalization::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;::new());
         }
 
-        <span class="comment">// VM-specific weak ref processing</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::VMRefClosure</span>]
-            .<span class="ident">set_sentinel</span>(<span class="ident">Box::new</span>(<span class="ident">VMProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>()));
+        <span class="comment">// VM-specific weak ref processing
+        </span>scheduler.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new()));
 
-        <span class="comment">// VM-specific weak ref forwarding</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::VMRefForwarding</span>]
-            .<span class="ident">add</span>(<span class="ident">VMForwardWeakRefs</span>::<span class="op">&lt;</span><span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        <span class="comment">// VM-specific weak ref forwarding
+        </span>scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
+            .add(VMForwardWeakRefs::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;::new());
 
-        <span class="comment">// VM-specific work after forwarding, possible to implement ref enququing.</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">add</span>(<span class="ident">VMPostForwarding</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::default</span>());
+        <span class="comment">// VM-specific work after forwarding, possible to implement ref enququing.
+        </span>scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::&lt;VM&gt;::default());
 
-        <span class="comment">// Analysis GC work</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-        {
-            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::GcHookWork</span>;
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>].<span class="ident">add</span>(<span class="ident">GcHookWork</span>);
+        <span class="comment">// Analysis GC work
+        </span><span class="attribute">#[cfg(feature = <span class="string">&quot;analysis&quot;</span>)]
+        </span>{
+            <span class="kw">use </span><span class="kw">crate</span>::util::analysis::GcHookWork;
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         }
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>]
-            .<span class="ident">add</span>(<span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+        </span>scheduler.work_buckets[WorkBucketStage::Final]
+            .add(<span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC::&lt;<span class="self">Self</span>&gt;::new(<span class="self">self</span>));
     }
 
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">_space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>)
+    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, _space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
+        <span class="self">self</span>.base().collection_required(<span class="self">self</span>, space_full)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">mc_space</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_used_pages</span>()
+    <span class="kw">fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.mc_space.reserved_pages() + <span class="self">self</span>.common.get_used_pages()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="number">0</span>
+    <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="number">0
+    </span>}
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompact&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        // SideMetadataContext by default, so we don&#39;t need to add it here.
+        </span><span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+        </span><span class="kw">let </span>global_side_metadata_specs = SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[]);
+        <span class="comment">// if global_alloc_bit is NOT enabled,
+        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
+        </span><span class="attribute">#[cfg(not(feature = <span class="string">&quot;global_alloc_bit&quot;</span>))]
+        </span><span class="kw">let </span>global_side_metadata_specs =
+            SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[ALLOC_SIDE_METADATA_SPEC]);
+
+        <span class="kw">let </span><span class="kw-2">mut </span>plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: <span class="kw-2">&amp;</span>MARKCOMPACT_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
+
+        <span class="kw">let </span>mc_space =
+            MarkCompactSpace::new(plan_args.get_space_args(<span class="string">&quot;mc&quot;</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()));
+
+        <span class="kw">let </span>res = MarkCompact {
+            mc_space,
+            common: CommonPlan::new(plan_args),
+        };
+
+        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
+        res.common
+            .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
+        res.mc_space
+            .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
+
+        res
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to</span>
-        <span class="comment">// SideMetadataContext by default, so we don&#39;t need to add it here.</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-        <span class="kw">let</span> <span class="ident">global_side_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
-        <span class="comment">// if global_alloc_bit is NOT enabled,</span>
-        <span class="comment">// we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
-        <span class="kw">let</span> <span class="ident">global_side_metadata_specs</span> <span class="op">=</span>
-            <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[<span class="ident">ALLOC_SIDE_METADATA_SPEC</span>]);
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
-            <span class="ident">global_args</span>: <span class="ident">args</span>,
-            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">MARKCOMPACT_CONSTRAINTS</span>,
-            <span class="ident">global_side_metadata_specs</span>,
-        };
-
-        <span class="kw">let</span> <span class="ident">mc_space</span> <span class="op">=</span>
-            <span class="ident">MarkCompactSpace::new</span>(<span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;mc&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()));
-
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">MarkCompact</span> {
-            <span class="ident">mc_space</span>,
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(<span class="ident">plan_args</span>),
-        };
-
-        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>
-        <span class="comment">// side metadata in extreme_assertions.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-        <span class="ident">res</span>.<span class="ident">common</span>
-            .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-        <span class="ident">res</span>.<span class="ident">mc_space</span>
-            .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-
-        <span class="ident">res</span>
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mc_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">MarkCompactSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mc_space</span>
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompact&lt;VM&gt; {
+    <span class="kw">pub fn </span>mc_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MarkCompactSpace&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.mc_space
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

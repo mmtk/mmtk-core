@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["counter",""],["stats",""]]});
+window.SIDEBAR_ITEMS = {"mod":[["counter",""],["stats",""]]};

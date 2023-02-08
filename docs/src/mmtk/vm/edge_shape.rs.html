@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;vm&#x2F;edge_shape.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>edge_shape.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/edge_shape.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>edge_shape.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -270,276 +268,275 @@
 <span id="268">268</span>
 <span id="269">269</span>
 <span id="270">270</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::hash::Hash</span>;
-<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt::Debug</span>, <span class="ident">ops::Range</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
+<span class="kw">use </span>std::marker::PhantomData;
+<span class="kw">use </span>std::{fmt::Debug, ops::Range};
 
-<span class="kw">use</span> <span class="ident">atomic::Atomic</span>;
+<span class="kw">use </span>atomic::Atomic;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::{<span class="ident">BYTES_IN_ADDRESS</span>, <span class="ident">LOG_BYTES_IN_ADDRESS</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
+<span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 
-<span class="doccomment">/// An abstract edge.  An edge holds an object reference.  When we load from it, we get an</span>
-<span class="doccomment">/// ObjectReference; we can also store an ObjectReference into it.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This intends to abstract out the differences of reference field representation among different</span>
-<span class="doccomment">/// VMs.  If the VM represent a reference field as a word that holds the pointer to the object, it</span>
-<span class="doccomment">/// can use the default `SimpleEdge` we provide.  In some cases, the VM need to implement its own</span>
-<span class="doccomment">/// `Edge` instances.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// For example:</span>
-<span class="doccomment">/// -   The VM uses compressed pointer (Compressed OOP in OpenJDK&#39;s terminology), where the heap</span>
-<span class="doccomment">///     size is limited, and a 64-bit pointer is stored in a 32-bit slot.</span>
-<span class="doccomment">/// -   The VM uses tagged pointer, where some bits of a word are used as metadata while the rest</span>
-<span class="doccomment">///     are used as pointer.</span>
-<span class="doccomment">/// -   A field holds a pointer to the middle of an object (an object field, or an array element,</span>
-<span class="doccomment">///     or some arbitrary offset) for some reasons.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// When loading, `Edge::load` shall decode its internal representation to a &quot;regular&quot;</span>
-<span class="doccomment">/// `ObjectReference`.  The implementation</span>
-<span class="doccomment">/// can do this with any appropriate operations, usually shifting and masking bits or subtracting</span>
-<span class="doccomment">/// offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a</span>
-<span class="doccomment">/// VM-neutral way, knowing only `ObjectReference`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// When GC moves object, `Edge::store` shall convert the updated `ObjectReference` back to the</span>
-<span class="doccomment">/// edge-specific representation.  Compressed pointers remain compressed; tagged pointers preserve</span>
-<span class="doccomment">/// their tag bits; and offsetted pointers keep their offsets.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The methods of this trait are called on hot paths.  Please ensure they have high performance.</span>
-<span class="doccomment">/// Use inlining when appropriate.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note: this trait only concerns the representation (i.e. the shape) of the edge, not its</span>
-<span class="doccomment">/// semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference</span>
-<span class="doccomment">/// in a word as a pointer, it can also use `SimpleEdge` for weak reference fields.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Edge</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Eq</span> <span class="op">+</span> <span class="ident">Hash</span> {
-    <span class="doccomment">/// Load object reference from the edge.</span>
-    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span>;
+<span class="doccomment">/// An abstract edge.  An edge holds an object reference.  When we load from it, we get an
+/// ObjectReference; we can also store an ObjectReference into it.
+///
+/// This intends to abstract out the differences of reference field representation among different
+/// VMs.  If the VM represent a reference field as a word that holds the pointer to the object, it
+/// can use the default `SimpleEdge` we provide.  In some cases, the VM need to implement its own
+/// `Edge` instances.
+///
+/// For example:
+/// -   The VM uses compressed pointer (Compressed OOP in OpenJDK&#39;s terminology), where the heap
+///     size is limited, and a 64-bit pointer is stored in a 32-bit slot.
+/// -   The VM uses tagged pointer, where some bits of a word are used as metadata while the rest
+///     are used as pointer.
+/// -   A field holds a pointer to the middle of an object (an object field, or an array element,
+///     or some arbitrary offset) for some reasons.
+///
+/// When loading, `Edge::load` shall decode its internal representation to a &quot;regular&quot;
+/// `ObjectReference`.  The implementation
+/// can do this with any appropriate operations, usually shifting and masking bits or subtracting
+/// offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a
+/// VM-neutral way, knowing only `ObjectReference`.
+///
+/// When GC moves object, `Edge::store` shall convert the updated `ObjectReference` back to the
+/// edge-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
+/// their tag bits; and offsetted pointers keep their offsets.
+///
+/// The methods of this trait are called on hot paths.  Please ensure they have high performance.
+/// Use inlining when appropriate.
+///
+/// Note: this trait only concerns the representation (i.e. the shape) of the edge, not its
+/// semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference
+/// in a word as a pointer, it can also use `SimpleEdge` for weak reference fields.
+</span><span class="kw">pub trait </span>Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
+    <span class="doccomment">/// Load object reference from the edge.
+    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference;
 
-    <span class="doccomment">/// Store the object reference `object` into the edge.</span>
-    <span class="kw">fn</span> <span class="ident">store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>);
+    <span class="doccomment">/// Store the object reference `object` into the edge.
+    </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
 
-    <span class="doccomment">/// Prefetch the edge so that a subsequent `load` will be faster.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">prefetch_load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// no-op by default</span>
-    }
+    <span class="doccomment">/// Prefetch the edge so that a subsequent `load` will be faster.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>prefetch_load(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// no-op by default
+    </span>}
 
-    <span class="doccomment">/// Prefetch the edge so that a subsequent `store` will be faster.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">prefetch_store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// no-op by default</span>
-    }
+    <span class="doccomment">/// Prefetch the edge so that a subsequent `store` will be faster.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>prefetch_store(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// no-op by default
+    </span>}
 }
 
-<span class="doccomment">/// A simple edge implementation that represents a word-sized slot where an ObjectReference value</span>
-<span class="doccomment">/// is stored as is.  It is the default edge type, and should be suitable for most VMs.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SimpleEdge</span> {
-    <span class="ident">slot_addr</span>: <span class="kw-2">*mut</span> <span class="ident">Atomic</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A simple edge implementation that represents a word-sized slot where an ObjectReference value
+/// is stored as is.  It is the default edge type, and should be suitable for most VMs.
+</span><span class="attribute">#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+</span><span class="kw">pub struct </span>SimpleEdge {
+    slot_addr: <span class="kw-2">*mut </span>Atomic&lt;ObjectReference&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">SimpleEdge</span> {
-    <span class="doccomment">/// Create a simple edge from an address.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// *   `address`: The address in memory where an `ObjectReference` is stored.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">slot_addr</span>: <span class="ident">address</span>.<span class="ident">to_mut_ptr</span>(),
+<span class="kw">impl </span>SimpleEdge {
+    <span class="doccomment">/// Create a simple edge from an address.
+    ///
+    /// Arguments:
+    /// *   `address`: The address in memory where an `ObjectReference` is stored.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>from_address(address: Address) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            slot_addr: address.to_mut_ptr(),
         }
     }
 
-    <span class="doccomment">/// Get the address of the edge.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Return the address at which the `ObjectReference` is stored.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">Address::from_mut_ptr</span>(<span class="self">self</span>.<span class="ident">slot_addr</span>)
+    <span class="doccomment">/// Get the address of the edge.
+    ///
+    /// Return the address at which the `ObjectReference` is stored.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>as_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        Address::from_mut_ptr(<span class="self">self</span>.slot_addr)
     }
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">SimpleEdge</span> {}
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>SimpleEdge {}
 
-<span class="kw">impl</span> <span class="ident">Edge</span> <span class="kw">for</span> <span class="ident">SimpleEdge</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw">unsafe</span> { (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">slot_addr</span>).<span class="ident">load</span>(<span class="ident">atomic::Ordering::Relaxed</span>) }
+<span class="kw">impl </span>Edge <span class="kw">for </span>SimpleEdge {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
+        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).load(atomic::Ordering::Relaxed) }
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-        <span class="kw">unsafe</span> { (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">slot_addr</span>).<span class="ident">store</span>(<span class="ident">object</span>, <span class="ident">atomic::Ordering::Relaxed</span>) }
-    }
-}
-
-<span class="doccomment">/// For backword compatibility, we let `Address` implement `Edge` so that existing bindings that</span>
-<span class="doccomment">/// use `Address` to represent an edge can continue to work.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// However, we should use `SimpleEdge` directly instead of using `Address`.  The purpose of the</span>
-<span class="doccomment">/// `Address` type is to represent an address in memory.  It is not directly related to fields</span>
-<span class="doccomment">/// that hold references to other objects.  Calling `load()` and `store()` on an `Address` does</span>
-<span class="doccomment">/// not indicate how many bytes to load or store, or how to interpret those bytes.  On the other</span>
-<span class="doccomment">/// hand, `SimpleEdge` is all about how to access a field that holds a reference represented</span>
-<span class="doccomment">/// simply as an `ObjectReference`.  The intention and the semantics are clearer with</span>
-<span class="doccomment">/// `SimpleEdge`.</span>
-<span class="kw">impl</span> <span class="ident">Edge</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw">unsafe</span> { <span class="ident">Address::load</span>(<span class="kw-2">*</span><span class="self">self</span>) }
-    }
-
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-        <span class="kw">unsafe</span> { <span class="ident">Address::store</span>(<span class="kw-2">*</span><span class="self">self</span>, <span class="ident">object</span>) }
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).store(object, atomic::Ordering::Relaxed) }
     }
 }
 
-<span class="attribute">#[<span class="ident">test</span>]</span>
-<span class="kw">fn</span> <span class="ident">a_simple_edge_should_have_the_same_size_as_a_pointer</span>() {
+<span class="doccomment">/// For backword compatibility, we let `Address` implement `Edge` so that existing bindings that
+/// use `Address` to represent an edge can continue to work.
+///
+/// However, we should use `SimpleEdge` directly instead of using `Address`.  The purpose of the
+/// `Address` type is to represent an address in memory.  It is not directly related to fields
+/// that hold references to other objects.  Calling `load()` and `store()` on an `Address` does
+/// not indicate how many bytes to load or store, or how to interpret those bytes.  On the other
+/// hand, `SimpleEdge` is all about how to access a field that holds a reference represented
+/// simply as an `ObjectReference`.  The intention and the semantics are clearer with
+/// `SimpleEdge`.
+</span><span class="kw">impl </span>Edge <span class="kw">for </span>Address {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
+        <span class="kw">unsafe </span>{ Address::load(<span class="kw-2">*</span><span class="self">self</span>) }
+    }
+
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+        <span class="kw">unsafe </span>{ Address::store(<span class="kw-2">*</span><span class="self">self</span>, object) }
+    }
+}
+
+<span class="attribute">#[test]
+</span><span class="kw">fn </span>a_simple_edge_should_have_the_same_size_as_a_pointer() {
     <span class="macro">assert_eq!</span>(
-        <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">SimpleEdge</span><span class="op">&gt;</span>(),
-        <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="kw-2">*mut</span> <span class="ident">libc::c_void</span><span class="op">&gt;</span>()
+        std::mem::size_of::&lt;SimpleEdge&gt;(),
+        std::mem::size_of::&lt;<span class="kw-2">*mut </span>libc::c_void&gt;()
     );
 }
 
-<span class="doccomment">/// A abstract memory slice represents a piece of **heap** memory.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">MemorySlice</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">Eq</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Hash</span> {
-    <span class="kw">type</span> <span class="ident">Edge</span>: <span class="ident">Edge</span>;
-    <span class="kw">type</span> <span class="ident">EdgeIterator</span>: <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::Edge</span><span class="op">&gt;</span>;
-    <span class="doccomment">/// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.</span>
-    <span class="kw">fn</span> <span class="ident">iter_edges</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::EdgeIterator</span>;
-    <span class="doccomment">/// Start address of the memory slice</span>
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span>;
-    <span class="doccomment">/// Size of the memory slice</span>
-    <span class="kw">fn</span> <span class="ident">bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span>;
-    <span class="doccomment">/// Memory copy support</span>
-    <span class="kw">fn</span> <span class="ident">copy</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">tgt</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>);
+<span class="doccomment">/// A abstract memory slice represents a piece of **heap** memory.
+</span><span class="kw">pub trait </span>MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
+    <span class="kw">type </span>Edge: Edge;
+    <span class="kw">type </span>EdgeIterator: Iterator&lt;Item = <span class="self">Self</span>::Edge&gt;;
+    <span class="doccomment">/// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
+    </span><span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator;
+    <span class="doccomment">/// Start address of the memory slice
+    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address;
+    <span class="doccomment">/// Size of the memory slice
+    </span><span class="kw">fn </span>bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
+    <span class="doccomment">/// Memory copy support
+    </span><span class="kw">fn </span>copy(src: <span class="kw-2">&amp;</span><span class="self">Self</span>, tgt: <span class="kw-2">&amp;</span><span class="self">Self</span>);
 }
 
-<span class="doccomment">/// Iterate edges within `Range&lt;Address&gt;`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AddressRangeIterator</span> {
-    <span class="ident">cursor</span>: <span class="ident">Address</span>,
-    <span class="ident">limit</span>: <span class="ident">Address</span>,
+<span class="doccomment">/// Iterate edges within `Range&lt;Address&gt;`.
+</span><span class="kw">pub struct </span>AddressRangeIterator {
+    cursor: Address,
+    limit: Address,
 }
 
-<span class="kw">impl</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">AddressRangeIterator</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">Address</span>;
+<span class="kw">impl </span>Iterator <span class="kw">for </span>AddressRangeIterator {
+    <span class="kw">type </span>Item = Address;
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">limit</span> {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">edge</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cursor</span>;
-            <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="ident">BYTES_IN_ADDRESS</span>;
-            <span class="prelude-val">Some</span>(<span class="ident">edge</span>)
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">if </span><span class="self">self</span>.cursor &gt;= <span class="self">self</span>.limit {
+            <span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="kw">let </span>edge = <span class="self">self</span>.cursor;
+            <span class="self">self</span>.cursor += BYTES_IN_ADDRESS;
+            <span class="prelude-val">Some</span>(edge)
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">MemorySlice</span> <span class="kw">for</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Edge</span> <span class="op">=</span> <span class="ident">Address</span>;
-    <span class="kw">type</span> <span class="ident">EdgeIterator</span> <span class="op">=</span> <span class="ident">AddressRangeIterator</span>;
+<span class="kw">impl </span>MemorySlice <span class="kw">for </span>Range&lt;Address&gt; {
+    <span class="kw">type </span>Edge = Address;
+    <span class="kw">type </span>EdgeIterator = AddressRangeIterator;
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">iter_edges</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::EdgeIterator</span> {
-        <span class="ident">AddressRangeIterator</span> {
-            <span class="ident">cursor</span>: <span class="self">self</span>.<span class="ident">start</span>,
-            <span class="ident">limit</span>: <span class="self">self</span>.<span class="ident">end</span>,
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
+        AddressRangeIterator {
+            cursor: <span class="self">self</span>.start,
+            limit: <span class="self">self</span>.end,
         }
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="self">self</span>.<span class="ident">start</span>
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="self">self</span>.start
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">end</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.end - <span class="self">self</span>.start
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">copy</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">tgt</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
-        <span class="macro">debug_assert_eq!</span>(<span class="ident">src</span>.<span class="ident">bytes</span>(), <span class="ident">tgt</span>.<span class="ident">bytes</span>());
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>copy(src: <span class="kw-2">&amp;</span><span class="self">Self</span>, tgt: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
+        <span class="macro">debug_assert_eq!</span>(src.bytes(), tgt.bytes());
         <span class="macro">debug_assert_eq!</span>(
-            <span class="ident">src</span>.<span class="ident">bytes</span>() <span class="op">&amp;</span> ((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span>) <span class="op">-</span> <span class="number">1</span>),
+            src.bytes() &amp; ((<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_ADDRESS) - <span class="number">1</span>),
             <span class="number">0</span>,
-            <span class="string">&quot;bytes are not a multiple of words&quot;</span>
-        );
-        <span class="comment">// Raw memory copy</span>
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">words</span> <span class="op">=</span> <span class="ident">tgt</span>.<span class="ident">bytes</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_ADDRESS</span>;
-            <span class="kw">let</span> <span class="ident">src</span> <span class="op">=</span> <span class="ident">src</span>.<span class="ident">start</span>().<span class="ident">to_ptr</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>();
-            <span class="kw">let</span> <span class="ident">tgt</span> <span class="op">=</span> <span class="ident">tgt</span>.<span class="ident">start</span>().<span class="ident">to_mut_ptr</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>();
-            <span class="ident">std::ptr::copy</span>(<span class="ident">src</span>, <span class="ident">tgt</span>, <span class="ident">words</span>)
+            <span class="string">&quot;bytes are not a multiple of words&quot;
+        </span>);
+        <span class="comment">// Raw memory copy
+        </span><span class="kw">unsafe </span>{
+            <span class="kw">let </span>words = tgt.bytes() &gt;&gt; LOG_BYTES_IN_ADDRESS;
+            <span class="kw">let </span>src = src.start().to_ptr::&lt;usize&gt;();
+            <span class="kw">let </span>tgt = tgt.start().to_mut_ptr::&lt;usize&gt;();
+            std::ptr::copy(src, tgt, words)
         }
     }
 }
 
-<span class="doccomment">/// Memory slice type with empty implementations.</span>
-<span class="doccomment">/// For VMs that do not use the memory slice type.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Clone</span>, <span class="ident">Hash</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnimplementedMemorySlice</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Edge</span> <span class="op">=</span> <span class="ident">SimpleEdge</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>);
+<span class="doccomment">/// Memory slice type with empty implementations.
+/// For VMs that do not use the memory slice type.
+</span><span class="attribute">#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+</span><span class="kw">pub struct </span>UnimplementedMemorySlice&lt;E: Edge = SimpleEdge&gt;(PhantomData&lt;E&gt;);
 
-<span class="doccomment">/// Edge iterator for `UnimplementedMemorySlice`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnimplementedMemorySliceEdgeIterator</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Edge</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>);
+<span class="doccomment">/// Edge iterator for `UnimplementedMemorySlice`.
+</span><span class="kw">pub struct </span>UnimplementedMemorySliceEdgeIterator&lt;E: Edge&gt;(PhantomData&lt;E&gt;);
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Edge</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">UnimplementedMemorySliceEdgeIterator</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">E</span>;
+<span class="kw">impl</span>&lt;E: Edge&gt; Iterator <span class="kw">for </span>UnimplementedMemorySliceEdgeIterator&lt;E&gt; {
+    <span class="kw">type </span>Item = E;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
         <span class="macro">unimplemented!</span>()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Edge</span><span class="op">&gt;</span> <span class="ident">MemorySlice</span> <span class="kw">for</span> <span class="ident">UnimplementedMemorySlice</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Edge</span> <span class="op">=</span> <span class="ident">E</span>;
-    <span class="kw">type</span> <span class="ident">EdgeIterator</span> <span class="op">=</span> <span class="ident">UnimplementedMemorySliceEdgeIterator</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>;
+<span class="kw">impl</span>&lt;E: Edge&gt; MemorySlice <span class="kw">for </span>UnimplementedMemorySlice&lt;E&gt; {
+    <span class="kw">type </span>Edge = E;
+    <span class="kw">type </span>EdgeIterator = UnimplementedMemorySliceEdgeIterator&lt;E&gt;;
 
-    <span class="kw">fn</span> <span class="ident">iter_edges</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::EdgeIterator</span> {
+    <span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
         <span class="macro">unimplemented!</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+    <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="macro">unimplemented!</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">fn </span>bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="macro">unimplemented!</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">copy</span>(<span class="ident">_src</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">_tgt</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
+    <span class="kw">fn </span>copy(_src: <span class="kw-2">&amp;</span><span class="self">Self</span>, _tgt: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
         <span class="macro">unimplemented!</span>()
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">address_range_iteration</span>() {
-        <span class="kw">let</span> <span class="ident">src</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="number">0</span>..<span class="number">32</span>).<span class="ident">collect</span>();
-        <span class="kw">let</span> <span class="ident">src_slice</span> <span class="op">=</span> <span class="ident">Address::from_ptr</span>(<span class="kw-2">&amp;</span><span class="ident">src</span>[<span class="number">0</span>])..<span class="ident">Address::from_ptr</span>(<span class="kw-2">&amp;</span><span class="ident">src</span>[<span class="number">0</span>]) <span class="op">+</span> <span class="ident">src</span>.<span class="ident">len</span>();
-        <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="ident">src_slice</span>.<span class="ident">iter_edges</span>().<span class="ident">enumerate</span>() {
-            <span class="macro">assert_eq!</span>(<span class="ident">i</span>, <span class="kw">unsafe</span> { <span class="ident">v</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>() })
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>address_range_iteration() {
+        <span class="kw">let </span>src: Vec&lt;usize&gt; = (<span class="number">0</span>..<span class="number">32</span>).collect();
+        <span class="kw">let </span>src_slice = Address::from_ptr(<span class="kw-2">&amp;</span>src[<span class="number">0</span>])..Address::from_ptr(<span class="kw-2">&amp;</span>src[<span class="number">0</span>]) + src.len();
+        <span class="kw">for </span>(i, v) <span class="kw">in </span>src_slice.iter_edges().enumerate() {
+            <span class="macro">assert_eq!</span>(i, <span class="kw">unsafe </span>{ v.load::&lt;usize&gt;() })
         }
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">memory_copy_on_address_ranges</span>() {
-        <span class="kw">let</span> <span class="ident">src</span> <span class="op">=</span> [<span class="number">1u8</span>; <span class="number">32</span>];
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dst</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">32</span>];
-        <span class="kw">let</span> <span class="ident">src_slice</span> <span class="op">=</span> <span class="ident">Address::from_ptr</span>(<span class="kw-2">&amp;</span><span class="ident">src</span>[<span class="number">0</span>])..<span class="ident">Address::from_ptr</span>(<span class="kw-2">&amp;</span><span class="ident">src</span>[<span class="number">0</span>]) <span class="op">+</span> <span class="ident">src</span>.<span class="ident">len</span>();
-        <span class="kw">let</span> <span class="ident">dst_slice</span> <span class="op">=</span>
-            <span class="ident">Address::from_mut_ptr</span>(<span class="kw-2">&amp;mut</span> <span class="ident">dst</span>[<span class="number">0</span>])..<span class="ident">Address::from_mut_ptr</span>(<span class="kw-2">&amp;mut</span> <span class="ident">dst</span>[<span class="number">0</span>]) <span class="op">+</span> <span class="ident">src</span>.<span class="ident">len</span>();
-        <span class="ident">MemorySlice::copy</span>(<span class="kw-2">&amp;</span><span class="ident">src_slice</span>, <span class="kw-2">&amp;</span><span class="ident">dst_slice</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">dst</span>.<span class="ident">iter</span>().<span class="ident">sum</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(), <span class="ident">src</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u8</span>);
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>memory_copy_on_address_ranges() {
+        <span class="kw">let </span>src = [<span class="number">1u8</span>; <span class="number">32</span>];
+        <span class="kw">let </span><span class="kw-2">mut </span>dst = [<span class="number">0u8</span>; <span class="number">32</span>];
+        <span class="kw">let </span>src_slice = Address::from_ptr(<span class="kw-2">&amp;</span>src[<span class="number">0</span>])..Address::from_ptr(<span class="kw-2">&amp;</span>src[<span class="number">0</span>]) + src.len();
+        <span class="kw">let </span>dst_slice =
+            Address::from_mut_ptr(<span class="kw-2">&amp;mut </span>dst[<span class="number">0</span>])..Address::from_mut_ptr(<span class="kw-2">&amp;mut </span>dst[<span class="number">0</span>]) + src.len();
+        MemorySlice::copy(<span class="kw-2">&amp;</span>src_slice, <span class="kw-2">&amp;</span>dst_slice);
+        <span class="macro">assert_eq!</span>(dst.iter().sum::&lt;u8&gt;(), src.len() <span class="kw">as </span>u8);
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

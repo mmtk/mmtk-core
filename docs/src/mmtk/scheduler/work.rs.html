@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;scheduler&#x2F;work.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>work.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/work.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>work.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -62,68 +60,67 @@
 <span id="60">60</span>
 <span id="61">61</span>
 <span id="62">62</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident">std::any</span>::{<span class="ident">type_name</span>, <span class="ident">TypeId</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;work_packet_stats&quot;</span>)]
+</span><span class="kw">use </span>std::any::{type_name, TypeId};
 
-<span class="doccomment">/// A special kind of work that will execute on the coordinator (i.e. controller) thread</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The coordinator thread holds the global monitor lock when executing `CoordinatorWork`s.</span>
-<span class="doccomment">/// So, directly adding new work to any buckets will cause dead lock.</span>
-<span class="doccomment">/// For this case, use `WorkBucket::add_with_priority_unsync` instead.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
+<span class="doccomment">/// A special kind of work that will execute on the coordinator (i.e. controller) thread
+///
+/// The coordinator thread holds the global monitor lock when executing `CoordinatorWork`s.
+/// So, directly adding new work to any buckets will cause dead lock.
+/// For this case, use `WorkBucket::add_with_priority_unsync` instead.
+</span><span class="kw">pub trait </span>CoordinatorWork&lt;VM: VMBinding&gt;: <span class="lifetime">&#39;static </span>+ Send + GCWork&lt;VM&gt; {}
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
-    <span class="doccomment">/// Define the work for this packet. However, this is not supposed to be called directly.</span>
-    <span class="doccomment">/// Usually `do_work_with_stat()` should be used.</span>
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+<span class="kw">pub trait </span>GCWork&lt;VM: VMBinding&gt;: <span class="lifetime">&#39;static </span>+ Send {
+    <span class="doccomment">/// Define the work for this packet. However, this is not supposed to be called directly.
+    /// Usually `do_work_with_stat()` should be used.
+    </span><span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;);
 
-    <span class="doccomment">/// Do work and collect statistics. This internally calls `do_work()`. In most cases,</span>
-    <span class="doccomment">/// this should be called rather than `do_work()` so that MMTk can correctly collect</span>
-    <span class="doccomment">/// statistics for the work packets.</span>
-    <span class="doccomment">/// If the feature &quot;work_packet_stats&quot; is not enabled, this call simply forwards the call</span>
-    <span class="doccomment">/// to `do_work()`.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">do_work_with_stat</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="macro">debug!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>());
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">worker</span>.<span class="ident">tls</span>.<span class="number">0.0</span>.<span class="ident">is_null</span>(), <span class="string">&quot;TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.&quot;</span>, <span class="ident">worker</span>.<span class="ident">ordinal</span>);
+    <span class="doccomment">/// Do work and collect statistics. This internally calls `do_work()`. In most cases,
+    /// this should be called rather than `do_work()` so that MMTk can correctly collect
+    /// statistics for the work packets.
+    /// If the feature &quot;work_packet_stats&quot; is not enabled, this call simply forwards the call
+    /// to `do_work()`.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">fn </span>do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">debug!</span>(<span class="string">&quot;{}&quot;</span>, std::any::type_name::&lt;<span class="self">Self</span>&gt;());
+        <span class="macro">debug_assert!</span>(!worker.tls.<span class="number">0.0</span>.is_null(), <span class="string">&quot;TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.&quot;</span>, worker.ordinal);
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>)]</span>
-        <span class="comment">// Start collecting statistics</span>
-        <span class="kw">let</span> <span class="ident">stat</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker_stat</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">borrow_stat_mut</span>();
-            <span class="ident">worker_stat</span>.<span class="ident">measure_work</span>(<span class="ident">TypeId::of</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="ident">type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="ident">mmtk</span>)
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;work_packet_stats&quot;</span>)]
+        </span><span class="comment">// Start collecting statistics
+        </span><span class="kw">let </span>stat = {
+            <span class="kw">let </span><span class="kw-2">mut </span>worker_stat = worker.shared.borrow_stat_mut();
+            worker_stat.measure_work(TypeId::of::&lt;<span class="self">Self</span>&gt;(), type_name::&lt;<span class="self">Self</span>&gt;(), mmtk)
         };
 
-        <span class="comment">// Do the actual work</span>
-        <span class="self">self</span>.<span class="ident">do_work</span>(<span class="ident">worker</span>, <span class="ident">mmtk</span>);
+        <span class="comment">// Do the actual work
+        </span><span class="self">self</span>.do_work(worker, mmtk);
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>)]</span>
-        <span class="comment">// Finish collecting statistics</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker_stat</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">borrow_stat_mut</span>();
-            <span class="ident">stat</span>.<span class="ident">end_of_work</span>(<span class="kw-2">&amp;mut</span> <span class="ident">worker_stat</span>);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;work_packet_stats&quot;</span>)]
+        </span><span class="comment">// Finish collecting statistics
+        </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>worker_stat = worker.shared.borrow_stat_mut();
+            stat.end_of_work(<span class="kw-2">&amp;mut </span>worker_stat);
         }
     }
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::ProcessEdgesWork</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
+<span class="kw">use </span><span class="kw">super</span>::gc_work::ProcessEdgesWork;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 
-<span class="doccomment">/// This trait provides a group of associated types that are needed to</span>
-<span class="doccomment">/// create GC work packets for a certain plan. For example, `GCWorkScheduler.schedule_common_work()`</span>
-<span class="doccomment">/// needs this trait to schedule different work packets. For certain plans,</span>
-<span class="doccomment">/// they may need to provide several types that implement this trait, e.g. one for</span>
-<span class="doccomment">/// nursery GC, one for mature GC.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GCWorkContext</span> {
-    <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;
-    <span class="kw">type</span> <span class="ident">PlanType</span>: <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>;
-    <span class="comment">// We should use SFTProcessEdges as the default value for this associate type. However, this requires</span>
-    <span class="comment">// `associated_type_defaults` which has not yet been stablized.</span>
-    <span class="kw">type</span> <span class="ident">ProcessEdgesWorkType</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>;
+<span class="doccomment">/// This trait provides a group of associated types that are needed to
+/// create GC work packets for a certain plan. For example, `GCWorkScheduler.schedule_common_work()`
+/// needs this trait to schedule different work packets. For certain plans,
+/// they may need to provide several types that implement this trait, e.g. one for
+/// nursery GC, one for mature GC.
+</span><span class="kw">pub trait </span>GCWorkContext {
+    <span class="kw">type </span>VM: VMBinding;
+    <span class="kw">type </span>PlanType: Plan&lt;VM = <span class="self">Self</span>::VM&gt;;
+    <span class="comment">// We should use SFTProcessEdges as the default value for this associate type. However, this requires
+    // `associated_type_defaults` which has not yet been stablized.
+    </span><span class="kw">type </span>ProcessEdgesWorkType: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

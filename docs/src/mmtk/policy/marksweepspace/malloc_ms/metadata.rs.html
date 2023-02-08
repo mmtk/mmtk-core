@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;marksweepspace&#x2F;malloc_ms&#x2F;metadata.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>metadata.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><script defer src="../../../../../main.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/marksweepspace/malloc_ms/metadata.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>metadata.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../../normalize.css"><link rel="stylesheet" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../../dark.css" disabled><link rel="stylesheet" href="../../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../../storage.js"></script><script defer src="../../../../../source-script.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -287,293 +285,292 @@
 <span id="285">285</span>
 <span id="286">286</span>
 <span id="287">287</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ObjectModel</span>, <span class="ident">VMBinding</span>};
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit;
+<span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+<span class="kw">use </span><span class="kw">crate</span>::vm::{ObjectModel, VMBinding};
+<span class="kw">use </span>std::sync::atomic::Ordering;
+<span class="kw">use </span>std::sync::Mutex;
 
-<span class="macro">lazy_static!</span> {
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">CHUNK_METADATA</span>: <span class="ident">SideMetadataContext</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
-        <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>],
-        <span class="ident">local</span>: <span class="macro">vec!</span>[],
+<span class="macro">lazy_static! </span>{
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">static </span><span class="kw-2">ref </span>CHUNK_METADATA: SideMetadataContext = SideMetadataContext {
+        global: <span class="macro">vec!</span>[ACTIVE_CHUNK_METADATA_SPEC],
+        local: <span class="macro">vec!</span>[],
     };
 
-    <span class="doccomment">/// Lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">CHUNK_MAP_LOCK</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(());
-    <span class="doccomment">/// Maximum metadata address for the ACTIVE_CHUNK_METADATA_SPEC which is used to check bounds</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">MAX_METADATA_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">upper_bound_address_for_contiguous</span>();
+    <span class="doccomment">/// Lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
+    </span><span class="kw">static </span><span class="kw-2">ref </span>CHUNK_MAP_LOCK: Mutex&lt;()&gt; = Mutex::new(());
+    <span class="doccomment">/// Maximum metadata address for the ACTIVE_CHUNK_METADATA_SPEC which is used to check bounds
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>MAX_METADATA_ADDRESS: Address = ACTIVE_CHUNK_METADATA_SPEC.upper_bound_address_for_contiguous();
 }
 
-<span class="doccomment">/// Metadata spec for the active chunk byte</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The active chunk metadata is used to track what chunks have been allocated by `malloc()`</span>
-<span class="doccomment">/// which is out of our control. We use this metadata later to generate sweep tasks for only</span>
-<span class="doccomment">/// the chunks which have live objects in them.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This metadata is mapped eagerly (as opposed to lazily like the others),</span>
-<span class="doccomment">/// hence a separate `SideMetadata` instance is required.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This is a global side metadata spec even though it is used only by MallocSpace as</span>
-<span class="doccomment">/// we require its space to be contiguous and mapped only once. Otherwise we risk</span>
-<span class="doccomment">/// overwriting the previous mapping.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-    <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_ACTIVE_CHUNK</span>;
+<span class="doccomment">/// Metadata spec for the active chunk byte
+///
+/// The active chunk metadata is used to track what chunks have been allocated by `malloc()`
+/// which is out of our control. We use this metadata later to generate sweep tasks for only
+/// the chunks which have live objects in them.
+///
+/// This metadata is mapped eagerly (as opposed to lazily like the others),
+/// hence a separate `SideMetadata` instance is required.
+///
+/// This is a global side metadata spec even though it is used only by MallocSpace as
+/// we require its space to be contiguous and mapped only once. Otherwise we risk
+/// overwriting the previous mapping.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
+    <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_ACTIVE_CHUNK;
 
-<span class="doccomment">/// Metadata spec for the active page byte</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The active page metadata is used to accurately track the total number of pages that have</span>
-<span class="doccomment">/// been reserved by `malloc()`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// We use a byte instead of a bit to avoid synchronization costs, i.e. to avoid</span>
-<span class="doccomment">/// the case where two threads try to update different bits in the same byte at</span>
-<span class="doccomment">/// the same time</span>
-<span class="comment">// XXX: This metadata spec is currently unused as we need to add a performant way to calculate</span>
-<span class="comment">// how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-    <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MALLOC_MS_ACTIVE_PAGE</span>;
+<span class="doccomment">/// Metadata spec for the active page byte
+///
+/// The active page metadata is used to accurately track the total number of pages that have
+/// been reserved by `malloc()`.
+///
+/// We use a byte instead of a bit to avoid synchronization costs, i.e. to avoid
+/// the case where two threads try to update different bits in the same byte at
+/// the same time
+</span><span class="comment">// XXX: This metadata spec is currently unused as we need to add a performant way to calculate
+// how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
+    <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MALLOC_MS_ACTIVE_PAGE;
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-    <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
+    <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
 
-<span class="doccomment">/// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,</span>
-<span class="doccomment">/// we will go through all the chunks for [address, address + size), and check if they are mapped.</span>
-<span class="doccomment">/// If any of the chunks is not mapped, return false. Otherwise return true.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_meta_space_mapped</span>(<span class="ident">address</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">address</span>);
-    <span class="kw">while</span> <span class="ident">chunk</span> <span class="op">&lt;</span> <span class="ident">address</span> <span class="op">+</span> <span class="ident">size</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">chunk</span>) {
-            <span class="kw">return</span> <span class="bool-val">false</span>;
+<span class="doccomment">/// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
+/// we will go through all the chunks for [address, address + size), and check if they are mapped.
+/// If any of the chunks is not mapped, return false. Otherwise return true.
+</span><span class="kw">pub fn </span>is_meta_space_mapped(address: Address, size: usize) -&gt; bool {
+    <span class="kw">let </span><span class="kw-2">mut </span>chunk = conversions::chunk_align_down(address);
+    <span class="kw">while </span>chunk &lt; address + size {
+        <span class="kw">if </span>!is_meta_space_mapped_for_address(chunk) {
+            <span class="kw">return </span><span class="bool-val">false</span>;
         }
-        <span class="ident">chunk</span> <span class="op">+</span><span class="op">=</span> <span class="ident">BYTES_IN_CHUNK</span>;
+        chunk += BYTES_IN_CHUNK;
     }
-    <span class="bool-val">true</span>
+    <span class="bool-val">true
+</span>}
+
+<span class="doccomment">/// Check if metadata is mapped for a given address. We check if the active chunk metadata is mapped,
+/// and if the active chunk bit is marked as well. If the chunk is mapped and marked, we consider the
+/// metadata for the chunk is properly mapped.
+</span><span class="kw">fn </span>is_meta_space_mapped_for_address(address: Address) -&gt; bool {
+    <span class="kw">let </span>chunk_start = conversions::chunk_align_down(address);
+    is_chunk_mapped(chunk_start) &amp;&amp; is_chunk_marked(chunk_start)
 }
 
-<span class="doccomment">/// Check if metadata is mapped for a given address. We check if the active chunk metadata is mapped,</span>
-<span class="doccomment">/// and if the active chunk bit is marked as well. If the chunk is mapped and marked, we consider the</span>
-<span class="doccomment">/// metadata for the chunk is properly mapped.</span>
-<span class="kw">fn</span> <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">let</span> <span class="ident">chunk_start</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">address</span>);
-    <span class="ident">is_chunk_mapped</span>(<span class="ident">chunk_start</span>) <span class="op">&amp;&amp;</span> <span class="ident">is_chunk_marked</span>(<span class="ident">chunk_start</span>)
-}
+<span class="doccomment">/// Eagerly map the active chunk metadata surrounding `chunk_start`
+</span><span class="kw">fn </span>map_active_chunk_metadata(chunk_start: Address) {
+    <span class="macro">debug_assert!</span>(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
+    <span class="comment">// We eagerly map 16Gb worth of space for the chunk mark bytes on 64-bits
+    // We require saturating subtractions in order to not overflow the chunk_start by
+    // accident when subtracting if we have been allocated a very low base address by `malloc()`
+    </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+    </span><span class="kw">let </span>start = chunk_start.saturating_sub(<span class="number">2048 </span>* BYTES_IN_CHUNK);
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+    </span><span class="kw">let </span>size = <span class="number">4096 </span>* BYTES_IN_CHUNK;
 
-<span class="doccomment">/// Eagerly map the active chunk metadata surrounding `chunk_start`</span>
-<span class="kw">fn</span> <span class="ident">map_active_chunk_metadata</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-    <span class="macro">debug_assert!</span>(<span class="ident">chunk_start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
-    <span class="comment">// We eagerly map 16Gb worth of space for the chunk mark bytes on 64-bits</span>
-    <span class="comment">// We require saturating subtractions in order to not overflow the chunk_start by</span>
-    <span class="comment">// accident when subtracting if we have been allocated a very low base address by `malloc()`</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">chunk_start</span>.<span class="ident">saturating_sub</span>(<span class="number">2048</span> <span class="op">*</span> <span class="ident">BYTES_IN_CHUNK</span>);
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="number">4096</span> <span class="op">*</span> <span class="ident">BYTES_IN_CHUNK</span>;
-
-    <span class="comment">// We eagerly map 2Gb (i.e. half the address space) worth of space for the chunk mark bytes on 32-bits</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">chunk_start</span>.<span class="ident">saturating_sub</span>(<span class="number">256</span> <span class="op">*</span> <span class="ident">BYTES_IN_CHUNK</span>);
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="number">512</span> <span class="op">*</span> <span class="ident">BYTES_IN_CHUNK</span>;
+    <span class="comment">// We eagerly map 2Gb (i.e. half the address space) worth of space for the chunk mark bytes on 32-bits
+    </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="kw">let </span>start = chunk_start.saturating_sub(<span class="number">256 </span>* BYTES_IN_CHUNK);
+    <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="kw">let </span>size = <span class="number">512 </span>* BYTES_IN_CHUNK;
 
     <span class="macro">debug!</span>(
         <span class="string">&quot;chunk_start = {} mapping space for {} -&gt; {}&quot;</span>,
-        <span class="ident">chunk_start</span>,
-        <span class="ident">start</span>,
-        <span class="ident">chunk_start</span> <span class="op">+</span> (<span class="ident">size</span> <span class="op">/</span> <span class="number">2</span>)
+        chunk_start,
+        start,
+        chunk_start + (size / <span class="number">2</span>)
     );
 
     <span class="macro">assert!</span>(
-        <span class="ident">CHUNK_METADATA</span>.<span class="ident">try_map_metadata_space</span>(<span class="ident">start</span>, <span class="ident">size</span>).<span class="ident">is_ok</span>(),
-        <span class="string">&quot;failed to mmap meta memory&quot;</span>
-    );
+        CHUNK_METADATA.try_map_metadata_space(start, size).is_ok(),
+        <span class="string">&quot;failed to mmap meta memory&quot;
+    </span>);
 }
 
-<span class="doccomment">/// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata</span>
-<span class="doccomment">/// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we</span>
-<span class="doccomment">/// will map for each chunk.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_meta_space</span>(<span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataContext</span>, <span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
-    <span class="comment">// In order to prevent race conditions, we synchronize on the lock first and then</span>
-    <span class="comment">// check if we need to map the active chunk metadata for `chunk_start`</span>
-    <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">CHUNK_MAP_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+<span class="doccomment">/// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
+/// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
+/// will map for each chunk.
+</span><span class="kw">pub fn </span>map_meta_space(metadata: <span class="kw-2">&amp;</span>SideMetadataContext, addr: Address, size: usize) {
+    <span class="comment">// In order to prevent race conditions, we synchronize on the lock first and then
+    // check if we need to map the active chunk metadata for `chunk_start`
+    </span><span class="kw">let </span>_lock = CHUNK_MAP_LOCK.lock().unwrap();
 
-    <span class="kw">let</span> <span class="ident">map_metadata_space_for_chunk</span> <span class="op">=</span> <span class="op">|</span><span class="ident">start</span>: <span class="ident">Address</span><span class="op">|</span> {
-        <span class="macro">debug_assert!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
-        <span class="comment">// Check if the chunk bit metadata is mapped. If it is not mapped, map it.</span>
-        <span class="comment">// Note that the chunk bit metadata is global. It may have been mapped because other policy mapped it.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">is_chunk_mapped</span>(<span class="ident">start</span>) {
-            <span class="ident">map_active_chunk_metadata</span>(<span class="ident">start</span>);
+    <span class="kw">let </span>map_metadata_space_for_chunk = |start: Address| {
+        <span class="macro">debug_assert!</span>(start.is_aligned_to(BYTES_IN_CHUNK));
+        <span class="comment">// Check if the chunk bit metadata is mapped. If it is not mapped, map it.
+        // Note that the chunk bit metadata is global. It may have been mapped because other policy mapped it.
+        </span><span class="kw">if </span>!is_chunk_mapped(start) {
+            map_active_chunk_metadata(start);
         }
 
-        <span class="comment">// If we have set the chunk bit, return. This is needed just in case another thread has done this before</span>
-        <span class="comment">// we can acquire the lock.</span>
-        <span class="kw">if</span> <span class="ident">is_chunk_marked</span>(<span class="ident">start</span>) {
+        <span class="comment">// If we have set the chunk bit, return. This is needed just in case another thread has done this before
+        // we can acquire the lock.
+        </span><span class="kw">if </span>is_chunk_marked(start) {
             <span class="kw">return</span>;
         }
 
-        <span class="comment">// Attempt to map the local metadata for the policy.</span>
-        <span class="comment">// Note that this might fail. For example, we have marked a chunk as active but later we freed all</span>
-        <span class="comment">// the objects in it, and unset its chunk bit. However, we do not free its metadata. So for the chunk,</span>
-        <span class="comment">// its chunk bit is mapped, but not marked, and all its local metadata is also mapped.</span>
-        <span class="kw">let</span> <span class="ident">mmap_metadata_result</span> <span class="op">=</span> <span class="ident">metadata</span>.<span class="ident">try_map_metadata_space</span>(<span class="ident">start</span>, <span class="ident">BYTES_IN_CHUNK</span>);
+        <span class="comment">// Attempt to map the local metadata for the policy.
+        // Note that this might fail. For example, we have marked a chunk as active but later we freed all
+        // the objects in it, and unset its chunk bit. However, we do not free its metadata. So for the chunk,
+        // its chunk bit is mapped, but not marked, and all its local metadata is also mapped.
+        </span><span class="kw">let </span>mmap_metadata_result = metadata.try_map_metadata_space(start, BYTES_IN_CHUNK);
         <span class="macro">debug_assert!</span>(
-            <span class="ident">mmap_metadata_result</span>.<span class="ident">is_ok</span>(),
+            mmap_metadata_result.is_ok(),
             <span class="string">&quot;mmap sidemetadata failed for chunk_start ({})&quot;</span>,
-            <span class="ident">start</span>
+            start
         );
 
-        <span class="comment">// Set the chunk mark at the end. So if we have chunk mark set, we know we have mapped side metadata</span>
-        <span class="comment">// for the chunk.</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;set chunk mark bit for {}&quot;</span>, <span class="ident">start</span>);
-        <span class="ident">set_chunk_mark</span>(<span class="ident">start</span>);
+        <span class="comment">// Set the chunk mark at the end. So if we have chunk mark set, we know we have mapped side metadata
+        // for the chunk.
+        </span><span class="macro">trace!</span>(<span class="string">&quot;set chunk mark bit for {}&quot;</span>, start);
+        set_chunk_mark(start);
     };
 
-    <span class="comment">// Go through each chunk, and map for them.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">addr</span>);
-    <span class="kw">while</span> <span class="ident">chunk</span> <span class="op">&lt;</span> <span class="ident">addr</span> <span class="op">+</span> <span class="ident">size</span> {
-        <span class="ident">map_metadata_space_for_chunk</span>(<span class="ident">chunk</span>);
-        <span class="ident">chunk</span> <span class="op">+</span><span class="op">=</span> <span class="ident">BYTES_IN_CHUNK</span>;
+    <span class="comment">// Go through each chunk, and map for them.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>chunk = conversions::chunk_align_down(addr);
+    <span class="kw">while </span>chunk &lt; addr + size {
+        map_metadata_space_for_chunk(chunk);
+        chunk += BYTES_IN_CHUNK;
     }
 }
 
-<span class="doccomment">/// Check if a given object was allocated by malloc</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_alloced_by_malloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>())
-        <span class="op">&amp;&amp;</span> <span class="ident">alloc_bit::is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+<span class="doccomment">/// Check if a given object was allocated by malloc
+</span><span class="kw">pub fn </span>is_alloced_by_malloc&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
+    is_meta_space_mapped_for_address(object.to_address::&lt;VM&gt;())
+        &amp;&amp; alloc_bit::is_alloced::&lt;VM&gt;(object)
 }
 
-<span class="doccomment">/// Check if there is an object allocated by malloc at the address.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function doesn&#39;t check if `addr` is aligned.</span>
-<span class="doccomment">/// If not, it will try to load the alloc bit for the address rounded down to the metadata&#39;s granularity.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_object_alloced_by_malloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">addr</span>) {
-        <span class="kw">return</span> <span class="prelude-val">None</span>;
+<span class="doccomment">/// Check if there is an object allocated by malloc at the address.
+///
+/// This function doesn&#39;t check if `addr` is aligned.
+/// If not, it will try to load the alloc bit for the address rounded down to the metadata&#39;s granularity.
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+</span><span class="kw">pub fn </span>has_object_alloced_by_malloc&lt;VM: VMBinding&gt;(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">if </span>!is_meta_space_mapped_for_address(addr) {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
     }
-    <span class="ident">alloc_bit::is_alloced_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">addr</span>)
+    alloc_bit::is_alloced_object::&lt;VM&gt;(addr)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_marked</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="ident">ordering</span>) <span class="op">==</span> <span class="number">1</span>
+<span class="kw">pub fn </span>is_marked&lt;VM: VMBinding&gt;(object: ObjectReference, ordering: Ordering) -&gt; bool {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(object, <span class="prelude-val">None</span>, ordering) == <span class="number">1
+</span>}
+
+<span class="kw">pub unsafe fn </span>is_marked_unsafe&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::&lt;VM, u8&gt;(object, <span class="prelude-val">None</span>) == <span class="number">1
+</span>}
+
+<span class="doccomment">/// Set the page mark from 0 to 1. Return true if we set it successfully in this call.
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>compare_exchange_set_page_mark(page_addr: Address) -&gt; bool {
+    <span class="comment">// The spec has 1 byte per each page. So it won&#39;t be the case that other threads may race and access other bits for the spec.
+    // If the compare-exchange fails, we know the byte was set to 1 before this call.
+    </span>ACTIVE_PAGE_METADATA_SPEC
+        .compare_exchange_atomic::&lt;u8&gt;(page_addr, <span class="number">0</span>, <span class="number">1</span>, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
 }
 
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_marked_unsafe</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>) <span class="op">==</span> <span class="number">1</span>
+<span class="attribute">#[allow(unused)]
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>is_page_marked(page_addr: Address) -&gt; bool {
+    ACTIVE_PAGE_METADATA_SPEC.load_atomic::&lt;u8&gt;(page_addr, Ordering::SeqCst) == <span class="number">1
+</span>}
+
+<span class="attribute">#[allow(unused)]
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>is_page_marked_unsafe(page_addr: Address) -&gt; bool {
+    ACTIVE_PAGE_METADATA_SPEC.load::&lt;u8&gt;(page_addr) == <span class="number">1
+</span>}
+
+<span class="kw">pub fn </span>is_chunk_mapped(chunk_start: Address) -&gt; bool {
+    <span class="comment">// Since `address_to_meta_address` will translate a data address to a metadata address without caring
+    // if it goes across metadata boundaries, we have to check if we have accidentally gone over the bounds
+    // of the active chunk metadata spec before we check if the metadata has been mapped or not
+    </span><span class="kw">let </span>meta_address =
+        side_metadata::address_to_meta_address(<span class="kw-2">&amp;</span>ACTIVE_CHUNK_METADATA_SPEC, chunk_start);
+    <span class="kw">if </span>meta_address &lt; <span class="kw-2">*</span>MAX_METADATA_ADDRESS {
+        meta_address.is_mapped()
+    } <span class="kw">else </span>{
+        <span class="bool-val">false
+    </span>}
 }
 
-<span class="doccomment">/// Set the page mark from 0 to 1. Return true if we set it successfully in this call.</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">compare_exchange_set_page_mark</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="comment">// The spec has 1 byte per each page. So it won&#39;t be the case that other threads may race and access other bits for the spec.</span>
-    <span class="comment">// If the compare-exchange fails, we know the byte was set to 1 before this call.</span>
-    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>
-        .<span class="ident">compare_exchange_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>, <span class="ident">Ordering::SeqCst</span>)
-        .<span class="ident">is_ok</span>()
+<span class="kw">pub fn </span>is_chunk_marked(chunk_start: Address) -&gt; bool {
+    ACTIVE_CHUNK_METADATA_SPEC.load_atomic::&lt;u8&gt;(chunk_start, Ordering::SeqCst) == <span class="number">1
+</span>}
+
+<span class="kw">pub unsafe fn </span>is_chunk_marked_unsafe(chunk_start: Address) -&gt; bool {
+    ACTIVE_CHUNK_METADATA_SPEC.load::&lt;u8&gt;(chunk_start) == <span class="number">1
+</span>}
+
+<span class="kw">pub fn </span>set_alloc_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    alloc_bit::set_alloc_bit::&lt;VM&gt;(object);
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">is_page_marked</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
+<span class="kw">pub fn </span>set_mark_bit&lt;VM: VMBinding&gt;(object: ObjectReference, ordering: Ordering) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::&lt;VM, u8&gt;(object, <span class="number">1</span>, <span class="prelude-val">None</span>, ordering);
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_page_marked_unsafe</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>) <span class="op">==</span> <span class="number">1</span>
+<span class="attribute">#[allow(unused)]
+</span><span class="kw">pub fn </span>unset_alloc_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit::&lt;VM&gt;(object);
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_chunk_mapped</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="comment">// Since `address_to_meta_address` will translate a data address to a metadata address without caring</span>
-    <span class="comment">// if it goes across metadata boundaries, we have to check if we have accidentally gone over the bounds</span>
-    <span class="comment">// of the active chunk metadata spec before we check if the metadata has been mapped or not</span>
-    <span class="kw">let</span> <span class="ident">meta_address</span> <span class="op">=</span>
-        <span class="ident">side_metadata::address_to_meta_address</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>, <span class="ident">chunk_start</span>);
-    <span class="kw">if</span> <span class="ident">meta_address</span> <span class="op">&lt;</span> <span class="kw-2">*</span><span class="ident">MAX_METADATA_ADDRESS</span> {
-        <span class="ident">meta_address</span>.<span class="ident">is_mapped</span>()
-    } <span class="kw">else</span> {
-        <span class="bool-val">false</span>
-    }
+<span class="attribute">#[allow(unused)]
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>set_page_mark(page_addr: Address) {
+    ACTIVE_PAGE_METADATA_SPEC.store_atomic::&lt;u8&gt;(page_addr, <span class="number">1</span>, Ordering::SeqCst);
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_chunk_marked</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>set_chunk_mark(chunk_start: Address) {
+    ACTIVE_CHUNK_METADATA_SPEC.store_atomic::&lt;u8&gt;(chunk_start, <span class="number">1</span>, Ordering::SeqCst);
 }
 
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_chunk_marked_unsafe</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>) <span class="op">==</span> <span class="number">1</span>
+<span class="doccomment">/// Is this allocation an offset malloc? The argument address should be the allocation address (object start)
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>is_offset_malloc(address: Address) -&gt; bool {
+    <span class="kw">unsafe </span>{ OFFSET_MALLOC_METADATA_SPEC.load::&lt;u8&gt;(address) == <span class="number">1 </span>}
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+<span class="doccomment">/// Set the offset bit for the allocation. The argument address should be the allocation address (object start)
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>set_offset_malloc_bit(address: Address) {
+    OFFSET_MALLOC_METADATA_SPEC.store_atomic::&lt;u8&gt;(address, <span class="number">1</span>, Ordering::SeqCst);
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="ident">Ordering</span>) {
-    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="number">1</span>, <span class="prelude-val">None</span>, <span class="ident">ordering</span>);
+<span class="doccomment">/// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>unset_offset_malloc_bit_unsafe(address: Address) {
+    OFFSET_MALLOC_METADATA_SPEC.store::&lt;u8&gt;(address, <span class="number">0</span>);
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">alloc_bit::unset_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+<span class="kw">pub unsafe fn </span>unset_alloc_bit_unsafe&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit_unsafe::&lt;VM&gt;(object);
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_page_mark</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) {
-    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+<span class="attribute">#[allow(unused)]
+</span><span class="kw">pub unsafe fn </span>unset_mark_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::&lt;VM, u8&gt;(object, <span class="number">0</span>, <span class="prelude-val">None</span>);
 }
 
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_chunk_mark</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+<span class="attribute">#[allow(unused)]
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>unset_page_mark_unsafe(page_addr: Address) {
+    ACTIVE_PAGE_METADATA_SPEC.store::&lt;u8&gt;(page_addr, <span class="number">0</span>)
 }
 
-<span class="doccomment">/// Is this allocation an offset malloc? The argument address should be the allocation address (object start)</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">is_offset_malloc</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">unsafe</span> { <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>) <span class="op">==</span> <span class="number">1</span> }
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>unset_chunk_mark_unsafe(chunk_start: Address) {
+    ACTIVE_CHUNK_METADATA_SPEC.store::&lt;u8&gt;(chunk_start, <span class="number">0</span>)
 }
 
-<span class="doccomment">/// Set the offset bit for the allocation. The argument address should be the allocation address (object start)</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_offset_malloc_bit</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
-    <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-}
+<span class="doccomment">/// Load u128 bits of side metadata
+///
+/// # Safety
+/// unsafe as it can segfault if one tries to read outside the bounds of the mapped side metadata
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>load128(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u128 {
+    <span class="kw">let </span>meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
 
-<span class="doccomment">/// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_offset_malloc_bit_unsafe</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
-    <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="number">0</span>);
-}
+    <span class="attribute">#[cfg(debug_assertions)]
+    </span>metadata_spec.assert_metadata_mapped(data_addr);
 
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_unsafe</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">alloc_bit::unset_alloc_bit_unsafe</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
-}
-
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="number">0</span>, <span class="prelude-val">None</span>);
-}
-
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) {
-    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">0</span>)
-}
-
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_chunk_mark_unsafe</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="number">0</span>)
-}
-
-<span class="doccomment">/// Load u128 bits of side metadata</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Safety</span>
-<span class="doccomment">/// unsafe as it can segfault if one tries to read outside the bounds of the mapped side metadata</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load128</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">u128</span> {
-    <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">side_metadata::address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-    <span class="ident">metadata_spec</span>.<span class="ident">assert_metadata_mapped</span>(<span class="ident">data_addr</span>);
-
-    <span class="ident">meta_addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u128</span>
+    meta_addr.load::&lt;u128&gt;()
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

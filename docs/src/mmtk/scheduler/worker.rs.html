@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;scheduler&#x2F;worker.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>worker.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/worker.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>worker.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -322,328 +320,327 @@
 <span id="320">320</span>
 <span id="321">321</span>
 <span id="322">322</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::WorkerLocalStat</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::GCWorkerCopyContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">Collection</span>, <span class="ident">GCThreadContext</span>, <span class="ident">VMBinding</span>};
-<span class="kw">use</span> <span class="ident">atomic::Atomic</span>;
-<span class="kw">use</span> <span class="ident">atomic_refcell</span>::{<span class="ident">AtomicRef</span>, <span class="ident">AtomicRefCell</span>, <span class="ident">AtomicRefMut</span>};
-<span class="kw">use</span> <span class="ident">crossbeam::deque</span>::{<span class="self">self</span>, <span class="ident">Stealer</span>};
-<span class="kw">use</span> <span class="ident">crossbeam::queue::ArrayQueue</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">std::sync::mpsc::Sender</span>;
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
+<span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
+<span class="kw">use super</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
+<span class="kw">use </span><span class="kw">crate</span>::util::copy::GCWorkerCopyContext;
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::vm::{Collection, GCThreadContext, VMBinding};
+<span class="kw">use </span>atomic::Atomic;
+<span class="kw">use </span>atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
+<span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Stealer};
+<span class="kw">use </span>crossbeam::queue::ArrayQueue;
+<span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
+<span class="kw">use </span>std::sync::mpsc::Sender;
+<span class="kw">use </span>std::sync::{Arc, Mutex};
 
-<span class="doccomment">/// Represents the ID of a GC worker thread.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ThreadId</span> <span class="op">=</span> <span class="ident">usize</span>;
+<span class="doccomment">/// Represents the ID of a GC worker thread.
+</span><span class="kw">pub type </span>ThreadId = usize;
 
-<span class="macro">thread_local!</span> {
-    <span class="doccomment">/// Current worker&#39;s ordinal</span>
-    <span class="kw">static</span> <span class="ident">WORKER_ORDINAL</span>: <span class="ident">Atomic</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadId</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Atomic::new</span>(<span class="prelude-val">None</span>);
+<span class="macro">thread_local! </span>{
+    <span class="doccomment">/// Current worker&#39;s ordinal
+    </span><span class="kw">static </span>WORKER_ORDINAL: Atomic&lt;<span class="prelude-ty">Option</span>&lt;ThreadId&gt;&gt; = Atomic::new(<span class="prelude-val">None</span>);
 }
 
-<span class="doccomment">/// Get current worker ordinal. Return `None` if the current thread is not a worker.</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">current_worker_ordinal</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadId</span><span class="op">&gt;</span> {
-    <span class="ident">WORKER_ORDINAL</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>))
+<span class="doccomment">/// Get current worker ordinal. Return `None` if the current thread is not a worker.
+</span><span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>current_worker_ordinal() -&gt; <span class="prelude-ty">Option</span>&lt;ThreadId&gt; {
+    WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed))
 }
 
-<span class="doccomment">/// The part shared between a GCWorker and the scheduler.</span>
-<span class="doccomment">/// This structure is used for communication, e.g. adding new work packets.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Worker-local statistics data.</span>
-    <span class="ident">stat</span>: <span class="ident">AtomicRefCell</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note: Currently, designated work cannot be added from the GC controller thread, or</span>
-    <span class="doccomment">/// there will be synchronization problems.  If it is necessary to do so, we need to</span>
-    <span class="doccomment">/// update the code in `GCWorkScheduler::poll_slow` for proper synchornization.</span>
-    <span class="kw">pub</span> <span class="ident">designated_work</span>: <span class="ident">ArrayQueue</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Handle for stealing packets from the current worker</span>
-    <span class="kw">pub</span> <span class="ident">stealer</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Stealer</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The part shared between a GCWorker and the scheduler.
+/// This structure is used for communication, e.g. adding new work packets.
+</span><span class="kw">pub struct </span>GCWorkerShared&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Worker-local statistics data.
+    </span>stat: AtomicRefCell&lt;WorkerLocalStat&lt;VM&gt;&gt;,
+    <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
+    ///
+    /// Note: Currently, designated work cannot be added from the GC controller thread, or
+    /// there will be synchronization problems.  If it is necessary to do so, we need to
+    /// update the code in `GCWorkScheduler::poll_slow` for proper synchornization.
+    </span><span class="kw">pub </span>designated_work: ArrayQueue&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
+    <span class="doccomment">/// Handle for stealing packets from the current worker
+    </span><span class="kw">pub </span>stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">stealer</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Stealer</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">stat</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">designated_work</span>: <span class="ident">ArrayQueue::new</span>(<span class="number">16</span>),
-            <span class="ident">stealer</span>,
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            stat: Default::default(),
+            designated_work: ArrayQueue::new(<span class="number">16</span>),
+            stealer,
         }
     }
 }
 
-<span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.</span>
-<span class="doccomment">/// The GC controller also has an embedded `GCWorker` because it may also execute work packets.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The VM-specific thread-local state of the GC thread.</span>
-    <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal</span>
-    <span class="doccomment">/// is usize::MAX if it is the embedded worker of the GC controller thread.</span>
-    <span class="kw">pub</span> <span class="ident">ordinal</span>: <span class="ident">ThreadId</span>,
-    <span class="doccomment">/// The reference to the scheduler.</span>
-    <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The copy context, used to implement copying GC.</span>
-    <span class="ident">copy</span>: <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The sending end of the channel to send message to the controller thread.</span>
-    <span class="kw">pub</span> <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The reference to the MMTk instance.</span>
-    <span class="kw">pub</span> <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.</span>
-    <span class="doccomment">/// False if this struct belongs to a standalone GCWorker thread.</span>
-    <span class="ident">is_coordinator</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// Reference to the shared part of the GC worker.  It is used for synchronization.</span>
-    <span class="kw">pub</span> <span class="ident">shared</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Local work packet queue.</span>
-    <span class="kw">pub</span> <span class="ident">local_work_buffer</span>: <span class="ident">deque::Worker</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.
+/// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
+</span><span class="kw">pub struct </span>GCWorker&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// The VM-specific thread-local state of the GC thread.
+    </span><span class="kw">pub </span>tls: VMWorkerThread,
+    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal
+    /// is usize::MAX if it is the embedded worker of the GC controller thread.
+    </span><span class="kw">pub </span>ordinal: ThreadId,
+    <span class="doccomment">/// The reference to the scheduler.
+    </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
+    <span class="doccomment">/// The copy context, used to implement copying GC.
+    </span>copy: GCWorkerCopyContext&lt;VM&gt;,
+    <span class="doccomment">/// The sending end of the channel to send message to the controller thread.
+    </span><span class="kw">pub </span>sender: Sender&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+    <span class="doccomment">/// The reference to the MMTk instance.
+    </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.
+    /// False if this struct belongs to a standalone GCWorker thread.
+    </span>is_coordinator: bool,
+    <span class="doccomment">/// Reference to the shared part of the GC worker.  It is used for synchronization.
+    </span><span class="kw">pub </span>shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
+    <span class="doccomment">/// Local work packet queue.
+    </span><span class="kw">pub </span>local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
 
-<span class="comment">// Error message for borrowing `GCWorkerShared::stat`.</span>
-<span class="kw">const</span> <span class="ident">STAT_BORROWED_MSG</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;GCWorkerShared.stat is already borrowed.  This may happen if \
+<span class="comment">// Error message for borrowing `GCWorkerShared::stat`.
+</span><span class="kw">const </span>STAT_BORROWED_MSG: <span class="kw-2">&amp;</span>str = <span class="string">&quot;GCWorkerShared.stat is already borrowed.  This may happen if \
     the mutator calls harness_begin or harness_end while the GC is running.&quot;</span>;
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">borrow_stat</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AtomicRef</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">stat</span>.<span class="ident">try_borrow</span>().<span class="ident">expect</span>(<span class="ident">STAT_BORROWED_MSG</span>)
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
+    <span class="kw">pub fn </span>borrow_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRef&lt;WorkerLocalStat&lt;VM&gt;&gt; {
+        <span class="self">self</span>.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">borrow_stat_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AtomicRefMut</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">stat</span>.<span class="ident">try_borrow_mut</span>().<span class="ident">expect</span>(<span class="ident">STAT_BORROWED_MSG</span>)
+    <span class="kw">pub fn </span>borrow_stat_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRefMut&lt;WorkerLocalStat&lt;VM&gt;&gt; {
+        <span class="self">self</span>.stat.try_borrow_mut().expect(STAT_BORROWED_MSG)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">ordinal</span>: <span class="ident">ThreadId</span>,
-        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">is_coordinator</span>: <span class="ident">bool</span>,
-        <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">shared</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">local_work_buffer</span>: <span class="ident">deque::Worker</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread::UNINITIALIZED</span>),
-            <span class="ident">ordinal</span>,
-            <span class="comment">// We will set this later</span>
-            <span class="ident">copy</span>: <span class="ident">GCWorkerCopyContext::new_non_copy</span>(),
-            <span class="ident">sender</span>,
-            <span class="ident">scheduler</span>,
-            <span class="ident">mmtk</span>,
-            <span class="ident">is_coordinator</span>,
-            <span class="ident">shared</span>,
-            <span class="ident">local_work_buffer</span>,
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorker&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        ordinal: ThreadId,
+        scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
+        is_coordinator: bool,
+        sender: Sender&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+        shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
+        local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            tls: VMWorkerThread(VMThread::UNINITIALIZED),
+            ordinal,
+            <span class="comment">// We will set this later
+            </span>copy: GCWorkerCopyContext::new_non_copy(),
+            sender,
+            scheduler,
+            mmtk,
+            is_coordinator,
+            shared,
+            local_work_buffer,
         }
     }
 
-    <span class="kw">const</span> <span class="ident">LOCALLY_CACHED_WORK_PACKETS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span>;
+    <span class="kw">const </span>LOCALLY_CACHED_WORK_PACKETS: usize = <span class="number">16</span>;
 
-    <span class="doccomment">/// Add a work packet to the work queue and mark it with a higher priority.</span>
-    <span class="doccomment">/// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be</span>
-    <span class="doccomment">/// pushed to the global bucket with a higher priority.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_work_prioritized</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bucket</span>: <span class="ident">WorkBucketStage</span>, <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">is_activated</span>()
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">local_work_buffer</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident"><span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS</span>
+    <span class="doccomment">/// Add a work packet to the work queue and mark it with a higher priority.
+    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// pushed to the global bucket with a higher priority.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>add_work_prioritized(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
+        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_activated()
+            || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
         {
-            <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">add_prioritized</span>(<span class="ident">Box::new</span>(<span class="ident">work</span>));
+            <span class="self">self</span>.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
             <span class="kw">return</span>;
         }
-        <span class="self">self</span>.<span class="ident">local_work_buffer</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="ident">work</span>));
+        <span class="self">self</span>.local_work_buffer.push(Box::new(work));
     }
 
-    <span class="doccomment">/// Add a work packet to the work queue.</span>
-    <span class="doccomment">/// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be</span>
-    <span class="doccomment">/// pushed to the global bucket.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bucket</span>: <span class="ident">WorkBucketStage</span>, <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">is_activated</span>()
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">local_work_buffer</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident"><span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS</span>
+    <span class="doccomment">/// Add a work packet to the work queue.
+    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// pushed to the global bucket.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>add_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
+        <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_activated()
+            || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
         {
-            <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">add</span>(<span class="ident">work</span>);
+            <span class="self">self</span>.scheduler.work_buckets[bucket].add(work);
             <span class="kw">return</span>;
         }
-        <span class="self">self</span>.<span class="ident">local_work_buffer</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="ident">work</span>));
+        <span class="self">self</span>.local_work_buffer.push(Box::new(work));
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_coordinator</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">is_coordinator</span>
+    <span class="kw">pub fn </span>is_coordinator(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.is_coordinator
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scheduler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">scheduler</span>
+    <span class="kw">pub fn </span>scheduler(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.scheduler
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_copy_context_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copy</span>
+    <span class="kw">pub fn </span>get_copy_context_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt; {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.copy
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="ident">work</span>.<span class="ident">do_work</span>(<span class="self">self</span>, <span class="self">self</span>.<span class="ident">mmtk</span>);
+    <span class="kw">pub fn </span>do_work(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span><span class="self">self</span>, <span class="kw-2">mut </span>work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
+        work.do_work(<span class="self">self</span>, <span class="self">self</span>.mmtk);
     }
 
-    <span class="doccomment">/// Poll a ready-to-execute work packet in the following order:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// 1. Any packet that should be processed only by this worker.</span>
-    <span class="doccomment">/// 2. Poll from the local work queue.</span>
-    <span class="doccomment">/// 3. Poll from activated global work-buckets</span>
-    <span class="doccomment">/// 4. Steal from other workers</span>
-    <span class="kw">fn</span> <span class="ident">poll</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">shared</span>
-            .<span class="ident">designated_work</span>
-            .<span class="ident">pop</span>()
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">local_work_buffer</span>.<span class="ident">pop</span>())
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">poll</span>(<span class="self">self</span>))
+    <span class="doccomment">/// Poll a ready-to-execute work packet in the following order:
+    ///
+    /// 1. Any packet that should be processed only by this worker.
+    /// 2. Poll from the local work queue.
+    /// 3. Poll from activated global work-buckets
+    /// 4. Steal from other workers
+    </span><span class="kw">fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
+        <span class="self">self</span>.shared
+            .designated_work
+            .pop()
+            .or_else(|| <span class="self">self</span>.local_work_buffer.pop())
+            .unwrap_or_else(|| <span class="self">self</span>.scheduler().poll(<span class="self">self</span>))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">do_boxed_work</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">work</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="ident">work</span>.<span class="ident">do_work</span>(<span class="self">self</span>, <span class="self">self</span>.<span class="ident">mmtk</span>);
+    <span class="kw">pub fn </span>do_boxed_work(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span><span class="self">self</span>, <span class="kw-2">mut </span>work: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
+        work.do_work(<span class="self">self</span>, <span class="self">self</span>.mmtk);
     }
 
-    <span class="doccomment">/// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.</span>
-    <span class="doccomment">/// Each worker will keep polling and executing work packets in a loop.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="ident">WORKER_ORDINAL</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">store</span>(<span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">ordinal</span>), <span class="ident">Ordering::SeqCst</span>));
-        <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">resolve_affinity</span>(<span class="self">self</span>.<span class="ident">ordinal</span>);
-        <span class="self">self</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
-        <span class="self">self</span>.<span class="ident">copy</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::plan::create_gc_worker_context</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>);
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">work</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll</span>();
-            <span class="ident">work</span>.<span class="ident">do_work_with_stat</span>(<span class="self">self</span>, <span class="ident">mmtk</span>);
+    <span class="doccomment">/// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
+    /// Each worker will keep polling and executing work packets in a loop.
+    </span><span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        WORKER_ORDINAL.with(|x| x.store(<span class="prelude-val">Some</span>(<span class="self">self</span>.ordinal), Ordering::SeqCst));
+        <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
+        <span class="self">self</span>.tls = tls;
+        <span class="self">self</span>.copy = <span class="kw">crate</span>::plan::create_gc_worker_context(tls, mmtk);
+        <span class="kw">loop </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>work = <span class="self">self</span>.poll();
+            work.do_work_with_stat(<span class="self">self</span>, mmtk);
         }
     }
 }
 
-<span class="doccomment">/// A worker group to manage all the GC workers (except the coordinator worker).</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Shared worker data</span>
-    <span class="kw">pub</span> <span class="ident">workers_shared</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">parked_workers</span>: <span class="ident">AtomicUsize</span>,
-    <span class="ident">unspawned_local_work_queues</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">deque::Worker</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A worker group to manage all the GC workers (except the coordinator worker).
+</span><span class="kw">pub struct </span>WorkerGroup&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// Shared worker data
+    </span><span class="kw">pub </span>workers_shared: Vec&lt;Arc&lt;GCWorkerShared&lt;VM&gt;&gt;&gt;,
+    parked_workers: AtomicUsize,
+    unspawned_local_work_queues: Mutex&lt;Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a WorkerGroup</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">num_workers</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">unspawned_local_work_queues</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">num_workers</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">deque::Worker::new_fifo</span>())
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkerGroup&lt;VM&gt; {
+    <span class="doccomment">/// Create a WorkerGroup
+    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; Arc&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">let </span>unspawned_local_work_queues = (<span class="number">0</span>..num_workers)
+            .map(|<span class="kw">_</span>| deque::Worker::new_fifo())
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let</span> <span class="ident">workers_shared</span> <span class="op">=</span> (<span class="number">0</span>..<span class="ident">num_workers</span>)
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> {
-                <span class="ident">Arc::new</span>(<span class="ident">GCWorkerShared</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="prelude-val">Some</span>(
-                    <span class="ident">unspawned_local_work_queues</span>[<span class="ident">i</span>].<span class="ident">stealer</span>(),
+        <span class="kw">let </span>workers_shared = (<span class="number">0</span>..num_workers)
+            .map(|i| {
+                Arc::new(GCWorkerShared::&lt;VM&gt;::new(<span class="prelude-val">Some</span>(
+                    unspawned_local_work_queues[i].stealer(),
                 )))
             })
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="ident">Arc::new</span>(<span class="self">Self</span> {
-            <span class="ident">workers_shared</span>,
-            <span class="ident">parked_workers</span>: <span class="ident">Default::default</span>(),
-            <span class="ident">unspawned_local_work_queues</span>: <span class="ident">Mutex::new</span>(<span class="ident">unspawned_local_work_queues</span>),
+        Arc::new(<span class="self">Self </span>{
+            workers_shared,
+            parked_workers: Default::default(),
+            unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
         })
     }
 
-    <span class="doccomment">/// Spawn all the worker threads</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn</span>(
+    <span class="doccomment">/// Spawn all the worker threads
+    </span><span class="kw">pub fn </span>spawn(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        sender: Sender&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+        tls: VMThread,
     ) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unspawned_local_work_queues</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">unspawned_local_work_queues</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// Spawn each worker thread.</span>
-        <span class="kw">for</span> (<span class="ident">ordinal</span>, <span class="ident">shared</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">workers_shared</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">GCWorker::new</span>(
-                <span class="ident">mmtk</span>,
-                <span class="ident">ordinal</span>,
-                <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>(),
+        <span class="kw">let </span><span class="kw-2">mut </span>unspawned_local_work_queues = <span class="self">self</span>.unspawned_local_work_queues.lock().unwrap();
+        <span class="comment">// Spawn each worker thread.
+        </span><span class="kw">for </span>(ordinal, shared) <span class="kw">in </span><span class="self">self</span>.workers_shared.iter().enumerate() {
+            <span class="kw">let </span>worker = Box::new(GCWorker::new(
+                mmtk,
+                ordinal,
+                mmtk.scheduler.clone(),
                 <span class="bool-val">false</span>,
-                <span class="ident">sender</span>.<span class="ident">clone</span>(),
-                <span class="ident">shared</span>.<span class="ident">clone</span>(),
-                <span class="ident">unspawned_local_work_queues</span>.<span class="ident">pop</span>().<span class="ident">unwrap</span>(),
+                sender.clone(),
+                shared.clone(),
+                unspawned_local_work_queues.pop().unwrap(),
             ));
-            <span class="ident">VM::VMCollection::spawn_gc_thread</span>(<span class="ident">tls</span>, <span class="ident">GCThreadContext</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::Worker</span>(<span class="ident">worker</span>));
+            VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::&lt;VM&gt;::Worker(worker));
         }
-        <span class="macro">debug_assert!</span>(<span class="ident">unspawned_local_work_queues</span>.<span class="ident">is_empty</span>());
+        <span class="macro">debug_assert!</span>(unspawned_local_work_queues.is_empty());
     }
 
-    <span class="doccomment">/// Get the number of workers in the group</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">workers_shared</span>.<span class="ident">len</span>()
+    <span class="doccomment">/// Get the number of workers in the group
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>worker_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.workers_shared.len()
     }
 
-    <span class="doccomment">/// Increase the packed-workers counter.</span>
-    <span class="doccomment">/// Called before a worker is parked.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Return true if all the workers are parked.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inc_parked_workers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">parked_workers</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-        <span class="macro">debug_assert!</span>(<span class="ident">old</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">worker_count</span>());
-        <span class="ident">old</span> <span class="op">+</span> <span class="number">1</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">worker_count</span>()
+    <span class="doccomment">/// Increase the packed-workers counter.
+    /// Called before a worker is parked.
+    ///
+    /// Return true if all the workers are parked.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>inc_parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
+        <span class="macro">debug_assert!</span>(old &lt; <span class="self">self</span>.worker_count());
+        old + <span class="number">1 </span>== <span class="self">self</span>.worker_count()
     }
 
-    <span class="doccomment">/// Decrease the packed-workers counter.</span>
-    <span class="doccomment">/// Called after a worker is resumed from the parked state.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dec_parked_workers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">parked_workers</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-        <span class="macro">debug_assert!</span>(<span class="ident">old</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_count</span>());
+    <span class="doccomment">/// Decrease the packed-workers counter.
+    /// Called after a worker is resumed from the parked state.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>dec_parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
+        <span class="macro">debug_assert!</span>(old &lt;= <span class="self">self</span>.worker_count());
     }
 
-    <span class="doccomment">/// Get the number of parked workers in the group</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parked_workers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">parked_workers</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+    <span class="doccomment">/// Get the number of parked workers in the group
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.parked_workers.load(Ordering::SeqCst)
     }
 
-    <span class="doccomment">/// Check if all the workers are packed</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">parked_workers</span>() <span class="op">==</span> <span class="self">self</span>.<span class="ident">worker_count</span>()
+    <span class="doccomment">/// Check if all the workers are packed
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>all_parked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.parked_workers() == <span class="self">self</span>.worker_count()
     }
 
-    <span class="doccomment">/// Return true if there&#39;re any pending designated work</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_designated_work</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">workers_shared</span>
-            .<span class="ident">iter</span>()
-            .<span class="ident">any</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="op">!</span><span class="ident">w</span>.<span class="ident">designated_work</span>.<span class="ident">is_empty</span>())
+    <span class="doccomment">/// Return true if there&#39;re any pending designated work
+    </span><span class="kw">pub fn </span>has_designated_work(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.workers_shared
+            .iter()
+            .any(|w| !w.designated_work.is_empty())
     }
 }
 
-<span class="doccomment">/// This ensures the worker always decrements the parked worker count on all control flow paths.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">ParkingGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">worker_group</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">all_parked</span>: <span class="ident">bool</span>,
+<span class="doccomment">/// This ensures the worker always decrements the parked worker count on all control flow paths.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ParkingGuard&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
+    worker_group: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WorkerGroup&lt;VM&gt;,
+    all_parked: bool,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ParkingGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">worker_group</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">all_parked</span> <span class="op">=</span> <span class="ident">worker_group</span>.<span class="ident">inc_parked_workers</span>();
-        <span class="ident">ParkingGuard</span> {
-            <span class="ident">worker_group</span>,
-            <span class="ident">all_parked</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; ParkingGuard&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+    <span class="kw">pub fn </span>new(worker_group: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WorkerGroup&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>all_parked = worker_group.inc_parked_workers();
+        ParkingGuard {
+            worker_group,
+            all_parked,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">all_parked</span>
+    <span class="kw">pub fn </span>all_parked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.all_parked
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">ParkingGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; Drop <span class="kw">for </span>ParkingGuard&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.worker_group.dec_parked_workers();
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

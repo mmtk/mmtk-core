@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["VMRequest",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["VMRequest",""]]};

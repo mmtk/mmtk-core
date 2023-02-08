@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;immix&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/immix/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -34,40 +32,39 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
-</pre><pre class="rust"><code><span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">block</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">defrag</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">immixspace</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">line</span>;
+</pre><pre class="rust"><code><span class="kw">pub mod </span>block;
+<span class="kw">pub mod </span>defrag;
+<span class="kw">pub mod </span>immixspace;
+<span class="kw">pub mod </span>line;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">immixspace</span>::<span class="kw-2">*</span>;
+<span class="kw">pub use </span>immixspace::<span class="kw-2">*</span>;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::Region</span>;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::block::Block;
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 
-<span class="doccomment">/// The max object size for immix: half of a block</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_IMMIX_OBJECT_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">Block::BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>;
+<span class="doccomment">/// The max object size for immix: half of a block
+</span><span class="kw">pub const </span>MAX_IMMIX_OBJECT_SIZE: usize = Block::BYTES &gt;&gt; <span class="number">1</span>;
 
-<span class="doccomment">/// Mark/sweep memory for block-level only</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCK_ONLY</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
+<span class="doccomment">/// Mark/sweep memory for block-level only
+</span><span class="kw">pub const </span>BLOCK_ONLY: bool = <span class="bool-val">false</span>;
 
-<span class="doccomment">/// Opportunistic copying</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFRAG</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="op">!</span><span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_no_defrag&quot;</span>);
+<span class="doccomment">/// Opportunistic copying
+</span><span class="kw">pub const </span>DEFRAG: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_no_defrag&quot;</span>);
 
-<span class="doccomment">/// Mark lines when scanning objects.</span>
-<span class="doccomment">/// Otherwise, do it at mark time.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_LINE_AT_SCAN_TIME</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+<span class="doccomment">/// Mark lines when scanning objects.
+/// Otherwise, do it at mark time.
+</span><span class="kw">pub const </span>MARK_LINE_AT_SCAN_TIME: bool = <span class="bool-val">true</span>;
 
-<span class="macro">macro_rules!</span> <span class="ident">validate</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>: <span class="ident">expr</span>) =&gt; { <span class="macro">assert!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>)) };
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>: <span class="ident">expr</span> =&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">y</span>: <span class="ident">expr</span>) =&gt; { <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span> { <span class="macro">assert!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">y</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span> <span class="ident">implies</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">y</span>)) } };
+<span class="macro">macro_rules! </span>validate {
+    (<span class="macro-nonterminal">$x</span>: expr) =&gt; { <span class="macro">assert!</span>(<span class="macro-nonterminal">$x</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$x</span>)) };
+    (<span class="macro-nonterminal">$x</span>: expr =&gt; <span class="macro-nonterminal">$y</span>: expr) =&gt; { <span class="kw">if </span><span class="macro-nonterminal">$x </span>{ <span class="macro">assert!</span>(<span class="macro-nonterminal">$y</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$x </span>implies <span class="macro-nonterminal">$y</span>)) } };
 }
 
-<span class="kw">fn</span> <span class="ident">validate_features</span>() {
-    <span class="comment">// Block-only immix cannot do defragmentation</span>
-    <span class="macro">validate!</span>(<span class="ident">DEFRAG</span> =&gt; <span class="op">!</span><span class="ident">BLOCK_ONLY</span>);
-    <span class="comment">// Number of lines in a block should not exceed BlockState::MARK_MARKED</span>
-    <span class="macro">assert!</span>(<span class="ident">Block::LINES</span> <span class="op">/</span> <span class="number">2</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">u8::MAX</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span>);
+<span class="kw">fn </span>validate_features() {
+    <span class="comment">// Block-only immix cannot do defragmentation
+    </span><span class="macro">validate!</span>(DEFRAG =&gt; !BLOCK_ONLY);
+    <span class="comment">// Number of lines in a block should not exceed BlockState::MARK_MARKED
+    </span><span class="macro">assert!</span>(Block::LINES / <span class="number">2 </span>&lt;= u8::MAX <span class="kw">as </span>usize - <span class="number">2</span>);
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

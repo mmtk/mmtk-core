@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["LOG_BYTES_IN_MALLOC_PAGE",""]],"fn":[["calloc",""],["free",""],["malloc",""],["malloc_usable_size",""],["posix_memalign",""],["realloc",""]]});
+window.SIDEBAR_ITEMS = {"constant":[["LOG_BYTES_IN_MALLOC_PAGE",""]],"fn":[["calloc",""],["free",""],["malloc",""],["malloc_usable_size",""],["posix_memalign",""],["realloc",""]]};

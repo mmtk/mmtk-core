@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;heap&#x2F;gc_trigger.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>gc_trigger.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/gc_trigger.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>gc_trigger.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -487,493 +485,492 @@
 <span id="485">485</span>
 <span id="486">486</span>
 <span id="487">487</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options</span>::{<span class="ident">GCTriggerSelector</span>, <span class="ident">Options</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
-<span class="kw">use</span> <span class="ident">std::mem::MaybeUninit</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicUsize</span>;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+<span class="kw">use </span><span class="kw">crate</span>::util::options::{GCTriggerSelector, Options};
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
+<span class="kw">use </span>std::mem::MaybeUninit;
+<span class="kw">use </span>std::sync::atomic::AtomicUsize;
 
-<span class="doccomment">/// GCTrigger is responsible for triggering GCs based on the given policy.</span>
-<span class="doccomment">/// All the decisions about heap limit and GC triggering should be resolved here.</span>
-<span class="doccomment">/// Depending on the actual policy, we may either forward the calls either to the plan</span>
-<span class="doccomment">/// or to the binding/runtime.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The current plan. This is uninitialized when we create it, and later initialized</span>
-    <span class="doccomment">/// once we have a fixed address for the plan.</span>
-    <span class="ident">plan</span>: <span class="ident">MaybeUninit</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The triggering policy.</span>
-    <span class="kw">pub</span> <span class="ident">policy</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCTriggerPolicy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// GCTrigger is responsible for triggering GCs based on the given policy.
+/// All the decisions about heap limit and GC triggering should be resolved here.
+/// Depending on the actual policy, we may either forward the calls either to the plan
+/// or to the binding/runtime.
+</span><span class="kw">pub struct </span>GCTrigger&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// The current plan. This is uninitialized when we create it, and later initialized
+    /// once we have a fixed address for the plan.
+    </span>plan: MaybeUninit&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;,
+    <span class="doccomment">/// The triggering policy.
+    </span><span class="kw">pub </span>policy: Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">options</span>: <span class="kw-2">&amp;</span><span class="ident">Options</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">GCTrigger</span> {
-            <span class="ident">plan</span>: <span class="ident">MaybeUninit::uninit</span>(),
-            <span class="ident">policy</span>: <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">gc_trigger</span> {
-                <span class="ident">GCTriggerSelector::FixedHeapSize</span>(<span class="ident">size</span>) =&gt; <span class="ident">Box::new</span>(<span class="ident">FixedHeapSizeTrigger</span> {
-                    <span class="ident">total_pages</span>: <span class="ident">conversions::bytes_to_pages_up</span>(<span class="ident">size</span>),
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTrigger&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(options: <span class="kw-2">&amp;</span>Options) -&gt; <span class="self">Self </span>{
+        GCTrigger {
+            plan: MaybeUninit::uninit(),
+            policy: <span class="kw">match </span><span class="kw-2">*</span>options.gc_trigger {
+                GCTriggerSelector::FixedHeapSize(size) =&gt; Box::new(FixedHeapSizeTrigger {
+                    total_pages: conversions::bytes_to_pages_up(size),
                 }),
-                <span class="ident">GCTriggerSelector::DynamicHeapSize</span>(<span class="ident">min</span>, <span class="ident">max</span>) =&gt; <span class="ident">Box::new</span>(<span class="ident">MemBalancerTrigger::new</span>(
-                    <span class="ident">conversions::bytes_to_pages_up</span>(<span class="ident">min</span>),
-                    <span class="ident">conversions::bytes_to_pages_up</span>(<span class="ident">max</span>),
+                GCTriggerSelector::DynamicHeapSize(min, max) =&gt; Box::new(MemBalancerTrigger::new(
+                    conversions::bytes_to_pages_up(min),
+                    conversions::bytes_to_pages_up(max),
                 )),
-                <span class="ident">GCTriggerSelector::Delegated</span> =&gt; <span class="macro">unimplemented!</span>(),
+                GCTriggerSelector::Delegated =&gt; <span class="macro">unimplemented!</span>(),
             },
         }
     }
 
-    <span class="doccomment">/// Set the plan. This is called in `create_plan()` after we created a boxed plan.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_plan</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">write</span>(<span class="ident">plan</span>);
+    <span class="doccomment">/// Set the plan. This is called in `create_plan()` after we created a boxed plan.
+    </span><span class="kw">pub fn </span>set_plan(<span class="kw-2">&amp;mut </span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) {
+        <span class="self">self</span>.plan.write(plan);
     }
 
-    <span class="doccomment">/// This method is called periodically by the allocation subsystem</span>
-    <span class="doccomment">/// (by default, each time a page is consumed), and provides the</span>
-    <span class="doccomment">/// collector with an opportunity to collect.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `space_full`: Space request failed, must recover pages within &#39;space&#39;.</span>
-    <span class="doccomment">/// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">poll</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">assume_init</span>() };
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">policy</span>.<span class="ident">is_gc_required</span>(<span class="ident">space_full</span>, <span class="ident">space</span>, <span class="ident">plan</span>) {
+    <span class="doccomment">/// This method is called periodically by the allocation subsystem
+    /// (by default, each time a page is consumed), and provides the
+    /// collector with an opportunity to collect.
+    ///
+    /// Arguments:
+    /// * `space_full`: Space request failed, must recover pages within &#39;space&#39;.
+    /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
+    </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;) -&gt; bool {
+        <span class="kw">let </span>plan = <span class="kw">unsafe </span>{ <span class="self">self</span>.plan.assume_init() };
+        <span class="kw">if </span><span class="self">self</span>.policy.is_gc_required(space_full, space, plan) {
             <span class="macro">info!</span>(
                 <span class="string">&quot;[POLL] {}{}&quot;</span>,
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">space</span>) <span class="op">=</span> <span class="ident">space</span> {
-                    <span class="macro">format!</span>(<span class="string">&quot;{}: &quot;</span>, <span class="ident">space</span>.<span class="ident">get_name</span>())
-                } <span class="kw">else</span> {
-                    <span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>()
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(space) = space {
+                    <span class="macro">format!</span>(<span class="string">&quot;{}: &quot;</span>, space.get_name())
+                } <span class="kw">else </span>{
+                    <span class="string">&quot;&quot;</span>.to_string()
                 },
-                <span class="string">&quot;Triggering collection&quot;</span>
-            );
-            <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">gc_requester</span>.<span class="ident">request</span>();
-            <span class="kw">return</span> <span class="bool-val">true</span>;
+                <span class="string">&quot;Triggering collection&quot;
+            </span>);
+            plan.base().gc_requester.request();
+            <span class="kw">return </span><span class="bool-val">true</span>;
         }
-        <span class="bool-val">false</span>
-    }
+        <span class="bool-val">false
+    </span>}
 
-    <span class="doccomment">/// Check if the heap is full</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_heap_full</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">assume_init</span>() };
-        <span class="self">self</span>.<span class="ident">policy</span>.<span class="ident">is_heap_full</span>(<span class="ident">plan</span>)
+    <span class="doccomment">/// Check if the heap is full
+    </span><span class="kw">pub fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>plan = <span class="kw">unsafe </span>{ <span class="self">self</span>.plan.assume_init() };
+        <span class="self">self</span>.policy.is_heap_full(plan)
     }
 }
 
-<span class="doccomment">/// This trait describes a GC trigger policy. A triggering policy have hooks to be informed about</span>
-<span class="doccomment">/// GC start/end so they can collect some statistics about GC and allocation. The policy needs to</span>
-<span class="doccomment">/// decide the (current) heap limit and decide whether a GC should be performed.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GCTriggerPolicy</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span> {
-    <span class="doccomment">/// Inform the triggering policy that a GC starts.</span>
-    <span class="kw">fn</span> <span class="ident">on_gc_start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {}
-    <span class="doccomment">/// Inform the triggering policy that a GC is about to start the release work. This is called</span>
-    <span class="doccomment">/// in the global [`crate::scheduler::gc_work::Release`] work packet. This means we assume a plan</span>
-    <span class="doccomment">/// do not schedule any work that reclaims memory before the global `Release` work. The current plans</span>
-    <span class="doccomment">/// satisfy this assumption: they schedule other release work in `plan.release()`.</span>
-    <span class="kw">fn</span> <span class="ident">on_gc_release</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {}
-    <span class="doccomment">/// Inform the triggering policy that a GC ends.</span>
-    <span class="kw">fn</span> <span class="ident">on_gc_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {}
-    <span class="doccomment">/// Is a GC required now?</span>
-    <span class="kw">fn</span> <span class="ident">is_gc_required</span>(
+<span class="doccomment">/// This trait describes a GC trigger policy. A triggering policy have hooks to be informed about
+/// GC start/end so they can collect some statistics about GC and allocation. The policy needs to
+/// decide the (current) heap limit and decide whether a GC should be performed.
+</span><span class="kw">pub trait </span>GCTriggerPolicy&lt;VM: VMBinding&gt;: Sync + Send {
+    <span class="doccomment">/// Inform the triggering policy that a GC starts.
+    </span><span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    <span class="doccomment">/// Inform the triggering policy that a GC is about to start the release work. This is called
+    /// in the global [`crate::scheduler::gc_work::Release`] work packet. This means we assume a plan
+    /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
+    /// satisfy this assumption: they schedule other release work in `plan.release()`.
+    </span><span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    <span class="doccomment">/// Inform the triggering policy that a GC ends.
+    </span><span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    <span class="doccomment">/// Is a GC required now?
+    </span><span class="kw">fn </span>is_gc_required(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space_full</span>: <span class="ident">bool</span>,
-        <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">bool</span>;
-    <span class="doccomment">/// Is current heap full?</span>
-    <span class="kw">fn</span> <span class="ident">is_heap_full</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>;
-    <span class="doccomment">/// Return the current heap size (in pages)</span>
-    <span class="kw">fn</span> <span class="ident">get_heap_size_in_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span>;
-    <span class="doccomment">/// Can the heap size grow?</span>
-    <span class="kw">fn</span> <span class="ident">can_heap_size_grow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+        space_full: bool,
+        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
+        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    ) -&gt; bool;
+    <span class="doccomment">/// Is current heap full?
+    </span><span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool;
+    <span class="doccomment">/// Return the current heap size (in pages)
+    </span><span class="kw">fn </span>get_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
+    <span class="doccomment">/// Can the heap size grow?
+    </span><span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 }
 
-<span class="doccomment">/// A simple GC trigger that uses a fixed heap size.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FixedHeapSizeTrigger</span> {
-    <span class="ident">total_pages</span>: <span class="ident">usize</span>,
+<span class="doccomment">/// A simple GC trigger that uses a fixed heap size.
+</span><span class="kw">pub struct </span>FixedHeapSizeTrigger {
+    total_pages: usize,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCTriggerPolicy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">FixedHeapSizeTrigger</span> {
-    <span class="kw">fn</span> <span class="ident">is_gc_required</span>(
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTriggerPolicy&lt;VM&gt; <span class="kw">for </span>FixedHeapSizeTrigger {
+    <span class="kw">fn </span>is_gc_required(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space_full</span>: <span class="ident">bool</span>,
-        <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// Let the plan decide</span>
-        <span class="ident">plan</span>.<span class="ident">collection_required</span>(<span class="ident">space_full</span>, <span class="ident">space</span>)
+        space_full: bool,
+        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
+        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    ) -&gt; bool {
+        <span class="comment">// Let the plan decide
+        </span>plan.collection_required(space_full, space)
     }
 
-    <span class="kw">fn</span> <span class="ident">is_heap_full</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// If reserved pages is larger than the total pages, the heap is full.</span>
-        <span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>() <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">total_pages</span>
+    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
+        <span class="comment">// If reserved pages is larger than the total pages, the heap is full.
+        </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.total_pages
     }
 
-    <span class="kw">fn</span> <span class="ident">get_heap_size_in_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">total_pages</span>
+    <span class="kw">fn </span>get_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.total_pages
     }
 
-    <span class="kw">fn</span> <span class="ident">can_heap_size_grow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="bool-val">false</span>
-    }
+    <span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="bool-val">false
+    </span>}
 }
 
-<span class="kw">use</span> <span class="ident">atomic_refcell::AtomicRefCell</span>;
-<span class="kw">use</span> <span class="ident">std::time::Instant</span>;
+<span class="kw">use </span>atomic_refcell::AtomicRefCell;
+<span class="kw">use </span>std::time::Instant;
 
-<span class="doccomment">/// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, &lt;https://dl.acm.org/doi/10.1145/3563323&gt;)</span>
-<span class="doccomment">/// We use MemBalancer to decide a heap limit between the min heap and the max heap.</span>
-<span class="doccomment">/// The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,</span>
-<span class="doccomment">/// and uses a fixed constant instead.</span>
-<span class="comment">// TODO: implement a complete mem balancer.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemBalancerTrigger</span> {
-    <span class="doccomment">/// The min heap size</span>
-    <span class="ident">min_heap_pages</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The max heap size</span>
-    <span class="ident">max_heap_pages</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The current heap size</span>
-    <span class="ident">current_heap_pages</span>: <span class="ident">AtomicUsize</span>,
-    <span class="doccomment">/// Statistics</span>
-    <span class="ident">stats</span>: <span class="ident">AtomicRefCell</span><span class="op">&lt;</span><span class="ident">MemBalancerStats</span><span class="op">&gt;</span>,
+<span class="doccomment">/// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, &lt;https://dl.acm.org/doi/10.1145/3563323&gt;)
+/// We use MemBalancer to decide a heap limit between the min heap and the max heap.
+/// The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,
+/// and uses a fixed constant instead.
+</span><span class="comment">// TODO: implement a complete mem balancer.
+</span><span class="kw">pub struct </span>MemBalancerTrigger {
+    <span class="doccomment">/// The min heap size
+    </span>min_heap_pages: usize,
+    <span class="doccomment">/// The max heap size
+    </span>max_heap_pages: usize,
+    <span class="doccomment">/// The current heap size
+    </span>current_heap_pages: AtomicUsize,
+    <span class="doccomment">/// Statistics
+    </span>stats: AtomicRefCell&lt;MemBalancerStats&gt;,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">MemBalancerStats</span> {
-    <span class="comment">// Allocation/collection stats in the previous estimation. We keep this so we can use them to smooth the current value</span>
-    <span class="doccomment">/// Previous allocated memory in pages.</span>
-    <span class="ident">allocation_pages_prev</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Previous allocation duration in secs</span>
-    <span class="ident">allocation_time_prev</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Previous collected memory in pages</span>
-    <span class="ident">collection_pages_prev</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Previous colleciton duration in secs</span>
-    <span class="ident">collection_time_prev</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Copy, Clone, Debug)]
+</span><span class="kw">struct </span>MemBalancerStats {
+    <span class="comment">// Allocation/collection stats in the previous estimation. We keep this so we can use them to smooth the current value
+    </span><span class="doccomment">/// Previous allocated memory in pages.
+    </span>allocation_pages_prev: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+    <span class="doccomment">/// Previous allocation duration in secs
+    </span>allocation_time_prev: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+    <span class="doccomment">/// Previous collected memory in pages
+    </span>collection_pages_prev: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+    <span class="doccomment">/// Previous colleciton duration in secs
+    </span>collection_time_prev: <span class="prelude-ty">Option</span>&lt;f64&gt;,
 
-    <span class="comment">// Allocation/collection stats in this estimation.</span>
-    <span class="doccomment">/// Allocated memory in pages</span>
-    <span class="ident">allocation_pages</span>: <span class="ident">f64</span>,
-    <span class="doccomment">/// Allocation duration in secs</span>
-    <span class="ident">allocation_time</span>: <span class="ident">f64</span>,
-    <span class="doccomment">/// Collected memory in pages</span>
-    <span class="ident">collection_pages</span>: <span class="ident">f64</span>,
-    <span class="doccomment">/// Collection duration in secs</span>
-    <span class="ident">collection_time</span>: <span class="ident">f64</span>,
+    <span class="comment">// Allocation/collection stats in this estimation.
+    </span><span class="doccomment">/// Allocated memory in pages
+    </span>allocation_pages: f64,
+    <span class="doccomment">/// Allocation duration in secs
+    </span>allocation_time: f64,
+    <span class="doccomment">/// Collected memory in pages
+    </span>collection_pages: f64,
+    <span class="doccomment">/// Collection duration in secs
+    </span>collection_time: f64,
 
-    <span class="doccomment">/// The time when this GC starts</span>
-    <span class="ident">gc_start_time</span>: <span class="ident">Instant</span>,
-    <span class="doccomment">/// The time when this GC ends</span>
-    <span class="ident">gc_end_time</span>: <span class="ident">Instant</span>,
+    <span class="doccomment">/// The time when this GC starts
+    </span>gc_start_time: Instant,
+    <span class="doccomment">/// The time when this GC ends
+    </span>gc_end_time: Instant,
 
-    <span class="doccomment">/// The live pages before we release memory.</span>
-    <span class="ident">gc_release_live_pages</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The live pages at the GC end</span>
-    <span class="ident">gc_end_live_pages</span>: <span class="ident">usize</span>,
+    <span class="doccomment">/// The live pages before we release memory.
+    </span>gc_release_live_pages: usize,
+    <span class="doccomment">/// The live pages at the GC end
+    </span>gc_end_live_pages: usize,
 }
 
-<span class="kw">impl</span> <span class="ident">std::default::Default</span> <span class="kw">for</span> <span class="ident">MemBalancerStats</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-        <span class="self">Self</span> {
-            <span class="ident">allocation_pages_prev</span>: <span class="prelude-val">None</span>,
-            <span class="ident">allocation_time_prev</span>: <span class="prelude-val">None</span>,
-            <span class="ident">collection_pages_prev</span>: <span class="prelude-val">None</span>,
-            <span class="ident">collection_time_prev</span>: <span class="prelude-val">None</span>,
-            <span class="ident">allocation_pages</span>: <span class="number">0f64</span>,
-            <span class="ident">allocation_time</span>: <span class="number">0f64</span>,
-            <span class="ident">collection_pages</span>: <span class="number">0f64</span>,
-            <span class="ident">collection_time</span>: <span class="number">0f64</span>,
-            <span class="ident">gc_start_time</span>: <span class="ident">now</span>,
-            <span class="ident">gc_end_time</span>: <span class="ident">now</span>,
-            <span class="ident">gc_release_live_pages</span>: <span class="number">0</span>,
-            <span class="ident">gc_end_live_pages</span>: <span class="number">0</span>,
+<span class="kw">impl </span>std::default::Default <span class="kw">for </span>MemBalancerStats {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>now = Instant::now();
+        <span class="self">Self </span>{
+            allocation_pages_prev: <span class="prelude-val">None</span>,
+            allocation_time_prev: <span class="prelude-val">None</span>,
+            collection_pages_prev: <span class="prelude-val">None</span>,
+            collection_time_prev: <span class="prelude-val">None</span>,
+            allocation_pages: <span class="number">0f64</span>,
+            allocation_time: <span class="number">0f64</span>,
+            collection_pages: <span class="number">0f64</span>,
+            collection_time: <span class="number">0f64</span>,
+            gc_start_time: now,
+            gc_end_time: now,
+            gc_release_live_pages: <span class="number">0</span>,
+            gc_end_live_pages: <span class="number">0</span>,
         }
     }
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GenerationalPlan</span>;
+<span class="kw">use </span><span class="kw">crate</span>::plan::GenerationalPlan;
 
-<span class="kw">impl</span> <span class="ident">MemBalancerStats</span> {
-    <span class="comment">// Collect mem stats for generational plans:</span>
-    <span class="comment">// * We ignore nursery GCs.</span>
-    <span class="comment">// * allocation = objects in mature space = promoted + pretentured = live pages in mature space before release - live pages at the end of last mature GC</span>
-    <span class="comment">// * collection = live pages in mature space at the end of GC -  live pages in mature space before release</span>
+<span class="kw">impl </span>MemBalancerStats {
+    <span class="comment">// Collect mem stats for generational plans:
+    // * We ignore nursery GCs.
+    // * allocation = objects in mature space = promoted + pretentured = live pages in mature space before release - live pages at the end of last mature GC
+    // * collection = live pages in mature space at the end of GC -  live pages in mature space before release
 
-    <span class="kw">fn</span> <span class="ident">generational_mem_stats_on_gc_start</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">_plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">GenerationalPlan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
+    </span><span class="kw">fn </span>generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        _plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
     ) {
-        <span class="comment">// We don&#39;t need to do anything</span>
-    }
-    <span class="kw">fn</span> <span class="ident">generational_mem_stats_on_gc_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">GenerationalPlan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
+        <span class="comment">// We don&#39;t need to do anything
+    </span>}
+    <span class="kw">fn </span>generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
     ) {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">common_gen</span>().<span class="ident">is_current_gc_nursery</span>() {
-            <span class="self">self</span>.<span class="ident">gc_release_live_pages</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">get_mature_reserved_pages</span>();
+        <span class="kw">if </span>!plan.common_gen().is_current_gc_nursery() {
+            <span class="self">self</span>.gc_release_live_pages = plan.get_mature_reserved_pages();
 
-            <span class="comment">// Calculate the promoted pages (including pre tentured objects)</span>
-            <span class="kw">let</span> <span class="ident">promoted</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gc_release_live_pages</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>;
-            <span class="self">self</span>.<span class="ident">allocation_pages</span> <span class="op">=</span> <span class="ident">promoted</span> <span class="kw">as</span> <span class="ident">f64</span>;
+            <span class="comment">// Calculate the promoted pages (including pre tentured objects)
+            </span><span class="kw">let </span>promoted = <span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages;
+            <span class="self">self</span>.allocation_pages = promoted <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;promoted = mature live before release {} - mature live at prev gc end {} = {}&quot;</span>,
-                <span class="self">self</span>.<span class="ident">gc_release_live_pages</span>,
-                <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>,
-                <span class="ident">promoted</span>
+                <span class="self">self</span>.gc_release_live_pages,
+                <span class="self">self</span>.gc_end_live_pages,
+                promoted
             );
             <span class="macro">trace!</span>(
                 <span class="string">&quot;allocated pages (accumulated to) = {}&quot;</span>,
-                <span class="self">self</span>.<span class="ident">allocation_pages</span>
+                <span class="self">self</span>.allocation_pages
             );
         }
     }
-    <span class="doccomment">/// Return true if we should compute a new heap limit. Only do so at the end of a mature GC</span>
-    <span class="kw">fn</span> <span class="ident">generational_mem_stats_on_gc_end</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">GenerationalPlan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">common_gen</span>().<span class="ident">is_current_gc_nursery</span>() {
-            <span class="self">self</span>.<span class="ident">gc_end_live_pages</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">get_mature_reserved_pages</span>();
-            <span class="self">self</span>.<span class="ident">collection_pages</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">gc_release_live_pages</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>) <span class="kw">as</span> <span class="ident">f64</span>;
+    <span class="doccomment">/// Return true if we should compute a new heap limit. Only do so at the end of a mature GC
+    </span><span class="kw">fn </span>generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
+    ) -&gt; bool {
+        <span class="kw">if </span>!plan.common_gen().is_current_gc_nursery() {
+            <span class="self">self</span>.gc_end_live_pages = plan.get_mature_reserved_pages();
+            <span class="self">self</span>.collection_pages = (<span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;collected pages = mature live at gc end {} - mature live at gc release {} = {}&quot;</span>,
-                <span class="self">self</span>.<span class="ident">gc_release_live_pages</span>,
-                <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>,
-                <span class="self">self</span>.<span class="ident">collection_pages</span>
+                <span class="self">self</span>.gc_release_live_pages,
+                <span class="self">self</span>.gc_end_live_pages,
+                <span class="self">self</span>.collection_pages
             );
-            <span class="bool-val">true</span>
-        } <span class="kw">else</span> {
-            <span class="bool-val">false</span>
-        }
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            <span class="bool-val">false
+        </span>}
     }
 
-    <span class="comment">// Collect mem stats for non generational plans</span>
-    <span class="comment">// * allocation = live pages at the start of GC - live pages at the end of last GC</span>
-    <span class="comment">// * collection = live pages at the end of GC - live pages before release</span>
+    <span class="comment">// Collect mem stats for non generational plans
+    // * allocation = live pages at the start of GC - live pages at the end of last GC
+    // * collection = live pages at the end of GC - live pages before release
 
-    <span class="kw">fn</span> <span class="ident">non_generational_mem_stats_on_gc_start</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">allocation_pages</span> <span class="op">=</span> (<span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>) <span class="kw">as</span> <span class="ident">f64</span>;
+    </span><span class="kw">fn </span>non_generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.allocation_pages = (mmtk.plan.get_reserved_pages() - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
             <span class="string">&quot;allocated pages = used {} - live in last gc {} = {}&quot;</span>,
-            <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>(),
-            <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>,
-            <span class="self">self</span>.<span class="ident">allocation_pages</span>
+            mmtk.plan.get_reserved_pages(),
+            <span class="self">self</span>.gc_end_live_pages,
+            <span class="self">self</span>.allocation_pages
         );
     }
-    <span class="kw">fn</span> <span class="ident">non_generational_mem_stats_on_gc_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">gc_release_live_pages</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>();
-        <span class="macro">trace!</span>(<span class="string">&quot;live before release = {}&quot;</span>, <span class="self">self</span>.<span class="ident">gc_release_live_pages</span>);
+    <span class="kw">fn </span>non_generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.gc_release_live_pages = mmtk.plan.get_reserved_pages();
+        <span class="macro">trace!</span>(<span class="string">&quot;live before release = {}&quot;</span>, <span class="self">self</span>.gc_release_live_pages);
     }
-    <span class="kw">fn</span> <span class="ident">non_generational_mem_stats_on_gc_end</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">gc_end_live_pages</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>();
-        <span class="macro">trace!</span>(<span class="string">&quot;live pages = {}&quot;</span>, <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>);
-        <span class="self">self</span>.<span class="ident">collection_pages</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">gc_release_live_pages</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>) <span class="kw">as</span> <span class="ident">f64</span>;
+    <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.gc_end_live_pages = mmtk.plan.get_reserved_pages();
+        <span class="macro">trace!</span>(<span class="string">&quot;live pages = {}&quot;</span>, <span class="self">self</span>.gc_end_live_pages);
+        <span class="self">self</span>.collection_pages = (<span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
             <span class="string">&quot;collected pages = live at gc end {} - live at gc release {} = {}&quot;</span>,
-            <span class="self">self</span>.<span class="ident">gc_release_live_pages</span>,
-            <span class="self">self</span>.<span class="ident">gc_end_live_pages</span>,
-            <span class="self">self</span>.<span class="ident">collection_pages</span>
+            <span class="self">self</span>.gc_release_live_pages,
+            <span class="self">self</span>.gc_end_live_pages,
+            <span class="self">self</span>.collection_pages
         );
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCTriggerPolicy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MemBalancerTrigger</span> {
-    <span class="kw">fn</span> <span class="ident">on_gc_start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTriggerPolicy&lt;VM&gt; <span class="kw">for </span>MemBalancerTrigger {
+    <span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_start ===&quot;</span>);
-        <span class="self">self</span>.<span class="ident">access_stats</span>(<span class="op">|</span><span class="ident">stats</span><span class="op">|</span> {
-            <span class="ident">stats</span>.<span class="ident">gc_start_time</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-            <span class="ident">stats</span>.<span class="ident">allocation_time</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">stats</span>.<span class="ident">gc_start_time</span> <span class="op">-</span> <span class="ident">stats</span>.<span class="ident">gc_end_time</span>).<span class="ident">as_secs_f64</span>();
+        <span class="self">self</span>.access_stats(|stats| {
+            stats.gc_start_time = Instant::now();
+            stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
             <span class="macro">trace!</span>(
                 <span class="string">&quot;gc_start = {:?}, allocation_time = {}&quot;</span>,
-                <span class="ident">stats</span>.<span class="ident">gc_start_time</span>,
-                <span class="ident">stats</span>.<span class="ident">allocation_time</span>
+                stats.gc_start_time,
+                stats.allocation_time
             );
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">plan</span>) <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">generational</span>() {
-                <span class="ident">stats</span>.<span class="ident">generational_mem_stats_on_gc_start</span>(<span class="ident">plan</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">stats</span>.<span class="ident">non_generational_mem_stats_on_gc_start</span>(<span class="ident">mmtk</span>);
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.plan.generational() {
+                stats.generational_mem_stats_on_gc_start(plan);
+            } <span class="kw">else </span>{
+                stats.non_generational_mem_stats_on_gc_start(mmtk);
             }
         });
     }
 
-    <span class="kw">fn</span> <span class="ident">on_gc_release</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_release ===&quot;</span>);
-        <span class="self">self</span>.<span class="ident">access_stats</span>(<span class="op">|</span><span class="ident">stats</span><span class="op">|</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">plan</span>) <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">generational</span>() {
-                <span class="ident">stats</span>.<span class="ident">generational_mem_stats_on_gc_release</span>(<span class="ident">plan</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">stats</span>.<span class="ident">non_generational_mem_stats_on_gc_release</span>(<span class="ident">mmtk</span>);
+        <span class="self">self</span>.access_stats(|stats| {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.plan.generational() {
+                stats.generational_mem_stats_on_gc_release(plan);
+            } <span class="kw">else </span>{
+                stats.non_generational_mem_stats_on_gc_release(mmtk);
             }
         });
     }
 
-    <span class="kw">fn</span> <span class="ident">on_gc_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_end ===&quot;</span>);
-        <span class="self">self</span>.<span class="ident">access_stats</span>(<span class="op">|</span><span class="ident">stats</span><span class="op">|</span> {
-            <span class="ident">stats</span>.<span class="ident">gc_end_time</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-            <span class="ident">stats</span>.<span class="ident">collection_time</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">stats</span>.<span class="ident">gc_end_time</span> <span class="op">-</span> <span class="ident">stats</span>.<span class="ident">gc_start_time</span>).<span class="ident">as_secs_f64</span>();
+        <span class="self">self</span>.access_stats(|stats| {
+            stats.gc_end_time = Instant::now();
+            stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
             <span class="macro">trace!</span>(
                 <span class="string">&quot;gc_end = {:?}, collection_time = {}&quot;</span>,
-                <span class="ident">stats</span>.<span class="ident">gc_end_time</span>,
-                <span class="ident">stats</span>.<span class="ident">collection_time</span>
+                stats.gc_end_time,
+                stats.collection_time
             );
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">plan</span>) <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">generational</span>() {
-                <span class="kw">if</span> <span class="ident">stats</span>.<span class="ident">generational_mem_stats_on_gc_end</span>(<span class="ident">plan</span>) {
-                    <span class="self">self</span>.<span class="ident">compute_new_heap_limit</span>(
-                        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>(),
-                        <span class="comment">// We reserve an extra of 2x max nursery: when MMTk triggers a GC, it needs to ensure there is enough room in the mature space</span>
-                        <span class="comment">// to accomodate the copiyng from nursery, thus it counts the nursery size twice to make sure that objects can all be copied.</span>
-                        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_collection_reserved_pages</span>()
-                            <span class="op">+</span> <span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">get_max_nursery_pages</span>() <span class="op">*</span> <span class="number">2</span>,
-                        <span class="ident">stats</span>,
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.plan.generational() {
+                <span class="kw">if </span>stats.generational_mem_stats_on_gc_end(plan) {
+                    <span class="self">self</span>.compute_new_heap_limit(
+                        mmtk.plan.get_reserved_pages(),
+                        <span class="comment">// We reserve an extra of 2x max nursery: when MMTk triggers a GC, it needs to ensure there is enough room in the mature space
+                        // to accomodate the copiyng from nursery, thus it counts the nursery size twice to make sure that objects can all be copied.
+                        </span>mmtk.plan.get_collection_reserved_pages()
+                            + mmtk.options.get_max_nursery_pages() * <span class="number">2</span>,
+                        stats,
                     );
                 }
-            } <span class="kw">else</span> {
-                <span class="ident">stats</span>.<span class="ident">non_generational_mem_stats_on_gc_end</span>(<span class="ident">mmtk</span>);
-                <span class="self">self</span>.<span class="ident">compute_new_heap_limit</span>(
-                    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>(),
-                    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_collection_reserved_pages</span>(),
-                    <span class="ident">stats</span>,
+            } <span class="kw">else </span>{
+                stats.non_generational_mem_stats_on_gc_end(mmtk);
+                <span class="self">self</span>.compute_new_heap_limit(
+                    mmtk.plan.get_reserved_pages(),
+                    mmtk.plan.get_collection_reserved_pages(),
+                    stats,
                 );
             }
         });
     }
 
-    <span class="kw">fn</span> <span class="ident">is_gc_required</span>(
+    <span class="kw">fn </span>is_gc_required(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space_full</span>: <span class="ident">bool</span>,
-        <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// Let the plan decide</span>
-        <span class="ident">plan</span>.<span class="ident">collection_required</span>(<span class="ident">space_full</span>, <span class="ident">space</span>)
+        space_full: bool,
+        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
+        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    ) -&gt; bool {
+        <span class="comment">// Let the plan decide
+        </span>plan.collection_required(space_full, space)
     }
 
-    <span class="kw">fn</span> <span class="ident">is_heap_full</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// If reserved pages is larger than the current heap size, the heap is full.</span>
-        <span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>() <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">current_heap_pages</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
+    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
+        <span class="comment">// If reserved pages is larger than the current heap size, the heap is full.
+        </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_heap_size_in_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">current_heap_pages</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
+    <span class="kw">fn </span>get_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
     }
 
-    <span class="kw">fn</span> <span class="ident">can_heap_size_grow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">current_heap_pages</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">max_heap_pages</span>
+    <span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed) &lt; <span class="self">self</span>.max_heap_pages
     }
 }
-<span class="kw">impl</span> <span class="ident">MemBalancerTrigger</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">min_heap_pages</span>: <span class="ident">usize</span>, <span class="ident">max_heap_pages</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">min_heap_pages</span>,
-            <span class="ident">max_heap_pages</span>,
-            <span class="comment">// start with min heap</span>
-            <span class="ident">current_heap_pages</span>: <span class="ident">AtomicUsize::new</span>(<span class="ident">min_heap_pages</span>),
-            <span class="ident">stats</span>: <span class="ident">AtomicRefCell::new</span>(<span class="ident">Default::default</span>()),
+<span class="kw">impl </span>MemBalancerTrigger {
+    <span class="kw">fn </span>new(min_heap_pages: usize, max_heap_pages: usize) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            min_heap_pages,
+            max_heap_pages,
+            <span class="comment">// start with min heap
+            </span>current_heap_pages: AtomicUsize::new(min_heap_pages),
+            stats: AtomicRefCell::new(Default::default()),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">access_stats</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="ident">F</span>)
-    <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;mut</span> <span class="ident">MemBalancerStats</span>),
+    <span class="kw">fn </span>access_stats&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: F)
+    <span class="kw">where
+        </span>F: FnMut(<span class="kw-2">&amp;mut </span>MemBalancerStats),
     {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stats</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">borrow_mut</span>();
-        <span class="ident">f</span>(<span class="kw-2">&amp;mut</span> <span class="ident">stats</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>stats = <span class="self">self</span>.stats.borrow_mut();
+        f(<span class="kw-2">&amp;mut </span>stats);
     }
 
-    <span class="kw">fn</span> <span class="ident">compute_new_heap_limit</span>(
+    <span class="kw">fn </span>compute_new_heap_limit(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">live</span>: <span class="ident">usize</span>,
-        <span class="ident">extra_reserve</span>: <span class="ident">usize</span>,
-        <span class="ident">stats</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MemBalancerStats</span>,
+        live: usize,
+        extra_reserve: usize,
+        stats: <span class="kw-2">&amp;mut </span>MemBalancerStats,
     ) {
-        <span class="macro">trace!</span>(<span class="string">&quot;compute new heap limit: {:?}&quot;</span>, <span class="ident">stats</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;compute new heap limit: {:?}&quot;</span>, stats);
 
-        <span class="comment">// Constants from the original paper</span>
-        <span class="kw">const</span> <span class="ident">ALLOCATION_SMOOTH_FACTOR</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">0.95</span>;
-        <span class="kw">const</span> <span class="ident">COLLECTION_SMOOTH_FACTOR</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">0.5</span>;
-        <span class="kw">const</span> <span class="ident">TUNING_FACTOR</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">0.2</span>;
+        <span class="comment">// Constants from the original paper
+        </span><span class="kw">const </span>ALLOCATION_SMOOTH_FACTOR: f64 = <span class="number">0.95</span>;
+        <span class="kw">const </span>COLLECTION_SMOOTH_FACTOR: f64 = <span class="number">0.5</span>;
+        <span class="kw">const </span>TUNING_FACTOR: f64 = <span class="number">0.2</span>;
 
-        <span class="comment">// Smooth memory/time for allocation/collection</span>
-        <span class="kw">let</span> <span class="ident">smooth</span> <span class="op">=</span> <span class="op">|</span><span class="ident">prev</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">f64</span><span class="op">&gt;</span>, <span class="ident">cur</span>, <span class="ident">factor</span><span class="op">|</span> {
-            <span class="ident">prev</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> <span class="ident">p</span> <span class="op">*</span> <span class="ident">factor</span> <span class="op">+</span> <span class="ident">cur</span> <span class="op">*</span> (<span class="number">1.0f64</span> <span class="op">-</span> <span class="ident">factor</span>))
-                .<span class="ident">unwrap_or</span>(<span class="ident">cur</span>)
+        <span class="comment">// Smooth memory/time for allocation/collection
+        </span><span class="kw">let </span>smooth = |prev: <span class="prelude-ty">Option</span>&lt;f64&gt;, cur, factor| {
+            prev.map(|p| p * factor + cur * (<span class="number">1.0f64 </span>- factor))
+                .unwrap_or(cur)
         };
-        <span class="kw">let</span> <span class="ident">alloc_mem</span> <span class="op">=</span> <span class="ident">smooth</span>(
-            <span class="ident">stats</span>.<span class="ident">allocation_pages_prev</span>,
-            <span class="ident">stats</span>.<span class="ident">allocation_pages</span>,
-            <span class="ident">ALLOCATION_SMOOTH_FACTOR</span>,
+        <span class="kw">let </span>alloc_mem = smooth(
+            stats.allocation_pages_prev,
+            stats.allocation_pages,
+            ALLOCATION_SMOOTH_FACTOR,
         );
-        <span class="kw">let</span> <span class="ident">alloc_time</span> <span class="op">=</span> <span class="ident">smooth</span>(
-            <span class="ident">stats</span>.<span class="ident">allocation_time_prev</span>,
-            <span class="ident">stats</span>.<span class="ident">allocation_time</span>,
-            <span class="ident">ALLOCATION_SMOOTH_FACTOR</span>,
+        <span class="kw">let </span>alloc_time = smooth(
+            stats.allocation_time_prev,
+            stats.allocation_time,
+            ALLOCATION_SMOOTH_FACTOR,
         );
-        <span class="kw">let</span> <span class="ident">gc_mem</span> <span class="op">=</span> <span class="ident">smooth</span>(
-            <span class="ident">stats</span>.<span class="ident">collection_pages_prev</span>,
-            <span class="ident">stats</span>.<span class="ident">collection_pages</span>,
-            <span class="ident">COLLECTION_SMOOTH_FACTOR</span>,
+        <span class="kw">let </span>gc_mem = smooth(
+            stats.collection_pages_prev,
+            stats.collection_pages,
+            COLLECTION_SMOOTH_FACTOR,
         );
-        <span class="kw">let</span> <span class="ident">gc_time</span> <span class="op">=</span> <span class="ident">smooth</span>(
-            <span class="ident">stats</span>.<span class="ident">collection_time_prev</span>,
-            <span class="ident">stats</span>.<span class="ident">collection_time</span>,
-            <span class="ident">COLLECTION_SMOOTH_FACTOR</span>,
+        <span class="kw">let </span>gc_time = smooth(
+            stats.collection_time_prev,
+            stats.collection_time,
+            COLLECTION_SMOOTH_FACTOR,
         );
         <span class="macro">trace!</span>(
             <span class="string">&quot;after smoothing, alloc mem = {}, alloc_time = {}&quot;</span>,
-            <span class="ident">alloc_mem</span>,
-            <span class="ident">alloc_time</span>
+            alloc_mem,
+            alloc_time
         );
         <span class="macro">trace!</span>(
             <span class="string">&quot;after smoothing, gc mem    = {}, gc_time    = {}&quot;</span>,
-            <span class="ident">gc_mem</span>,
-            <span class="ident">gc_time</span>
+            gc_mem,
+            gc_time
         );
 
-        <span class="comment">// We got the smoothed stats. Now save the current stats as previous stats</span>
-        <span class="ident">stats</span>.<span class="ident">allocation_pages_prev</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">stats</span>.<span class="ident">allocation_pages</span>);
-        <span class="ident">stats</span>.<span class="ident">allocation_pages</span> <span class="op">=</span> <span class="number">0f64</span>;
-        <span class="ident">stats</span>.<span class="ident">allocation_time_prev</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">stats</span>.<span class="ident">allocation_time</span>);
-        <span class="ident">stats</span>.<span class="ident">allocation_time</span> <span class="op">=</span> <span class="number">0f64</span>;
-        <span class="ident">stats</span>.<span class="ident">collection_pages_prev</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">stats</span>.<span class="ident">collection_pages</span>);
-        <span class="ident">stats</span>.<span class="ident">collection_pages</span> <span class="op">=</span> <span class="number">0f64</span>;
-        <span class="ident">stats</span>.<span class="ident">collection_time_prev</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">stats</span>.<span class="ident">collection_time</span>);
-        <span class="ident">stats</span>.<span class="ident">collection_time</span> <span class="op">=</span> <span class="number">0f64</span>;
+        <span class="comment">// We got the smoothed stats. Now save the current stats as previous stats
+        </span>stats.allocation_pages_prev = <span class="prelude-val">Some</span>(stats.allocation_pages);
+        stats.allocation_pages = <span class="number">0f64</span>;
+        stats.allocation_time_prev = <span class="prelude-val">Some</span>(stats.allocation_time);
+        stats.allocation_time = <span class="number">0f64</span>;
+        stats.collection_pages_prev = <span class="prelude-val">Some</span>(stats.collection_pages);
+        stats.collection_pages = <span class="number">0f64</span>;
+        stats.collection_time_prev = <span class="prelude-val">Some</span>(stats.collection_time);
+        stats.collection_time = <span class="number">0f64</span>;
 
-        <span class="comment">// Calculate the square root</span>
-        <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">gc_mem</span> <span class="op">!</span><span class="op">=</span> <span class="number">0f64</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">live</span> <span class="kw">as</span> <span class="ident">f64</span>;
-            <span class="ident">e</span> <span class="kw-2">*</span><span class="op">=</span> <span class="ident">alloc_mem</span> <span class="op">/</span> <span class="ident">alloc_time</span>;
-            <span class="ident">e</span> <span class="op">/</span><span class="op">=</span> <span class="ident">TUNING_FACTOR</span>;
-            <span class="ident">e</span> <span class="op">/</span><span class="op">=</span> <span class="ident">gc_mem</span> <span class="op">/</span> <span class="ident">gc_time</span>;
-            <span class="ident">e</span>.<span class="ident">sqrt</span>()
-        } <span class="kw">else</span> {
-            <span class="comment">// If collected memory is zero, we cannot do division by zero. So use an estimate value instead.</span>
-            (<span class="ident">live</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="number">4096f64</span>).<span class="ident">sqrt</span>()
+        <span class="comment">// Calculate the square root
+        </span><span class="kw">let </span>e: f64 = <span class="kw">if </span>gc_mem != <span class="number">0f64 </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>e = live <span class="kw">as </span>f64;
+            e <span class="kw-2">*</span>= alloc_mem / alloc_time;
+            e /= TUNING_FACTOR;
+            e /= gc_mem / gc_time;
+            e.sqrt()
+        } <span class="kw">else </span>{
+            <span class="comment">// If collected memory is zero, we cannot do division by zero. So use an estimate value instead.
+            </span>(live <span class="kw">as </span>f64 * <span class="number">4096f64</span>).sqrt()
         };
 
-        <span class="comment">// This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.</span>
-        <span class="kw">let</span> <span class="ident">optimal_heap</span> <span class="op">=</span> <span class="ident">live</span> <span class="op">+</span> <span class="ident">e</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">extra_reserve</span>;
+        <span class="comment">// This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
+        </span><span class="kw">let </span>optimal_heap = live + e <span class="kw">as </span>usize + extra_reserve;
         <span class="macro">trace!</span>(
             <span class="string">&quot;optimal = live {} + sqrt(live) {} + extra {}&quot;</span>,
-            <span class="ident">live</span>,
-            <span class="ident">e</span>,
-            <span class="ident">extra_reserve</span>
+            live,
+            e,
+            extra_reserve
         );
 
-        <span class="comment">// The new heap size must be within min/max.</span>
-        <span class="kw">let</span> <span class="ident">new_heap</span> <span class="op">=</span> <span class="ident">optimal_heap</span>.<span class="ident">clamp</span>(<span class="self">self</span>.<span class="ident">min_heap_pages</span>, <span class="self">self</span>.<span class="ident">max_heap_pages</span>);
+        <span class="comment">// The new heap size must be within min/max.
+        </span><span class="kw">let </span>new_heap = optimal_heap.clamp(<span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages);
         <span class="macro">debug!</span>(
             <span class="string">&quot;MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])&quot;</span>,
-            <span class="ident">new_heap</span>, <span class="ident">optimal_heap</span>, <span class="self">self</span>.<span class="ident">min_heap_pages</span>, <span class="self">self</span>.<span class="ident">max_heap_pages</span>
+            new_heap, optimal_heap, <span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages
         );
-        <span class="self">self</span>.<span class="ident">current_heap_pages</span>.<span class="ident">store</span>(<span class="ident">new_heap</span>, <span class="ident">Ordering::Relaxed</span>);
+        <span class="self">self</span>.current_heap_pages.store(new_heap, Ordering::Relaxed);
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

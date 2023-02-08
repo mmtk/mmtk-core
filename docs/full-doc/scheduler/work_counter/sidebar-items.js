@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["WorkCounterBase","Common struct for different work counters"],["WorkDuration","Measure the durations of work packets"]],"trait":[["WorkCounter","An abstraction of work counters"],["WorkCounterClone","Make [`WorkCounter`] trait objects cloneable"]]});
+window.SIDEBAR_ITEMS = {"struct":[["WorkCounterBase","Common struct for different work counters"],["WorkDuration","Measure the durations of work packets"]],"trait":[["WorkCounter","An abstraction of work counters"],["WorkCounterClone","Make [`WorkCounter`] trait objects cloneable"]]};

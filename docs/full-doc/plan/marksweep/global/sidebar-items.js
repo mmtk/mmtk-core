@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["MS_CONSTRAINTS",""]],"struct":[["MarkSweep",""]],"type":[["MarkSweepSpace",""]]});
+window.SIDEBAR_ITEMS = {"constant":[["MS_CONSTRAINTS",""]],"struct":[["MarkSweep",""]],"type":[["MarkSweepSpace",""]]};

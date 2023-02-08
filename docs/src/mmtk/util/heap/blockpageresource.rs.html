@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;heap&#x2F;blockpageresource.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>blockpageresource.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/blockpageresource.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>blockpageresource.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -415,421 +413,420 @@
 <span id="413">413</span>
 <span id="414">414</span>
 <span id="415">415</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::pageresource</span>::{<span class="ident">PRAllocFail</span>, <span class="ident">PRAllocResult</span>};
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">FreeListPageResource</span>, <span class="ident">PageResource</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::Region</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
-<span class="kw">use</span> <span class="ident">spin::RwLock</span>;
-<span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicUsize</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
+<span class="kw">use super</span>::{FreeListPageResource, PageResource};
+<span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
+<span class="kw">use </span>atomic::Ordering;
+<span class="kw">use </span>spin::RwLock;
+<span class="kw">use </span>std::cell::UnsafeCell;
+<span class="kw">use </span>std::sync::atomic::AtomicUsize;
+<span class="kw">use </span>std::sync::Mutex;
 
-<span class="kw">const</span> <span class="ident">UNINITIALIZED_WATER_MARK</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="op">-</span><span class="number">1</span>;
-<span class="kw">const</span> <span class="ident">LOCAL_BUFFER_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>;
+<span class="kw">const </span>UNINITIALIZED_WATER_MARK: i32 = -<span class="number">1</span>;
+<span class="kw">const </span>LOCAL_BUFFER_SIZE: usize = <span class="number">128</span>;
 
-<span class="doccomment">/// A fast PageResource for fixed-size block allocation only.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BlockPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">B</span>: <span class="ident">Region</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-    <span class="ident">flpr</span>: <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A buffer for storing all the free blocks</span>
-    <span class="ident">block_queue</span>: <span class="ident">BlockPool</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Slow-path allocation synchronization</span>
-    <span class="ident">sync</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
+<span class="doccomment">/// A fast PageResource for fixed-size block allocation only.
+</span><span class="kw">pub struct </span>BlockPageResource&lt;VM: VMBinding, B: Region + <span class="lifetime">&#39;static</span>&gt; {
+    flpr: FreeListPageResource&lt;VM&gt;,
+    <span class="doccomment">/// A buffer for storing all the free blocks
+    </span>block_queue: BlockPool&lt;B&gt;,
+    <span class="doccomment">/// Slow-path allocation synchronization
+    </span>sync: Mutex&lt;()&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BlockPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">B</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonPageResource</span> {
-        <span class="self">self</span>.<span class="ident">flpr</span>.<span class="ident">common</span>()
+<span class="kw">impl</span>&lt;VM: VMBinding, B: Region&gt; PageResource&lt;VM&gt; <span class="kw">for </span>BlockPageResource&lt;VM, B&gt; {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPageResource {
+        <span class="self">self</span>.flpr.common()
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">common_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">CommonPageResource</span> {
-        <span class="self">self</span>.<span class="ident">flpr</span>.<span class="ident">common_mut</span>()
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPageResource {
+        <span class="self">self</span>.flpr.common_mut()
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">alloc_pages</span>(
+    <span class="attribute">#[inline]
+    </span><span class="kw">fn </span>alloc_pages(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
-        <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">required_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">alloc_pages_fast</span>(<span class="ident">space_descriptor</span>, <span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>)
+        space_descriptor: SpaceDescriptor,
+        reserved_pages: usize,
+        required_pages: usize,
+        tls: VMThread,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;PRAllocResult, PRAllocFail&gt; {
+        <span class="self">self</span>.alloc_pages_fast(space_descriptor, reserved_pages, required_pages, tls)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_available_physical_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">contiguous</span>);
-        <span class="kw">let</span> <span class="ident">_sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="self">self</span>.<span class="ident">flpr</span>.<span class="ident">get_available_physical_pages</span>()
+    <span class="kw">fn </span>get_available_physical_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.common().contiguous);
+        <span class="kw">let </span>_sync = <span class="self">self</span>.sync.lock().unwrap();
+        <span class="self">self</span>.flpr.get_available_physical_pages()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> <span class="ident">BlockPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">B</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Block granularity in pages</span>
-    <span class="kw">const</span> <span class="ident">LOG_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">B::LOG_BYTES</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
+<span class="kw">impl</span>&lt;VM: VMBinding, B: Region&gt; BlockPageResource&lt;VM, B&gt; {
+    <span class="doccomment">/// Block granularity in pages
+    </span><span class="kw">const </span>LOG_PAGES: usize = B::LOG_BYTES - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_contiguous</span>(
-        <span class="ident">log_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">start</span>: <span class="ident">Address</span>,
-        <span class="ident">bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">num_workers</span>: <span class="ident">usize</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="macro">assert!</span>((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">log_pages</span>) <span class="op">&lt;</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>);
-        <span class="self">Self</span> {
-            <span class="ident">flpr</span>: <span class="ident">FreeListPageResource::new_contiguous</span>(<span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">vm_map</span>),
-            <span class="ident">block_queue</span>: <span class="ident">BlockPool::new</span>(<span class="ident">num_workers</span>),
-            <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(()),
+    <span class="kw">pub fn </span>new_contiguous(
+        log_pages: usize,
+        start: Address,
+        bytes: usize,
+        vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
+        num_workers: usize,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="macro">assert!</span>((<span class="number">1 </span>&lt;&lt; log_pages) &lt;= PAGES_IN_CHUNK);
+        <span class="self">Self </span>{
+            flpr: FreeListPageResource::new_contiguous(start, bytes, vm_map),
+            block_queue: BlockPool::new(num_workers),
+            sync: Mutex::new(()),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_discontiguous</span>(<span class="ident">log_pages</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">num_workers</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="macro">assert!</span>((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">log_pages</span>) <span class="op">&lt;</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>);
-        <span class="self">Self</span> {
-            <span class="ident">flpr</span>: <span class="ident">FreeListPageResource::new_discontiguous</span>(<span class="ident">vm_map</span>),
-            <span class="ident">block_queue</span>: <span class="ident">BlockPool::new</span>(<span class="ident">num_workers</span>),
-            <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(()),
+    <span class="kw">pub fn </span>new_discontiguous(log_pages: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap, num_workers: usize) -&gt; <span class="self">Self </span>{
+        <span class="macro">assert!</span>((<span class="number">1 </span>&lt;&lt; log_pages) &lt;= PAGES_IN_CHUNK);
+        <span class="self">Self </span>{
+            flpr: FreeListPageResource::new_discontiguous(vm_map),
+            block_queue: BlockPool::new(num_workers),
+            sync: Mutex::new(()),
         }
     }
 
-    <span class="doccomment">/// Grow contiguous space</span>
-    <span class="attribute">#[<span class="ident">cold</span>]</span>
-    <span class="kw">fn</span> <span class="ident">alloc_pages_slow_sync</span>(
+    <span class="doccomment">/// Grow contiguous space
+    </span><span class="attribute">#[cold]
+    </span><span class="kw">fn </span>alloc_pages_slow_sync(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
-        <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">required_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// Retry fast allocation</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">pop</span>() {
-            <span class="self">self</span>.<span class="ident">commit_pages</span>(<span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>);
-            <span class="kw">return</span> <span class="ident">Result::Ok</span>(<span class="ident">PRAllocResult</span> {
-                <span class="ident">start</span>: <span class="ident">block</span>.<span class="ident">start</span>(),
-                <span class="ident">pages</span>: <span class="ident">required_pages</span>,
-                <span class="ident">new_chunk</span>: <span class="bool-val">false</span>,
+        space_descriptor: SpaceDescriptor,
+        reserved_pages: usize,
+        required_pages: usize,
+        tls: VMThread,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;PRAllocResult, PRAllocFail&gt; {
+        <span class="kw">let </span>_guard = <span class="self">self</span>.sync.lock().unwrap();
+        <span class="comment">// Retry fast allocation
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(block) = <span class="self">self</span>.block_queue.pop() {
+            <span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
+            <span class="kw">return </span>Result::Ok(PRAllocResult {
+                start: block.start(),
+                pages: required_pages,
+                new_chunk: <span class="bool-val">false</span>,
             });
         }
-        <span class="comment">// Grow space (a chunk at a time)</span>
-        <span class="comment">// 1. Grow space</span>
-        <span class="kw">let</span> <span class="ident">start</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">flpr</span>.<span class="ident">allocate_one_chunk_no_commit</span>(<span class="ident">space_descriptor</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">result</span>) =&gt; <span class="ident">result</span>.<span class="ident">start</span>,
-            <span class="ident">err</span> =&gt; <span class="kw">return</span> <span class="ident">err</span>,
+        <span class="comment">// Grow space (a chunk at a time)
+        // 1. Grow space
+        </span><span class="kw">let </span>start: Address = <span class="kw">match </span><span class="self">self</span>.flpr.allocate_one_chunk_no_commit(space_descriptor) {
+            <span class="prelude-val">Ok</span>(result) =&gt; result.start,
+            err =&gt; <span class="kw">return </span>err,
         };
-        <span class="macro">assert!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
-        <span class="comment">// 2. Take the first block int the chunk as the allocation result</span>
-        <span class="kw">let</span> <span class="ident">first_block</span> <span class="op">=</span> <span class="ident">start</span>;
-        <span class="comment">// 3. Push all remaining blocks to one or more block lists</span>
-        <span class="kw">let</span> <span class="ident">last_block</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">array</span> <span class="op">=</span> <span class="ident">BlockQueue::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">B::BYTES</span>;
-        <span class="kw">while</span> <span class="ident">cursor</span> <span class="op">&lt;</span> <span class="ident">last_block</span> {
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">array</span>.<span class="ident">push_relaxed</span>(<span class="ident">B::from_aligned_address</span>(<span class="ident">cursor</span>)) };
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="ident">result</span> {
-                <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">add_global_array</span>(<span class="ident">array</span>);
-                <span class="ident">array</span> <span class="op">=</span> <span class="ident">BlockQueue::new</span>();
-                <span class="kw">let</span> <span class="ident">result2</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">array</span>.<span class="ident">push_relaxed</span>(<span class="ident">block</span>) };
-                <span class="macro">debug_assert!</span>(<span class="ident">result2</span>.<span class="ident">is_ok</span>());
+        <span class="macro">assert!</span>(start.is_aligned_to(BYTES_IN_CHUNK));
+        <span class="comment">// 2. Take the first block int the chunk as the allocation result
+        </span><span class="kw">let </span>first_block = start;
+        <span class="comment">// 3. Push all remaining blocks to one or more block lists
+        </span><span class="kw">let </span>last_block = start + BYTES_IN_CHUNK;
+        <span class="kw">let </span><span class="kw-2">mut </span>array = BlockQueue::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>cursor = start + B::BYTES;
+        <span class="kw">while </span>cursor &lt; last_block {
+            <span class="kw">let </span>result = <span class="kw">unsafe </span>{ array.push_relaxed(B::from_aligned_address(cursor)) };
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(block) = result {
+                <span class="self">self</span>.block_queue.add_global_array(array);
+                array = BlockQueue::new();
+                <span class="kw">let </span>result2 = <span class="kw">unsafe </span>{ array.push_relaxed(block) };
+                <span class="macro">debug_assert!</span>(result2.is_ok());
             }
-            <span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="ident">B::BYTES</span>;
+            cursor += B::BYTES;
         }
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">array</span>.<span class="ident">is_empty</span>());
-        <span class="comment">// 4. Push the block list to the global pool</span>
-        <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">add_global_array</span>(<span class="ident">array</span>);
-        <span class="comment">// Finish slow-allocation</span>
-        <span class="self">self</span>.<span class="ident">commit_pages</span>(<span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>);
-        <span class="ident">Result::Ok</span>(<span class="ident">PRAllocResult</span> {
-            <span class="ident">start</span>: <span class="ident">first_block</span>,
-            <span class="ident">pages</span>: <span class="ident">required_pages</span>,
-            <span class="ident">new_chunk</span>: <span class="bool-val">true</span>,
+        <span class="macro">debug_assert!</span>(!array.is_empty());
+        <span class="comment">// 4. Push the block list to the global pool
+        </span><span class="self">self</span>.block_queue.add_global_array(array);
+        <span class="comment">// Finish slow-allocation
+        </span><span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
+        Result::Ok(PRAllocResult {
+            start: first_block,
+            pages: required_pages,
+            new_chunk: <span class="bool-val">true</span>,
         })
     }
 
-    <span class="doccomment">/// Allocate a block</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">alloc_pages_fast</span>(
+    <span class="doccomment">/// Allocate a block
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>alloc_pages_fast(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
-        <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">required_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">tls</span>: <span class="ident">VMThread</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert_eq!</span>(<span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>);
-        <span class="macro">debug_assert_eq!</span>(<span class="ident">reserved_pages</span>, <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_PAGES</span>);
-        <span class="comment">// Fast allocate from the blocks list</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">pop</span>() {
-            <span class="self">self</span>.<span class="ident">commit_pages</span>(<span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>);
-            <span class="kw">return</span> <span class="ident">Result::Ok</span>(<span class="ident">PRAllocResult</span> {
-                <span class="ident">start</span>: <span class="ident">block</span>.<span class="ident">start</span>(),
-                <span class="ident">pages</span>: <span class="ident">required_pages</span>,
-                <span class="ident">new_chunk</span>: <span class="bool-val">false</span>,
+        space_descriptor: SpaceDescriptor,
+        reserved_pages: usize,
+        required_pages: usize,
+        tls: VMThread,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;PRAllocResult, PRAllocFail&gt; {
+        <span class="macro">debug_assert_eq!</span>(reserved_pages, required_pages);
+        <span class="macro">debug_assert_eq!</span>(reserved_pages, <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_PAGES);
+        <span class="comment">// Fast allocate from the blocks list
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(block) = <span class="self">self</span>.block_queue.pop() {
+            <span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
+            <span class="kw">return </span>Result::Ok(PRAllocResult {
+                start: block.start(),
+                pages: required_pages,
+                new_chunk: <span class="bool-val">false</span>,
             });
         }
-        <span class="comment">// Slow-path：we need to grow space</span>
-        <span class="self">self</span>.<span class="ident">alloc_pages_slow_sync</span>(<span class="ident">space_descriptor</span>, <span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>)
+        <span class="comment">// Slow-path：we need to grow space
+        </span><span class="self">self</span>.alloc_pages_slow_sync(space_descriptor, reserved_pages, required_pages, tls)
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="ident">B</span>) {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">contiguous</span>);
-        <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_PAGES</span>;
-        <span class="macro">debug_assert!</span>(<span class="ident">pages</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">get_committed_pages</span>());
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">release</span>(<span class="ident">pages</span> <span class="kw">as</span> <span class="kw">_</span>);
-        <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">push</span>(<span class="ident">block</span>)
+    <span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>release_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.common().contiguous);
+        <span class="kw">let </span>pages = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_PAGES;
+        <span class="macro">debug_assert!</span>(pages <span class="kw">as </span>usize &lt;= <span class="self">self</span>.common().accounting.get_committed_pages());
+        <span class="self">self</span>.common().accounting.release(pages <span class="kw">as _</span>);
+        <span class="self">self</span>.block_queue.push(block)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">flush_all</span>()
-        <span class="comment">// TODO: For 32-bit space, we may want to free some contiguous chunks.</span>
-    }
+    <span class="kw">pub fn </span>flush_all(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.block_queue.flush_all()
+        <span class="comment">// TODO: For 32-bit space, we may want to free some contiguous chunks.
+    </span>}
 }
 
-<span class="doccomment">/// A block list that supports fast lock-free push/pop operations</span>
-<span class="kw">struct</span> <span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> {
-    <span class="ident">cursor</span>: <span class="ident">AtomicUsize</span>,
-    <span class="ident">data</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A block list that supports fast lock-free push/pop operations
+</span><span class="kw">struct </span>BlockQueue&lt;B: Region&gt; {
+    cursor: AtomicUsize,
+    data: UnsafeCell&lt;Vec&lt;B&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> <span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create an array</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">default_block</span> <span class="op">=</span> <span class="ident">B::from_aligned_address</span>(<span class="ident">Address::ZERO</span>);
-        <span class="self">Self</span> {
-            <span class="ident">cursor</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
-            <span class="ident">data</span>: <span class="ident">UnsafeCell::new</span>(<span class="macro">vec!</span>[<span class="ident">default_block</span>; <span class="ident"><span class="self">Self</span>::CAPACITY</span>]),
+<span class="kw">impl</span>&lt;B: Region&gt; BlockQueue&lt;B&gt; {
+    <span class="doccomment">/// Create an array
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>default_block = B::from_aligned_address(Address::ZERO);
+        <span class="self">Self </span>{
+            cursor: AtomicUsize::new(<span class="number">0</span>),
+            data: UnsafeCell::new(<span class="macro">vec!</span>[default_block; <span class="self">Self</span>::CAPACITY]),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> <span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
-    <span class="kw">const</span> <span class="ident">CAPACITY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">256</span>;
+<span class="kw">impl</span>&lt;B: Region&gt; BlockQueue&lt;B&gt; {
+    <span class="kw">const </span>CAPACITY: usize = <span class="number">256</span>;
 
-    <span class="doccomment">/// Get an entry</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">get_entry</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>) -&gt; <span class="ident">B</span> {
-        <span class="kw">unsafe</span> { (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">data</span>.<span class="ident">get</span>())[<span class="ident">i</span>] }
+    <span class="doccomment">/// Get an entry
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>get_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) -&gt; B {
+        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i] }
     }
 
-    <span class="doccomment">/// Set an entry.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// It&#39;s unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">set_entry</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>, <span class="ident">block</span>: <span class="ident">B</span>) {
-        (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">data</span>.<span class="ident">get</span>())[<span class="ident">i</span>] <span class="op">=</span> <span class="ident">block</span>
+    <span class="doccomment">/// Set an entry.
+    ///
+    /// It&#39;s unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">unsafe fn </span>set_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize, block: B) {
+        (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i] = block
     }
 
-    <span class="doccomment">/// Non-atomically push an element.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// It&#39;s unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">push_relaxed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="ident">B</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">B</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
-        <span class="kw">if</span> <span class="ident">i</span> <span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::CAPACITY</span> {
-            <span class="self">self</span>.<span class="ident">set_entry</span>(<span class="ident">i</span>, <span class="ident">block</span>);
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">store</span>(<span class="ident">i</span> <span class="op">+</span> <span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
+    <span class="doccomment">/// Non-atomically push an element.
+    ///
+    /// It&#39;s unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">unsafe fn </span>push_relaxed(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) -&gt; <span class="prelude-ty">Result</span>&lt;(), B&gt; {
+        <span class="kw">let </span>i = <span class="self">self</span>.cursor.load(Ordering::Relaxed);
+        <span class="kw">if </span>i &lt; <span class="self">Self</span>::CAPACITY {
+            <span class="self">self</span>.set_entry(i, block);
+            <span class="self">self</span>.cursor.store(i + <span class="number">1</span>, Ordering::Relaxed);
             <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Err</span>(<span class="ident">block</span>)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>(block)
         }
     }
 
-    <span class="doccomment">/// Atomically pop an element from the array.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">cursor</span>
-            .<span class="ident">fetch_update</span>(<span class="ident">Ordering::SeqCst</span>, <span class="ident">Ordering::SeqCst</span>, <span class="op">|</span><span class="ident">i</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;</span> <span class="number">0</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">i</span> <span class="op">-</span> <span class="number">1</span>)
-                } <span class="kw">else</span> {
-                    <span class="prelude-val">None</span>
-                }
+    <span class="doccomment">/// Atomically pop an element from the array.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;B&gt; {
+        <span class="kw">let </span>i = <span class="self">self
+            </span>.cursor
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |i| {
+                <span class="kw">if </span>i &gt; <span class="number">0 </span>{
+                    <span class="prelude-val">Some</span>(i - <span class="number">1</span>)
+                } <span class="kw">else </span>{
+                    <span class="prelude-val">None
+                </span>}
             });
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">i</span>) <span class="op">=</span> <span class="ident">i</span> {
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">get_entry</span>(<span class="ident">i</span> <span class="op">-</span> <span class="number">1</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(i) = i {
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.get_entry(i - <span class="number">1</span>))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
+
+    <span class="doccomment">/// Get array size
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.cursor.load(Ordering::SeqCst)
+    }
+
+    <span class="doccomment">/// Test if the array is empty
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.len() == <span class="number">0
+    </span>}
+
+    <span class="doccomment">/// Iterate all elements in the array
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(B)) {
+        <span class="kw">let </span>len = <span class="self">self</span>.len();
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..len {
+            f(<span class="self">self</span>.get_entry(i))
         }
     }
 
-    <span class="doccomment">/// Get array size</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
-    }
-
-    <span class="doccomment">/// Test if the array is empty</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span>
-    }
-
-    <span class="doccomment">/// Iterate all elements in the array</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">iterate_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">B</span>)) {
-        <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">len</span>();
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">len</span> {
-            <span class="ident">f</span>(<span class="self">self</span>.<span class="ident">get_entry</span>(<span class="ident">i</span>))
+    <span class="doccomment">/// Replace the array with a new array.
+    ///
+    /// Return the old array
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>replace(<span class="kw-2">&amp;</span><span class="self">self</span>, new_array: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+        <span class="comment">// Swap cursor
+        </span><span class="kw">let </span>temp = <span class="self">self</span>.cursor.load(Ordering::Relaxed);
+        <span class="self">self</span>.cursor
+            .store(new_array.cursor.load(Ordering::Relaxed), Ordering::Relaxed);
+        new_array.cursor.store(temp, Ordering::Relaxed);
+        <span class="comment">// Swap data
+        </span><span class="kw">unsafe </span>{
+            core::ptr::swap(<span class="self">self</span>.data.get(), new_array.data.get());
         }
-    }
-
-    <span class="doccomment">/// Replace the array with a new array.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Return the old array</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">new_array</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
-        <span class="comment">// Swap cursor</span>
-        <span class="kw">let</span> <span class="ident">temp</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
-        <span class="self">self</span>.<span class="ident">cursor</span>
-            .<span class="ident">store</span>(<span class="ident">new_array</span>.<span class="ident">cursor</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>), <span class="ident">Ordering::Relaxed</span>);
-        <span class="ident">new_array</span>.<span class="ident">cursor</span>.<span class="ident">store</span>(<span class="ident">temp</span>, <span class="ident">Ordering::Relaxed</span>);
-        <span class="comment">// Swap data</span>
-        <span class="kw">unsafe</span> {
-            <span class="ident">std::mem::swap</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">data</span>.<span class="ident">get</span>(), <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">new_array</span>.<span class="ident">data</span>.<span class="ident">get</span>());
-        }
-        <span class="comment">// Return old array</span>
-        <span class="ident">new_array</span>
+        <span class="comment">// Return old array
+        </span>new_array
     }
 }
 
-<span class="doccomment">/// A block queue which contains a global pool and a set of thread-local queues.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Mutator or collector threads always allocate blocks by poping from the global pool。</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Collector threads free blocks to their thread-local queues, and then flush to the global pools before GC ends.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BlockPool</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// First global BlockArray for fast allocation</span>
-    <span class="ident">head_global_freed_blocks</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A list of BlockArray that is flushed to the global pool</span>
-    <span class="ident">global_freed_blocks</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Thread-local block queues</span>
-    <span class="ident">worker_local_freed_blocks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Total number of blocks in the whole BlockQueue</span>
-    <span class="ident">count</span>: <span class="ident">AtomicUsize</span>,
+<span class="doccomment">/// A block queue which contains a global pool and a set of thread-local queues.
+///
+/// Mutator or collector threads always allocate blocks by poping from the global pool。
+///
+/// Collector threads free blocks to their thread-local queues, and then flush to the global pools before GC ends.
+</span><span class="kw">pub struct </span>BlockPool&lt;B: Region&gt; {
+    <span class="doccomment">/// First global BlockArray for fast allocation
+    </span>head_global_freed_blocks: RwLock&lt;<span class="prelude-ty">Option</span>&lt;BlockQueue&lt;B&gt;&gt;&gt;,
+    <span class="doccomment">/// A list of BlockArray that is flushed to the global pool
+    </span>global_freed_blocks: RwLock&lt;Vec&lt;BlockQueue&lt;B&gt;&gt;&gt;,
+    <span class="doccomment">/// Thread-local block queues
+    </span>worker_local_freed_blocks: Vec&lt;BlockQueue&lt;B&gt;&gt;,
+    <span class="doccomment">/// Total number of blocks in the whole BlockQueue
+    </span>count: AtomicUsize,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Region</span><span class="op">&gt;</span> <span class="ident">BlockPool</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a BlockQueue</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">num_workers</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">head_global_freed_blocks</span>: <span class="ident">RwLock::new</span>(<span class="prelude-val">None</span>),
-            <span class="ident">global_freed_blocks</span>: <span class="ident">RwLock::new</span>(<span class="macro">vec!</span>[]),
-            <span class="ident">worker_local_freed_blocks</span>: (<span class="number">0</span>..<span class="ident">num_workers</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">BlockQueue::new</span>()).<span class="ident">collect</span>(),
-            <span class="ident">count</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
+<span class="kw">impl</span>&lt;B: Region&gt; BlockPool&lt;B&gt; {
+    <span class="doccomment">/// Create a BlockQueue
+    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            head_global_freed_blocks: RwLock::new(<span class="prelude-val">None</span>),
+            global_freed_blocks: RwLock::new(<span class="macro">vec!</span>[]),
+            worker_local_freed_blocks: (<span class="number">0</span>..num_workers).map(|<span class="kw">_</span>| BlockQueue::new()).collect(),
+            count: AtomicUsize::new(<span class="number">0</span>),
         }
     }
 
-    <span class="doccomment">/// Add a BlockArray to the global pool</span>
-    <span class="kw">fn</span> <span class="ident">add_global_array</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">array</span>: <span class="ident">BlockQueue</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">fetch_add</span>(<span class="ident">array</span>.<span class="ident">len</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="self">self</span>.<span class="ident">global_freed_blocks</span>.<span class="ident">write</span>().<span class="ident">push</span>(<span class="ident">array</span>);
+    <span class="doccomment">/// Add a BlockArray to the global pool
+    </span><span class="kw">fn </span>add_global_array(<span class="kw-2">&amp;</span><span class="self">self</span>, array: BlockQueue&lt;B&gt;) {
+        <span class="self">self</span>.count.fetch_add(array.len(), Ordering::SeqCst);
+        <span class="self">self</span>.global_freed_blocks.write().push(array);
     }
 
-    <span class="doccomment">/// Push a block to the thread-local queue</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="ident">B</span>) {
-        <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::scheduler::current_worker_ordinal</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">failed</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">worker_local_freed_blocks</span>[<span class="ident">id</span>]
-                .<span class="ident">push_relaxed</span>(<span class="ident">block</span>)
-                .<span class="ident">is_err</span>()
+    <span class="doccomment">/// Push a block to the thread-local queue
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
+        <span class="self">self</span>.count.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
+        <span class="kw">let </span>id = <span class="kw">crate</span>::scheduler::current_worker_ordinal().unwrap();
+        <span class="kw">let </span>failed = <span class="kw">unsafe </span>{
+            <span class="self">self</span>.worker_local_freed_blocks[id]
+                .push_relaxed(block)
+                .is_err()
         };
-        <span class="kw">if</span> <span class="ident">failed</span> {
-            <span class="kw">let</span> <span class="ident">queue</span> <span class="op">=</span> <span class="ident">BlockQueue::new</span>();
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">queue</span>.<span class="ident">push_relaxed</span>(<span class="ident">block</span>) };
-            <span class="macro">debug_assert!</span>(<span class="ident">result</span>.<span class="ident">is_ok</span>());
-            <span class="kw">let</span> <span class="ident">old_queue</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_local_freed_blocks</span>[<span class="ident">id</span>].<span class="ident">replace</span>(<span class="ident">queue</span>);
-            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">old_queue</span>.<span class="ident">is_empty</span>());
-            <span class="self">self</span>.<span class="ident">global_freed_blocks</span>.<span class="ident">write</span>().<span class="ident">push</span>(<span class="ident">old_queue</span>);
+        <span class="kw">if </span>failed {
+            <span class="kw">let </span>queue = BlockQueue::new();
+            <span class="kw">let </span>result = <span class="kw">unsafe </span>{ queue.push_relaxed(block) };
+            <span class="macro">debug_assert!</span>(result.is_ok());
+            <span class="kw">let </span>old_queue = <span class="self">self</span>.worker_local_freed_blocks[id].replace(queue);
+            <span class="macro">assert!</span>(!old_queue.is_empty());
+            <span class="self">self</span>.global_freed_blocks.write().push(old_queue);
         }
     }
 
-    <span class="doccomment">/// Pop a block from the global pool</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="doccomment">/// Pop a block from the global pool
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;B&gt; {
+        <span class="kw">if </span><span class="self">self</span>.len() == <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-        <span class="kw">let</span> <span class="ident">head_global_freed_blocks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">head_global_freed_blocks</span>.<span class="ident">upgradeable_read</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="ident">head_global_freed_blocks</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">q</span><span class="op">|</span> <span class="ident">q</span>.<span class="ident">pop</span>()) {
-            <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-            <span class="prelude-val">Some</span>(<span class="ident">block</span>)
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">global_freed_blocks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">global_freed_blocks</span>.<span class="ident">write</span>();
-            <span class="comment">// Retry fast-alloc</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="ident">head_global_freed_blocks</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">q</span><span class="op">|</span> <span class="ident">q</span>.<span class="ident">pop</span>()) {
-                <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">block</span>);
+        <span class="kw">let </span>head_global_freed_blocks = <span class="self">self</span>.head_global_freed_blocks.upgradeable_read();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
+            <span class="self">self</span>.count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
+            <span class="prelude-val">Some</span>(block)
+        } <span class="kw">else </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>global_freed_blocks = <span class="self">self</span>.global_freed_blocks.write();
+            <span class="comment">// Retry fast-alloc
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
+                <span class="self">self</span>.count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
+                <span class="kw">return </span><span class="prelude-val">Some</span>(block);
             }
-            <span class="comment">// Get a new list of blocks for allocation</span>
-            <span class="kw">let</span> <span class="ident">blocks</span> <span class="op">=</span> <span class="ident">global_freed_blocks</span>.<span class="ident">pop</span>()<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">blocks</span>.<span class="ident">pop</span>().<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">blocks</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">head_global_freed_blocks</span> <span class="op">=</span> <span class="ident">head_global_freed_blocks</span>.<span class="ident">upgrade</span>();
-                <span class="macro">debug_assert!</span>(<span class="ident">head_global_freed_blocks</span>
-                    .<span class="ident">as_ref</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">blocks</span><span class="op">|</span> <span class="ident">blocks</span>.<span class="ident">is_empty</span>())
-                    .<span class="ident">unwrap_or</span>(<span class="bool-val">true</span>));
-                <span class="kw-2">*</span><span class="ident">head_global_freed_blocks</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">blocks</span>);
+            <span class="comment">// Get a new list of blocks for allocation
+            </span><span class="kw">let </span>blocks = global_freed_blocks.pop()<span class="question-mark">?</span>;
+            <span class="kw">let </span>block = blocks.pop().unwrap();
+            <span class="kw">if </span>!blocks.is_empty() {
+                <span class="kw">let </span><span class="kw-2">mut </span>head_global_freed_blocks = head_global_freed_blocks.upgrade();
+                <span class="macro">debug_assert!</span>(head_global_freed_blocks
+                    .as_ref()
+                    .map(|blocks| blocks.is_empty())
+                    .unwrap_or(<span class="bool-val">true</span>));
+                <span class="kw-2">*</span>head_global_freed_blocks = <span class="prelude-val">Some</span>(blocks);
             }
-            <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-            <span class="prelude-val">Some</span>(<span class="ident">block</span>)
-        }
-    }
-
-    <span class="doccomment">/// Flush a given thread-local queue to the global pool</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">id</span>: <span class="ident">usize</span>) {
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">worker_local_freed_blocks</span>[<span class="ident">id</span>].<span class="ident">is_empty</span>() {
-            <span class="kw">let</span> <span class="ident">queue</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_local_freed_blocks</span>[<span class="ident">id</span>].<span class="ident">replace</span>(<span class="ident">BlockQueue::new</span>());
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">queue</span>.<span class="ident">is_empty</span>() {
-                <span class="self">self</span>.<span class="ident">global_freed_blocks</span>.<span class="ident">write</span>().<span class="ident">push</span>(<span class="ident">queue</span>)
-            }
+            <span class="self">self</span>.count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
+            <span class="prelude-val">Some</span>(block)
         }
     }
 
-    <span class="doccomment">/// Flush all thread-local queues to the global pool</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> {
+    <span class="doccomment">/// Flush a given thread-local queue to the global pool
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;</span><span class="self">self</span>, id: usize) {
+        <span class="kw">if </span>!<span class="self">self</span>.worker_local_freed_blocks[id].is_empty() {
+            <span class="kw">let </span>queue = <span class="self">self</span>.worker_local_freed_blocks[id].replace(BlockQueue::new());
+            <span class="kw">if </span>!queue.is_empty() {
+                <span class="self">self</span>.global_freed_blocks.write().push(queue)
+            }
+        }
+    }
+
+    <span class="doccomment">/// Flush all thread-local queues to the global pool
+    </span><span class="kw">pub fn </span>flush_all(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">if </span><span class="self">self</span>.len() == <span class="number">0 </span>{
             <span class="kw">return</span>;
         }
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="self">self</span>.<span class="ident">worker_local_freed_blocks</span>.<span class="ident">len</span>() {
-            <span class="self">self</span>.<span class="ident">flush</span>(<span class="ident">i</span>)
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="self">self</span>.worker_local_freed_blocks.len() {
+            <span class="self">self</span>.flush(i)
         }
     }
 
-    <span class="doccomment">/// Get total number of blocks in the whole BlockQueue</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+    <span class="doccomment">/// Get total number of blocks in the whole BlockQueue
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.count.load(Ordering::SeqCst)
     }
 
-    <span class="doccomment">/// Iterate all the blocks in the BlockQueue</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iterate_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">B</span>)) {
-        <span class="kw">for</span> <span class="ident">array</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">head_global_freed_blocks</span>.<span class="ident">read</span>() {
-            <span class="ident">array</span>.<span class="ident">iterate_blocks</span>(<span class="ident">f</span>)
+    <span class="doccomment">/// Iterate all the blocks in the BlockQueue
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(B)) {
+        <span class="kw">for </span>array <span class="kw">in </span><span class="kw-2">&amp;*</span><span class="self">self</span>.head_global_freed_blocks.read() {
+            array.iterate_blocks(f)
         }
-        <span class="kw">for</span> <span class="ident">array</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">global_freed_blocks</span>.<span class="ident">read</span>() {
-            <span class="ident">array</span>.<span class="ident">iterate_blocks</span>(<span class="ident">f</span>);
+        <span class="kw">for </span>array <span class="kw">in </span><span class="kw-2">&amp;*</span><span class="self">self</span>.global_freed_blocks.read() {
+            array.iterate_blocks(f);
         }
-        <span class="kw">for</span> <span class="ident">array</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">worker_local_freed_blocks</span> {
-            <span class="ident">array</span>.<span class="ident">iterate_blocks</span>(<span class="ident">f</span>);
+        <span class="kw">for </span>array <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.worker_local_freed_blocks {
+            array.iterate_blocks(f);
         }
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

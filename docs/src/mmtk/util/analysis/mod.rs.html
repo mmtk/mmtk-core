@@ -1,14 +1,12 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;analysis&#x2F;mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/analysis/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
 <span id="12">12</span>
@@ -88,94 +86,93 @@
 <span id="86">86</span>
 <span id="87">87</span>
 <span id="88">88</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::stats::Stats</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::Stats;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
+<span class="kw">use </span>std::sync::{Arc, Mutex};
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">gc_count</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">obj_num</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">obj_size</span>;
+<span class="kw">pub mod </span>gc_count;
+<span class="kw">pub mod </span>obj_num;
+<span class="kw">pub mod </span>obj_size;
 
-<span class="kw">use</span> <span class="ident"><span class="self">self</span>::gc_count::GcCounter</span>;
-<span class="kw">use</span> <span class="ident"><span class="self">self</span>::obj_num::ObjectCounter</span>;
-<span class="kw">use</span> <span class="ident"><span class="self">self</span>::obj_size::PerSizeClassObjectCounter</span>;
+<span class="kw">use </span><span class="self">self</span>::gc_count::GcCounter;
+<span class="kw">use </span><span class="self">self</span>::obj_num::ObjectCounter;
+<span class="kw">use </span><span class="self">self</span>::obj_size::PerSizeClassObjectCounter;
 
-<span class="doccomment">///</span>
-<span class="doccomment">/// This trait exposes hooks for developers to implement their own analysis routines.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Most traits would want to hook into the `Stats` and counters provided by the MMTk</span>
-<span class="doccomment">/// framework that are exposed to the Harness.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The arguments for the hooks should be sufficient, however, if one wishes to add</span>
-<span class="doccomment">/// other arguments, then they can create an analysis routine specific function and</span>
-<span class="doccomment">/// invoke it in its respective place.</span>
-<span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RtAnalysis</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">alloc_hook</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_size</span>: <span class="ident">usize</span>, <span class="ident">_align</span>: <span class="ident">usize</span>, <span class="ident">_offset</span>: <span class="ident">isize</span>) {}
-    <span class="kw">fn</span> <span class="ident">gc_hook</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {}
-    <span class="kw">fn</span> <span class="ident">set_running</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">running</span>: <span class="ident">bool</span>);
+<span class="doccomment">///
+/// This trait exposes hooks for developers to implement their own analysis routines.
+///
+/// Most traits would want to hook into the `Stats` and counters provided by the MMTk
+/// framework that are exposed to the Harness.
+///
+/// The arguments for the hooks should be sufficient, however, if one wishes to add
+/// other arguments, then they can create an analysis routine specific function and
+/// invoke it in its respective place.
+///
+</span><span class="kw">pub trait </span>RtAnalysis&lt;VM: VMBinding&gt; {
+    <span class="kw">fn </span>alloc_hook(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _size: usize, _align: usize, _offset: isize) {}
+    <span class="kw">fn </span>gc_hook(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    <span class="kw">fn </span>set_running(<span class="kw-2">&amp;mut </span><span class="self">self</span>, running: bool);
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GcHookWork</span>;
+<span class="attribute">#[derive(Default)]
+</span><span class="kw">pub struct </span>GcHookWork;
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GcHookWork</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>();
-        <span class="ident">base</span>.<span class="ident">analysis_manager</span>.<span class="ident">gc_hook</span>(<span class="ident">mmtk</span>);
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>GcHookWork {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="kw">let </span>base = <span class="kw-2">&amp;</span>mmtk.plan.base();
+        base.analysis_manager.gc_hook(mmtk);
     }
 }
 
-<span class="comment">// The AnalysisManager essentially acts as a proxy for all analysis routines made.</span>
-<span class="comment">// The framwework uses the AnalysisManager to call hooks for analysis routines.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AnalysisManager</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">routines</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">RtAnalysis</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="comment">// The AnalysisManager essentially acts as a proxy for all analysis routines made.
+// The framwework uses the AnalysisManager to call hooks for analysis routines.
+</span><span class="attribute">#[derive(Default)]
+</span><span class="kw">pub struct </span>AnalysisManager&lt;VM: VMBinding&gt; {
+    routines: Mutex&lt;Vec&lt;Arc&lt;Mutex&lt;<span class="kw">dyn </span>RtAnalysis&lt;VM&gt; + Send&gt;&gt;&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">AnalysisManager</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">stats</span>: <span class="kw-2">&amp;</span><span class="ident">Stats</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">AnalysisManager</span> {
-            <span class="ident">routines</span>: <span class="ident">Mutex::new</span>(<span class="macro">vec!</span>[]),
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; AnalysisManager&lt;VM&gt; {
+    <span class="kw">pub fn </span>new(stats: <span class="kw-2">&amp;</span>Stats) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>manager = AnalysisManager {
+            routines: Mutex::new(<span class="macro">vec!</span>[]),
         };
-        <span class="ident">manager</span>.<span class="ident">initialize_routines</span>(<span class="ident">stats</span>);
-        <span class="ident">manager</span>
+        manager.initialize_routines(stats);
+        manager
     }
 
-    <span class="comment">// Initializing all routines. If you want to add a new routine, here is the place</span>
-    <span class="comment">// to do so</span>
-    <span class="kw">fn</span> <span class="ident">initialize_routines</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">stats</span>: <span class="kw-2">&amp;</span><span class="ident">Stats</span>) {
-        <span class="kw">let</span> <span class="ident">ctr</span> <span class="op">=</span> <span class="ident">stats</span>.<span class="ident">new_event_counter</span>(<span class="string">&quot;obj.num&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
-        <span class="kw">let</span> <span class="ident">gc_ctr</span> <span class="op">=</span> <span class="ident">stats</span>.<span class="ident">new_event_counter</span>(<span class="string">&quot;gc.num&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
-        <span class="kw">let</span> <span class="ident">obj_num</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">ObjectCounter::new</span>(<span class="bool-val">true</span>, <span class="ident">ctr</span>)));
-        <span class="kw">let</span> <span class="ident">gc_count</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">GcCounter::new</span>(<span class="bool-val">true</span>, <span class="ident">gc_ctr</span>)));
-        <span class="kw">let</span> <span class="ident">obj_size</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">PerSizeClassObjectCounter::new</span>(<span class="bool-val">true</span>)));
-        <span class="self">self</span>.<span class="ident">add_analysis_routine</span>(<span class="ident">obj_num</span>);
-        <span class="self">self</span>.<span class="ident">add_analysis_routine</span>(<span class="ident">gc_count</span>);
-        <span class="self">self</span>.<span class="ident">add_analysis_routine</span>(<span class="ident">obj_size</span>);
+    <span class="comment">// Initializing all routines. If you want to add a new routine, here is the place
+    // to do so
+    </span><span class="kw">fn </span>initialize_routines(<span class="kw-2">&amp;mut </span><span class="self">self</span>, stats: <span class="kw-2">&amp;</span>Stats) {
+        <span class="kw">let </span>ctr = stats.new_event_counter(<span class="string">&quot;obj.num&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
+        <span class="kw">let </span>gc_ctr = stats.new_event_counter(<span class="string">&quot;gc.num&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
+        <span class="kw">let </span>obj_num = Arc::new(Mutex::new(ObjectCounter::new(<span class="bool-val">true</span>, ctr)));
+        <span class="kw">let </span>gc_count = Arc::new(Mutex::new(GcCounter::new(<span class="bool-val">true</span>, gc_ctr)));
+        <span class="kw">let </span>obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(<span class="bool-val">true</span>)));
+        <span class="self">self</span>.add_analysis_routine(obj_num);
+        <span class="self">self</span>.add_analysis_routine(gc_count);
+        <span class="self">self</span>.add_analysis_routine(obj_size);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_analysis_routine</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">routine</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">RtAnalysis</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">routines</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">routines</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="ident">routines</span>.<span class="ident">push</span>(<span class="ident">routine</span>.<span class="ident">clone</span>());
+    <span class="kw">pub fn </span>add_analysis_routine(<span class="kw-2">&amp;mut </span><span class="self">self</span>, routine: Arc&lt;Mutex&lt;<span class="kw">dyn </span>RtAnalysis&lt;VM&gt; + Send&gt;&gt;) {
+        <span class="kw">let </span><span class="kw-2">mut </span>routines = <span class="self">self</span>.routines.lock().unwrap();
+        routines.push(routine.clone());
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc_hook</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) {
-        <span class="kw">let</span> <span class="ident">routines</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">routines</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">routines</span> {
-            <span class="ident">r</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">alloc_hook</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
+    <span class="kw">pub fn </span>alloc_hook(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize, align: usize, offset: isize) {
+        <span class="kw">let </span>routines = <span class="self">self</span>.routines.lock().unwrap();
+        <span class="kw">for </span>r <span class="kw">in </span><span class="kw-2">&amp;*</span>routines {
+            r.lock().unwrap().alloc_hook(size, align, offset);
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_hook</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">routines</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">routines</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">routines</span> {
-            <span class="ident">r</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">gc_hook</span>(<span class="ident">mmtk</span>);
+    <span class="kw">pub fn </span>gc_hook(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="kw">let </span>routines = <span class="self">self</span>.routines.lock().unwrap();
+        <span class="kw">for </span>r <span class="kw">in </span><span class="kw-2">&amp;*</span>routines {
+            r.lock().unwrap().gc_hook(mmtk);
         }
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

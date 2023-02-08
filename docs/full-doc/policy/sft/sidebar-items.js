@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["DEBUG_SFT","Print debug info for SFT. Should be false when committed."],["EMPTY_SFT_NAME",""],["EMPTY_SPACE_SFT",""]],"struct":[["EmptySpaceSFT","An empty entry for SFT."],["GCWorkerMutRef",""]],"trait":[["SFT","Space Function Table (SFT)."]]});
+window.SIDEBAR_ITEMS = {"constant":[["DEBUG_SFT","Print debug info for SFT. Should be false when committed."],["EMPTY_SFT_NAME",""],["EMPTY_SPACE_SFT",""]],"struct":[["EmptySpaceSFT","An empty entry for SFT."],["GCWorkerMutRef",""]],"trait":[["SFT","Space Function Table (SFT)."]]};

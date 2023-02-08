@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;util&#x2F;alloc&#x2F;allocator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>allocator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/alloc/allocator.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>allocator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -377,299 +375,299 @@
 <span id="375">375</span>
 <span id="376">376</span>
 <span id="377">377</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
+<span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>};
-<span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
+<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::vm::{ActivePlan, Collection};
+<span class="kw">use </span>downcast_rs::Downcast;
 
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="doccomment">/// A list of errors that MMTk can encounter during allocation.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AllocationError</span> {
-    <span class="doccomment">/// The specified heap size is too small for the given program to continue.</span>
-    <span class="ident">HeapOutOfMemory</span>,
-    <span class="doccomment">/// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to</span>
-    <span class="doccomment">/// abort if such an error is thrown.</span>
-    <span class="ident">MmapOutOfMemory</span>,
+<span class="attribute">#[repr(C)]
+#[derive(Debug)]
+</span><span class="doccomment">/// A list of errors that MMTk can encounter during allocation.
+</span><span class="kw">pub enum </span>AllocationError {
+    <span class="doccomment">/// The specified heap size is too small for the given program to continue.
+    </span>HeapOutOfMemory,
+    <span class="doccomment">/// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to
+    /// abort if such an error is thrown.
+    </span>MmapOutOfMemory,
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_allocation_no_fill</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">region</span>: <span class="ident">Address</span>,
-    <span class="ident">alignment</span>: <span class="ident">usize</span>,
-    <span class="ident">offset</span>: <span class="ident">isize</span>,
-) -&gt; <span class="ident">Address</span> {
-    <span class="ident">align_allocation_inner</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">region</span>, <span class="ident">alignment</span>, <span class="ident">offset</span>, <span class="ident">VM::MIN_ALIGNMENT</span>, <span class="bool-val">false</span>)
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>align_allocation_no_fill&lt;VM: VMBinding&gt;(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -&gt; Address {
+    align_allocation_inner::&lt;VM&gt;(region, alignment, offset, VM::MIN_ALIGNMENT, <span class="bool-val">false</span>)
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_allocation</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">region</span>: <span class="ident">Address</span>,
-    <span class="ident">alignment</span>: <span class="ident">usize</span>,
-    <span class="ident">offset</span>: <span class="ident">isize</span>,
-) -&gt; <span class="ident">Address</span> {
-    <span class="ident">align_allocation_inner</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">region</span>, <span class="ident">alignment</span>, <span class="ident">offset</span>, <span class="ident">VM::MIN_ALIGNMENT</span>, <span class="bool-val">true</span>)
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>align_allocation&lt;VM: VMBinding&gt;(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -&gt; Address {
+    align_allocation_inner::&lt;VM&gt;(region, alignment, offset, VM::MIN_ALIGNMENT, <span class="bool-val">true</span>)
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_allocation_inner</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">region</span>: <span class="ident">Address</span>,
-    <span class="ident">alignment</span>: <span class="ident">usize</span>,
-    <span class="ident">offset</span>: <span class="ident">isize</span>,
-    <span class="ident">known_alignment</span>: <span class="ident">usize</span>,
-    <span class="ident">fillalignmentgap</span>: <span class="ident">bool</span>,
-) -&gt; <span class="ident">Address</span> {
-    <span class="macro">debug_assert!</span>(<span class="ident">known_alignment</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span>);
-    <span class="comment">// Make sure MIN_ALIGNMENT is reasonable.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
-    {
-        <span class="macro">debug_assert!</span>(<span class="ident">VM::MIN_ALIGNMENT</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BYTES_IN_INT</span>);
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>align_allocation_inner&lt;VM: VMBinding&gt;(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+    known_alignment: usize,
+    fillalignmentgap: bool,
+) -&gt; Address {
+    <span class="macro">debug_assert!</span>(known_alignment &gt;= VM::MIN_ALIGNMENT);
+    <span class="comment">// Make sure MIN_ALIGNMENT is reasonable.
+    </span><span class="attribute">#[allow(clippy::assertions_on_constants)]
+    </span>{
+        <span class="macro">debug_assert!</span>(VM::MIN_ALIGNMENT &gt;= BYTES_IN_INT);
     }
-    <span class="macro">debug_assert!</span>(<span class="op">!</span>(<span class="ident">fillalignmentgap</span> <span class="op">&amp;&amp;</span> <span class="ident">region</span>.<span class="ident">is_zero</span>()));
-    <span class="macro">debug_assert!</span>(<span class="ident">alignment</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">VM::MAX_ALIGNMENT</span>);
-    <span class="macro">debug_assert!</span>(<span class="ident">offset</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span>);
-    <span class="macro">debug_assert!</span>(<span class="ident">region</span>.<span class="ident">is_aligned_to</span>(<span class="ident">VM::ALLOC_END_ALIGNMENT</span>));
-    <span class="macro">debug_assert!</span>((<span class="ident">alignment</span> <span class="op">&amp;</span> (<span class="ident">VM::MIN_ALIGNMENT</span> <span class="op">-</span> <span class="number">1</span>)) <span class="op">==</span> <span class="number">0</span>);
-    <span class="macro">debug_assert!</span>((<span class="ident">offset</span> <span class="op">&amp;</span> (<span class="ident">VM::MIN_ALIGNMENT</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">isize</span>) <span class="op">==</span> <span class="number">0</span>);
+    <span class="macro">debug_assert!</span>(!(fillalignmentgap &amp;&amp; region.is_zero()));
+    <span class="macro">debug_assert!</span>(alignment &lt;= VM::MAX_ALIGNMENT);
+    <span class="macro">debug_assert!</span>(offset &gt;= <span class="number">0</span>);
+    <span class="macro">debug_assert!</span>(region.is_aligned_to(VM::ALLOC_END_ALIGNMENT));
+    <span class="macro">debug_assert!</span>((alignment &amp; (VM::MIN_ALIGNMENT - <span class="number">1</span>)) == <span class="number">0</span>);
+    <span class="macro">debug_assert!</span>((offset &amp; (VM::MIN_ALIGNMENT - <span class="number">1</span>) <span class="kw">as </span>isize) == <span class="number">0</span>);
 
-    <span class="comment">// No alignment ever required.</span>
-    <span class="kw">if</span> <span class="ident">alignment</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">known_alignment</span> <span class="op">|</span><span class="op">|</span> <span class="ident">VM::MAX_ALIGNMENT</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span> {
-        <span class="kw">return</span> <span class="ident">region</span>;
-    }
-
-    <span class="comment">// May require an alignment</span>
-    <span class="kw">let</span> <span class="ident">region_isize</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">as_usize</span>() <span class="kw">as</span> <span class="ident">isize</span>;
-
-    <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> (<span class="ident">alignment</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">isize</span>; <span class="comment">// fromIntSignExtend</span>
-    <span class="kw">let</span> <span class="ident">neg_off</span> <span class="op">=</span> <span class="op">-</span><span class="ident">offset</span>; <span class="comment">// fromIntSignExtend</span>
-    <span class="kw">let</span> <span class="ident">delta</span> <span class="op">=</span> (<span class="ident">neg_off</span> <span class="op">-</span> <span class="ident">region_isize</span>) <span class="op">&amp;</span> <span class="ident">mask</span>;
-
-    <span class="kw">if</span> <span class="ident">fillalignmentgap</span> <span class="op">&amp;&amp;</span> (<span class="ident">VM::ALIGNMENT_VALUE</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>) {
-        <span class="ident">fill_alignment_gap</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">region</span>, <span class="ident">region</span> <span class="op">+</span> <span class="ident">delta</span>);
+    <span class="comment">// No alignment ever required.
+    </span><span class="kw">if </span>alignment &lt;= known_alignment || VM::MAX_ALIGNMENT &lt;= VM::MIN_ALIGNMENT {
+        <span class="kw">return </span>region;
     }
 
-    <span class="ident">region</span> <span class="op">+</span> <span class="ident">delta</span>
+    <span class="comment">// May require an alignment
+    </span><span class="kw">let </span>region_isize = region.as_usize() <span class="kw">as </span>isize;
+
+    <span class="kw">let </span>mask = (alignment - <span class="number">1</span>) <span class="kw">as </span>isize; <span class="comment">// fromIntSignExtend
+    </span><span class="kw">let </span>neg_off = -offset; <span class="comment">// fromIntSignExtend
+    </span><span class="kw">let </span>delta = (neg_off - region_isize) &amp; mask;
+
+    <span class="kw">if </span>fillalignmentgap &amp;&amp; (VM::ALIGNMENT_VALUE != <span class="number">0</span>) {
+        fill_alignment_gap::&lt;VM&gt;(region, region + delta);
+    }
+
+    region + delta
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fill_alignment_gap</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">immut_start</span>: <span class="ident">Address</span>, <span class="ident">end</span>: <span class="ident">Address</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">immut_start</span>;
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(immut_start: Address, end: Address) {
+    <span class="kw">let </span><span class="kw-2">mut </span>start = immut_start;
 
-    <span class="kw">if</span> <span class="ident">VM::MAX_ALIGNMENT</span> <span class="op">-</span> <span class="ident">VM::MIN_ALIGNMENT</span> <span class="op">==</span> <span class="ident">BYTES_IN_INT</span> {
-        <span class="comment">// At most a single hole</span>
-        <span class="kw">if</span> <span class="ident">end</span> <span class="op">-</span> <span class="ident">start</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">unsafe</span> {
-                <span class="ident">start</span>.<span class="ident">store</span>(<span class="ident">VM::ALIGNMENT_VALUE</span>);
+    <span class="kw">if </span>VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
+        <span class="comment">// At most a single hole
+        </span><span class="kw">if </span>end - start != <span class="number">0 </span>{
+            <span class="kw">unsafe </span>{
+                start.store(VM::ALIGNMENT_VALUE);
             }
         }
-    } <span class="kw">else</span> {
-        <span class="kw">while</span> <span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">end</span> {
-            <span class="kw">unsafe</span> {
-                <span class="ident">start</span>.<span class="ident">store</span>(<span class="ident">VM::ALIGNMENT_VALUE</span>);
+    } <span class="kw">else </span>{
+        <span class="kw">while </span>start &lt; end {
+            <span class="kw">unsafe </span>{
+                start.store(VM::ALIGNMENT_VALUE);
             }
-            <span class="ident">start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">BYTES_IN_INT</span>;
+            start += BYTES_IN_INT;
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_maximum_aligned_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">alignment</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">get_maximum_aligned_size_inner</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span>, <span class="ident">alignment</span>, <span class="ident">VM::MIN_ALIGNMENT</span>)
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>get_maximum_aligned_size&lt;VM: VMBinding&gt;(size: usize, alignment: usize) -&gt; usize {
+    get_maximum_aligned_size_inner::&lt;VM&gt;(size, alignment, VM::MIN_ALIGNMENT)
 }
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_maximum_aligned_size_inner</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="ident">alignment</span>: <span class="ident">usize</span>,
-    <span class="ident">known_alignment</span>: <span class="ident">usize</span>,
-) -&gt; <span class="ident">usize</span> {
+<span class="attribute">#[inline(always)]
+</span><span class="kw">pub fn </span>get_maximum_aligned_size_inner&lt;VM: VMBinding&gt;(
+    size: usize,
+    alignment: usize,
+    known_alignment: usize,
+) -&gt; usize {
     <span class="macro">trace!</span>(
         <span class="string">&quot;size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}&quot;</span>,
-        <span class="ident">size</span>,
-        <span class="ident">alignment</span>,
-        <span class="ident">known_alignment</span>,
-        <span class="ident">VM::MIN_ALIGNMENT</span>
+        size,
+        alignment,
+        known_alignment,
+        VM::MIN_ALIGNMENT
     );
-    <span class="macro">debug_assert!</span>(<span class="ident">size</span> <span class="op">==</span> <span class="ident">size</span> <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">known_alignment</span> <span class="op">-</span> <span class="number">1</span>));
-    <span class="macro">debug_assert!</span>(<span class="ident">known_alignment</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span>);
+    <span class="macro">debug_assert!</span>(size == size &amp; !(known_alignment - <span class="number">1</span>));
+    <span class="macro">debug_assert!</span>(known_alignment &gt;= VM::MIN_ALIGNMENT);
 
-    <span class="kw">if</span> <span class="ident">VM::MAX_ALIGNMENT</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span> <span class="op">|</span><span class="op">|</span> <span class="ident">alignment</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">known_alignment</span> {
-        <span class="ident">size</span>
-    } <span class="kw">else</span> {
-        <span class="ident">size</span> <span class="op">+</span> <span class="ident">alignment</span> <span class="op">-</span> <span class="ident">known_alignment</span>
+    <span class="kw">if </span>VM::MAX_ALIGNMENT &lt;= VM::MIN_ALIGNMENT || alignment &lt;= known_alignment {
+        size
+    } <span class="kw">else </span>{
+        size + alignment - known_alignment
     }
 }
 
-<span class="doccomment">/// A trait which implements allocation routines. Every allocator needs to implements this trait.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Allocator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Downcast</span> {
-    <span class="doccomment">/// Return the [`VMThread`] associated with this allocator instance.</span>
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMThread</span>;
+<span class="doccomment">/// A trait which implements allocation routines. Every allocator needs to implements this trait.
+</span><span class="kw">pub trait </span>Allocator&lt;VM: VMBinding&gt;: Downcast {
+    <span class="doccomment">/// Return the [`VMThread`] associated with this allocator instance.
+    </span><span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMThread;
 
-    <span class="doccomment">/// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.</span>
-    <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.
+    </span><span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;;
 
-    <span class="doccomment">/// Return the [`Plan`] instance that this allocator instance is associated with.</span>
-    <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Return the [`Plan`] instance that this allocator instance is associated with.
+    </span><span class="kw">fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;;
 
-    <span class="doccomment">/// Return if this allocator can do thread local allocation. If an allocator does not do thread</span>
-    <span class="doccomment">/// local allocation, each allocation will go to slowpath and will have a check for GC polls.</span>
-    <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Return if this allocator can do thread local allocation. If an allocator does not do thread
+    /// local allocation, each allocation will go to slowpath and will have a check for GC polls.
+    </span><span class="kw">fn </span>does_thread_local_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 
-    <span class="doccomment">/// Return at which granularity the allocator acquires memory from the global space and use</span>
-    <span class="doccomment">/// them as thread local buffer. For example, the [`BumpAllocator`](crate::util::alloc::BumpAllocator) acquires memory at 32KB</span>
-    <span class="doccomment">/// blocks. Depending on the actual size for the current object, they always acquire memory of</span>
-    <span class="doccomment">/// N*32KB (N&gt;=1). Thus the [`BumpAllocator`](crate::util::alloc::BumpAllocator) returns 32KB for this method.  Only allocators</span>
-    <span class="doccomment">/// that do thread local allocation need to implement this method.</span>
-    <span class="kw">fn</span> <span class="ident">get_thread_local_buffer_granularity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>(), <span class="string">&quot;An allocator that does not thread local allocation does not have a buffer granularity.&quot;</span>);
+    <span class="doccomment">/// Return at which granularity the allocator acquires memory from the global space and use
+    /// them as thread local buffer. For example, the [`BumpAllocator`](crate::util::alloc::BumpAllocator) acquires memory at 32KB
+    /// blocks. Depending on the actual size for the current object, they always acquire memory of
+    /// N*32KB (N&gt;=1). Thus the [`BumpAllocator`](crate::util::alloc::BumpAllocator) returns 32KB for this method.  Only allocators
+    /// that do thread local allocation need to implement this method.
+    </span><span class="kw">fn </span>get_thread_local_buffer_granularity(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="macro">assert!</span>(<span class="self">self</span>.does_thread_local_allocation(), <span class="string">&quot;An allocator that does not thread local allocation does not have a buffer granularity.&quot;</span>);
         <span class="macro">unimplemented!</span>()
     }
 
-    <span class="doccomment">/// An allocation attempt. The implementation of this function depends on the allocator used.</span>
-    <span class="doccomment">/// If an allocator supports thread local allocations, then the allocation will be serviced</span>
-    <span class="doccomment">/// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
-    <span class="doccomment">/// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to</span>
-    <span class="doccomment">/// it. We have no assumptions on whether the VM will continue executing or abort immediately.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// An allocator needs to make sure the object reference for the returned address is in the same</span>
-    <span class="doccomment">/// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).</span>
-    <span class="doccomment">/// See [`crate::util::alloc::object_ref_guard`](util/alloc/object_ref_guard).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
-    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
-    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
-    <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span>;
+    <span class="doccomment">/// An allocation attempt. The implementation of this function depends on the allocator used.
+    /// If an allocator supports thread local allocations, then the allocation will be serviced
+    /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).
+    ///
+    /// Note that in the case where the VM is out of memory, we invoke
+    /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
+    /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
+    ///
+    /// An allocator needs to make sure the object reference for the returned address is in the same
+    /// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).
+    /// See [`crate::util::alloc::object_ref_guard`](util/alloc/object_ref_guard).
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    </span><span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address;
 
-    <span class="doccomment">/// Slowpath allocation attempt. This function is explicitly not inlined for performance</span>
-    <span class="doccomment">/// considerations.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
-    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
-    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="self">self</span>.<span class="ident">alloc_slow_inline</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+    <span class="doccomment">/// Slowpath allocation attempt. This function is explicitly not inlined for performance
+    /// considerations.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    </span><span class="attribute">#[inline(never)]
+    </span><span class="kw">fn </span>alloc_slow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+        <span class="self">self</span>.alloc_slow_inline(size, align, offset)
     }
 
-    <span class="doccomment">/// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A</span>
-    <span class="doccomment">/// slowpath allocation in MMTk attempts to allocate the object using the per-allocator</span>
-    <span class="doccomment">/// definition of [`alloc_slow_once`](Allocator::alloc_slow_once). This function also accounts for increasing the</span>
-    <span class="doccomment">/// allocation bytes in order to support stress testing. In case precise stress testing is</span>
-    <span class="doccomment">/// being used, the [`alloc_slow_once_precise_stress`](Allocator::alloc_slow_once_precise_stress) function is used instead.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
-    <span class="doccomment">/// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform</span>
-    <span class="doccomment">/// the binding and then return a null pointer back to it. We have no assumptions on whether</span>
-    <span class="doccomment">/// the VM will continue executing or abort immediately on a</span>
-    <span class="doccomment">/// [`AllocationError::HeapOutOfMemory`] error.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
-    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
-    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow_inline</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_tls</span>();
-        <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">base</span>();
-        <span class="kw">let</span> <span class="ident">is_mutator</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>);
-        <span class="kw">let</span> <span class="ident">stress_test</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">is_stress_test_gc_enabled</span>();
+    <span class="doccomment">/// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A
+    /// slowpath allocation in MMTk attempts to allocate the object using the per-allocator
+    /// definition of [`alloc_slow_once`](Allocator::alloc_slow_once). This function also accounts for increasing the
+    /// allocation bytes in order to support stress testing. In case precise stress testing is
+    /// being used, the [`alloc_slow_once_precise_stress`](Allocator::alloc_slow_once_precise_stress) function is used instead.
+    ///
+    /// Note that in the case where the VM is out of memory, we invoke
+    /// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform
+    /// the binding and then return a null pointer back to it. We have no assumptions on whether
+    /// the VM will continue executing or abort immediately on a
+    /// [`AllocationError::HeapOutOfMemory`] error.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>alloc_slow_inline(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+        <span class="kw">let </span>tls = <span class="self">self</span>.get_tls();
+        <span class="kw">let </span>plan = <span class="self">self</span>.get_plan().base();
+        <span class="kw">let </span>is_mutator = VM::VMActivePlan::is_mutator(tls);
+        <span class="kw">let </span>stress_test = plan.is_stress_test_gc_enabled();
 
-        <span class="comment">// Information about the previous collection.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">previous_result_zero</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="comment">// Information about the previous collection.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>emergency_collection = <span class="bool-val">false</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>previous_result_zero = <span class="bool-val">false</span>;
 
-        <span class="kw">loop</span> {
-            <span class="comment">// Try to allocate using the slow path</span>
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_mutator</span> <span class="op">&amp;&amp;</span> <span class="ident">stress_test</span> <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">is_precise_stress</span>() {
-                <span class="comment">// If we are doing precise stress GC, we invoke the special allow_slow_once call.</span>
-                <span class="comment">// alloc_slow_once_precise_stress() should make sure that every allocation goes</span>
-                <span class="comment">// to the slowpath (here) so we can check the allocation bytes and decide</span>
-                <span class="comment">// if we need to do a stress GC.</span>
+        <span class="kw">loop </span>{
+            <span class="comment">// Try to allocate using the slow path
+            </span><span class="kw">let </span>result = <span class="kw">if </span>is_mutator &amp;&amp; stress_test &amp;&amp; plan.is_precise_stress() {
+                <span class="comment">// If we are doing precise stress GC, we invoke the special allow_slow_once call.
+                // alloc_slow_once_precise_stress() should make sure that every allocation goes
+                // to the slowpath (here) so we can check the allocation bytes and decide
+                // if we need to do a stress GC.
 
-                <span class="comment">// If we should do a stress GC now, we tell the alloc_slow_once_precise_stress()</span>
-                <span class="comment">// so they would avoid try any thread local allocation, and directly call</span>
-                <span class="comment">// global acquire and do a poll.</span>
-                <span class="kw">let</span> <span class="ident">need_poll</span> <span class="op">=</span> <span class="ident">is_mutator</span> <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">should_do_stress_gc</span>();
-                <span class="self">self</span>.<span class="ident">alloc_slow_once_precise_stress</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="ident">need_poll</span>)
-            } <span class="kw">else</span> {
-                <span class="comment">// If we are not doing precise stress GC, just call the normal alloc_slow_once().</span>
-                <span class="comment">// Normal stress test only checks for stress GC in the slowpath.</span>
-                <span class="self">self</span>.<span class="ident">alloc_slow_once</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+                // If we should do a stress GC now, we tell the alloc_slow_once_precise_stress()
+                // so they would avoid try any thread local allocation, and directly call
+                // global acquire and do a poll.
+                </span><span class="kw">let </span>need_poll = is_mutator &amp;&amp; plan.should_do_stress_gc();
+                <span class="self">self</span>.alloc_slow_once_precise_stress(size, align, offset, need_poll)
+            } <span class="kw">else </span>{
+                <span class="comment">// If we are not doing precise stress GC, just call the normal alloc_slow_once().
+                // Normal stress test only checks for stress GC in the slowpath.
+                </span><span class="self">self</span>.alloc_slow_once(size, align, offset)
             };
 
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">is_mutator</span> {
-                <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">result</span>.<span class="ident">is_zero</span>());
-                <span class="kw">return</span> <span class="ident">result</span>;
+            <span class="kw">if </span>!is_mutator {
+                <span class="macro">debug_assert!</span>(!result.is_zero());
+                <span class="kw">return </span>result;
             }
 
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">result</span>.<span class="ident">is_zero</span>() {
-                <span class="comment">// Report allocation success to assist OutOfMemory handling.</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
-                    <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="kw">if </span>!result.is_zero() {
+                <span class="comment">// Report allocation success to assist OutOfMemory handling.
+                </span><span class="kw">if </span>!plan.allocation_success.load(Ordering::Relaxed) {
+                    plan.allocation_success.store(<span class="bool-val">true</span>, Ordering::SeqCst);
                 }
 
-                <span class="comment">// Only update the allocation bytes if we haven&#39;t failed a previous allocation in this loop</span>
-                <span class="kw">if</span> <span class="ident">stress_test</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_initialized</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">previous_result_zero</span> {
-                    <span class="kw">let</span> <span class="ident">allocated_size</span> <span class="op">=</span>
-                        <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">is_precise_stress</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>() {
-                            <span class="comment">// For precise stress test, or for allocators that do not have thread local buffer,</span>
-                            <span class="comment">// we know exactly how many bytes we allocate.</span>
-                            <span class="ident">size</span>
-                        } <span class="kw">else</span> {
-                            <span class="comment">// For normal stress test, we count the entire thread local buffer size as allocated.</span>
-                            <span class="ident"><span class="kw">crate</span>::util::conversions::raw_align_up</span>(
-                                <span class="ident">size</span>,
-                                <span class="self">self</span>.<span class="ident">get_thread_local_buffer_granularity</span>(),
+                <span class="comment">// Only update the allocation bytes if we haven&#39;t failed a previous allocation in this loop
+                </span><span class="kw">if </span>stress_test &amp;&amp; <span class="self">self</span>.get_plan().is_initialized() &amp;&amp; !previous_result_zero {
+                    <span class="kw">let </span>allocated_size =
+                        <span class="kw">if </span>plan.is_precise_stress() || !<span class="self">self</span>.does_thread_local_allocation() {
+                            <span class="comment">// For precise stress test, or for allocators that do not have thread local buffer,
+                            // we know exactly how many bytes we allocate.
+                            </span>size
+                        } <span class="kw">else </span>{
+                            <span class="comment">// For normal stress test, we count the entire thread local buffer size as allocated.
+                            </span><span class="kw">crate</span>::util::conversions::raw_align_up(
+                                size,
+                                <span class="self">self</span>.get_thread_local_buffer_granularity(),
                             )
                         };
-                    <span class="kw">let</span> <span class="ident">_allocation_bytes</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">increase_allocation_bytes_by</span>(<span class="ident">allocated_size</span>);
+                    <span class="kw">let </span>_allocation_bytes = plan.increase_allocation_bytes_by(allocated_size);
 
-                    <span class="comment">// This is the allocation hook for the analysis trait. If you want to call</span>
-                    <span class="comment">// an analysis counter specific allocation hook, then here is the place to do so</span>
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-                    <span class="kw">if</span> <span class="ident">_allocation_bytes</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> {
+                    <span class="comment">// This is the allocation hook for the analysis trait. If you want to call
+                    // an analysis counter specific allocation hook, then here is the place to do so
+                    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;analysis&quot;</span>)]
+                    </span><span class="kw">if </span>_allocation_bytes &gt; <span class="kw-2">*</span>plan.options.analysis_factor {
                         <span class="macro">trace!</span>(
                             <span class="string">&quot;Analysis: allocation_bytes = {} more than analysis_factor = {}&quot;</span>,
-                            <span class="ident">_allocation_bytes</span>,
-                            <span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
+                            _allocation_bytes,
+                            <span class="kw-2">*</span>plan.options.analysis_factor
                         );
 
-                        <span class="ident">plan</span>.<span class="ident">analysis_manager</span>.<span class="ident">alloc_hook</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
+                        plan.analysis_manager.alloc_hook(size, align, offset);
                     }
                 }
 
-                <span class="kw">return</span> <span class="ident">result</span>;
+                <span class="kw">return </span>result;
             }
 
-            <span class="comment">// It is possible to have cases where a thread is blocked for another GC (non emergency)</span>
-            <span class="comment">// immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying</span>
-            <span class="comment">// the thread does not leave this loop between the two GCs. The local var &#39;emergency_collection&#39;</span>
-            <span class="comment">// was set to true after the first GC. But when we execute this check below, we just finished</span>
-            <span class="comment">// the second GC, which is not emergency. In such case, we will give a false OOM.</span>
-            <span class="comment">// We cannot just rely on the local var. Instead, we get the emergency collection value again,</span>
-            <span class="comment">// and check both.</span>
-            <span class="kw">if</span> <span class="ident">emergency_collection</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>() {
+            <span class="comment">// It is possible to have cases where a thread is blocked for another GC (non emergency)
+            // immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying
+            // the thread does not leave this loop between the two GCs. The local var &#39;emergency_collection&#39;
+            // was set to true after the first GC. But when we execute this check below, we just finished
+            // the second GC, which is not emergency. In such case, we will give a false OOM.
+            // We cannot just rely on the local var. Instead, we get the emergency collection value again,
+            // and check both.
+            </span><span class="kw">if </span>emergency_collection &amp;&amp; <span class="self">self</span>.get_plan().is_emergency_collection() {
                 <span class="macro">trace!</span>(<span class="string">&quot;Emergency collection&quot;</span>);
-                <span class="comment">// Report allocation success to assist OutOfMemory handling.</span>
-                <span class="comment">// This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)</span>
-                <span class="kw">let</span> <span class="ident">fail_with_oom</span> <span class="op">=</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">swap</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
-                <span class="macro">trace!</span>(<span class="string">&quot;fail with oom={}&quot;</span>, <span class="ident">fail_with_oom</span>);
-                <span class="kw">if</span> <span class="ident">fail_with_oom</span> {
-                    <span class="comment">// Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM</span>
-                    <span class="macro">trace!</span>(<span class="string">&quot;Throw HeapOutOfMemory!&quot;</span>);
-                    <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>, <span class="ident">AllocationError::HeapOutOfMemory</span>);
-                    <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">swap</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
-                    <span class="kw">return</span> <span class="ident">result</span>;
+                <span class="comment">// Report allocation success to assist OutOfMemory handling.
+                // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
+                </span><span class="kw">let </span>fail_with_oom = !plan.allocation_success.swap(<span class="bool-val">true</span>, Ordering::SeqCst);
+                <span class="macro">trace!</span>(<span class="string">&quot;fail with oom={}&quot;</span>, fail_with_oom);
+                <span class="kw">if </span>fail_with_oom {
+                    <span class="comment">// Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
+                    </span><span class="macro">trace!</span>(<span class="string">&quot;Throw HeapOutOfMemory!&quot;</span>);
+                    VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+                    plan.allocation_success.swap(<span class="bool-val">false</span>, Ordering::SeqCst);
+                    <span class="kw">return </span>result;
                 }
             }
 
@@ -677,83 +675,82 @@
              * In some VMs the scheduler can change the affinity between the
              * current thread and the mutator context. This is possible for
              * VMs that dynamically multiplex Java threads onto multiple mutator
-             * contexts. */</span>
-            <span class="comment">// FIXME: No good way to do this</span>
-            <span class="comment">//current = unsafe {</span>
-            <span class="comment">//    VMActivePlan::mutator(tls).get_allocator_from_space(space)</span>
-            <span class="comment">//};</span>
+             * contexts. */
+            // FIXME: No good way to do this
+            //current = unsafe {
+            //    VMActivePlan::mutator(tls).get_allocator_from_space(space)
+            //};
 
-            <span class="comment">// Record whether last collection was an Emergency collection. If so, we make one more</span>
-            <span class="comment">// attempt to allocate before we signal an OOM.</span>
-            <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>();
-            <span class="macro">trace!</span>(<span class="string">&quot;Got emergency collection as {}&quot;</span>, <span class="ident">emergency_collection</span>);
-            <span class="ident">previous_result_zero</span> <span class="op">=</span> <span class="bool-val">true</span>;
+            // Record whether last collection was an Emergency collection. If so, we make one more
+            // attempt to allocate before we signal an OOM.
+            </span>emergency_collection = <span class="self">self</span>.get_plan().is_emergency_collection();
+            <span class="macro">trace!</span>(<span class="string">&quot;Got emergency collection as {}&quot;</span>, emergency_collection);
+            previous_result_zero = <span class="bool-val">true</span>;
         }
     }
 
-    <span class="doccomment">/// Single slow path allocation attempt. This is called by [`alloc_slow_inline`](Allocator::alloc_slow_inline). The</span>
-    <span class="doccomment">/// implementation of this function depends on the allocator used. Generally, if an allocator</span>
-    <span class="doccomment">/// supports thread local allocations, it will try to allocate more TLAB space here. If it</span>
-    <span class="doccomment">/// doesn&#39;t, then (generally) the allocator simply allocates enough space for the current</span>
-    <span class="doccomment">/// object.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
-    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
-    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span>;
+    <span class="doccomment">/// Single slow path allocation attempt. This is called by [`alloc_slow_inline`](Allocator::alloc_slow_inline). The
+    /// implementation of this function depends on the allocator used. Generally, if an allocator
+    /// supports thread local allocations, it will try to allocate more TLAB space here. If it
+    /// doesn&#39;t, then (generally) the allocator simply allocates enough space for the current
+    /// object.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    </span><span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address;
 
-    <span class="doccomment">/// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to</span>
-    <span class="doccomment">/// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for</span>
-    <span class="doccomment">/// allocators that do thread local allocation, they may allocate from their thread local</span>
-    <span class="doccomment">/// buffer which does not have a GC poll check, and they may even allocate with the JIT</span>
-    <span class="doccomment">/// generated allocation fastpath which is unaware of stress test GC. For both cases, we are</span>
-    <span class="doccomment">/// not able to guarantee a stress GC is triggered every N bytes. To solve this, when the</span>
-    <span class="doccomment">/// stress factor is set, we will call this method instead of the normal alloc_slow_once(). We</span>
-    <span class="doccomment">/// expect the implementation of this slow allocation will trick the fastpath so every</span>
-    <span class="doccomment">/// allocation will fail in the fastpath, jump to the slow path and eventually call this method</span>
-    <span class="doccomment">/// again for the actual allocation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The actual implementation about how to trick the fastpath may vary. For example, our bump</span>
-    <span class="doccomment">/// pointer allocator will set the thread local buffer limit to the buffer size instead of the</span>
-    <span class="doccomment">/// buffer end address. In this case, every fastpath check (cursor + size &lt; limit) will fail,</span>
-    <span class="doccomment">/// and jump to this slowpath. In the slowpath, we still allocate from the thread local buffer,</span>
-    <span class="doccomment">/// and recompute the limit (remaining buffer size).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If an allocator does not do thread local allocation (which returns false for</span>
-    <span class="doccomment">/// does_thread_local_allocation()), it does not need to override this method. The default</span>
-    <span class="doccomment">/// implementation will simply call allow_slow_once() and it will work fine for allocators that</span>
-    <span class="doccomment">/// do not have thread local allocation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
-    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
-    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
-    <span class="doccomment">/// * `need_poll`: if this is true, the implementation must poll for a GC, rather than</span>
-    <span class="doccomment">///   attempting to allocate from the local buffer.</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once_precise_stress</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">size</span>: <span class="ident">usize</span>,
-        <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">need_poll</span>: <span class="ident">bool</span>,
-    ) -&gt; <span class="ident">Address</span> {
-        <span class="comment">// If an allocator does thread local allocation but does not override this method to</span>
-        <span class="comment">// provide a correct implementation, we will log a warning.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>() <span class="op">&amp;&amp;</span> <span class="ident">need_poll</span> {
-            <span class="macro">warn!</span>(<span class="string">&quot;{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).&quot;</span>, <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>());
+    <span class="doccomment">/// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to
+    /// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for
+    /// allocators that do thread local allocation, they may allocate from their thread local
+    /// buffer which does not have a GC poll check, and they may even allocate with the JIT
+    /// generated allocation fastpath which is unaware of stress test GC. For both cases, we are
+    /// not able to guarantee a stress GC is triggered every N bytes. To solve this, when the
+    /// stress factor is set, we will call this method instead of the normal alloc_slow_once(). We
+    /// expect the implementation of this slow allocation will trick the fastpath so every
+    /// allocation will fail in the fastpath, jump to the slow path and eventually call this method
+    /// again for the actual allocation.
+    ///
+    /// The actual implementation about how to trick the fastpath may vary. For example, our bump
+    /// pointer allocator will set the thread local buffer limit to the buffer size instead of the
+    /// buffer end address. In this case, every fastpath check (cursor + size &lt; limit) will fail,
+    /// and jump to this slowpath. In the slowpath, we still allocate from the thread local buffer,
+    /// and recompute the limit (remaining buffer size).
+    ///
+    /// If an allocator does not do thread local allocation (which returns false for
+    /// does_thread_local_allocation()), it does not need to override this method. The default
+    /// implementation will simply call allow_slow_once() and it will work fine for allocators that
+    /// do not have thread local allocation.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than
+    ///   attempting to allocate from the local buffer.
+    </span><span class="kw">fn </span>alloc_slow_once_precise_stress(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -&gt; Address {
+        <span class="comment">// If an allocator does thread local allocation but does not override this method to
+        // provide a correct implementation, we will log a warning.
+        </span><span class="kw">if </span><span class="self">self</span>.does_thread_local_allocation() &amp;&amp; need_poll {
+            <span class="macro">warn!</span>(<span class="string">&quot;{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).&quot;</span>, std::any::type_name::&lt;<span class="self">Self</span>&gt;());
         }
-        <span class="self">self</span>.<span class="ident">alloc_slow_once</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+        <span class="self">self</span>.alloc_slow_once(size, align, offset)
     }
 
-    <span class="doccomment">/// The [`crate::plan::Mutator`] that includes this allocator is going to be destroyed. Some allocators</span>
-    <span class="doccomment">/// may need to save/transfer its thread local data to the space.</span>
-    <span class="kw">fn</span> <span class="ident">on_mutator_destroy</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// By default, do nothing</span>
-    }
+    <span class="doccomment">/// The [`crate::plan::Mutator`] that includes this allocator is going to be destroyed. Some allocators
+    /// may need to save/transfer its thread local data to the space.
+    </span><span class="kw">fn </span>on_mutator_destroy(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// By default, do nothing
+    </span>}
 }
 
-<span class="macro">impl_downcast!</span>(<span class="ident">Allocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>);
+<span class="macro">impl_downcast!</span>(Allocator&lt;VM&gt; <span class="kw">where </span>VM: VMBinding);
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

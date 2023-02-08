@@ -1,104 +1,102 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;immix&#x2F;block.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/immix/block.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../../normalize.css"><link rel="stylesheet" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../../ayu.css" disabled><link rel="stylesheet" href="../../../../dark.css" disabled><link rel="stylesheet" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../main.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -328,334 +326,333 @@
 <span id="326">326</span>
 <span id="327">327</span>
 <span id="328">328</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line::Line</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ImmixSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::blockpageresource::BlockPool</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::chunk_map::Chunk</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan</span>::{<span class="ident">Region</span>, <span class="ident">RegionIterator</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">MetadataByteArrayRef</span>, <span class="ident">SideMetadataSpec</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::Histogram;
+<span class="kw">use </span><span class="kw">super</span>::line::Line;
+<span class="kw">use </span><span class="kw">super</span>::ImmixSpace;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::blockpageresource::BlockPool;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::Chunk;
+<span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::{Region, RegionIterator};
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
+<span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="doccomment">/// The block allocation state.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">BlockState</span> {
-    <span class="doccomment">/// the block is not allocated.</span>
-    <span class="ident">Unallocated</span>,
-    <span class="doccomment">/// the block is allocated but not marked.</span>
-    <span class="ident">Unmarked</span>,
-    <span class="doccomment">/// the block is allocated and marked.</span>
-    <span class="ident">Marked</span>,
-    <span class="doccomment">/// the block is marked as reusable.</span>
-    <span class="ident">Reusable</span> { <span class="ident">unavailable_lines</span>: <span class="ident">u8</span> },
+<span class="doccomment">/// The block allocation state.
+</span><span class="attribute">#[derive(Debug, PartialEq, Clone, Copy)]
+</span><span class="kw">pub enum </span>BlockState {
+    <span class="doccomment">/// the block is not allocated.
+    </span>Unallocated,
+    <span class="doccomment">/// the block is allocated but not marked.
+    </span>Unmarked,
+    <span class="doccomment">/// the block is allocated and marked.
+    </span>Marked,
+    <span class="doccomment">/// the block is marked as reusable.
+    </span>Reusable { unavailable_lines: u8 },
 }
 
-<span class="kw">impl</span> <span class="ident">BlockState</span> {
-    <span class="doccomment">/// Private constant</span>
-    <span class="kw">const</span> <span class="ident">MARK_UNALLOCATED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="doccomment">/// Private constant</span>
-    <span class="kw">const</span> <span class="ident">MARK_UNMARKED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">u8::MAX</span>;
-    <span class="doccomment">/// Private constant</span>
-    <span class="kw">const</span> <span class="ident">MARK_MARKED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">u8::MAX</span> <span class="op">-</span> <span class="number">1</span>;
+<span class="kw">impl </span>BlockState {
+    <span class="doccomment">/// Private constant
+    </span><span class="kw">const </span>MARK_UNALLOCATED: u8 = <span class="number">0</span>;
+    <span class="doccomment">/// Private constant
+    </span><span class="kw">const </span>MARK_UNMARKED: u8 = u8::MAX;
+    <span class="doccomment">/// Private constant
+    </span><span class="kw">const </span>MARK_MARKED: u8 = u8::MAX - <span class="number">1</span>;
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BlockState</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">u8</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident"><span class="self">Self</span>::MARK_UNALLOCATED</span> =&gt; <span class="ident">BlockState::Unallocated</span>,
-            <span class="ident"><span class="self">Self</span>::MARK_UNMARKED</span> =&gt; <span class="ident">BlockState::Unmarked</span>,
-            <span class="ident"><span class="self">Self</span>::MARK_MARKED</span> =&gt; <span class="ident">BlockState::Marked</span>,
-            <span class="ident">unavailable_lines</span> =&gt; <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> },
+<span class="kw">impl </span>From&lt;u8&gt; <span class="kw">for </span>BlockState {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>from(state: u8) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>state {
+            <span class="self">Self</span>::MARK_UNALLOCATED =&gt; BlockState::Unallocated,
+            <span class="self">Self</span>::MARK_UNMARKED =&gt; BlockState::Unmarked,
+            <span class="self">Self</span>::MARK_MARKED =&gt; BlockState::Marked,
+            unavailable_lines =&gt; BlockState::Reusable { unavailable_lines },
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">BlockState</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">u8</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">BlockState</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident">BlockState::Unallocated</span> =&gt; <span class="ident">BlockState::MARK_UNALLOCATED</span>,
-            <span class="ident">BlockState::Unmarked</span> =&gt; <span class="ident">BlockState::MARK_UNMARKED</span>,
-            <span class="ident">BlockState::Marked</span> =&gt; <span class="ident">BlockState::MARK_MARKED</span>,
-            <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> } =&gt; <span class="ident">unavailable_lines</span>,
+<span class="kw">impl </span>From&lt;BlockState&gt; <span class="kw">for </span>u8 {
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>from(state: BlockState) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>state {
+            BlockState::Unallocated =&gt; BlockState::MARK_UNALLOCATED,
+            BlockState::Unmarked =&gt; BlockState::MARK_UNMARKED,
+            BlockState::Marked =&gt; BlockState::MARK_MARKED,
+            BlockState::Reusable { unavailable_lines } =&gt; unavailable_lines,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">BlockState</span> {
-    <span class="doccomment">/// Test if the block is reuasable.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_reusable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident">BlockState::Reusable</span> { .. })
+<span class="kw">impl </span>BlockState {
+    <span class="doccomment">/// Test if the block is reuasable.
+    </span><span class="kw">pub const fn </span>is_reusable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(<span class="self">self</span>, BlockState::Reusable { .. })
     }
 }
 
-<span class="doccomment">/// Data structure to reference an immix block.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Block</span>(<span class="ident">Address</span>);
+<span class="doccomment">/// Data structure to reference an immix block.
+</span><span class="attribute">#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+</span><span class="kw">pub struct </span>Block(Address);
 
-<span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Block</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_smaller_block&quot;</span>))]</span>
-    <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">15</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_smaller_block&quot;</span>)]</span>
-    <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">13</span>;
+<span class="kw">impl </span>Region <span class="kw">for </span>Block {
+    <span class="attribute">#[cfg(not(feature = <span class="string">&quot;immix_smaller_block&quot;</span>))]
+    </span><span class="kw">const </span>LOG_BYTES: usize = <span class="number">15</span>;
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;immix_smaller_block&quot;</span>)]
+    </span><span class="kw">const </span>LOG_BYTES: usize = <span class="number">13</span>;
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from_aligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
-        <span class="self">Self</span>(<span class="ident">address</span>)
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
+        <span class="macro">debug_assert!</span>(address.is_aligned_to(<span class="self">Self</span>::BYTES));
+        <span class="self">Self</span>(address)
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">Block</span> {
-    <span class="doccomment">/// Log pages in block</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
-    <span class="doccomment">/// Pages in block</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_PAGES</span>;
-    <span class="doccomment">/// Log lines in block</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_LINES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span> <span class="op">-</span> <span class="ident">Line::LOG_BYTES</span>;
-    <span class="doccomment">/// Lines in block</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LINES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_LINES</span>;
+<span class="kw">impl </span>Block {
+    <span class="doccomment">/// Log pages in block
+    </span><span class="kw">pub const </span>LOG_PAGES: usize = <span class="self">Self</span>::LOG_BYTES - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+    <span class="doccomment">/// Pages in block
+    </span><span class="kw">pub const </span>PAGES: usize = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_PAGES;
+    <span class="doccomment">/// Log lines in block
+    </span><span class="kw">pub const </span>LOG_LINES: usize = <span class="self">Self</span>::LOG_BYTES - Line::LOG_BYTES;
+    <span class="doccomment">/// Lines in block
+    </span><span class="kw">pub const </span>LINES: usize = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_LINES;
 
-    <span class="doccomment">/// Block defrag state table (side)</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFRAG_STATE_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEFRAG</span>;
+    <span class="doccomment">/// Block defrag state table (side)
+    </span><span class="kw">pub const </span>DEFRAG_STATE_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEFRAG;
 
-    <span class="doccomment">/// Block mark table (side)</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK</span>;
+    <span class="doccomment">/// Block mark table (side)
+    </span><span class="kw">pub const </span>MARK_TABLE: SideMetadataSpec =
+        <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
 
-    <span class="doccomment">/// Get the chunk containing the block.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Chunk</span> {
-        <span class="ident">Chunk::from_unaligned_address</span>(<span class="self">self</span>.<span class="number">0</span>)
+    <span class="doccomment">/// Get the chunk containing the block.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>chunk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Chunk {
+        Chunk::from_unaligned_address(<span class="self">self</span>.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Get the address range of the block&#39;s line mark table.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">line_mark_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MetadataByteArrayRef</span><span class="op">&lt;</span>{ <span class="ident">Block::LINES</span> }<span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
-        <span class="ident">MetadataByteArrayRef</span>::<span class="op">&lt;</span>{ <span class="ident">Block::LINES</span> }<span class="op">&gt;</span><span class="ident">::new</span>(<span class="kw-2">&amp;</span><span class="ident">Line::MARK_TABLE</span>, <span class="self">self</span>.<span class="ident">start</span>(), <span class="ident"><span class="self">Self</span>::BYTES</span>)
+    <span class="doccomment">/// Get the address range of the block&#39;s line mark table.
+    </span><span class="attribute">#[allow(clippy::assertions_on_constants)]
+    #[inline(always)]
+    </span><span class="kw">pub fn </span>line_mark_table(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MetadataByteArrayRef&lt;{ Block::LINES }&gt; {
+        <span class="macro">debug_assert!</span>(!<span class="kw">super</span>::BLOCK_ONLY);
+        MetadataByteArrayRef::&lt;{ Block::LINES }&gt;::new(<span class="kw-2">&amp;</span>Line::MARK_TABLE, <span class="self">self</span>.start(), <span class="self">Self</span>::BYTES)
     }
 
-    <span class="doccomment">/// Get block mark state.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">BlockState</span> {
-        <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::MARK_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="ident">byte</span>.<span class="ident">into</span>()
+    <span class="doccomment">/// Get block mark state.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; BlockState {
+        <span class="kw">let </span>byte = <span class="self">Self</span>::MARK_TABLE.load_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
+        byte.into()
     }
 
-    <span class="doccomment">/// Set block mark state.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="ident">BlockState</span>) {
-        <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">u8::from</span>(<span class="ident">state</span>);
-        <span class="ident"><span class="self">Self</span>::MARK_TABLE</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">state</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Set block mark state.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>set_state(<span class="kw-2">&amp;</span><span class="self">self</span>, state: BlockState) {
+        <span class="kw">let </span>state = u8::from(state);
+        <span class="self">Self</span>::MARK_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), state, Ordering::SeqCst);
     }
 
-    <span class="comment">// Defrag byte</span>
+    <span class="comment">// Defrag byte
 
-    <span class="kw">const</span> <span class="ident">DEFRAG_SOURCE_STATE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">u8::MAX</span>;
+    </span><span class="kw">const </span>DEFRAG_SOURCE_STATE: u8 = u8::MAX;
 
-    <span class="doccomment">/// Test if the block is marked for defragmentation.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_defrag_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="macro">debug_assert!</span>(<span class="ident">byte</span> <span class="op">==</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">byte</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>);
-        <span class="ident">byte</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>
+    <span class="doccomment">/// Test if the block is marked for defragmentation.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>is_defrag_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>byte = <span class="self">Self</span>::DEFRAG_STATE_TABLE.load_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
+        <span class="macro">debug_assert!</span>(byte == <span class="number">0 </span>|| byte == <span class="self">Self</span>::DEFRAG_SOURCE_STATE);
+        byte == <span class="self">Self</span>::DEFRAG_SOURCE_STATE
     }
 
-    <span class="doccomment">/// Mark the block for defragmentation.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_as_defrag_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">defrag</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">defrag</span> { <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span> } <span class="kw">else</span> { <span class="number">0</span> };
-        <span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">byte</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Mark the block for defragmentation.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>set_as_defrag_source(<span class="kw-2">&amp;</span><span class="self">self</span>, defrag: bool) {
+        <span class="kw">let </span>byte = <span class="kw">if </span>defrag { <span class="self">Self</span>::DEFRAG_SOURCE_STATE } <span class="kw">else </span>{ <span class="number">0 </span>};
+        <span class="self">Self</span>::DEFRAG_STATE_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), byte, Ordering::SeqCst);
     }
 
-    <span class="doccomment">/// Record the number of holes in the block.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_holes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">holes</span>: <span class="ident">usize</span>) {
-        <span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">holes</span> <span class="kw">as</span> <span class="ident">u8</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Record the number of holes in the block.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>set_holes(<span class="kw-2">&amp;</span><span class="self">self</span>, holes: usize) {
+        <span class="self">Self</span>::DEFRAG_STATE_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), holes <span class="kw">as </span>u8, Ordering::SeqCst);
     }
 
-    <span class="doccomment">/// Get the number of holes.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_holes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="macro">debug_assert_ne!</span>(<span class="ident">byte</span>, <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>);
-        <span class="ident">byte</span> <span class="kw">as</span> <span class="ident">usize</span>
+    <span class="doccomment">/// Get the number of holes.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>get_holes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">let </span>byte = <span class="self">Self</span>::DEFRAG_STATE_TABLE.load_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
+        <span class="macro">debug_assert_ne!</span>(byte, <span class="self">Self</span>::DEFRAG_SOURCE_STATE);
+        byte <span class="kw">as </span>usize
     }
 
-    <span class="doccomment">/// Initialize a clean block after acquired from page-resource.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">copy</span>: <span class="ident">bool</span>) {
-        <span class="self">self</span>.<span class="ident">set_state</span>(<span class="kw">if</span> <span class="ident">copy</span> {
-            <span class="ident">BlockState::Marked</span>
-        } <span class="kw">else</span> {
-            <span class="ident">BlockState::Unmarked</span>
+    <span class="doccomment">/// Initialize a clean block after acquired from page-resource.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;</span><span class="self">self</span>, copy: bool) {
+        <span class="self">self</span>.set_state(<span class="kw">if </span>copy {
+            BlockState::Marked
+        } <span class="kw">else </span>{
+            BlockState::Unmarked
         });
-        <span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">Self</span>::DEFRAG_STATE_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), <span class="number">0</span>, Ordering::SeqCst);
     }
 
-    <span class="doccomment">/// Deinitalize a block before releasing.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deinit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit</span>(<span class="self">self</span>.<span class="ident">start</span>(), <span class="ident"><span class="self">Self</span>::BYTES</span>);
-        <span class="self">self</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Unallocated</span>);
+    <span class="doccomment">/// Deinitalize a block before releasing.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>deinit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+        </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
+        <span class="self">self</span>.set_state(BlockState::Unallocated);
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_line</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Line</span> {
-        <span class="ident">Line::from_aligned_address</span>(<span class="self">self</span>.<span class="ident">start</span>())
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>start_line(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Line {
+        Line::from_aligned_address(<span class="self">self</span>.start())
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">end_line</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Line</span> {
-        <span class="ident">Line::from_aligned_address</span>(<span class="self">self</span>.<span class="ident">end</span>())
+    <span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>end_line(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Line {
+        Line::from_aligned_address(<span class="self">self</span>.end())
     }
 
-    <span class="doccomment">/// Get the range of lines within the block.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">RegionIterator</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
-        <span class="ident">RegionIterator</span>::<span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>.<span class="ident">start_line</span>(), <span class="self">self</span>.<span class="ident">end_line</span>())
+    <span class="doccomment">/// Get the range of lines within the block.
+    </span><span class="attribute">#[allow(clippy::assertions_on_constants)]
+    #[inline(always)]
+    </span><span class="kw">pub fn </span>lines(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; RegionIterator&lt;Line&gt; {
+        <span class="macro">debug_assert!</span>(!<span class="kw">super</span>::BLOCK_ONLY);
+        RegionIterator::&lt;Line&gt;::new(<span class="self">self</span>.start_line(), <span class="self">self</span>.end_line())
     }
 
-    <span class="doccomment">/// Sweep this block.</span>
-    <span class="doccomment">/// Return true if the block is swept.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// Sweep this block.
+    /// Return true if the block is swept.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>sweep&lt;VM: VMBinding&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">mark_histogram</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Histogram</span>,
-        <span class="ident">line_mark_state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_state</span>() {
-                <span class="ident">BlockState::Unallocated</span> =&gt; <span class="bool-val">false</span>,
-                <span class="ident">BlockState::Unmarked</span> =&gt; {
-                    <span class="comment">// Release the block if it is allocated but not marked by the current GC.</span>
-                    <span class="ident">space</span>.<span class="ident">release_block</span>(<span class="kw-2">*</span><span class="self">self</span>);
-                    <span class="bool-val">true</span>
-                }
-                <span class="ident">BlockState::Marked</span> =&gt; {
-                    <span class="comment">// The block is live.</span>
-                    <span class="bool-val">false</span>
-                }
-                <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+        space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,
+        mark_histogram: <span class="kw-2">&amp;mut </span>Histogram,
+        line_mark_state: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    ) -&gt; bool {
+        <span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
+            <span class="kw">match </span><span class="self">self</span>.get_state() {
+                BlockState::Unallocated =&gt; <span class="bool-val">false</span>,
+                BlockState::Unmarked =&gt; {
+                    <span class="comment">// Release the block if it is allocated but not marked by the current GC.
+                    </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
+                    <span class="bool-val">true
+                </span>}
+                BlockState::Marked =&gt; {
+                    <span class="comment">// The block is live.
+                    </span><span class="bool-val">false
+                </span>}
+                <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
             }
-        } <span class="kw">else</span> {
-            <span class="comment">// Calculate number of marked lines and holes.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">marked_lines</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">holes</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">prev_line_is_marked</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="kw">let</span> <span class="ident">line_mark_state</span> <span class="op">=</span> <span class="ident">line_mark_state</span>.<span class="ident">unwrap</span>();
+        } <span class="kw">else </span>{
+            <span class="comment">// Calculate number of marked lines and holes.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>marked_lines = <span class="number">0</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>holes = <span class="number">0</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>prev_line_is_marked = <span class="bool-val">true</span>;
+            <span class="kw">let </span>line_mark_state = line_mark_state.unwrap();
 
-            <span class="kw">for</span> <span class="ident">line</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">lines</span>() {
-                <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">is_marked</span>(<span class="ident">line_mark_state</span>) {
-                    <span class="ident">marked_lines</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                    <span class="ident">prev_line_is_marked</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                } <span class="kw">else</span> {
-                    <span class="kw">if</span> <span class="ident">prev_line_is_marked</span> {
-                        <span class="ident">holes</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            <span class="kw">for </span>line <span class="kw">in </span><span class="self">self</span>.lines() {
+                <span class="kw">if </span>line.is_marked(line_mark_state) {
+                    marked_lines += <span class="number">1</span>;
+                    prev_line_is_marked = <span class="bool-val">true</span>;
+                } <span class="kw">else </span>{
+                    <span class="kw">if </span>prev_line_is_marked {
+                        holes += <span class="number">1</span>;
                     }
 
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-                    <span class="ident"><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit</span>(<span class="ident">line</span>.<span class="ident">start</span>(), <span class="ident">Line::BYTES</span>);
+                    <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+                    </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(line.start(), Line::BYTES);
 
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_zero_on_release&quot;</span>)]</span>
-                    <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">line</span>.<span class="ident">start</span>(), <span class="ident">Line::BYTES</span>);
+                    <span class="attribute">#[cfg(feature = <span class="string">&quot;immix_zero_on_release&quot;</span>)]
+                    </span><span class="kw">crate</span>::util::memory::zero(line.start(), Line::BYTES);
 
-                    <span class="ident">prev_line_is_marked</span> <span class="op">=</span> <span class="bool-val">false</span>;
+                    prev_line_is_marked = <span class="bool-val">false</span>;
                 }
             }
 
-            <span class="kw">if</span> <span class="ident">marked_lines</span> <span class="op">==</span> <span class="number">0</span> {
-                <span class="comment">// Release the block if non of its lines are marked.</span>
-                <span class="ident">space</span>.<span class="ident">release_block</span>(<span class="kw-2">*</span><span class="self">self</span>);
-                <span class="bool-val">true</span>
-            } <span class="kw">else</span> {
-                <span class="comment">// There are some marked lines. Keep the block live.</span>
-                <span class="kw">if</span> <span class="ident">marked_lines</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Block::LINES</span> {
-                    <span class="comment">// There are holes. Mark the block as reusable.</span>
-                    <span class="self">self</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Reusable</span> {
-                        <span class="ident">unavailable_lines</span>: <span class="ident">marked_lines</span> <span class="kw">as</span> <span class="kw">_</span>,
+            <span class="kw">if </span>marked_lines == <span class="number">0 </span>{
+                <span class="comment">// Release the block if non of its lines are marked.
+                </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
+                <span class="bool-val">true
+            </span>} <span class="kw">else </span>{
+                <span class="comment">// There are some marked lines. Keep the block live.
+                </span><span class="kw">if </span>marked_lines != Block::LINES {
+                    <span class="comment">// There are holes. Mark the block as reusable.
+                    </span><span class="self">self</span>.set_state(BlockState::Reusable {
+                        unavailable_lines: marked_lines <span class="kw">as _</span>,
                     });
-                    <span class="ident">space</span>.<span class="ident">reusable_blocks</span>.<span class="ident">push</span>(<span class="kw-2">*</span><span class="self">self</span>)
-                } <span class="kw">else</span> {
-                    <span class="comment">// Clear mark state.</span>
-                    <span class="self">self</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Unmarked</span>);
+                    space.reusable_blocks.push(<span class="kw-2">*</span><span class="self">self</span>)
+                } <span class="kw">else </span>{
+                    <span class="comment">// Clear mark state.
+                    </span><span class="self">self</span>.set_state(BlockState::Unmarked);
                 }
-                <span class="comment">// Update mark_histogram</span>
-                <span class="ident">mark_histogram</span>[<span class="ident">holes</span>] <span class="op">+</span><span class="op">=</span> <span class="ident">marked_lines</span>;
-                <span class="comment">// Record number of holes in block side metadata.</span>
-                <span class="self">self</span>.<span class="ident">set_holes</span>(<span class="ident">holes</span>);
-                <span class="bool-val">false</span>
-            }
+                <span class="comment">// Update mark_histogram
+                </span>mark_histogram[holes] += marked_lines;
+                <span class="comment">// Record number of holes in block side metadata.
+                </span><span class="self">self</span>.set_holes(holes);
+                <span class="bool-val">false
+            </span>}
         }
     }
 }
 
-<span class="doccomment">/// A non-block single-linked list to store blocks.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReusableBlockPool</span> {
-    <span class="ident">queue</span>: <span class="ident">BlockPool</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>,
-    <span class="ident">num_workers</span>: <span class="ident">usize</span>,
+<span class="doccomment">/// A non-block single-linked list to store blocks.
+</span><span class="kw">pub struct </span>ReusableBlockPool {
+    queue: BlockPool&lt;Block&gt;,
+    num_workers: usize,
 }
 
-<span class="kw">impl</span> <span class="ident">ReusableBlockPool</span> {
-    <span class="doccomment">/// Create empty block list</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">num_workers</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">queue</span>: <span class="ident">BlockPool::new</span>(<span class="ident">num_workers</span>),
-            <span class="ident">num_workers</span>,
+<span class="kw">impl </span>ReusableBlockPool {
+    <span class="doccomment">/// Create empty block list
+    </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            queue: BlockPool::new(num_workers),
+            num_workers,
         }
     }
 
-    <span class="doccomment">/// Get number of blocks in this list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">len</span>()
+    <span class="doccomment">/// Get number of blocks in this list.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.queue.len()
     }
 
-    <span class="doccomment">/// Add a block to the list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="ident">Block</span>) {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">push</span>(<span class="ident">block</span>)
+    <span class="doccomment">/// Add a block to the list.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, block: Block) {
+        <span class="self">self</span>.queue.push(block)
     }
 
-    <span class="doccomment">/// Pop a block out of the list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">pop</span>()
+    <span class="doccomment">/// Pop a block out of the list.
+    </span><span class="attribute">#[inline(always)]
+    </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
+        <span class="self">self</span>.queue.pop()
     }
 
-    <span class="doccomment">/// Clear the list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">queue</span> <span class="op">=</span> <span class="ident">BlockPool::new</span>(<span class="self">self</span>.<span class="ident">num_workers</span>);
+    <span class="doccomment">/// Clear the list.
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.queue = BlockPool::new(<span class="self">self</span>.num_workers);
     }
 
-    <span class="doccomment">/// Iterate all the blocks in the queue. Call the visitor for each reported block.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iterate_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">Block</span>)) {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">iterate_blocks</span>(<span class="kw-2">&amp;mut</span> <span class="ident">f</span>);
+    <span class="doccomment">/// Iterate all the blocks in the queue. Call the visitor for each reported block.
+    </span><span class="attribute">#[inline]
+    </span><span class="kw">pub fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: <span class="kw">impl </span>FnMut(Block)) {
+        <span class="self">self</span>.queue.iterate_blocks(<span class="kw-2">&amp;mut </span>f);
     }
 
-    <span class="doccomment">/// Flush the block queue</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">flush_all</span>();
+    <span class="doccomment">/// Flush the block queue
+    </span><span class="kw">pub fn </span>flush_all(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.queue.flush_all();
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>
