@@ -1040,15 +1040,6 @@
 <span id="1040">1040</span>
 <span id="1041">1041</span>
 <span id="1042">1042</span>
-<span id="1043">1043</span>
-<span id="1044">1044</span>
-<span id="1045">1045</span>
-<span id="1046">1046</span>
-<span id="1047">1047</span>
-<span id="1048">1048</span>
-<span id="1049">1049</span>
-<span id="1050">1050</span>
-<span id="1051">1051</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1779,15 +1770,6 @@
     }
 
     <span class="kw">fn </span>create_process_node_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;) {
-        <span class="comment">// Note: Node roots cannot be moved.  Currently, this implies that the plan must never
-        // move objects.  However, in the future, if we start to support object pinning, then
-        // moving plans that support object pinning (such as Immix) can still use node roots.
-        </span><span class="macro">assert!</span>(
-            !<span class="self">self</span>.mmtk.plan.constraints().moves_objects,
-            <span class="string">&quot;Attempted to add node roots when using a plan that moves objects.  Plan: {:?}&quot;</span>,
-            <span class="kw-2">*</span><span class="self">self</span>.mmtk.options.plan
-        );
-
         <span class="comment">// We want to use E::create_scan_work.
         </span><span class="kw">let </span>process_edges_work = E::new(<span class="macro">vec!</span>[], <span class="bool-val">true</span>, <span class="self">self</span>.mmtk);
         <span class="kw">let </span>work = process_edges_work.create_scan_work(nodes, <span class="bool-val">true</span>);
