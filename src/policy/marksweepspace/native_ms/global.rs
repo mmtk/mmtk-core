@@ -174,6 +174,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
 pub const MAX_OBJECT_SIZE: usize = crate::policy::marksweepspace::native_ms::MI_LARGE_OBJ_SIZE_MAX;
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
+    // Allow ptr_arg as we want to keep the function signature the same as for malloc marksweep
+    #[allow(clippy::ptr_arg)]
     pub fn extend_global_side_metadata_specs(_specs: &mut Vec<SideMetadataSpec>) {
         // MarkSweepSpace does not need any special global specs. This method exists, as
         // we need this method for MallocSpace, and we want those two spaces to be used interchangably.

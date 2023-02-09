@@ -257,8 +257,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     end_line,
                     self.tls
                 );
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::bzero_alloc_bit(self.cursor, self.limit - self.cursor);
                 crate::util::memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(
                     align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit

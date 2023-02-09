@@ -283,5 +283,5 @@ pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Addres
     #[cfg(debug_assertions)]
     metadata_spec.assert_metadata_mapped(data_addr);
 
-    meta_addr.load::<u128>() as u128
+    meta_addr.load::<u128>()
 }

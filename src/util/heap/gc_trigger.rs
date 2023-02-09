@@ -79,6 +79,11 @@ impl<VM: VMBinding> GCTrigger<VM> {
 /// GC start/end so they can collect some statistics about GC and allocation. The policy needs to
 /// decide the (current) heap limit and decide whether a GC should be performed.
 pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
+    /// Inform the triggering policy that we have pending allocation.
+    /// Any GC trigger policy with dynamic heap size should take this into account when calculating a new heap size.
+    /// Failing to do so may result in unnecessay GCs, or result in an infinite loop if the new heap size
+    /// can never accomodate the pending allocation.
+    fn on_pending_allocation(&self, _pages: usize) {}
     /// Inform the triggering policy that a GC starts.
     fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
@@ -147,6 +152,9 @@ pub struct MemBalancerTrigger {
     max_heap_pages: usize,
     /// The current heap size
     current_heap_pages: AtomicUsize,
+    /// The number of pending allocation pages. The allocation requests for them have failed, and a GC is triggered.
+    /// We will need to take them into consideration so that the new heap size can accomodate those allocations.
+    pending_pages: AtomicUsize,
     /// Statistics
     stats: AtomicRefCell<MemBalancerStats>,
 }
@@ -291,6 +299,10 @@ impl MemBalancerStats {
 }
 
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
+    fn on_pending_allocation(&self, pages: usize) {
+        self.pending_pages.fetch_add(pages, Ordering::SeqCst);
+    }
+
     fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
         trace!("=== on_gc_start ===");
         self.access_stats(|stats| {
@@ -352,6 +364,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 );
             }
         });
+        // Clear pending allocation pages at the end of GC, no matter we used it or not.
+        self.pending_pages.store(0, Ordering::SeqCst);
     }
 
     fn is_gc_required(
@@ -382,6 +396,7 @@ impl MemBalancerTrigger {
         Self {
             min_heap_pages,
             max_heap_pages,
+            pending_pages: AtomicUsize::new(0),
             // start with min heap
             current_heap_pages: AtomicUsize::new(min_heap_pages),
             stats: AtomicRefCell::new(Default::default()),
@@ -467,8 +482,11 @@ impl MemBalancerTrigger {
             (live as f64 * 4096f64).sqrt()
         };
 
+        // Get pending allocations
+        let pending_pages = self.pending_pages.load(Ordering::SeqCst);
+
         // This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
-        let optimal_heap = live + e as usize + extra_reserve;
+        let optimal_heap = live + e as usize + extra_reserve + pending_pages;
         trace!(
             "optimal = live {} + sqrt(live) {} + extra {}",
             live,

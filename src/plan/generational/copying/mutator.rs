@@ -34,7 +34,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
     let config = MutatorConfig {
-        allocator_mapping: &*ALLOCATOR_MAPPING,
+        allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new(create_gen_space_mapping(&*mmtk.plan, &gencopy.gen.nursery)),
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,

@@ -89,7 +89,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {

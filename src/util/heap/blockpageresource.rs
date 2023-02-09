@@ -279,7 +279,7 @@ impl<B: Region> BlockQueue<B> {
         new_array.cursor.store(temp, Ordering::Relaxed);
         // Swap data
         unsafe {
-            std::mem::swap(&mut *self.data.get(), &mut *new_array.data.get());
+            core::ptr::swap(self.data.get(), new_array.data.get());
         }
         // Return old array
         new_array

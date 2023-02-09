@@ -184,7 +184,7 @@ impl Block {
     pub fn load_block_list(&self) -> *mut BlockList {
         let block_list =
             Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst);
-        unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) }
+        block_list as *mut BlockList
     }
 
     pub fn load_block_cell_size(&self) -> usize {

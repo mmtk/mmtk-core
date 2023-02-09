@@ -75,6 +75,19 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
     }
+
+    fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        if !Block::containing::<VM>(object).is_defrag_source() {
+            return None;
+        }
+
+        if ForwardingWord::is_forwarded::<VM>(object) {
+            Some(ForwardingWord::read_forwarding_pointer::<VM>(object))
+        } else {
+            None
+        }
+    }
+
     fn is_live(&self, object: ObjectReference) -> bool {
         if super::NEVER_MOVE_OBJECTS {
             // We won't forward objects.
@@ -214,6 +227,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
@@ -224,6 +239,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
@@ -564,8 +581,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
                 let new_object =
                     ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
                 Block::containing::<VM>(new_object).set_state(BlockState::Marked);
@@ -720,6 +735,8 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     #[inline(always)]
     fn reset_object_mark(&self) {
+        // NOTE: We reset the mark bits because cyclic mark bit is currently not supported, yet.
+        // See `ImmixSpace::prepare`.
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
         }
@@ -734,6 +751,12 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+        }
+        // NOTE: We don't need to reset the forwarding pointer metadata because it is meaningless
+        // until the forwarding bits are also set, at which time we also write the forwarding
+        // pointer.
     }
 }
 

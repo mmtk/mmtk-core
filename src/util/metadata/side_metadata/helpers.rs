@@ -18,7 +18,7 @@ pub(crate) fn address_to_contiguous_meta_address(
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
-    let log_bytes_in_region = metadata_spec.log_bytes_in_region as usize;
+    let log_bytes_in_region = metadata_spec.log_bytes_in_region;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
