@@ -72,6 +72,10 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::atomic::AtomicUsize;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
@@ -110,7 +114,8 @@
     /// the allocation cannot be satisfied. We can call this to clear the number of reserved pages,
     /// so later we can reserve and attempt again.
     </span><span class="kw">pub fn </span>clear_reserved(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
-        <span class="self">self</span>.reserved.fetch_sub(pages, Ordering::Relaxed);
+        <span class="kw">let </span>_prev = <span class="self">self</span>.reserved.fetch_sub(pages, Ordering::Relaxed);
+        <span class="macro">debug_assert!</span>(_prev &gt;= pages);
     }
 
     <span class="doccomment">/// Inform of successfully committing a certain number of pages. This is used after we have reserved
@@ -122,8 +127,11 @@
     <span class="doccomment">/// Inform of releasing a certain number of pages. The number of pages will be deducted from
     /// both reserved and committed pages.
     </span><span class="kw">pub fn </span>release(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
-        <span class="self">self</span>.reserved.fetch_sub(pages, Ordering::Relaxed);
-        <span class="self">self</span>.committed.fetch_sub(pages, Ordering::Relaxed);
+        <span class="kw">let </span>_prev_reserved = <span class="self">self</span>.reserved.fetch_sub(pages, Ordering::Relaxed);
+        <span class="macro">debug_assert!</span>(_prev_reserved &gt;= pages);
+
+        <span class="kw">let </span>_prev_committed = <span class="self">self</span>.committed.fetch_sub(pages, Ordering::Relaxed);
+        <span class="macro">debug_assert!</span>(_prev_committed &gt;= pages);
     }
 
     <span class="doccomment">/// Set both reserved and committed pages to zero. This is only used when we completely clear a space.

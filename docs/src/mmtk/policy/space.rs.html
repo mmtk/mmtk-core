@@ -573,6 +573,18 @@
 <span id="573">573</span>
 <span id="574">574</span>
 <span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -643,8 +655,14 @@
         <span class="kw">if </span>should_poll &amp;&amp; <span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.as_space())) {
             <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
             <span class="macro">assert!</span>(allow_gc, <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
+
+            <span class="comment">// Clear the request, and inform GC trigger about the pending allocation.
+            </span>pr.clear_request(pages_reserved);
+            <span class="self">self</span>.get_gc_trigger()
+                .policy
+                .on_pending_allocation(pages_reserved);
+
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); <span class="comment">// We have checked that this is mutator
-            </span>pr.clear_request(pages_reserved); <span class="comment">// clear the pages after GC. We need those reserved pages so we can compute new heap size properly.
             </span><span class="kw">unsafe </span>{ Address::zero() }
         } <span class="kw">else </span>{
             <span class="macro">debug!</span>(<span class="string">&quot;Collection not required&quot;</span>);
@@ -750,8 +768,14 @@
 
                     <span class="kw">let </span>gc_performed = <span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">true</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.as_space()));
                     <span class="macro">debug_assert!</span>(gc_performed, <span class="string">&quot;GC not performed when forced.&quot;</span>);
+
+                    <span class="comment">// Clear the request, and inform GC trigger about the pending allocation.
+                    </span>pr.clear_request(pages_reserved);
+                    <span class="self">self</span>.get_gc_trigger()
+                        .policy
+                        .on_pending_allocation(pages_reserved);
+
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); <span class="comment">// We asserted that this is mutator.
-                    </span>pr.clear_request(pages_reserved); <span class="comment">// clear the pages after GC. We need those reserved pages so we can compute new heap size properly.
                     </span><span class="kw">unsafe </span>{ Address::zero() }
                 }
             }
