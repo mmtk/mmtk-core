@@ -364,6 +364,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 );
             }
         });
+        // Clear pending allocation pages at the end of GC, no matter we used it or not.
+        self.pending_pages.store(0, Ordering::SeqCst);
     }
 
     fn is_gc_required(
@@ -480,9 +482,8 @@ impl MemBalancerTrigger {
             (live as f64 * 4096f64).sqrt()
         };
 
-        // Get pending allocations and clear it
+        // Get pending allocations
         let pending_pages = self.pending_pages.load(Ordering::SeqCst);
-        self.pending_pages.store(0, Ordering::SeqCst);
 
         // This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
         let optimal_heap = live + e as usize + extra_reserve + pending_pages;
