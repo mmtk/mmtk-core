@@ -43,84 +43,6 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..immix::IMMIX_CONSTRAINTS
 };
 
-impl<VM: VMBinding> crate::plan::generational::global::SupportNurseryGC<VM> for StickyImmix<VM> {
-    fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
-        self.immix.immix_space.in_space(object)
-            && !self
-                .immix
-                .immix_space
-                .is_marked_with_current_mark_state(object)
-    }
-
-    // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
-    // As sticky immix needs object metadata to know if an object is an nursery object or not, we cannot really tell
-    // whether an address is in nursery or not. In this case, we just return false -- this is a conservative return value
-    // for the memory slice copying barrier. It means we will treat the object as if it is in mature space, and will
-    // push it to the remembered set.
-    fn is_address_in_nursery(&self, _addr: crate::util::Address) -> bool {
-        false
-    }
-
-    fn trace_object_nursery<Q: crate::ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: crate::util::ObjectReference,
-        worker: &mut crate::scheduler::GCWorker<VM>,
-    ) -> crate::util::ObjectReference {
-        if self.immix.immix_space.in_space(object) {
-            if !self.is_object_in_nursery(object) {
-                // Mature object
-                trace!("Immix mature object {}, skip", object);
-                return object;
-            } else {
-                let object = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
-                    let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
-                        queue,
-                        object,
-                        CopySemantics::DefaultCopy,
-                        worker,
-                        true,
-                    );
-                    trace!(
-                        "Immix nursery object {} is being traced with opportunistic copy {}",
-                        object,
-                        if ret == object {
-                            "".to_string()
-                        } else {
-                            format!(" -> new object {}", ret)
-                        }
-                    );
-                    ret
-                } else {
-                    trace!(
-                        "Immix nursery object {} is being traced without moving",
-                        object
-                    );
-                    self.immix
-                        .immix_space
-                        .trace_object_without_moving(queue, object)
-                };
-
-                return object;
-            }
-        }
-
-        if self.immix.common().get_los().in_space(object) {
-            return self
-                .immix
-                .common()
-                .get_los()
-                .trace_object::<Q>(queue, object);
-        }
-
-        warn!(
-            "Object {} is not in nursery or in LOS, it is not traced!",
-            object
-        );
-        object
-    }
-}
-
 impl<VM: VMBinding> Plan for StickyImmix<VM> {
     type VM = VM;
 
@@ -288,12 +210,90 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
         !self.gc_full_heap.load(Ordering::SeqCst)
     }
 
+    fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
+        self.immix.immix_space.in_space(object)
+            && !self
+                .immix
+                .immix_space
+                .is_marked_with_current_mark_state(object)
+    }
+
+    // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
+    // As sticky immix needs object metadata to know if an object is an nursery object or not, we cannot really tell
+    // whether an address is in nursery or not. In this case, we just return false -- this is a conservative return value
+    // for the memory slice copying barrier. It means we will treat the object as if it is in mature space, and will
+    // push it to the remembered set.
+    fn is_address_in_nursery(&self, _addr: crate::util::Address) -> bool {
+        false
+    }
+
     fn get_mature_physical_pages_available(&self) -> usize {
         self.immix.immix_space.available_physical_pages()
     }
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.immix.immix_space.reserved_pages()
+    }
+}
+
+impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> for StickyImmix<VM> {
+    fn trace_object_nursery<Q: crate::ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: crate::util::ObjectReference,
+        worker: &mut crate::scheduler::GCWorker<VM>,
+    ) -> crate::util::ObjectReference {
+        if self.immix.immix_space.in_space(object) {
+            if !self.is_object_in_nursery(object) {
+                // Mature object
+                trace!("Immix mature object {}, skip", object);
+                return object;
+            } else {
+                let object = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                    let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
+                        queue,
+                        object,
+                        CopySemantics::DefaultCopy,
+                        worker,
+                        true,
+                    );
+                    trace!(
+                        "Immix nursery object {} is being traced with opportunistic copy {}",
+                        object,
+                        if ret == object {
+                            "".to_string()
+                        } else {
+                            format!(" -> new object {}", ret)
+                        }
+                    );
+                    ret
+                } else {
+                    trace!(
+                        "Immix nursery object {} is being traced without moving",
+                        object
+                    );
+                    self.immix
+                        .immix_space
+                        .trace_object_without_moving(queue, object)
+                };
+
+                return object;
+            }
+        }
+
+        if self.immix.common().get_los().in_space(object) {
+            return self
+                .immix
+                .common()
+                .get_los()
+                .trace_object::<Q>(queue, object);
+        }
+
+        warn!(
+            "Object {} is not in nursery or in LOS, it is not traced!",
+            object
+        );
+        object
     }
 }
 

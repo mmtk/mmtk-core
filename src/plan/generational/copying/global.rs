@@ -3,7 +3,7 @@ use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
-use crate::plan::generational::global::SupportNurseryGC;
+use crate::plan::generational::global::GenerationalPlanExt;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -41,25 +41,6 @@ pub struct GenCopy<VM: VMBinding> {
 }
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
-
-impl<VM: VMBinding> SupportNurseryGC<VM> for GenCopy<VM> {
-    fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
-        self.gen.nursery.in_space(object)
-    }
-
-    fn is_address_in_nursery(&self, addr: Address) -> bool {
-        self.gen.nursery.address_in_space(addr)
-    }
-
-    fn trace_object_nursery<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        self.gen.trace_object_nursery(queue, object, worker)
-    }
-}
 
 impl<VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
@@ -189,12 +170,31 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
         self.gen.is_current_gc_nursery()
     }
 
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
+        self.gen.nursery.in_space(object)
+    }
+
+    fn is_address_in_nursery(&self, addr: Address) -> bool {
+        self.gen.nursery.address_in_space(addr)
+    }
+
     fn get_mature_physical_pages_available(&self) -> usize {
         self.tospace().available_physical_pages()
     }
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlanExt<VM> for GenCopy<VM> {
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.gen.trace_object_nursery(queue, object, worker)
     }
 }
 

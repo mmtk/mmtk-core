@@ -13,9 +13,12 @@ use crate::MMTK;
 use super::gc_work::GenNurseryProcessEdges;
 use super::gc_work::ProcessModBuf;
 use super::gc_work::ProcessRegionModBuf;
-use super::global::SupportNurseryGC;
+use super::global::GenerationalPlanExt;
 
-pub struct GenObjectBarrierSemantics<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> {
+pub struct GenObjectBarrierSemantics<
+    VM: VMBinding,
+    P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
+> {
     /// MMTk instance
     mmtk: &'static MMTK<VM>,
     /// Generational plan
@@ -26,7 +29,7 @@ pub struct GenObjectBarrierSemantics<VM: VMBinding, P: SupportNurseryGC<VM> + Pl
     region_modbuf: VectorQueue<VM::VMMemorySlice>,
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>>
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
     GenObjectBarrierSemantics<VM, P>
 {
     pub fn new(mmtk: &'static MMTK<VM>, plan: &'static P) -> Self {
@@ -59,7 +62,7 @@ impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>>
     }
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> BarrierSemantics
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSemantics
     for GenObjectBarrierSemantics<VM, P>
 {
     type VM = VM;

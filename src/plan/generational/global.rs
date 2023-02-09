@@ -300,11 +300,22 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 }
 
-/// This trait includes methods that are specific to generational plans.
+/// This trait includes methods that are specific to generational plans. This trait needs
+/// to be object safe.
 pub trait GenerationalPlan: Plan {
     /// Is the current GC a nursery GC? If a GC is not a nursery GC, it will be a full heap GC.
     /// This should only be called during GC.
     fn is_current_gc_nursery(&self) -> bool;
+
+    /// Is the object in the nursery?
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
+
+    /// Is the address in the nursery? As we only know addresses rather than object references, the
+    /// implementation cannot access per-object metadata. If the plan does not have knowledge whether
+    /// the address is in nursery or not (e.g. mature/nursery objects share the same space and are
+    /// only differentiated by object metadata), the implementation should return `false` as a more
+    /// conservative result.
+    fn is_address_in_nursery(&self, addr: Address) -> bool;
 
     /// Return the number of pages available for allocation into the mature space.
     fn get_mature_physical_pages_available(&self) -> usize;
@@ -313,13 +324,12 @@ pub trait GenerationalPlan: Plan {
     fn get_mature_reserved_pages(&self) -> usize;
 }
 
-/// This trait includes methods to support nursery GC. A plan that uses [``]generational barriers, or
-/// nursery tracing work is required to implement this. It is separated from [`GenerationalPlan`] as we use
-/// type parameters in its method, thus it is not object safe. We would like to keep [`GenerationalPlan`]
-/// object safe, so we introduce this trait.
-pub trait SupportNurseryGC<VM: VMBinding>: Plan<VM = VM> {
-    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
-    fn is_address_in_nursery(&self, addr: Address) -> bool;
+/// This trait is the extension trait for [`GenerationalPlan`] (see Rust pattern for extension trait).
+/// Generally any method should be put to [`GenerationalPlan`] if possible while keeping [`GenerationalPlan`]
+/// object safe. In this case, generic methods will be put to this extension trait.
+pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {
+    /// Trace an object in nursery collection. If the object is in nursery, we should call `trace_object`
+    /// on the space. Otherwise, we can just return the object.
     fn trace_object_nursery<Q: ObjectQueue>(
         &self,
         queue: &mut Q,

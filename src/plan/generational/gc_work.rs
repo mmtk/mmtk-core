@@ -9,17 +9,17 @@ use crate::MMTK;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-use super::global::SupportNurseryGC;
+use super::global::GenerationalPlanExt;
 
 /// Process edges for a nursery GC. This type is provided if a generational plan does not use
 /// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,
 /// it does not need to use this type.
-pub struct GenNurseryProcessEdges<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> {
+pub struct GenNurseryProcessEdges<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesWork
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdgesWork
     for GenNurseryProcessEdges<VM, P>
 {
     type VM = VM;
@@ -58,7 +58,7 @@ impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesW
     }
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> Deref
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> Deref
     for GenNurseryProcessEdges<VM, P>
 {
     type Target = ProcessEdgesBase<VM>;
@@ -67,7 +67,7 @@ impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> Deref
     }
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> DerefMut
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> DerefMut
     for GenNurseryProcessEdges<VM, P>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
