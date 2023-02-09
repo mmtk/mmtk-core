@@ -80,7 +80,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
 /// decide the (current) heap limit and decide whether a GC should be performed.
 pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Inform the triggering policy that we have pending allocation.
-    /// Any policy with dynamic heap size should take this into account when calculating a new heap size.
+    /// Any GC trigger policy with dynamic heap size should take this into account when calculating a new heap size.
     /// Failing to do so may result in unnecessay GCs, or result in an infinite loop if the new heap size
     /// can never accomodate the pending allocation.
     fn on_pending_allocation(&self, _pages: usize) {}
@@ -152,7 +152,7 @@ pub struct MemBalancerTrigger {
     max_heap_pages: usize,
     /// The current heap size
     current_heap_pages: AtomicUsize,
-    /// The number of pending allocaiton pages. The allocation requests for them have failed, and a GC is triggered.
+    /// The number of pending allocation pages. The allocation requests for them have failed, and a GC is triggered.
     /// We will need to take them into consideration so that the new heap size can accomodate those allocations.
     pending_pages: AtomicUsize,
     /// Statistics
@@ -412,7 +412,7 @@ impl MemBalancerTrigger {
     fn compute_new_heap_limit(
         &self,
         live: usize,
-        mut extra_reserve: usize,
+        extra_reserve: usize,
         stats: &mut MemBalancerStats,
     ) {
         trace!("compute new heap limit: {:?}", stats);
@@ -480,12 +480,12 @@ impl MemBalancerTrigger {
             (live as f64 * 4096f64).sqrt()
         };
 
-        // Take pending allocations into consideration
-        extra_reserve += self.pending_pages.load(Ordering::SeqCst);
+        // Get pending allocations and clear it
+        let pending_pages = self.pending_pages.load(Ordering::SeqCst);
         self.pending_pages.store(0, Ordering::SeqCst);
 
         // This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
-        let optimal_heap = live + e as usize + extra_reserve;
+        let optimal_heap = live + e as usize + extra_reserve + pending_pages;
         trace!(
             "optimal = live {} + sqrt(live) {} + extra {}",
             live,
