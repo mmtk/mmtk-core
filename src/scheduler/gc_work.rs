@@ -223,7 +223,7 @@ pub struct EndOfGC;
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        info!("End of GC");
+        info!("End of GC ({} used pages, {} total pages)", mmtk.plan.get_reserved_pages(), mmtk.plan.get_total_pages());
 
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]

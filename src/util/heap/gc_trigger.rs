@@ -54,13 +54,15 @@ impl<VM: VMBinding> GCTrigger<VM> {
         let plan = unsafe { self.plan.assume_init() };
         if self.policy.is_gc_required(space_full, space, plan) {
             info!(
-                "[POLL] {}{}",
+                "[POLL] {}{} ({} used pages, {} total pages)",
                 if let Some(space) = space {
                     format!("{}: ", space.get_name())
                 } else {
                     "".to_string()
                 },
-                "Triggering collection"
+                "Triggering collection",
+                plan.get_reserved_pages(),
+                plan.get_total_pages(),
             );
             plan.base().gc_requester.request();
             return true;
