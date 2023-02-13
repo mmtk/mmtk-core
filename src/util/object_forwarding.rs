@@ -103,7 +103,6 @@ pub fn forward_object<VM: VMBinding>(
 }
 
 /// Return the forwarding bits for a given `ObjectReference`.
-#[inline]
 pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
     VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(
         object,

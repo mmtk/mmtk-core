@@ -161,7 +161,6 @@ impl<VM: VMBinding> MMTK<VM> {
         self.plan.as_ref()
     }
 
-    #[inline(always)]
     pub fn get_options(&self) -> &Options {
         &self.options
     }

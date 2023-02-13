@@ -30,7 +30,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         let plan = base.plan().downcast_ref().unwrap();
         Self { plan, base }
     }
-    #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -40,7 +39,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         self.plan
             .trace_object_nursery(&mut self.base.nodes, object, worker)
     }
-    #[inline]
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
         let new_object = self.trace_object(object);
@@ -48,7 +46,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         slot.store(new_object);
     }
 
-    #[inline(always)]
     fn create_scan_work(
         &self,
         nodes: Vec<ObjectReference>,
@@ -94,7 +91,6 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Flip the per-object unlogged bits to "unlogged" state.
         for obj in &self.modbuf {
@@ -137,7 +133,6 @@ impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
-    #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
         if mmtk.plan.generational().unwrap().is_current_gc_nursery() {

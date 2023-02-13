@@ -62,12 +62,10 @@ impl HeaderMetadataSpec {
         }
     }
 
-    #[inline(always)]
     fn byte_offset(&self) -> isize {
         self.bit_offset >> LOG_BITS_IN_BYTE
     }
 
-    #[inline(always)]
     fn meta_addr(&self, header: Address) -> Address {
         header + self.byte_offset()
     }
@@ -76,7 +74,6 @@ impl HeaderMetadataSpec {
 
     /// Get the bit shift (the bit distance from the lowest bit to the bits location defined in the spec),
     /// and the mask (used to extract value for the bits defined in the spec).
-    #[inline(always)]
     fn get_shift_and_mask_for_bits(&self) -> (isize, u8) {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         let byte_offset = self.byte_offset();
@@ -86,7 +83,6 @@ impl HeaderMetadataSpec {
     }
 
     /// Extract bits from a raw byte, and put it to the lowest bits.
-    #[inline(always)]
     fn get_bits_from_u8(&self, raw_byte: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         let (bit_shift, mask) = self.get_shift_and_mask_for_bits();
@@ -94,7 +90,6 @@ impl HeaderMetadataSpec {
     }
 
     /// Set bits to a raw byte. `set_val` has the valid value in its lowest bits.
-    #[inline(always)]
     fn set_bits_to_u8(&self, raw_byte: u8, set_val: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         debug_assert!(
@@ -108,7 +103,6 @@ impl HeaderMetadataSpec {
     }
 
     /// Truncate a value based on the spec.
-    #[inline(always)]
     fn truncate_bits_in_u8(&self, val: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         val & ((1 << self.num_of_bits) - 1)
@@ -118,13 +112,11 @@ impl HeaderMetadataSpec {
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
-    #[inline(always)]
     pub unsafe fn load<T: MetadataValue>(&self, header: Address, optional_mask: Option<T>) -> T {
         self.load_inner::<T>(header, optional_mask, None)
     }
 
     /// This function provides a default implementation for the `load_metadata_atomic` method from the `ObjectModel` trait.
-    #[inline(always)]
     pub fn load_atomic<T: MetadataValue>(
         &self,
         header: Address,
@@ -134,7 +126,6 @@ impl HeaderMetadataSpec {
         self.load_inner::<T>(header, optional_mask, Some(ordering))
     }
 
-    #[inline(always)]
     fn load_inner<T: MetadataValue>(
         &self,
         header: Address,
@@ -181,7 +172,6 @@ impl HeaderMetadataSpec {
     ///
     /// # Safety
     /// This is a non-atomic store, thus not thread-safe.
-    #[inline(always)]
     pub unsafe fn store<T: MetadataValue>(
         &self,
         header: Address,
@@ -194,7 +184,6 @@ impl HeaderMetadataSpec {
     /// This function provides a default implementation for the `store_metadata_atomic` method from the `ObjectModel` trait.
     ///
     /// Note: this function does compare-and-swap in a busy loop. So, unlike `compare_exchange_metadata`, this operation will always success.
-    #[inline(always)]
     pub fn store_atomic<T: MetadataValue>(
         &self,
         header: Address,
@@ -205,7 +194,6 @@ impl HeaderMetadataSpec {
         self.store_inner::<T>(header, val, optional_mask, Some(ordering))
     }
 
-    #[inline(always)]
     fn store_inner<T: MetadataValue>(
         &self,
         header: Address,
@@ -264,7 +252,6 @@ impl HeaderMetadataSpec {
     /// This function provides a default implementation for the `compare_exchange_metadata` method from the `ObjectModel` trait.
     ///
     /// Note: this function only does fetch and exclusive store once, without any busy waiting in a loop.
-    #[inline(always)]
     pub fn compare_exchange<T: MetadataValue>(
         &self,
         header: Address,
@@ -320,7 +307,6 @@ impl HeaderMetadataSpec {
 
     /// Inner method for fetch_add/sub on bits.
     /// For fetch_and/or, we don't necessarily need this method. We could directly do fetch_and/or on the u8.
-    #[inline(always)]
     fn fetch_ops_on_bits<F: Fn(u8) -> u8>(
         &self,
         header: Address,
@@ -347,7 +333,6 @@ impl HeaderMetadataSpec {
     }
 
     /// This function provides a default implementation for the `fetch_add` method from the `ObjectModel` trait.
-    #[inline(always)]
     pub fn fetch_add<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
@@ -362,7 +347,6 @@ impl HeaderMetadataSpec {
     }
 
     /// This function provides a default implementation for the `fetch_sub` method from the `ObjectModel` trait.
-    #[inline(always)]
     pub fn fetch_sub<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
@@ -377,7 +361,6 @@ impl HeaderMetadataSpec {
     }
 
     /// This function provides a default implementation for the `fetch_and` method from the `ObjectModel` trait.
-    #[inline(always)]
     pub fn fetch_and<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
@@ -395,7 +378,6 @@ impl HeaderMetadataSpec {
     }
 
     /// This function provides a default implementation for the `fetch_or` method from the `ObjectModel` trait.
-    #[inline(always)]
     pub fn fetch_or<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
@@ -414,7 +396,6 @@ impl HeaderMetadataSpec {
 
     /// This function provides a default implementation for the `fetch_update` method from the `ObjectModel` trait.
     /// The semantics is the same as Rust's `fetch_update` on atomic types.
-    #[inline(always)]
     pub fn fetch_update<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
         &self,
         header: Address,

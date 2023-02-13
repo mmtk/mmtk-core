@@ -190,7 +190,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     // Find an available block from local block lists
-    #[inline(always)]
     fn find_free_block_local(&mut self, size: usize, align: usize) -> Option<Block> {
         Self::find_free_block_with(
             &mut self.available_blocks,
@@ -205,7 +204,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // This will usually be the first block on the available list. If all available blocks are found
     // to be full, other lists are searched
     // This function allows different available block lists -- normal allocation uses self.avaialble_blocks, and precise stress test uses self.avialable_blocks_stress.
-    #[inline(always)]
     fn find_free_block_with(
         available_blocks: &mut BlockLists,
         consumed_blocks: &mut BlockLists,
@@ -238,7 +236,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     /// Add a block to the given bin in the available block lists. Depending on which available block list we are using, this
     /// method may add the block to available_blocks, or available_blocks_stress.
-    #[inline(always)]
     fn add_to_available_blocks(&mut self, bin: usize, block: Block, stress: bool) {
         if stress {
             debug_assert!(self.plan.base().is_precise_stress());
@@ -249,7 +246,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     /// Tries to recycle local blocks if there is any. This is a no-op for eager sweeping mark sweep.
-    #[inline]
     fn recycle_local_blocks(
         &mut self,
         size: usize,

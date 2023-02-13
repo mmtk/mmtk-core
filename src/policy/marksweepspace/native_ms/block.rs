@@ -30,14 +30,12 @@ pub struct Block(NonZeroUsize);
 impl Region for Block {
     const LOG_BYTES: usize = 16;
 
-    #[inline(always)]
     fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         debug_assert!(!address.is_zero());
         Self(unsafe { NonZeroUsize::new_unchecked(address.as_usize()) })
     }
 
-    #[inline(always)]
     fn start(&self) -> Address {
         unsafe { Address::from_usize(self.0.get()) }
     }
@@ -85,30 +83,25 @@ impl Block {
     pub const TLS_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
-    #[inline]
     pub fn load_free_list(&self) -> Address {
         unsafe { Address::from_usize(Block::FREE_LIST_TABLE.load::<usize>(self.start())) }
     }
 
-    #[inline]
     pub fn store_free_list(&self, free_list: Address) {
         unsafe { Block::FREE_LIST_TABLE.store::<usize>(self.start(), free_list.as_usize()) }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
-    #[inline]
     pub fn load_local_free_list(&self) -> Address {
         unsafe { Address::from_usize(Block::LOCAL_FREE_LIST_TABLE.load::<usize>(self.start())) }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
-    #[inline]
     pub fn store_local_free_list(&self, local_free: Address) {
         unsafe { Block::LOCAL_FREE_LIST_TABLE.store::<usize>(self.start(), local_free.as_usize()) }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
-    #[inline]
     pub fn load_thread_free_list(&self) -> Address {
         unsafe {
             Address::from_usize(
@@ -118,7 +111,6 @@ impl Block {
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
-    #[inline]
     pub fn store_thread_free_list(&self, thread_free: Address) {
         unsafe {
             Block::THREAD_FREE_LIST_TABLE.store::<usize>(self.start(), thread_free.as_usize())
@@ -126,7 +118,6 @@ impl Block {
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
-    #[inline]
     pub fn cas_thread_free_list(&self, old_thread_free: Address, new_thread_free: Address) -> bool {
         Block::THREAD_FREE_LIST_TABLE
             .compare_exchange_atomic::<usize>(
@@ -212,21 +203,18 @@ impl Block {
     }
 
     /// Get block mark state.
-    #[inline(always)]
     pub fn get_state(&self) -> BlockState {
         let byte = Self::MARK_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         byte.into()
     }
 
     /// Set block mark state.
-    #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
         let state = u8::from(state);
         Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
     /// Release this block if it is unmarked. Return true if the block is release.
-    #[inline(always)]
     pub fn attempt_release<VM: VMBinding>(self, space: &MarkSweepSpace<VM>) -> bool {
         match self.get_state() {
             BlockState::Unallocated => false,
@@ -385,19 +373,16 @@ impl Block {
     }
 
     /// Get the chunk containing the block.
-    #[inline(always)]
     pub fn chunk(&self) -> Chunk {
         Chunk::from_unaligned_address(self.start())
     }
 
     /// Initialize a clean block after acquired from page-resource.
-    #[inline]
     pub fn init(&self) {
         self.set_state(BlockState::Unmarked);
     }
 
     /// Deinitalize a block before releasing.
-    #[inline]
     pub fn deinit(&self) {
         self.set_state(BlockState::Unallocated);
     }
@@ -424,7 +409,6 @@ impl BlockState {
 }
 
 impl From<u8> for BlockState {
-    #[inline(always)]
     fn from(state: u8) -> Self {
         match state {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
@@ -436,7 +420,6 @@ impl From<u8> for BlockState {
 }
 
 impl From<BlockState> for u8 {
-    #[inline(always)]
     fn from(state: BlockState) -> Self {
         match state {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,

@@ -41,7 +41,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
         }
     }
 
-    #[cold]
     fn flush_modbuf(&mut self) {
         let buf = self.modbuf.take();
         if !buf.is_empty() {
@@ -50,7 +49,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
         }
     }
 
-    #[cold]
     fn flush_region_modbuf(&mut self) {
         let buf = self.region_modbuf.take();
         if !buf.is_empty() {
@@ -67,7 +65,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
 {
     type VM = VM;
 
-    #[cold]
     fn flush(&mut self) {
         self.flush_modbuf();
         self.flush_region_modbuf();

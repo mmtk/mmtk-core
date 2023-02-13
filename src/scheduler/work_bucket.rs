@@ -17,12 +17,10 @@ impl<VM: VMBinding> BucketQueue<VM> {
         }
     }
 
-    #[inline(always)]
     fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
 
-    #[inline(always)]
     fn steal_batch_and_pop(
         &self,
         dest: &Worker<Box<dyn GCWork<VM>>>,
@@ -30,12 +28,10 @@ impl<VM: VMBinding> BucketQueue<VM> {
         self.queue.steal_batch_and_pop(dest)
     }
 
-    #[inline(always)]
     fn push(&self, w: Box<dyn GCWork<VM>>) {
         self.queue.push(w);
     }
 
-    #[inline(always)]
     fn push_all(&self, ws: Vec<Box<dyn GCWork<VM>>>) {
         for w in ws {
             self.queue.push(w);
@@ -83,7 +79,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         }
     }
 
-    #[inline(always)]
     fn notify_one_worker(&self) {
         // If the bucket is not activated, don't notify anyone.
         if !self.is_activated() {
@@ -96,7 +91,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         }
     }
 
-    #[inline(always)]
     pub fn notify_all_workers(&self) {
         // If the bucket is not activated, don't notify anyone.
         if !self.is_activated() {
@@ -109,7 +103,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         }
     }
 
-    #[inline(always)]
     pub fn is_activated(&self) -> bool {
         self.active.load(Ordering::SeqCst)
     }
@@ -120,7 +113,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     /// Test if the bucket is drained
-    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
             && self
@@ -130,7 +122,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
                 .unwrap_or(true)
     }
 
-    #[inline(always)]
     pub fn is_drained(&self) -> bool {
         self.is_activated() && self.is_empty()
     }
@@ -143,21 +134,18 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     /// Add a work packet to this bucket
     /// Panic if this bucket cannot receive prioritized packets.
-    #[inline(always)]
     pub fn add_prioritized(&self, work: Box<dyn GCWork<VM>>) {
         self.prioritized_queue.as_ref().unwrap().push(work);
         self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
-    #[inline(always)]
     pub fn add<W: GCWork<VM>>(&self, work: W) {
         self.queue.push(Box::new(work));
         self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
-    #[inline(always)]
     pub fn add_boxed(&self, work: Box<dyn GCWork<VM>>) {
         self.queue.push(work);
         self.notify_one_worker();
@@ -165,7 +153,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     /// Add multiple packets with a higher priority.
     /// Panic if this bucket cannot receive prioritized packets.
-    #[inline(always)]
     pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
         if self.is_activated() {
@@ -174,7 +161,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     /// Add multiple packets
-    #[inline(always)]
     pub fn bulk_add(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         if work_vec.is_empty() {
             return;
@@ -186,7 +172,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     /// Get a work packet from this bucket
-    #[inline(always)]
     pub fn poll(&self, worker: &Worker<Box<dyn GCWork<VM>>>) -> Steal<Box<dyn GCWork<VM>>> {
         if !self.is_activated() || self.is_empty() {
             return Steal::Empty;
@@ -217,7 +202,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         sentinel.is_some()
     }
 
-    #[inline(always)]
     pub fn update(&self, scheduler: &GCWorkScheduler<VM>) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
             if !self.is_activated() && can_open(scheduler) {
@@ -306,7 +290,6 @@ pub enum WorkBucketStage {
 }
 
 impl WorkBucketStage {
-    #[inline]
     pub fn first_stw_stage() -> Self {
         WorkBucketStage::from_usize(1)
     }

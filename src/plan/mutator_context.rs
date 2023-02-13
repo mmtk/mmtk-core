@@ -116,14 +116,12 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     }
 
     /// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
-    #[inline(always)]
     unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B {
         debug_assert!(self.barrier().is::<B>());
         let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
         &mut *payload
     }
 
-    #[inline(always)]
     fn barrier(&mut self) -> &mut dyn Barrier<VM> {
         &mut *self.barrier
     }
