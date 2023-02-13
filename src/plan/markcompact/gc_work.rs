@@ -18,7 +18,6 @@ pub struct CalculateForwardingAddress<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.mc_space.calculate_forwarding_pointer();
     }
@@ -37,7 +36,6 @@ pub struct UpdateReferences<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
@@ -70,7 +68,6 @@ pub struct Compact<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.mc_space.compact();
     }

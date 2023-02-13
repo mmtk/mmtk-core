@@ -102,7 +102,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         })
     }
 
-    #[inline]
     pub fn num_workers(&self) -> usize {
         self.worker_group.as_ref().worker_count()
     }
@@ -335,7 +334,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    #[inline(always)]
     fn all_activated_buckets_are_empty(&self) -> bool {
         for bucket in self.work_buckets.values() {
             if bucket.is_activated() && !bucket.is_drained() {
@@ -346,7 +344,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Get a schedulable work packet without retry.
-    #[inline(always)]
     fn poll_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
         let mut should_retry = false;
         // Try find a packet that can be processed only by this worker.
@@ -380,7 +377,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Get a schedulable work packet.
-    #[inline]
     fn poll_schedulable_work(&self, worker: &GCWorker<VM>) -> Option<Box<dyn GCWork<VM>>> {
         // Loop until we successfully get a packet.
         loop {
@@ -401,13 +397,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Called by workers to get a schedulable work packet.
     /// Park the worker if there're no available packets.
-    #[inline]
     pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         self.poll_schedulable_work(worker)
             .unwrap_or_else(|| self.poll_slow(worker))
     }
 
-    #[cold]
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         // Note: The lock is released during `wait` in the loop.
         let mut guard = self.worker_monitor.0.lock().unwrap();

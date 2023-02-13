@@ -144,7 +144,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*super::mutator::ALLOCATOR_MAPPING
+        &super::mutator::ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {

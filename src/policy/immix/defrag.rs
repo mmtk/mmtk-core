@@ -38,13 +38,11 @@ impl Defrag {
     }
 
     /// Report back a completed mark histogram
-    #[inline(always)]
     pub fn add_completed_mark_histogram(&self, histogram: Histogram) {
         self.mark_histograms.lock().push(histogram)
     }
 
     /// Check if the current GC is a defrag GC.
-    #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.in_defrag_collection.load(Ordering::Acquire)
     }
@@ -76,7 +74,6 @@ impl Defrag {
     }
 
     /// Check if the defrag space is exhausted.
-    #[inline(always)]
     pub fn space_exhausted(&self) -> bool {
         self.defrag_space_exhausted.load(Ordering::Acquire)
     }
@@ -182,7 +179,7 @@ impl Defrag {
             // Calculate the number of free lines in this bucket.
             let this_bucket_avail = spill_avail_histograms[threshold] as isize;
             // Update counters
-            limit -= this_bucket_avail as isize;
+            limit -= this_bucket_avail;
             required_lines += this_bucket_mark;
             // Stop scanning. Lines to evacuate exceeds the free to-space lines.
             if limit < required_lines {

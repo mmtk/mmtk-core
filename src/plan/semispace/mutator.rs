@@ -54,7 +54,7 @@ pub fn create_ss_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let ss = plan.downcast_ref::<SemiSpace<VM>>().unwrap();
     let config = MutatorConfig {
-        allocator_mapping: &*ALLOCATOR_MAPPING,
+        allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));

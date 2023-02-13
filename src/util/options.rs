@@ -934,7 +934,7 @@ mod tests {
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {
                         cpu_list.push_str(format!(",{}", cpu).as_str());
-                        vec.push(cpu as u16);
+                        vec.push(cpu);
                     }
 
                     std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
