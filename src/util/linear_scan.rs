@@ -67,7 +67,6 @@ pub trait LinearScanObjectSize {
 /// Default object size as ObjectModel::get_current_size()
 pub struct DefaultObjectSize<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
-    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
     }
@@ -86,45 +85,37 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     fn start(&self) -> Address;
 
     /// Create a region from an arbitrary address.
-    #[inline(always)]
     fn from_unaligned_address(address: Address) -> Self {
         Self::from_aligned_address(Self::align(address))
     }
 
     /// Align the address to the region.
-    #[inline(always)]
     fn align(address: Address) -> Address {
         address.align_down(Self::BYTES)
     }
     /// Check if an address is aligned to the region.
-    #[inline(always)]
     fn is_aligned(address: Address) -> bool {
         address.is_aligned_to(Self::BYTES)
     }
 
     /// Return the end address of the region. Note that the end address is not in the region.
-    #[inline(always)]
     fn end(&self) -> Address {
         self.start() + Self::BYTES
     }
     /// Return the next region after this one.
-    #[inline(always)]
     fn next(&self) -> Self {
         self.next_nth(1)
     }
     /// Return the next nth region after this one.
-    #[inline(always)]
     fn next_nth(&self, n: usize) -> Self {
         debug_assert!(self.start().as_usize() < usize::MAX - (n << Self::LOG_BYTES));
         Self::from_aligned_address(self.start() + (n << Self::LOG_BYTES))
     }
     /// Return the region that contains the object (by its cell address).
-    #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
         Self::from_unaligned_address(object.to_address::<VM>())
     }
     /// Check if the given address is in the region.
-    #[inline(always)]
     fn includes_address(&self, addr: Address) -> bool {
         Self::align(addr) == self.start()
     }
@@ -171,13 +162,11 @@ mod tests {
     impl Region for Page {
         const LOG_BYTES: usize = LOG_BYTES_IN_PAGE as usize;
 
-        #[inline(always)]
         fn from_aligned_address(address: Address) -> Self {
             debug_assert!(address.is_aligned_to(Self::BYTES));
             Self(address)
         }
 
-        #[inline(always)]
         fn start(&self) -> Address {
             self.0
         }

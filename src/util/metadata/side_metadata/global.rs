@@ -30,23 +30,19 @@ pub struct SideMetadataSpec {
 
 impl SideMetadataSpec {
     /// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
-    #[inline(always)]
     pub const fn is_absolute_offset(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
     }
     /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
-    #[inline(always)]
     pub const fn is_rel_offset(&self) -> bool {
         !self.is_absolute_offset()
     }
 
-    #[inline(always)]
     pub const fn get_absolute_offset(&self) -> Address {
         debug_assert!(self.is_absolute_offset());
         unsafe { self.offset.addr }
     }
 
-    #[inline(always)]
     pub const fn get_rel_offset(&self) -> usize {
         debug_assert!(self.is_rel_offset());
         unsafe { self.offset.rel_offset }
@@ -139,7 +135,6 @@ impl SideMetadataSpec {
     }
 
     /// Check with the mmapper to see if side metadata is mapped for the spec for the data address.
-    #[inline]
     pub(crate) fn is_mapped(&self, data_addr: Address) -> bool {
         use crate::util::heap::layout::Mmapper;
         use crate::MMAPPER;
@@ -296,7 +291,6 @@ impl SideMetadataSpec {
     /// * check whether the given value type matches the number of bits for the side metadata.
     /// * check if the side metadata memory is mapped.
     /// * check if the side metadata content is correct based on a sanity map (only for extreme assertions).
-    #[inline(always)]
     #[allow(unused_variables)] // data_addr/input is not used in release build
     fn side_metadata_access<T: MetadataValue, R: Copy, F: FnOnce() -> R, V: FnOnce(R)>(
         &self,
@@ -337,7 +331,6 @@ impl SideMetadataSpec {
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
-    #[inline(always)]
     pub unsafe fn load<T: MetadataValue>(&self, data_addr: Address) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
@@ -370,7 +363,6 @@ impl SideMetadataSpec {
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
-    #[inline(always)]
     pub unsafe fn store<T: MetadataValue>(&self, data_addr: Address, metadata: T) {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
@@ -396,7 +388,6 @@ impl SideMetadataSpec {
         )
     }
 
-    #[inline(always)]
     pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
@@ -420,7 +411,6 @@ impl SideMetadataSpec {
         )
     }
 
-    #[inline(always)]
     pub fn store_atomic<T: MetadataValue>(&self, data_addr: Address, metadata: T, order: Ordering) {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
@@ -459,7 +449,6 @@ impl SideMetadataSpec {
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
-    #[inline(always)]
     pub unsafe fn set_zero(&self, data_addr: Address) {
         use num_traits::Zero;
         match self.log_num_of_bits {
@@ -473,7 +462,6 @@ impl SideMetadataSpec {
 
     /// Atomiccally store zero to the side metadata for the given address.
     /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
-    #[inline(always)]
     pub fn set_zero_atomic(&self, data_addr: Address, order: Ordering) {
         use num_traits::Zero;
         match self.log_num_of_bits {
@@ -485,7 +473,6 @@ impl SideMetadataSpec {
         }
     }
 
-    #[inline(always)]
     pub fn compare_exchange_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -543,7 +530,6 @@ impl SideMetadataSpec {
 
     /// This is used to implement fetch_add/sub for bits.
     /// For fetch_and/or, we don't necessarily need this method. We could directly do fetch_and/or on the u8.
-    #[inline(always)]
     fn fetch_ops_on_bits<F: Fn(u8) -> u8>(
         &self,
         data_addr: Address,
@@ -573,7 +559,6 @@ impl SideMetadataSpec {
     }
 
     /// Wraps around on overflow.
-    #[inline(always)]
     pub fn fetch_add_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -606,7 +591,6 @@ impl SideMetadataSpec {
         )
     }
 
-    #[inline(always)]
     pub fn fetch_sub_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -638,7 +622,6 @@ impl SideMetadataSpec {
         )
     }
 
-    #[inline(always)]
     pub fn fetch_and_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -670,7 +653,6 @@ impl SideMetadataSpec {
         )
     }
 
-    #[inline(always)]
     pub fn fetch_or_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -702,7 +684,6 @@ impl SideMetadataSpec {
         )
     }
 
-    #[inline(always)]
     pub fn fetch_update_atomic<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
         &self,
         data_addr: Address,
@@ -1038,7 +1019,6 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
     }
 
     /// Get a byte from the metadata byte array at the given index.
-    #[inline(always)]
     #[allow(clippy::let_and_return)]
     pub fn get(&self, index: usize) -> u8 {
         #[cfg(feature = "extreme_assertions")]

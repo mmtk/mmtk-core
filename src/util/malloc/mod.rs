@@ -19,13 +19,11 @@ use crate::MMTK;
 //   are needed to maintain allocated bytes properly. The API is inspired by Julia's counted malloc.
 //   The counted version is only available with the feature `malloc_counted_size`.
 
-#[inline(always)]
 pub fn malloc(size: usize) -> Address {
     Address::from_mut_ptr(unsafe { self::library::malloc(size) })
 }
 
 #[cfg(feature = "malloc_counted_size")]
-#[inline(always)]
 pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
     let res = malloc(size);
     if !res.is_zero() {
@@ -34,13 +32,11 @@ pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
     res
 }
 
-#[inline(always)]
 pub fn calloc(num: usize, size: usize) -> Address {
     Address::from_mut_ptr(unsafe { self::library::calloc(num, size) })
 }
 
 #[cfg(feature = "malloc_counted_size")]
-#[inline(always)]
 pub fn counted_calloc<VM: VMBinding>(mmtk: &MMTK<VM>, num: usize, size: usize) -> Address {
     let res = calloc(num, size);
     if !res.is_zero() {
@@ -49,13 +45,11 @@ pub fn counted_calloc<VM: VMBinding>(mmtk: &MMTK<VM>, num: usize, size: usize) -
     res
 }
 
-#[inline(always)]
 pub fn realloc(addr: Address, size: usize) -> Address {
     Address::from_mut_ptr(unsafe { self::library::realloc(addr.to_mut_ptr(), size) })
 }
 
 #[cfg(feature = "malloc_counted_size")]
-#[inline(always)]
 pub fn realloc_with_old_size<VM: VMBinding>(
     mmtk: &MMTK<VM>,
     addr: Address,
@@ -74,13 +68,11 @@ pub fn realloc_with_old_size<VM: VMBinding>(
     res
 }
 
-#[inline(always)]
 pub fn free(addr: Address) {
     unsafe { self::library::free(addr.to_mut_ptr()) }
 }
 
 #[cfg(feature = "malloc_counted_size")]
-#[inline(always)]
 pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
     free(addr);
     if !addr.is_zero() {

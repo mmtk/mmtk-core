@@ -266,7 +266,6 @@ impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
     /// This function is inlined because `trace_object` is probably the hottest function in MMTk.
     /// If this function is called in small closures, please profile the program and make sure the
     /// closure is inlined, too.
-    #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         let result = self.process_edges_work.trace_object(object);
         self.flush_if_full();
@@ -275,7 +274,6 @@ impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
 }
 
 impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
-    #[inline(always)]
     fn flush_if_full(&mut self) {
         if self.process_edges_work.nodes.is_full() {
             self.flush();
@@ -288,7 +286,6 @@ impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
         }
     }
 
-    #[cold]
     fn flush(&mut self) {
         let next_nodes = self.process_edges_work.pop_nodes();
         assert!(!next_nodes.is_empty());
@@ -536,20 +533,20 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     pub fn set_worker(&mut self, worker: &mut GCWorker<VM>) {
         self.worker = worker;
     }
-    #[inline]
+
     pub fn worker(&self) -> &'static mut GCWorker<VM> {
         unsafe { &mut *self.worker }
     }
-    #[inline]
+
     pub fn mmtk(&self) -> &'static MMTK<VM> {
         self.mmtk
     }
-    #[inline]
+
     pub fn plan(&self) -> &'static dyn Plan<VM = VM> {
         &*self.mmtk.plan
     }
+
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
-    #[inline]
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
         self.nodes.take()
     }
@@ -598,7 +595,6 @@ pub trait ProcessEdgesWork:
 
     /// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
     /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
-    #[inline]
     fn start_or_dispatch_scan_work(&mut self, work_packet: impl GCWork<Self::VM>) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
@@ -624,7 +620,6 @@ pub trait ProcessEdgesWork:
 
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
     /// this method will simply return with no work packet created.
-    #[cold]
     fn flush(&mut self) {
         let nodes = self.pop_nodes();
         if !nodes.is_empty() {
@@ -632,7 +627,6 @@ pub trait ProcessEdgesWork:
         }
     }
 
-    #[inline]
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
         let new_object = self.trace_object(object);
@@ -641,7 +635,6 @@ pub trait ProcessEdgesWork:
         }
     }
 
-    #[inline]
     fn process_edges(&mut self) {
         for i in 0..self.edges.len() {
             self.process_edge(self.edges[i])
@@ -650,7 +643,6 @@ pub trait ProcessEdgesWork:
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
-    #[inline]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
         self.set_worker(worker);
@@ -686,7 +678,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         Self { base }
     }
 
-    #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::sft::GCWorkerMutRef;
 
@@ -702,7 +693,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 
-    #[inline(always)]
     fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
         ScanObjects::<Self>::new(nodes, false, roots)
     }
@@ -743,14 +733,12 @@ impl<E: ProcessEdgesWork> ProcessEdgesWorkRootsWorkFactory<E> {
 
 impl<VM: VMBinding> Deref for SFTProcessEdges<VM> {
     type Target = ProcessEdgesBase<VM>;
-    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
 impl<VM: VMBinding> DerefMut for SFTProcessEdges<VM> {
-    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
@@ -888,7 +876,6 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
         self.roots
     }
 
-    #[inline(always)]
     fn post_scan_object(&self, _object: ObjectReference) {
         // Do nothing.
     }
@@ -934,7 +921,6 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         Self { plan, base }
     }
 
-    #[inline(always)]
     fn create_scan_work(
         &self,
         nodes: Vec<ObjectReference>,
@@ -943,7 +929,6 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         PlanScanObjects::<Self, P>::new(self.plan, nodes, false, roots)
     }
 
-    #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -954,7 +939,6 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
             .trace_object::<VectorObjectQueue, KIND>(&mut self.base.nodes, object, worker)
     }
 
-    #[inline]
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
         let new_object = self.trace_object(object);
@@ -969,7 +953,6 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     for PlanProcessEdges<VM, P, KIND>
 {
     type Target = ProcessEdgesBase<VM>;
-    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
     }
@@ -978,7 +961,6 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
 impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> DerefMut
     for PlanProcessEdges<VM, P, KIND>
 {
-    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
@@ -1021,7 +1003,6 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
         self.roots
     }
 
-    #[inline(always)]
     fn post_scan_object(&self, object: ObjectReference) {
         self.plan.post_scan_object(object);
     }
