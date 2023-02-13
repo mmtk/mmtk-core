@@ -428,23 +428,6 @@
 <span id="428">428</span>
 <span id="429">429</span>
 <span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
 </pre><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -477,15 +460,13 @@
 <span class="kw">impl </span>Region <span class="kw">for </span>Block {
     <span class="kw">const </span>LOG_BYTES: usize = <span class="number">16</span>;
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
+    <span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
         <span class="macro">debug_assert!</span>(address.is_aligned_to(<span class="self">Self</span>::BYTES));
         <span class="macro">debug_assert!</span>(!address.is_zero());
         <span class="self">Self</span>(<span class="kw">unsafe </span>{ NonZeroUsize::new_unchecked(address.as_usize()) })
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+    <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.<span class="number">0</span>.get()) }
     }
 }
@@ -532,30 +513,25 @@
     <span class="kw">pub const </span>TLS_TABLE: SideMetadataSpec =
         <span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>load_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+    <span class="kw">pub fn </span>load_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="kw">unsafe </span>{ Address::from_usize(Block::FREE_LIST_TABLE.load::&lt;usize&gt;(<span class="self">self</span>.start())) }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>store_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, free_list: Address) {
+    <span class="kw">pub fn </span>store_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, free_list: Address) {
         <span class="kw">unsafe </span>{ Block::FREE_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), free_list.as_usize()) }
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
-    #[inline]
     </span><span class="kw">pub fn </span>load_local_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="kw">unsafe </span>{ Address::from_usize(Block::LOCAL_FREE_LIST_TABLE.load::&lt;usize&gt;(<span class="self">self</span>.start())) }
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
-    #[inline]
     </span><span class="kw">pub fn </span>store_local_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, local_free: Address) {
         <span class="kw">unsafe </span>{ Block::LOCAL_FREE_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), local_free.as_usize()) }
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
-    #[inline]
     </span><span class="kw">pub fn </span>load_thread_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="kw">unsafe </span>{
             Address::from_usize(
@@ -565,7 +541,6 @@
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
-    #[inline]
     </span><span class="kw">pub fn </span>store_thread_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, thread_free: Address) {
         <span class="kw">unsafe </span>{
             Block::THREAD_FREE_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), thread_free.as_usize())
@@ -573,7 +548,6 @@
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_native_mimalloc&quot;</span>)]
-    #[inline]
     </span><span class="kw">pub fn </span>cas_thread_free_list(<span class="kw-2">&amp;</span><span class="self">self</span>, old_thread_free: Address, new_thread_free: Address) -&gt; bool {
         Block::THREAD_FREE_LIST_TABLE
             .compare_exchange_atomic::&lt;usize&gt;(
@@ -659,21 +633,18 @@
     }
 
     <span class="doccomment">/// Get block mark state.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; BlockState {
         <span class="kw">let </span>byte = <span class="self">Self</span>::MARK_TABLE.load_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
         byte.into()
     }
 
     <span class="doccomment">/// Set block mark state.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>set_state(<span class="kw-2">&amp;</span><span class="self">self</span>, state: BlockState) {
         <span class="kw">let </span>state = u8::from(state);
         <span class="self">Self</span>::MARK_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), state, Ordering::SeqCst);
     }
 
     <span class="doccomment">/// Release this block if it is unmarked. Return true if the block is release.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>attempt_release&lt;VM: VMBinding&gt;(<span class="self">self</span>, space: <span class="kw-2">&amp;</span>MarkSweepSpace&lt;VM&gt;) -&gt; bool {
         <span class="kw">match </span><span class="self">self</span>.get_state() {
             BlockState::Unallocated =&gt; <span class="bool-val">false</span>,
@@ -832,19 +803,16 @@
     }
 
     <span class="doccomment">/// Get the chunk containing the block.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>chunk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Chunk {
         Chunk::from_unaligned_address(<span class="self">self</span>.start())
     }
 
     <span class="doccomment">/// Initialize a clean block after acquired from page-resource.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.set_state(BlockState::Unmarked);
     }
 
     <span class="doccomment">/// Deinitalize a block before releasing.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>deinit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.set_state(BlockState::Unallocated);
     }
@@ -871,8 +839,7 @@
 }
 
 <span class="kw">impl </span>From&lt;u8&gt; <span class="kw">for </span>BlockState {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>from(state: u8) -&gt; <span class="self">Self </span>{
+    <span class="kw">fn </span>from(state: u8) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>state {
             <span class="self">Self</span>::MARK_UNALLOCATED =&gt; BlockState::Unallocated,
             <span class="self">Self</span>::MARK_UNMARKED =&gt; BlockState::Unmarked,
@@ -883,8 +850,7 @@
 }
 
 <span class="kw">impl </span>From&lt;BlockState&gt; <span class="kw">for </span>u8 {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>from(state: BlockState) -&gt; <span class="self">Self </span>{
+    <span class="kw">fn </span>from(state: BlockState) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>state {
             BlockState::Unallocated =&gt; BlockState::MARK_UNALLOCATED,
             BlockState::Unmarked =&gt; BlockState::MARK_UNMARKED,

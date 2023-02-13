@@ -24,7 +24,6 @@
 <span id="24">24</span>
 <span id="25">25</span>
 <span id="26">26</span>
-<span id="27">27</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -49,8 +48,7 @@
         align: usize,
         offset: isize,
     ) -&gt; Address;
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _obj: ObjectReference, _bytes: usize) {}
+    <span class="kw">fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _obj: ObjectReference, _bytes: usize) {}
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

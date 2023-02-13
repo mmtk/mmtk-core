@@ -144,7 +144,7 @@
                     <main>
                         <h1 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h1>
 <p>This is <em>one</em> possible implementation of the Triplespace collector, provided
-in case you are stuck on the exercise. </p>
+in case you are stuck on the exercise.</p>
 <p><strong>Attempt the exercise yourself before reading this.</strong></p>
 <p>First, rename all instances of <code>mygc</code> to <code>triplespace</code>, and add it as a
 module by following the instructions in <a href="./create.html">Create MyGC</a>.</p>
@@ -311,8 +311,7 @@ tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</co
 the tospace and fromspace:
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    #[inline(always)] // Ensure this function is always inlined because it is very hot.
-    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
+</span>    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
         }

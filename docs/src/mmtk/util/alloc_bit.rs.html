@@ -93,8 +93,6 @@
 <span id="93">93</span>
 <span id="94">94</span>
 <span id="95">95</span>
-<span id="96">96</span>
-<span id="97">97</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -147,7 +145,6 @@
 
 <span class="doccomment">/// Check if an address can be turned directly into an object reference using the alloc bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
-</span><span class="attribute">#[inline]
 </span><span class="kw">pub fn </span>is_alloced_object&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
     <span class="kw">let </span>potential_object = ObjectReference::from_raw_address(address);
     <span class="kw">let </span>addr = potential_object.to_address::&lt;VM&gt;();
@@ -171,7 +168,6 @@
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
-</span><span class="attribute">#[inline]
 </span><span class="kw">pub unsafe fn </span>is_alloced_object_unsafe&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
     <span class="kw">let </span>potential_object = ObjectReference::from_raw_address(address);
     <span class="kw">let </span>addr = potential_object.to_address::&lt;VM&gt;();

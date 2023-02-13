@@ -816,26 +816,6 @@
 <span id="816">816</span>
 <span id="817">817</span>
 <span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
-<span id="823">823</span>
-<span id="824">824</span>
-<span id="825">825</span>
-<span id="826">826</span>
-<span id="827">827</span>
-<span id="828">828</span>
-<span id="829">829</span>
-<span id="830">830</span>
-<span id="831">831</span>
-<span id="832">832</span>
-<span id="833">833</span>
-<span id="834">834</span>
-<span id="835">835</span>
-<span id="836">836</span>
-<span id="837">837</span>
-<span id="838">838</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
@@ -935,12 +915,10 @@
         </span><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit::&lt;VM&gt;(_object);
     }
     <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
-    #[inline(always)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
         <span class="kw">crate</span>::util::alloc_bit::is_alloced_object::&lt;VM&gt;(addr).is_some()
     }
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>sft_trace_object(
+    <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         _queue: <span class="kw-2">&amp;mut </span>VectorObjectQueue,
         _object: ObjectReference,
@@ -975,8 +953,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::policy::gc_work::PolicyTraceObject&lt;VM&gt; <span class="kw">for </span>ImmixSpace&lt;VM&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
+    <span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
@@ -992,16 +969,14 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+    <span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="kw">if </span><span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME &amp;&amp; !<span class="kw">super</span>::BLOCK_ONLY {
             <span class="macro">debug_assert!</span>(<span class="self">self</span>.in_space(object));
             <span class="self">self</span>.mark_lines(object);
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool {
+    <span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool {
         <span class="kw">if </span>KIND == TRACE_KIND_DEFRAG {
             <span class="bool-val">true
         </span>} <span class="kw">else if </span>KIND == TRACE_KIND_FAST {
@@ -1097,7 +1072,6 @@
     }
 
     <span class="doccomment">/// Check if current GC is a defrag GC.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>in_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.defrag.in_defrag()
     }
@@ -1253,7 +1227,6 @@
     }
 
     <span class="doccomment">/// Trace and mark objects without evacuation.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fast_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         trace: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>ObjectQueue,
@@ -1263,7 +1236,6 @@
     }
 
     <span class="doccomment">/// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         trace: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>ObjectQueue,
@@ -1286,7 +1258,6 @@
     }
 
     <span class="doccomment">/// Trace and mark objects without evacuation.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>trace_object_without_moving(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>ObjectQueue,
@@ -1309,7 +1280,6 @@
 
     <span class="doccomment">/// Trace object and do evacuation if required.
     </span><span class="attribute">#[allow(clippy::assertions_on_constants)]
-    #[inline(always)]
     </span><span class="kw">pub fn </span>trace_object_with_opportunistic_copy(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>ObjectQueue,
@@ -1379,14 +1349,12 @@
 
     <span class="doccomment">/// Mark all the lines that the given object spans.
     </span><span class="attribute">#[allow(clippy::assertions_on_constants)]
-    #[inline]
     </span><span class="kw">pub fn </span>mark_lines(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="macro">debug_assert!</span>(!<span class="kw">super</span>::BLOCK_ONLY);
         Line::mark_lines_for_object::&lt;VM&gt;(object, <span class="self">self</span>.line_mark_state.load(Ordering::Acquire));
     }
 
     <span class="doccomment">/// Atomically mark an object.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>attempt_mark(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, mark_state: u8) -&gt; bool {
         <span class="kw">loop </span>{
             <span class="kw">let </span>old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
@@ -1416,7 +1384,6 @@
     </span>}
 
     <span class="doccomment">/// Check if an object is marked.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>is_marked(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, mark_state: u8) -&gt; bool {
         <span class="kw">let </span>old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
             object,
@@ -1427,7 +1394,6 @@
     }
 
     <span class="doccomment">/// Check if an object is pinned.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>is_pinned(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
         </span><span class="kw">return </span><span class="self">self</span>.is_object_pinned(_object);
@@ -1498,7 +1464,6 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; PrepareBlockState&lt;VM&gt; {
     <span class="doccomment">/// Clear object mark table
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>reset_object_mark(chunk: Chunk) {
         <span class="comment">// NOTE: We reset the mark bits because cyclic mark bit is currently not supported, yet.
         // See `ImmixSpace::prepare`.
@@ -1515,8 +1480,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareBlockState&lt;VM&gt; {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="kw">let </span>defrag_threshold = <span class="self">self</span>.defrag_threshold.unwrap_or(<span class="number">0</span>);
         <span class="comment">// Clear object mark table for this chunk
         </span><span class="self">Self</span>::reset_object_mark(<span class="self">self</span>.chunk);
@@ -1550,8 +1514,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>SweepChunk&lt;VM&gt; {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>histogram = <span class="self">self</span>.space.defrag.new_histogram();
         <span class="kw">if </span><span class="self">self</span>.space.chunk_map.get(<span class="self">self</span>.chunk) == ChunkState::Allocated {
             <span class="kw">let </span>line_mark_state = <span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
@@ -1621,8 +1584,7 @@
         <span class="self">self</span>.copy_allocator.reset();
         <span class="self">self</span>.defrag_allocator.reset();
     }
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>alloc_copy(
+    <span class="kw">fn </span>alloc_copy(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         _original: ObjectReference,
         bytes: usize,
@@ -1635,8 +1597,7 @@
             <span class="self">self</span>.copy_allocator.alloc(bytes, align, offset)
         }
     }
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, obj: ObjectReference, _bytes: usize) {
+    <span class="kw">fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, obj: ObjectReference, _bytes: usize) {
         <span class="comment">// Mark the object
         </span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::&lt;VM, u8&gt;(
             obj,
@@ -1663,8 +1624,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt; {
+    <span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt; {
         <span class="comment">// Both copy allocators should point to the same space.
         </span><span class="macro">debug_assert_eq!</span>(
             <span class="self">self</span>.defrag_allocator.immix_space().common().descriptor,

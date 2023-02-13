@@ -526,10 +526,6 @@
 <span id="526">526</span>
 <span id="527">527</span>
 <span id="528">528</span>
-<span id="529">529</span>
-<span id="530">530</span>
-<span id="531">531</span>
-<span id="532">532</span>
 </pre><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft&#39;s mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 </span><span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::native_ms::<span class="kw-2">*</span>;
@@ -722,7 +718,6 @@
     }
 
     <span class="comment">// Find an available block from local block lists
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>find_free_block_local(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize) -&gt; <span class="prelude-ty">Option</span>&lt;Block&gt; {
         <span class="self">Self</span>::find_free_block_with(
             <span class="kw-2">&amp;mut </span><span class="self">self</span>.available_blocks,
@@ -737,7 +732,6 @@
     // This will usually be the first block on the available list. If all available blocks are found
     // to be full, other lists are searched
     // This function allows different available block lists -- normal allocation uses self.avaialble_blocks, and precise stress test uses self.avialable_blocks_stress.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>find_free_block_with(
         available_blocks: <span class="kw-2">&amp;mut </span>BlockLists,
         consumed_blocks: <span class="kw-2">&amp;mut </span>BlockLists,
@@ -770,7 +764,6 @@
 
     <span class="doccomment">/// Add a block to the given bin in the available block lists. Depending on which available block list we are using, this
     /// method may add the block to available_blocks, or available_blocks_stress.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>add_to_available_blocks(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bin: usize, block: Block, stress: bool) {
         <span class="kw">if </span>stress {
             <span class="macro">debug_assert!</span>(<span class="self">self</span>.plan.base().is_precise_stress());
@@ -781,7 +774,6 @@
     }
 
     <span class="doccomment">/// Tries to recycle local blocks if there is any. This is a no-op for eager sweeping mark sweep.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">fn </span>recycle_local_blocks(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         size: usize,

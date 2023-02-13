@@ -1483,26 +1483,6 @@
 <span id="1483">1483</span>
 <span id="1484">1484</span>
 <span id="1485">1485</span>
-<span id="1486">1486</span>
-<span id="1487">1487</span>
-<span id="1488">1488</span>
-<span id="1489">1489</span>
-<span id="1490">1490</span>
-<span id="1491">1491</span>
-<span id="1492">1492</span>
-<span id="1493">1493</span>
-<span id="1494">1494</span>
-<span id="1495">1495</span>
-<span id="1496">1496</span>
-<span id="1497">1497</span>
-<span id="1498">1498</span>
-<span id="1499">1499</span>
-<span id="1500">1500</span>
-<span id="1501">1501</span>
-<span id="1502">1502</span>
-<span id="1503">1503</span>
-<span id="1504">1504</span>
-<span id="1505">1505</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
@@ -1535,24 +1515,20 @@
 
 <span class="kw">impl </span>SideMetadataSpec {
     <span class="doccomment">/// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const fn </span>is_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.is_global || <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>)
     }
     <span class="doccomment">/// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const fn </span>is_rel_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         !<span class="self">self</span>.is_absolute_offset()
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub const fn </span>get_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+    <span class="kw">pub const fn </span>get_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_absolute_offset());
         <span class="kw">unsafe </span>{ <span class="self">self</span>.offset.addr }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub const fn </span>get_rel_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="kw">pub const fn </span>get_rel_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_rel_offset());
         <span class="kw">unsafe </span>{ <span class="self">self</span>.offset.rel_offset }
     }
@@ -1644,7 +1620,6 @@
     }
 
     <span class="doccomment">/// Check with the mmapper to see if side metadata is mapped for the spec for the data address.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address) -&gt; bool {
         <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
         <span class="kw">use </span><span class="kw">crate</span>::MMAPPER;
@@ -1801,8 +1776,7 @@
     /// * check whether the given value type matches the number of bits for the side metadata.
     /// * check if the side metadata memory is mapped.
     /// * check if the side metadata content is correct based on a sanity map (only for extreme assertions).
-    </span><span class="attribute">#[inline(always)]
-    #[allow(unused_variables)] </span><span class="comment">// data_addr/input is not used in release build
+    </span><span class="attribute">#[allow(unused_variables)] </span><span class="comment">// data_addr/input is not used in release build
     </span><span class="kw">fn </span>side_metadata_access&lt;T: MetadataValue, R: Copy, F: FnOnce() -&gt; R, V: FnOnce(R)&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
@@ -1842,7 +1816,6 @@
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>load&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address) -&gt; T {
         <span class="self">self</span>.side_metadata_access::&lt;T, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
             data_addr,
@@ -1875,7 +1848,6 @@
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>store&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, metadata: T) {
         <span class="self">self</span>.side_metadata_access::&lt;T, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
             data_addr,
@@ -1901,8 +1873,7 @@
         )
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>load_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, order: Ordering) -&gt; T {
+    <span class="kw">pub fn </span>load_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, order: Ordering) -&gt; T {
         <span class="self">self</span>.side_metadata_access::&lt;T, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
             data_addr,
             <span class="prelude-val">None</span>,
@@ -1925,8 +1896,7 @@
         )
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>store_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, metadata: T, order: Ordering) {
+    <span class="kw">pub fn </span>store_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, metadata: T, order: Ordering) {
         <span class="self">self</span>.side_metadata_access::&lt;T, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
             data_addr,
             <span class="prelude-val">Some</span>(metadata),
@@ -1964,7 +1934,6 @@
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>set_zero(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address) {
         <span class="kw">use </span>num_traits::Zero;
         <span class="kw">match </span><span class="self">self</span>.log_num_of_bits {
@@ -1978,7 +1947,6 @@
 
     <span class="doccomment">/// Atomiccally store zero to the side metadata for the given address.
     /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>set_zero_atomic(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, order: Ordering) {
         <span class="kw">use </span>num_traits::Zero;
         <span class="kw">match </span><span class="self">self</span>.log_num_of_bits {
@@ -1990,8 +1958,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>compare_exchange_atomic&lt;T: MetadataValue&gt;(
+    <span class="kw">pub fn </span>compare_exchange_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         old_metadata: T,
@@ -2048,7 +2015,6 @@
 
     <span class="doccomment">/// This is used to implement fetch_add/sub for bits.
     /// For fetch_and/or, we don&#39;t necessarily need this method. We could directly do fetch_and/or on the u8.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>fetch_ops_on_bits&lt;F: Fn(u8) -&gt; u8&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
@@ -2078,7 +2044,6 @@
     }
 
     <span class="doccomment">/// Wraps around on overflow.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_add_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
@@ -2111,8 +2076,7 @@
         )
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>fetch_sub_atomic&lt;T: MetadataValue&gt;(
+    <span class="kw">pub fn </span>fetch_sub_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         val: T,
@@ -2143,8 +2107,7 @@
         )
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>fetch_and_atomic&lt;T: MetadataValue&gt;(
+    <span class="kw">pub fn </span>fetch_and_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         val: T,
@@ -2175,8 +2138,7 @@
         )
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>fetch_or_atomic&lt;T: MetadataValue&gt;(
+    <span class="kw">pub fn </span>fetch_or_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         val: T,
@@ -2207,8 +2169,7 @@
         )
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>fetch_update_atomic&lt;T: MetadataValue, F: FnMut(T) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; + Copy&gt;(
+    <span class="kw">pub fn </span>fetch_update_atomic&lt;T: MetadataValue, F: FnMut(T) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; + Copy&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         set_order: Ordering,
@@ -2543,8 +2504,7 @@
     }
 
     <span class="doccomment">/// Get a byte from the metadata byte array at the given index.
-    </span><span class="attribute">#[inline(always)]
-    #[allow(clippy::let_and_return)]
+    </span><span class="attribute">#[allow(clippy::let_and_return)]
     </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; u8 {
         <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
         </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();

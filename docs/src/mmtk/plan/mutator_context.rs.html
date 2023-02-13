@@ -357,8 +357,6 @@
 <span id="357">357</span>
 <span id="358">358</span>
 <span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::Barrier;
@@ -477,15 +475,13 @@
     }
 
     <span class="doccomment">/// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">unsafe fn </span>barrier_impl&lt;B: Barrier&lt;VM&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>B {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.barrier().is::&lt;B&gt;());
         <span class="kw">let </span>(payload, _vptr) = std::mem::transmute::&lt;<span class="kw">_</span>, (<span class="kw-2">*mut </span>B, <span class="kw-2">*mut </span>())&gt;(<span class="self">self</span>.barrier());
         <span class="kw-2">&amp;mut *</span>payload
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>barrier(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Barrier&lt;VM&gt; {
+    <span class="kw">fn </span>barrier(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Barrier&lt;VM&gt; {
         <span class="kw-2">&amp;mut *</span><span class="self">self</span>.barrier
     }
 }

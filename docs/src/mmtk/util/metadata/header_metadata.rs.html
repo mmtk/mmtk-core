@@ -996,25 +996,6 @@
 <span id="996">996</span>
 <span id="997">997</span>
 <span id="998">998</span>
-<span id="999">999</span>
-<span id="1000">1000</span>
-<span id="1001">1001</span>
-<span id="1002">1002</span>
-<span id="1003">1003</span>
-<span id="1004">1004</span>
-<span id="1005">1005</span>
-<span id="1006">1006</span>
-<span id="1007">1007</span>
-<span id="1008">1008</span>
-<span id="1009">1009</span>
-<span id="1010">1010</span>
-<span id="1011">1011</span>
-<span id="1012">1012</span>
-<span id="1013">1013</span>
-<span id="1014">1014</span>
-<span id="1015">1015</span>
-<span id="1016">1016</span>
-<span id="1017">1017</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module provides a default implementation of the access functions for in-header metadata.
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -1079,13 +1060,11 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>byte_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; isize {
+    <span class="kw">fn </span>byte_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; isize {
         <span class="self">self</span>.bit_offset &gt;&gt; LOG_BITS_IN_BYTE
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>meta_addr(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address) -&gt; Address {
+    <span class="kw">fn </span>meta_addr(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address) -&gt; Address {
         header + <span class="self">self</span>.byte_offset()
     }
 
@@ -1093,7 +1072,6 @@
 
     </span><span class="doccomment">/// Get the bit shift (the bit distance from the lowest bit to the bits location defined in the spec),
     /// and the mask (used to extract value for the bits defined in the spec).
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>get_shift_and_mask_for_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (isize, u8) {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.num_of_bits &lt; BITS_IN_BYTE);
         <span class="kw">let </span>byte_offset = <span class="self">self</span>.byte_offset();
@@ -1103,7 +1081,6 @@
     }
 
     <span class="doccomment">/// Extract bits from a raw byte, and put it to the lowest bits.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>get_bits_from_u8(<span class="kw-2">&amp;</span><span class="self">self</span>, raw_byte: u8) -&gt; u8 {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.num_of_bits &lt; BITS_IN_BYTE);
         <span class="kw">let </span>(bit_shift, mask) = <span class="self">self</span>.get_shift_and_mask_for_bits();
@@ -1111,7 +1088,6 @@
     }
 
     <span class="doccomment">/// Set bits to a raw byte. `set_val` has the valid value in its lowest bits.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>set_bits_to_u8(<span class="kw-2">&amp;</span><span class="self">self</span>, raw_byte: u8, set_val: u8) -&gt; u8 {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.num_of_bits &lt; BITS_IN_BYTE);
         <span class="macro">debug_assert!</span>(
@@ -1125,7 +1101,6 @@
     }
 
     <span class="doccomment">/// Truncate a value based on the spec.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>truncate_bits_in_u8(<span class="kw-2">&amp;</span><span class="self">self</span>, val: u8) -&gt; u8 {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.num_of_bits &lt; BITS_IN_BYTE);
         val &amp; ((<span class="number">1 </span>&lt;&lt; <span class="self">self</span>.num_of_bits) - <span class="number">1</span>)
@@ -1135,13 +1110,11 @@
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>load&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address, optional_mask: <span class="prelude-ty">Option</span>&lt;T&gt;) -&gt; T {
         <span class="self">self</span>.load_inner::&lt;T&gt;(header, optional_mask, <span class="prelude-val">None</span>)
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `load_metadata_atomic` method from the `ObjectModel` trait.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>load_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
@@ -1151,8 +1124,7 @@
         <span class="self">self</span>.load_inner::&lt;T&gt;(header, optional_mask, <span class="prelude-val">Some</span>(ordering))
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>load_inner&lt;T: MetadataValue&gt;(
+    <span class="kw">fn </span>load_inner&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
         optional_mask: <span class="prelude-ty">Option</span>&lt;T&gt;,
@@ -1198,7 +1170,6 @@
     ///
     /// # Safety
     /// This is a non-atomic store, thus not thread-safe.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>store&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
@@ -1211,7 +1182,6 @@
     <span class="doccomment">/// This function provides a default implementation for the `store_metadata_atomic` method from the `ObjectModel` trait.
     ///
     /// Note: this function does compare-and-swap in a busy loop. So, unlike `compare_exchange_metadata`, this operation will always success.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>store_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
@@ -1222,8 +1192,7 @@
         <span class="self">self</span>.store_inner::&lt;T&gt;(header, val, optional_mask, <span class="prelude-val">Some</span>(ordering))
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>store_inner&lt;T: MetadataValue&gt;(
+    <span class="kw">fn </span>store_inner&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
         val: T,
@@ -1281,7 +1250,6 @@
     <span class="doccomment">/// This function provides a default implementation for the `compare_exchange_metadata` method from the `ObjectModel` trait.
     ///
     /// Note: this function only does fetch and exclusive store once, without any busy waiting in a loop.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>compare_exchange&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
@@ -1337,7 +1305,6 @@
 
     <span class="doccomment">/// Inner method for fetch_add/sub on bits.
     /// For fetch_and/or, we don&#39;t necessarily need this method. We could directly do fetch_and/or on the u8.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>fetch_ops_on_bits&lt;F: Fn(u8) -&gt; u8&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,
@@ -1364,7 +1331,6 @@
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_add` method from the `ObjectModel` trait.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_add&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address, val: T, order: Ordering) -&gt; T {
         <span class="attribute">#[cfg(debug_assertions)]
         </span><span class="self">self</span>.assert_spec::&lt;T&gt;();
@@ -1379,7 +1345,6 @@
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_sub` method from the `ObjectModel` trait.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_sub&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address, val: T, order: Ordering) -&gt; T {
         <span class="attribute">#[cfg(debug_assertions)]
         </span><span class="self">self</span>.assert_spec::&lt;T&gt;();
@@ -1394,7 +1359,6 @@
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_and` method from the `ObjectModel` trait.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_and&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address, val: T, order: Ordering) -&gt; T {
         <span class="attribute">#[cfg(debug_assertions)]
         </span><span class="self">self</span>.assert_spec::&lt;T&gt;();
@@ -1412,7 +1376,6 @@
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_or` method from the `ObjectModel` trait.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_or&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, header: Address, val: T, order: Ordering) -&gt; T {
         <span class="attribute">#[cfg(debug_assertions)]
         </span><span class="self">self</span>.assert_spec::&lt;T&gt;();
@@ -1431,7 +1394,6 @@
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_update` method from the `ObjectModel` trait.
     /// The semantics is the same as Rust&#39;s `fetch_update` on atomic types.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_update&lt;T: MetadataValue, F: FnMut(T) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; + Copy&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         header: Address,

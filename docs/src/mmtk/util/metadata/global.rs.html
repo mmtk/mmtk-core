@@ -331,16 +331,6 @@
 <span id="331">331</span>
 <span id="332">332</span>
 <span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::header_metadata::HeaderMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -384,7 +374,6 @@
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>load&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -407,7 +396,6 @@
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the ordering for the load operation.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>load_atomic&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -434,7 +422,6 @@
     ///
     /// # Safety
     /// This is a non-atomic store, thus not thread-safe.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>store&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -459,7 +446,6 @@
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `ordering`: is the ordering for the store operation.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>store_atomic&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -493,7 +479,6 @@
     /// * `success_order`: is the atomic ordering used if the operation is successful.
     /// * `failure_order`: is the atomic ordering used if the operation fails.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>compare_exchange_metadata&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -534,7 +519,6 @@
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_add_metadata&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -560,7 +544,6 @@
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_sub_metadata&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -586,7 +569,6 @@
     /// * `val`: is the value to bit-and with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_and_metadata&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -612,7 +594,6 @@
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_or_metadata&lt;VM: VMBinding, T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         object: ObjectReference,
@@ -639,7 +620,6 @@
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     /// * `f`: the update function. The function may be called multiple times.
     ///
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>fetch_update_metadata&lt;
         VM: VMBinding,
         T: MetadataValue,

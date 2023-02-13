@@ -186,7 +186,6 @@
 <span id="186">186</span>
 <span id="187">187</span>
 <span id="188">188</span>
-<span id="189">189</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap};
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -340,8 +339,7 @@
         }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>acquire_block(
+    <span class="kw">fn </span>acquire_block(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         size: usize,
         align: usize,

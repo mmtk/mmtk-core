@@ -255,19 +255,6 @@
 <span id="255">255</span>
 <span id="256">256</span>
 <span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::{fmt::Debug, ops::Range};
@@ -317,13 +304,11 @@
     </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
 
     <span class="doccomment">/// Prefetch the edge so that a subsequent `load` will be faster.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>prefetch_load(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// no-op by default
     </span>}
 
     <span class="doccomment">/// Prefetch the edge so that a subsequent `store` will be faster.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>prefetch_store(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// no-op by default
     </span>}
@@ -342,7 +327,6 @@
     ///
     /// Arguments:
     /// *   `address`: The address in memory where an `ObjectReference` is stored.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>from_address(address: Address) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             slot_addr: address.to_mut_ptr(),
@@ -352,7 +336,6 @@
     <span class="doccomment">/// Get the address of the edge.
     ///
     /// Return the address at which the `ObjectReference` is stored.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>as_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         Address::from_mut_ptr(<span class="self">self</span>.slot_addr)
     }
@@ -361,13 +344,11 @@
 <span class="kw">unsafe impl </span>Send <span class="kw">for </span>SimpleEdge {}
 
 <span class="kw">impl </span>Edge <span class="kw">for </span>SimpleEdge {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
+    <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
         <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).load(atomic::Ordering::Relaxed) }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+    <span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).store(object, atomic::Ordering::Relaxed) }
     }
 }
@@ -383,13 +364,11 @@
 /// simply as an `ObjectReference`.  The intention and the semantics are clearer with
 /// `SimpleEdge`.
 </span><span class="kw">impl </span>Edge <span class="kw">for </span>Address {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
+    <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
         <span class="kw">unsafe </span>{ Address::load(<span class="kw-2">*</span><span class="self">self</span>) }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+    <span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="kw">unsafe </span>{ Address::store(<span class="kw-2">*</span><span class="self">self</span>, object) }
     }
 }
@@ -425,8 +404,7 @@
 <span class="kw">impl </span>Iterator <span class="kw">for </span>AddressRangeIterator {
     <span class="kw">type </span>Item = Address;
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
         <span class="kw">if </span><span class="self">self</span>.cursor &gt;= <span class="self">self</span>.limit {
             <span class="prelude-val">None
         </span>} <span class="kw">else </span>{
@@ -441,26 +419,22 @@
     <span class="kw">type </span>Edge = Address;
     <span class="kw">type </span>EdgeIterator = AddressRangeIterator;
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
+    <span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
         AddressRangeIterator {
             cursor: <span class="self">self</span>.start,
             limit: <span class="self">self</span>.end,
         }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+    <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="self">self</span>.start
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="kw">fn </span>bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.end - <span class="self">self</span>.start
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>copy(src: <span class="kw-2">&amp;</span><span class="self">Self</span>, tgt: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
+    <span class="kw">fn </span>copy(src: <span class="kw-2">&amp;</span><span class="self">Self</span>, tgt: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
         <span class="macro">debug_assert_eq!</span>(src.bytes(), tgt.bytes());
         <span class="macro">debug_assert_eq!</span>(
             src.bytes() &amp; ((<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_ADDRESS) - <span class="number">1</span>),

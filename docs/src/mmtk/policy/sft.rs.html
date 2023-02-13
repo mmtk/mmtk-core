@@ -178,11 +178,6 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
@@ -212,7 +207,6 @@
     </span><span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str;
 
     <span class="doccomment">/// Get forwarding pointer if the object is forwarded.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="prelude-val">None
     </span>}
@@ -222,7 +216,6 @@
 
     <span class="doccomment">/// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>is_reachable(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
         <span class="self">self</span>.is_live(object)
     }
@@ -254,7 +247,6 @@
     /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
     /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
     /// in the space contain actual MMTk objects. So they need a further check.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">true
     </span>}
@@ -338,12 +330,10 @@
          */
         </span><span class="bool-val">false
     </span>}
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+    <span class="kw">fn </span>is_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">false
     </span>}
     <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
-    #[inline(always)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
         <span class="bool-val">false
     </span>}

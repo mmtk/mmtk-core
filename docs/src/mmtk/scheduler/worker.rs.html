@@ -312,14 +312,6 @@
 <span id="312">312</span>
 <span id="313">313</span>
 <span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -344,7 +336,6 @@
 }
 
 <span class="doccomment">/// Get current worker ordinal. Return `None` if the current thread is not a worker.
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>current_worker_ordinal() -&gt; <span class="prelude-ty">Option</span>&lt;ThreadId&gt; {
     WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed))
 }
@@ -445,7 +436,6 @@
     <span class="doccomment">/// Add a work packet to the work queue and mark it with a higher priority.
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket with a higher priority.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>add_work_prioritized(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
         <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_activated()
             || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
@@ -459,7 +449,6 @@
     <span class="doccomment">/// Add a work packet to the work queue.
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>add_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bucket: WorkBucketStage, work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
         <span class="kw">if </span>!<span class="self">self</span>.scheduler().work_buckets[bucket].is_activated()
             || <span class="self">self</span>.local_work_buffer.len() &gt;= <span class="self">Self</span>::LOCALLY_CACHED_WORK_PACKETS
@@ -573,7 +562,6 @@
     }
 
     <span class="doccomment">/// Get the number of workers in the group
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>worker_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.workers_shared.len()
     }
@@ -582,7 +570,6 @@
     /// Called before a worker is parked.
     ///
     /// Return true if all the workers are parked.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>inc_parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>old = <span class="self">self</span>.parked_workers.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
         <span class="macro">debug_assert!</span>(old &lt; <span class="self">self</span>.worker_count());
@@ -591,20 +578,17 @@
 
     <span class="doccomment">/// Decrease the packed-workers counter.
     /// Called after a worker is resumed from the parked state.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>dec_parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let </span>old = <span class="self">self</span>.parked_workers.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
         <span class="macro">debug_assert!</span>(old &lt;= <span class="self">self</span>.worker_count());
     }
 
     <span class="doccomment">/// Get the number of parked workers in the group
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.parked_workers.load(Ordering::SeqCst)
     }
 
     <span class="doccomment">/// Check if all the workers are packed
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>all_parked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.parked_workers() == <span class="self">self</span>.worker_count()
     }

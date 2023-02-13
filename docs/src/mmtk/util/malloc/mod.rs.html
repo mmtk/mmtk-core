@@ -79,14 +79,6 @@
 <span id="79">79</span>
 <span id="80">80</span>
 <span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
-<span id="86">86</span>
-<span id="87">87</span>
-<span id="88">88</span>
-<span id="89">89</span>
 </pre><pre class="rust"><code><span class="doccomment">/// Malloc provided by libraries
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>library;
 <span class="doccomment">/// Using malloc as mark sweep free-list allocator
@@ -108,13 +100,11 @@
 //   are needed to maintain allocated bytes properly. The API is inspired by Julia&#39;s counted malloc.
 //   The counted version is only available with the feature `malloc_counted_size`.
 
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>malloc(size: usize) -&gt; Address {
     Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::malloc(size) })
 }
 
 <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
-#[inline(always)]
 </span><span class="kw">pub fn </span>counted_malloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, size: usize) -&gt; Address {
     <span class="kw">let </span>res = malloc(size);
     <span class="kw">if </span>!res.is_zero() {
@@ -123,13 +113,11 @@
     res
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>calloc(num: usize, size: usize) -&gt; Address {
+<span class="kw">pub fn </span>calloc(num: usize, size: usize) -&gt; Address {
     Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::calloc(num, size) })
 }
 
 <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
-#[inline(always)]
 </span><span class="kw">pub fn </span>counted_calloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, num: usize, size: usize) -&gt; Address {
     <span class="kw">let </span>res = calloc(num, size);
     <span class="kw">if </span>!res.is_zero() {
@@ -138,13 +126,11 @@
     res
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>realloc(addr: Address, size: usize) -&gt; Address {
+<span class="kw">pub fn </span>realloc(addr: Address, size: usize) -&gt; Address {
     Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::realloc(addr.to_mut_ptr(), size) })
 }
 
 <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
-#[inline(always)]
 </span><span class="kw">pub fn </span>realloc_with_old_size&lt;VM: VMBinding&gt;(
     mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;,
     addr: Address,
@@ -163,13 +149,11 @@
     res
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>free(addr: Address) {
+<span class="kw">pub fn </span>free(addr: Address) {
     <span class="kw">unsafe </span>{ <span class="self">self</span>::library::free(addr.to_mut_ptr()) }
 }
 
 <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
-#[inline(always)]
 </span><span class="kw">pub fn </span>free_with_size&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, addr: Address, old_size: usize) {
     free(addr);
     <span class="kw">if </span>!addr.is_zero() {

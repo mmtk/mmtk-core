@@ -89,9 +89,6 @@
 <span id="89">89</span>
 <span id="90">90</span>
 <span id="91">91</span>
-<span id="92">92</span>
-<span id="93">93</span>
-<span id="94">94</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Generational read/write barrier implementations.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSemantics;
@@ -130,8 +127,7 @@
         }
     }
 
-    <span class="attribute">#[cold]
-    </span><span class="kw">fn </span>flush_modbuf(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>flush_modbuf(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>buf = <span class="self">self</span>.modbuf.take();
         <span class="kw">if </span>!buf.is_empty() {
             <span class="self">self</span>.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
@@ -139,8 +135,7 @@
         }
     }
 
-    <span class="attribute">#[cold]
-    </span><span class="kw">fn </span>flush_region_modbuf(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>flush_region_modbuf(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>buf = <span class="self">self</span>.region_modbuf.take();
         <span class="kw">if </span>!buf.is_empty() {
             <span class="macro">debug_assert!</span>(!buf.is_empty());
@@ -153,8 +148,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; BarrierSemantics <span class="kw">for </span>GenObjectBarrierSemantics&lt;VM&gt; {
     <span class="kw">type </span>VM = VM;
 
-    <span class="attribute">#[cold]
-    </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.flush_modbuf();
         <span class="self">self</span>.flush_region_modbuf();
     }

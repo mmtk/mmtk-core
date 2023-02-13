@@ -368,13 +368,6 @@
 <span id="368">368</span>
 <span id="369">369</span>
 <span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
@@ -397,8 +390,7 @@
     </span>MmapOutOfMemory,
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>align_allocation_no_fill&lt;VM: VMBinding&gt;(
+<span class="kw">pub fn </span>align_allocation_no_fill&lt;VM: VMBinding&gt;(
     region: Address,
     alignment: usize,
     offset: isize,
@@ -406,8 +398,7 @@
     align_allocation_inner::&lt;VM&gt;(region, alignment, offset, VM::MIN_ALIGNMENT, <span class="bool-val">false</span>)
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>align_allocation&lt;VM: VMBinding&gt;(
+<span class="kw">pub fn </span>align_allocation&lt;VM: VMBinding&gt;(
     region: Address,
     alignment: usize,
     offset: isize,
@@ -415,8 +406,7 @@
     align_allocation_inner::&lt;VM&gt;(region, alignment, offset, VM::MIN_ALIGNMENT, <span class="bool-val">true</span>)
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>align_allocation_inner&lt;VM: VMBinding&gt;(
+<span class="kw">pub fn </span>align_allocation_inner&lt;VM: VMBinding&gt;(
     region: Address,
     alignment: usize,
     offset: isize,
@@ -455,8 +445,7 @@
     region + delta
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(immut_start: Address, end: Address) {
+<span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(immut_start: Address, end: Address) {
     <span class="kw">let </span><span class="kw-2">mut </span>start = immut_start;
 
     <span class="kw">if </span>VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
@@ -476,13 +465,11 @@
     }
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>get_maximum_aligned_size&lt;VM: VMBinding&gt;(size: usize, alignment: usize) -&gt; usize {
+<span class="kw">pub fn </span>get_maximum_aligned_size&lt;VM: VMBinding&gt;(size: usize, alignment: usize) -&gt; usize {
     get_maximum_aligned_size_inner::&lt;VM&gt;(size, alignment, VM::MIN_ALIGNMENT)
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub fn </span>get_maximum_aligned_size_inner&lt;VM: VMBinding&gt;(
+<span class="kw">pub fn </span>get_maximum_aligned_size_inner&lt;VM: VMBinding&gt;(
     size: usize,
     alignment: usize,
     known_alignment: usize,
@@ -575,7 +562,6 @@
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>alloc_slow_inline(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
         <span class="kw">let </span>tls = <span class="self">self</span>.get_tls();
         <span class="kw">let </span>plan = <span class="self">self</span>.get_plan().base();

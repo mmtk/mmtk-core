@@ -133,9 +133,6 @@
 <span id="133">133</span>
 <span id="134">134</span>
 <span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWork;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::RegionIterator;
@@ -153,14 +150,12 @@
 <span class="kw">impl </span>Region <span class="kw">for </span>Chunk {
     <span class="kw">const </span>LOG_BYTES: usize = <span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
+    <span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
         <span class="macro">debug_assert!</span>(address.is_aligned_to(<span class="self">Self</span>::BYTES));
         <span class="self">Self</span>(address)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+    <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="self">self</span>.<span class="number">0
     </span>}
 }
@@ -171,7 +166,6 @@
     </span><span class="kw">pub const </span>ZERO: <span class="self">Self </span>= <span class="self">Self</span>(Address::ZERO);
 
     <span class="doccomment">/// Get an iterator for regions within this chunk.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>iter_region&lt;R: Region&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; RegionIterator&lt;R&gt; {
         <span class="comment">// R should be smaller than a chunk
         </span><span class="macro">debug_assert!</span>(R::LOG_BYTES &lt; <span class="self">Self</span>::LOG_BYTES);

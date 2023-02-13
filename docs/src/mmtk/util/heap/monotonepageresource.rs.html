@@ -318,7 +318,6 @@
 <span id="318">318</span>
 <span id="319">319</span>
 <span id="320">320</span>
-<span id="321">321</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -594,8 +593,7 @@
         }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">unsafe fn </span>release_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, guard: <span class="kw-2">&amp;mut </span>MutexGuard&lt;MonotonePageResourceSync&gt;) {
+    <span class="kw">unsafe fn </span>release_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, guard: <span class="kw-2">&amp;mut </span>MutexGuard&lt;MonotonePageResourceSync&gt;) {
         <span class="comment">// TODO: concurrent zeroing
         </span><span class="kw">if </span><span class="self">self</span>.common().contiguous {
             guard.cursor = <span class="kw">match </span>guard.conditional {

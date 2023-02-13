@@ -1021,25 +1021,6 @@
 <span id="1021">1021</span>
 <span id="1022">1022</span>
 <span id="1023">1023</span>
-<span id="1024">1024</span>
-<span id="1025">1025</span>
-<span id="1026">1026</span>
-<span id="1027">1027</span>
-<span id="1028">1028</span>
-<span id="1029">1029</span>
-<span id="1030">1030</span>
-<span id="1031">1031</span>
-<span id="1032">1032</span>
-<span id="1033">1033</span>
-<span id="1034">1034</span>
-<span id="1035">1035</span>
-<span id="1036">1036</span>
-<span id="1037">1037</span>
-<span id="1038">1038</span>
-<span id="1039">1039</span>
-<span id="1040">1040</span>
-<span id="1041">1041</span>
-<span id="1042">1042</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1308,7 +1289,6 @@
     /// This function is inlined because `trace_object` is probably the hottest function in MMTk.
     /// If this function is called in small closures, please profile the program and make sure the
     /// closure is inlined, too.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
         <span class="kw">let </span>result = <span class="self">self</span>.process_edges_work.trace_object(object);
         <span class="self">self</span>.flush_if_full();
@@ -1317,8 +1297,7 @@
 }
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; ProcessEdgesWorkTracer&lt;E&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>flush_if_full(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>flush_if_full(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">if </span><span class="self">self</span>.process_edges_work.nodes.is_full() {
             <span class="self">self</span>.flush();
         }
@@ -1330,8 +1309,7 @@
         }
     }
 
-    <span class="attribute">#[cold]
-    </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>next_nodes = <span class="self">self</span>.process_edges_work.pop_nodes();
         <span class="macro">assert!</span>(!next_nodes.is_empty());
         <span class="kw">let </span>work_packet = <span class="self">self</span>.process_edges_work.create_scan_work(next_nodes, <span class="bool-val">false</span>);
@@ -1578,20 +1556,20 @@
     <span class="kw">pub fn </span>set_worker(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;) {
         <span class="self">self</span>.worker = worker;
     }
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>worker(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>GCWorker&lt;VM&gt; {
+
+    <span class="kw">pub fn </span>worker(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>GCWorker&lt;VM&gt; {
         <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span><span class="self">self</span>.worker }
     }
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>mmtk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt; {
+
+    <span class="kw">pub fn </span>mmtk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt; {
         <span class="self">self</span>.mmtk
     }
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+
+    <span class="kw">pub fn </span>plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
         <span class="kw-2">&amp;*</span><span class="self">self</span>.mmtk.plan
     }
+
     <span class="doccomment">/// Pop all nodes from nodes, and clear nodes to an empty vector.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>pop_nodes(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Vec&lt;ObjectReference&gt; {
         <span class="self">self</span>.nodes.take()
     }
@@ -1640,7 +1618,6 @@
 
     <span class="doccomment">/// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
     /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">fn </span>start_or_dispatch_scan_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, work_packet: <span class="kw">impl </span>GCWork&lt;<span class="self">Self</span>::VM&gt;) {
         <span class="kw">if </span><span class="self">Self</span>::SCAN_OBJECTS_IMMEDIATELY {
             <span class="comment">// We execute this `scan_objects_work` immediately.
@@ -1666,7 +1643,6 @@
 
     <span class="doccomment">/// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
     /// this method will simply return with no work packet created.
-    </span><span class="attribute">#[cold]
     </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>nodes = <span class="self">self</span>.pop_nodes();
         <span class="kw">if </span>!nodes.is_empty() {
@@ -1674,8 +1650,7 @@
         }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
+    <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span>object = slot.load();
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
         <span class="kw">if </span><span class="self">Self</span>::OVERWRITE_REFERENCE {
@@ -1683,8 +1658,7 @@
         }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>process_edges(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>process_edges(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="self">self</span>.edges.len() {
             <span class="self">self</span>.process_edge(<span class="self">self</span>.edges[i])
         }
@@ -1692,8 +1666,7 @@
 }
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>E {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;ProcessEdgesWork&quot;</span>);
         <span class="self">self</span>.set_worker(worker);
         <span class="self">self</span>.process_edges();
@@ -1728,8 +1701,7 @@
         <span class="self">Self </span>{ base }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
+    <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
         <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 
         <span class="kw">if </span>object.is_null() {
@@ -1744,8 +1716,7 @@
         sft.sft_trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>.base.nodes, object, worker)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>create_scan_work(<span class="kw-2">&amp;</span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;<span class="self">Self</span>&gt; {
+    <span class="kw">fn </span>create_scan_work(<span class="kw-2">&amp;</span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;<span class="self">Self</span>&gt; {
         ScanObjects::&lt;<span class="self">Self</span>&gt;::new(nodes, <span class="bool-val">false</span>, roots)
     }
 }
@@ -1785,15 +1756,13 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Deref <span class="kw">for </span>SFTProcessEdges&lt;VM&gt; {
     <span class="kw">type </span>Target = ProcessEdgesBase&lt;VM&gt;;
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base
     }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; DerefMut <span class="kw">for </span>SFTProcessEdges&lt;VM&gt; {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.base
     }
 }
@@ -1930,8 +1899,7 @@
         <span class="self">self</span>.roots
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
+    <span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) {
         <span class="comment">// Do nothing.
     </span>}
 
@@ -1976,8 +1944,7 @@
         <span class="self">Self </span>{ plan, base }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>create_scan_work(
+    <span class="kw">fn </span>create_scan_work(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         nodes: Vec&lt;ObjectReference&gt;,
         roots: bool,
@@ -1985,8 +1952,7 @@
         PlanScanObjects::&lt;<span class="self">Self</span>, P&gt;::new(<span class="self">self</span>.plan, nodes, <span class="bool-val">false</span>, roots)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
+    <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
         <span class="kw">if </span>object.is_null() {
             <span class="kw">return </span>object;
         }
@@ -1996,8 +1962,7 @@
             .trace_object::&lt;VectorObjectQueue, KIND&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>.base.nodes, object, worker)
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
+    <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span>object = slot.load();
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
         <span class="kw">if </span>P::may_move_objects::&lt;KIND&gt;() {
@@ -2011,8 +1976,7 @@
     <span class="kw">for </span>PlanProcessEdges&lt;VM, P, KIND&gt;
 {
     <span class="kw">type </span>Target = ProcessEdgesBase&lt;VM&gt;;
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base
     }
 }
@@ -2020,8 +1984,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding, P: PlanTraceObject&lt;VM&gt; + Plan&lt;VM = VM&gt;, <span class="kw">const </span>KIND: TraceKind&gt; DerefMut
     <span class="kw">for </span>PlanProcessEdges&lt;VM, P, KIND&gt;
 {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.base
     }
 }
@@ -2063,8 +2026,7 @@
         <span class="self">self</span>.roots
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
+    <span class="kw">fn </span>post_scan_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="self">self</span>.plan.post_scan_object(object);
     }
 

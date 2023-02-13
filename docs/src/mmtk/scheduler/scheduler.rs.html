@@ -488,12 +488,6 @@
 <span id="488">488</span>
 <span id="489">489</span>
 <span id="490">490</span>
-<span id="491">491</span>
-<span id="492">492</span>
-<span id="493">493</span>
-<span id="494">494</span>
-<span id="495">495</span>
-<span id="496">496</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ParkingGuard, ThreadId, WorkerGroup};
@@ -598,8 +592,7 @@
         })
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>num_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="kw">pub fn </span>num_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.worker_group.as_ref().worker_count()
     }
 
@@ -831,7 +824,6 @@
     }
 
     <span class="doccomment">/// Check if all the work buckets are empty
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>all_activated_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">for </span>bucket <span class="kw">in </span><span class="self">self</span>.work_buckets.values() {
             <span class="kw">if </span>bucket.is_activated() &amp;&amp; !bucket.is_drained() {
@@ -842,7 +834,6 @@
     </span>}
 
     <span class="doccomment">/// Get a schedulable work packet without retry.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>poll_schedulable_work_once(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Steal&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>should_retry = <span class="bool-val">false</span>;
         <span class="comment">// Try find a packet that can be processed only by this worker.
@@ -876,7 +867,6 @@
     }
 
     <span class="doccomment">/// Get a schedulable work packet.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">fn </span>poll_schedulable_work(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
         <span class="comment">// Loop until we successfully get a packet.
         </span><span class="kw">loop </span>{
@@ -897,14 +887,12 @@
 
     <span class="doccomment">/// Called by workers to get a schedulable work packet.
     /// Park the worker if there&#39;re no available packets.
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
         <span class="self">self</span>.poll_schedulable_work(worker)
             .unwrap_or_else(|| <span class="self">self</span>.poll_slow(worker))
     }
 
-    <span class="attribute">#[cold]
-    </span><span class="kw">fn </span>poll_slow(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
+    <span class="kw">fn </span>poll_slow(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
         <span class="comment">// Note: The lock is released during `wait` in the loop.
         </span><span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="self">self</span>.worker_monitor.<span class="number">0</span>.lock().unwrap();
         <span class="lifetime">&#39;polling_loop</span>: <span class="kw">loop </span>{

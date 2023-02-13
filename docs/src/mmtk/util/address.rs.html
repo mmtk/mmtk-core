@@ -580,39 +580,6 @@
 <span id="580">580</span>
 <span id="581">581</span>
 <span id="582">582</span>
-<span id="583">583</span>
-<span id="584">584</span>
-<span id="585">585</span>
-<span id="586">586</span>
-<span id="587">587</span>
-<span id="588">588</span>
-<span id="589">589</span>
-<span id="590">590</span>
-<span id="591">591</span>
-<span id="592">592</span>
-<span id="593">593</span>
-<span id="594">594</span>
-<span id="595">595</span>
-<span id="596">596</span>
-<span id="597">597</span>
-<span id="598">598</span>
-<span id="599">599</span>
-<span id="600">600</span>
-<span id="601">601</span>
-<span id="602">602</span>
-<span id="603">603</span>
-<span id="604">604</span>
-<span id="605">605</span>
-<span id="606">606</span>
-<span id="607">607</span>
-<span id="608">608</span>
-<span id="609">609</span>
-<span id="610">610</span>
-<span id="611">611</span>
-<span id="612">612</span>
-<span id="613">613</span>
-<span id="614">614</span>
-<span id="615">615</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::mem;
@@ -748,18 +715,15 @@
     <span class="kw">pub const </span>MAX: <span class="self">Self </span>= Address(usize::max_value());
 
     <span class="doccomment">/// creates Address from a pointer
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>from_ptr&lt;T&gt;(ptr: <span class="kw-2">*const </span>T) -&gt; Address {
         Address(ptr <span class="kw">as </span>usize)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>from_ref&lt;T&gt;(r: <span class="kw-2">&amp;</span>T) -&gt; Address {
+    <span class="kw">pub fn </span>from_ref&lt;T&gt;(r: <span class="kw-2">&amp;</span>T) -&gt; Address {
         Address(r <span class="kw">as </span><span class="kw-2">*const </span>T <span class="kw">as </span>usize)
     }
 
     <span class="doccomment">/// creates Address from a mutable pointer
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>from_mut_ptr&lt;T&gt;(ptr: <span class="kw-2">*mut </span>T) -&gt; Address {
         Address(ptr <span class="kw">as </span>usize)
     }
@@ -768,7 +732,6 @@
     /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
     /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const unsafe fn </span>zero() -&gt; Address {
         Address(<span class="number">0</span>)
     }
@@ -777,7 +740,6 @@
     /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
     /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>max() -&gt; Address {
         <span class="kw">use </span>std::usize;
         Address(usize::MAX)
@@ -788,13 +750,11 @@
     /// It is unsafe and the user needs to be aware that they may create an invalid address.
     /// This creates arbitrary addresses which may not be valid. This should only be used for hard-coded addresses. Any other uses of this function could be
     /// replaced with more proper alternatives.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const unsafe fn </span>from_usize(raw: usize) -&gt; Address {
         Address(raw)
     }
 
     <span class="doccomment">/// shifts the address by N T-typed objects (returns addr + N * size_of(T))
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>shift&lt;T&gt;(<span class="self">self</span>, offset: isize) -&gt; <span class="self">Self </span>{
         <span class="self">self </span>+ mem::size_of::&lt;T&gt;() <span class="kw">as </span>isize * offset
     }
@@ -802,13 +762,11 @@
     <span class="comment">// These const functions are duplicated with the operator traits. But we need them,
     // as we need them to declare constants.
 
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const fn </span>get_extent(<span class="self">self</span>, other: Address) -&gt; ByteSize {
         <span class="self">self</span>.<span class="number">0 </span>- other.<span class="number">0
     </span>}
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub const fn </span>get_offset(<span class="self">self</span>, other: Address) -&gt; ByteOffset {
+    <span class="kw">pub const fn </span>get_offset(<span class="self">self</span>, other: Address) -&gt; ByteOffset {
         <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>isize - other.<span class="number">0 </span><span class="kw">as </span>isize
     }
 
@@ -816,7 +774,6 @@
     // The add() function is const fn, and we can use it to declare Address constants.
     // The Add trait function cannot be const.
     </span><span class="attribute">#[allow(clippy::should_implement_trait)]
-    #[inline(always)]
     </span><span class="kw">pub const fn </span>add(<span class="self">self</span>, size: usize) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0 </span>+ size)
     }
@@ -825,7 +782,6 @@
     // The sub() function is const fn, and we can use it to declare Address constants.
     // The Sub trait function cannot be const.
     </span><span class="attribute">#[allow(clippy::should_implement_trait)]
-    #[inline(always)]
     </span><span class="kw">pub const fn </span>sub(<span class="self">self</span>, size: usize) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0 </span>- size)
     }
@@ -842,7 +798,6 @@
     <span class="doccomment">/// loads a value of type T from the address
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>load&lt;T: Copy&gt;(<span class="self">self</span>) -&gt; T {
         <span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>T)
     }
@@ -850,7 +805,6 @@
     <span class="doccomment">/// stores a value of type T to the address
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>store&lt;T&gt;(<span class="self">self</span>, value: T) {
         <span class="comment">// We use a ptr.write() operation as directly setting the pointer would drop the old value
         // which may result in unexpected behaviour
@@ -860,7 +814,6 @@
     <span class="doccomment">/// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>atomic_load&lt;T: Atomic&gt;(<span class="self">self</span>, order: Ordering) -&gt; T::Type {
         <span class="kw">let </span>loc = <span class="kw-2">&amp;*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T);
         loc.load(order)
@@ -869,7 +822,6 @@
     <span class="doccomment">/// atomic operation: store
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>atomic_store&lt;T: Atomic&gt;(<span class="self">self</span>, val: T::Type, order: Ordering) {
         <span class="kw">let </span>loc = <span class="kw-2">&amp;*</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T);
         loc.store(val, order)
@@ -878,7 +830,6 @@
     <span class="doccomment">/// atomic operation: compare and exchange usize
     /// # Safety
     /// This could throw a segment fault if the address is invalid
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>compare_exchange&lt;T: Atomic&gt;(
         <span class="self">self</span>,
         old: T::Type,
@@ -891,20 +842,17 @@
     }
 
     <span class="doccomment">/// is this address zero?
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>is_zero(<span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
     </span>}
 
     <span class="doccomment">/// aligns up the address to the given alignment
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const fn </span>align_up(<span class="self">self</span>, align: ByteSize) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
         Address(conversions::raw_align_up(<span class="self">self</span>.<span class="number">0</span>, align))
     }
 
     <span class="doccomment">/// aligns down the address to the given alignment
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const fn </span>align_down(<span class="self">self</span>, align: ByteSize) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
         Address(conversions::raw_align_down(<span class="self">self</span>.<span class="number">0</span>, align))
@@ -917,13 +865,11 @@
     }
 
     <span class="doccomment">/// converts the Address to a pointer
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>to_ptr&lt;T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">*const </span>T {
         <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*const </span>T
     }
 
     <span class="doccomment">/// converts the Address to a mutable pointer
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>to_mut_ptr&lt;T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">*mut </span>T {
         <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>T
     }
@@ -932,19 +878,16 @@
     ///
     /// # Safety
     /// The caller must guarantee the address actually points to a Rust object.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub unsafe fn </span>as_ref&lt;<span class="lifetime">&#39;a</span>, T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T {
         <span class="kw-2">&amp;*</span><span class="self">self</span>.to_mut_ptr()
     }
 
     <span class="doccomment">/// converts the Address to a pointer-sized integer
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub const fn </span>as_usize(<span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.<span class="number">0
     </span>}
 
     <span class="doccomment">/// returns the chunk index for this address
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>chunk_index(<span class="self">self</span>) -&gt; usize {
         <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
         conversions::address_to_chunk_index(<span class="self">self</span>)
@@ -1096,7 +1039,6 @@
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
     /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>to_raw_address(<span class="self">self</span>) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0</span>)
     }
@@ -1106,7 +1048,6 @@
     ///
     /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>from_raw_address(addr: Address) -&gt; ObjectReference {
         ObjectReference(addr.<span class="number">0</span>)
     }
@@ -1114,7 +1055,6 @@
     <span class="doccomment">/// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
     /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
     /// comments on [`crate::vm::ObjectModel::ref_to_address`].
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>to_address&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
         <span class="kw">let </span>to_address = VM::VMObjectModel::ref_to_address(<span class="self">self</span>);
@@ -1125,14 +1065,12 @@
     <span class="doccomment">/// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
     /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
     /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>to_header&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
         VM::VMObjectModel::ref_to_header(<span class="self">self</span>)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>to_object_start&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
+    <span class="kw">pub fn </span>to_object_start&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
         <span class="kw">let </span>object_start = VM::VMObjectModel::ref_to_object_start(<span class="self">self</span>);
         <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == <span class="self">self</span>.to_raw_address(), <span class="string">&quot;The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}&quot;</span>, <span class="self">self</span>, object_start);
@@ -1142,7 +1080,6 @@
     <span class="doccomment">/// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
     /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
     /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>from_address&lt;VM: VMBinding&gt;(addr: Address) -&gt; ObjectReference {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
         <span class="kw">let </span>obj = VM::VMObjectModel::address_to_ref(addr);
@@ -1151,7 +1088,6 @@
     }
 
     <span class="doccomment">/// is this object reference null reference?
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>is_null(<span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
     </span>}
@@ -1163,7 +1099,6 @@
 
     <span class="doccomment">/// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>is_reachable(<span class="self">self</span>) -&gt; bool {
         <span class="kw">if </span><span class="self">self</span>.is_null() {
             <span class="bool-val">false
@@ -1186,7 +1121,6 @@
     }
 
     <span class="doccomment">/// Get forwarding pointer if the object is forwarded.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>get_forwarded_object(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
         <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.get_forwarded_object(<span class="self">self</span>)
     }

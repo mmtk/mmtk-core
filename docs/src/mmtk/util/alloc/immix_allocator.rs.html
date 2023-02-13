@@ -396,9 +396,6 @@
 <span id="396">396</span>
 <span id="397">397</span>
 <span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap};
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::line::<span class="kw-2">*</span>;
@@ -466,8 +463,7 @@
         <span class="kw">crate</span>::policy::immix::block::Block::BYTES
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
         <span class="macro">debug_assert!</span>(
             size &lt;= <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE,
             <span class="string">&quot;Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}&quot;</span>,
@@ -592,8 +588,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>immix_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt; {
+    <span class="kw">pub fn </span>immix_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt; {
         <span class="self">self</span>.space
     }
 
@@ -615,7 +610,6 @@
     }
 
     <span class="doccomment">/// Bump allocate small objects into recyclable lines (i.e. holes).
-    </span><span class="attribute">#[cold]
     </span><span class="kw">fn </span>alloc_slow_hot(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_hot&quot;</span>, <span class="self">self</span>.tls);
         <span class="kw">if </span><span class="self">self</span>.acquire_recyclable_lines(size, align, offset) {

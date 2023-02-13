@@ -287,7 +287,6 @@
 <span id="287">287</span>
 <span id="288">288</span>
 <span id="289">289</span>
-<span id="290">290</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -421,12 +420,11 @@
     /// For maximum performance, the VM should support edge-enqueuing for as many objects as
     /// practical.  Also note that this method is called for every object to be scanned, so it
     /// must be fast.  The VM binding should avoid expensive checks and keep it as efficient as
-    /// possible.  Add `#[inline(always)]` to ensure it is inlined.
+    /// possible.
     ///
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>support_edge_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">true
     </span>}

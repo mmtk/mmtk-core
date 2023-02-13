@@ -522,17 +522,6 @@
 <span id="522">522</span>
 <span id="523">523</span>
 <span id="524">524</span>
-<span id="525">525</span>
-<span id="526">526</span>
-<span id="527">527</span>
-<span id="528">528</span>
-<span id="529">529</span>
-<span id="530">530</span>
-<span id="531">531</span>
-<span id="532">532</span>
-<span id="533">533</span>
-<span id="534">534</span>
-<span id="535">535</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -626,8 +615,7 @@
     <span class="kw">unsafe impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sync <span class="kw">for </span>SFTSpaceMap&lt;<span class="lifetime">&#39;a</span>&gt; {}
 
     <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTMap <span class="kw">for </span>SFTSpaceMap&lt;<span class="lifetime">&#39;a</span>&gt; {
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
+        <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
             <span class="comment">// Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
             // So any address has an SFT entry.
             </span><span class="bool-val">true
@@ -637,15 +625,13 @@
             <span class="prelude-val">None
         </span>}
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
+        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
             <span class="comment">// We should be able to map the entire address range to indices in the table.
             </span><span class="macro">debug_assert!</span>(<span class="self">Self</span>::addr_to_index(address) &lt; <span class="self">self</span>.sft.len());
             <span class="kw">unsafe </span>{ <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(<span class="self">Self</span>::addr_to_index(address)) }
         }
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
+        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
             <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(<span class="self">Self</span>::addr_to_index(address))
         }
 
@@ -700,8 +686,7 @@
             <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
         }
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">const fn </span>addr_to_index(addr: Address) -&gt; usize {
+        <span class="kw">const fn </span>addr_to_index(addr: Address) -&gt; usize {
             addr.and(<span class="self">Self</span>::ADDRESS_MASK) &gt;&gt; LOG_SPACE_EXTENT
         }
 
@@ -791,8 +776,7 @@
     <span class="kw">unsafe impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sync <span class="kw">for </span>SFTDenseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {}
 
     <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTMap <span class="kw">for </span>SFTDenseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
+        <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
             <span class="kw">if </span>SFT_DENSE_CHUNK_MAP_INDEX.is_mapped(addr) {
                 <span class="kw">let </span>index = <span class="self">Self</span>::addr_to_index(addr);
                 index &lt; <span class="self">self</span>.sft.len() <span class="kw">as </span>u8
@@ -806,8 +790,7 @@
             <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX)
         }
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
+        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
             <span class="kw">if </span><span class="self">self</span>.has_sft_entry(address) {
                 <span class="kw">unsafe </span>{
                     <span class="kw-2">*</span><span class="self">self
@@ -819,8 +802,7 @@
             }
         }
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
+        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
             <span class="kw-2">*</span><span class="self">self
                 </span>.sft
                 .get_unchecked(<span class="self">Self</span>::addr_to_index(address) <span class="kw">as </span>usize)
@@ -906,8 +888,7 @@
             <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
         }
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">pub fn </span>addr_to_index(addr: Address) -&gt; u8 {
+        <span class="kw">pub fn </span>addr_to_index(addr: Address) -&gt; u8 {
             SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::&lt;u8&gt;(addr, Ordering::Relaxed)
         }
     }
@@ -929,8 +910,7 @@
     <span class="kw">unsafe impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sync <span class="kw">for </span>SFTSparseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {}
 
     <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTMap <span class="kw">for </span>SFTSparseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
+        <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
             addr.chunk_index() &lt; MAX_CHUNKS
         }
 
@@ -938,8 +918,7 @@
             <span class="prelude-val">None
         </span>}
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
+        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
             <span class="kw">if </span><span class="self">self</span>.has_sft_entry(address) {
                 <span class="kw">unsafe </span>{ <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(address.chunk_index()) }
             } <span class="kw">else </span>{
@@ -947,8 +926,7 @@
             }
         }
 
-        <span class="attribute">#[inline(always)]
-        </span><span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
+        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
             <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(address.chunk_index())
         }
 

@@ -892,14 +892,6 @@
 <span id="892">892</span>
 <span id="893">893</span>
 <span id="894">894</span>
-<span id="895">895</span>
-<span id="896">896</span>
-<span id="897">897</span>
-<span id="898">898</span>
-<span id="899">899</span>
-<span id="900">900</span>
-<span id="901">901</span>
-<span id="902">902</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1035,7 +1027,6 @@
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>alloc&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     size: usize,
@@ -1069,7 +1060,6 @@
 /// * `refer`: The newly allocated object.
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>post_alloc&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     refer: ObjectReference,
@@ -1093,7 +1083,6 @@
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>object_reference_write&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
@@ -1118,7 +1107,6 @@
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>object_reference_write_pre&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
@@ -1145,7 +1133,6 @@
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>object_reference_write_post&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
@@ -1172,7 +1159,6 @@
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>memory_region_copy&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
     src: VM::VMMemorySlice,
@@ -1198,7 +1184,6 @@
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>memory_region_copy_pre&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
     src: VM::VMMemorySlice,
@@ -1224,7 +1209,6 @@
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub fn </span>memory_region_copy_post&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
     src: VM::VMMemorySlice,

@@ -813,14 +813,6 @@
 <span id="813">813</span>
 <span id="814">814</span>
 <span id="815">815</span>
-<span id="816">816</span>
-<span id="817">817</span>
-<span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
-<span id="823">823</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -923,7 +915,6 @@
 
     <span class="doccomment">/// For malloc space, we just use the side metadata.
     </span><span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
-    #[inline(always)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
         <span class="macro">debug_assert!</span>(!addr.is_zero());
         <span class="comment">// `addr` cannot be mapped by us. It should be mapped by the malloc library.
@@ -936,8 +927,7 @@
         set_alloc_bit::&lt;VM&gt;(object);
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>sft_trace_object(
+    <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>VectorObjectQueue,
         object: ObjectReference,
@@ -1042,8 +1032,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::policy::gc_work::PolicyTraceObject&lt;VM&gt; <span class="kw">for </span>MallocSpace&lt;VM&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: <span class="kw">crate</span>::policy::gc_work::TraceKind&gt;(
+    <span class="kw">fn </span>trace_object&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: <span class="kw">crate</span>::policy::gc_work::TraceKind&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
@@ -1053,8 +1042,7 @@
         <span class="self">self</span>.trace_object(queue, object)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: <span class="kw">crate</span>::policy::gc_work::TraceKind&gt;() -&gt; bool {
+    <span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: <span class="kw">crate</span>::policy::gc_work::TraceKind&gt;() -&gt; bool {
         <span class="bool-val">false
     </span>}
 }
@@ -1220,8 +1208,7 @@
         }
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>trace_object&lt;Q: ObjectQueue&gt;(
+    <span class="kw">pub fn </span>trace_object&lt;Q: ObjectQueue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
@@ -1336,7 +1323,6 @@
     }
 
     <span class="doccomment">/// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>get_malloc_addr_size(object: ObjectReference) -&gt; (Address, bool, usize) {
         <span class="kw">let </span>obj_start = object.to_object_start::&lt;VM&gt;();
         <span class="kw">let </span>offset_malloc_bit = is_offset_malloc(obj_start);
@@ -1621,8 +1607,7 @@
 
 <span class="kw">struct </span>MallocObjectSize&lt;VM&gt;(PhantomData&lt;VM&gt;);
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::util::linear_scan::LinearScanObjectSize <span class="kw">for </span>MallocObjectSize&lt;VM&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>size(object: ObjectReference) -&gt; usize {
+    <span class="kw">fn </span>size(object: ObjectReference) -&gt; usize {
         <span class="kw">let </span>(<span class="kw">_</span>, <span class="kw">_</span>, bytes) = MallocSpace::&lt;VM&gt;::get_malloc_addr_size(object);
         bytes
     }
@@ -1639,8 +1624,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>MSSweepChunk&lt;VM&gt; {
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.ms.sweep_chunk(<span class="self">self</span>.chunk);
     }
 }

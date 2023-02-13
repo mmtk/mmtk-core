@@ -245,10 +245,6 @@
 <span id="245">245</span>
 <span id="246">246</span>
 <span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Statistics for work packets
 </span><span class="kw">use </span><span class="kw">super</span>::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
 <span class="attribute">#[cfg(feature = <span class="string">&quot;perf_counter&quot;</span>)]
@@ -414,7 +410,6 @@
 <span class="kw">impl </span>WorkStat {
     <span class="doccomment">/// Stop all work counters for the work packet type of the just executed
     /// work packet
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>end_of_work&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, worker_stat: <span class="kw-2">&amp;mut </span>WorkerLocalStat&lt;VM&gt;) {
         <span class="kw">if </span>!worker_stat.is_enabled() {
             <span class="kw">return</span>;
@@ -459,17 +454,14 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkerLocalStat&lt;VM&gt; {
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>is_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub fn </span>is_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.enabled.load(Ordering::SeqCst)
     }
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>enable(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">pub fn </span>enable(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.enabled.store(<span class="bool-val">true</span>, Ordering::SeqCst);
     }
     <span class="doccomment">/// Measure the execution of a work packet by starting all counters for that
     /// type
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>measure_work(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         work_id: TypeId,

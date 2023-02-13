@@ -399,7 +399,6 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
         Self { base, plan }
     }
 
-    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
@@ -425,7 +424,6 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
         }
     }
 
-    #[inline(always)]
     fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
         ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
@@ -433,14 +431,12 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
 
 impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
     type Target = ProcessEdgesBase&lt;VM&gt;;
-    #[inline]
     fn deref(&amp;self) -&gt; &amp;Self::Target {
         &amp;self.base
     }
 }
 
 impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    #[inline]
     fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
         &amp;mut self.base
     }
@@ -486,7 +482,6 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         Self { base, plan }
     }
 
-    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
@@ -512,7 +507,6 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         }
     }
 
-    #[inline(always)]
     fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
         ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
@@ -524,14 +518,12 @@ dereferenced as <code>ProcessEdgesBase</code>.</p>
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
     type Target = ProcessEdgesBase&lt;VM&gt;;
-    #[inline]
     fn deref(&amp;self) -&gt; &amp;Self::Target {
         &amp;self.base
     }
 }
 
 impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    #[inline]
     fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
         &amp;mut self.base
     }

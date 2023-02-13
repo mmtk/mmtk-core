@@ -110,11 +110,6 @@
 <span id="110">110</span>
 <span id="111">111</span>
 <span id="112">112</span>
-<span id="113">113</span>
-<span id="114">114</span>
-<span id="115">115</span>
-<span id="116">116</span>
-<span id="117">117</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
@@ -164,13 +159,11 @@
     }
 
     <span class="doccomment">/// Check if the buffer size reaches `CAPACITY`.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>is_full(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.buffer.len() &gt;= <span class="self">Self</span>::CAPACITY
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, v: T) {
+    <span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, v: T) {
         <span class="kw">if </span><span class="self">self</span>.buffer.is_empty() {
             <span class="self">self</span>.buffer.reserve(<span class="self">Self</span>::CAPACITY);
         }
@@ -185,8 +178,7 @@
 }
 
 <span class="kw">impl </span>ObjectQueue <span class="kw">for </span>VectorQueue&lt;ObjectReference&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>enqueue(<span class="kw-2">&amp;mut </span><span class="self">self</span>, v: ObjectReference) {
+    <span class="kw">fn </span>enqueue(<span class="kw-2">&amp;mut </span><span class="self">self</span>, v: ObjectReference) {
         <span class="self">self</span>.push(v);
     }
 }
@@ -217,8 +209,7 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, E: ProcessEdgesWork&gt; EdgeVisitor&lt;EdgeOf&lt;E&gt;&gt; <span class="kw">for </span>ObjectsClosure&lt;<span class="lifetime">&#39;a</span>, E&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>visit_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;E&gt;) {
+    <span class="kw">fn </span>visit_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;E&gt;) {
         <span class="self">self</span>.buffer.push(slot);
         <span class="kw">if </span><span class="self">self</span>.buffer.is_full() {
             <span class="self">self</span>.flush();
@@ -227,8 +218,7 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, E: ProcessEdgesWork&gt; Drop <span class="kw">for </span>ObjectsClosure&lt;<span class="lifetime">&#39;a</span>, E&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.flush();
     }
 }

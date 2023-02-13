@@ -137,11 +137,6 @@
 <span id="137">137</span>
 <span id="138">138</span>
 <span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
@@ -156,7 +151,6 @@
 <span class="kw">use </span>std::io::Result;
 
 <span class="doccomment">/// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>address_to_contiguous_meta_address(
     metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
     data_addr: Address,
@@ -233,7 +227,6 @@
 }
 
 <span class="doccomment">/// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
-</span><span class="attribute">#[inline(always)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>address_to_meta_address(
     metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
     data_addr: Address,
@@ -265,13 +258,11 @@
 }
 
 <span class="attribute">#[allow(dead_code)]
-#[inline(always)]
 </span><span class="kw">pub const fn </span>metadata_address_range_size(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; usize {
     <span class="number">1usize </span>&lt;&lt; (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) <span class="kw">as </span>usize)
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_lshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u8 {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_lshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u8 {
     <span class="kw">let </span>bits_num_log = metadata_spec.log_num_of_bits <span class="kw">as </span>i32;
     <span class="kw">if </span>bits_num_log &gt;= <span class="number">3 </span>{
         <span class="kw">return </span><span class="number">0</span>;
@@ -281,8 +272,7 @@
         <span class="kw">as </span>u8
 }
 
-<span class="attribute">#[inline(always)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_mask(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; u8 {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_mask(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; u8 {
     <span class="kw">let </span>bits_num_log = metadata_spec.log_num_of_bits;
     ((<span class="number">1usize </span>&lt;&lt; (<span class="number">1usize </span>&lt;&lt; bits_num_log)) - <span class="number">1</span>) <span class="kw">as </span>u8
 }

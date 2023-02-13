@@ -199,9 +199,6 @@
 <span id="199">199</span>
 <span id="200">200</span>
 <span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{
     block::{Block, BlockState},
     line::Line,
@@ -242,13 +239,11 @@
     }
 
     <span class="doccomment">/// Report back a completed mark histogram
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>add_completed_mark_histogram(<span class="kw-2">&amp;</span><span class="self">self</span>, histogram: Histogram) {
         <span class="self">self</span>.mark_histograms.lock().push(histogram)
     }
 
     <span class="doccomment">/// Check if the current GC is a defrag GC.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>in_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.in_defrag_collection.load(Ordering::Acquire)
     }
@@ -280,7 +275,6 @@
     </span>}
 
     <span class="doccomment">/// Check if the defrag space is exhausted.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>space_exhausted(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.defrag_space_exhausted.load(Ordering::Acquire)
     }

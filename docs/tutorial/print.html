@@ -1123,7 +1123,6 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
         Self { base, plan }
     }
 
-    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
@@ -1149,7 +1148,6 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
         }
     }
 
-    #[inline(always)]
     fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
         ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
@@ -1157,14 +1155,12 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
 
 impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
     type Target = ProcessEdgesBase&lt;VM&gt;;
-    #[inline]
     fn deref(&amp;self) -&gt; &amp;Self::Target {
         &amp;self.base
     }
 }
 
 impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    #[inline]
     fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
         &amp;mut self.base
     }
@@ -1210,7 +1206,6 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         Self { base, plan }
     }
 
-    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
@@ -1236,7 +1231,6 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         }
     }
 
-    #[inline(always)]
     fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
         ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
@@ -1248,14 +1242,12 @@ dereferenced as <code>ProcessEdgesBase</code>.</p>
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
     type Target = ProcessEdgesBase&lt;VM&gt;;
-    #[inline]
     fn deref(&amp;self) -&gt; &amp;Self::Target {
         &amp;self.base
     }
 }
 
 impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    #[inline]
     fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
         &amp;mut self.base
     }
@@ -1308,7 +1300,7 @@ generational collector.</p>
 performance of this collector compares to MyGC. Great work!</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h1>
 <p>This is <em>one</em> possible implementation of the Triplespace collector, provided
-in case you are stuck on the exercise. </p>
+in case you are stuck on the exercise.</p>
 <p><strong>Attempt the exercise yourself before reading this.</strong></p>
 <p>First, rename all instances of <code>mygc</code> to <code>triplespace</code>, and add it as a
 module by following the instructions in <a href="mygc/ss/./create.html">Create MyGC</a>.</p>
@@ -1475,8 +1467,7 @@ tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</co
 the tospace and fromspace:
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    #[inline(always)] // Ensure this function is always inlined because it is very hot.
-    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
+</span>    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
         }

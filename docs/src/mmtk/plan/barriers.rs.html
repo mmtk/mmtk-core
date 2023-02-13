@@ -216,11 +216,6 @@
 <span id="216">216</span>
 <span id="217">217</span>
 <span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::{Edge, MemorySlice};
@@ -373,14 +368,12 @@
 
     <span class="doccomment">/// Attepmt to atomically log an object.
     /// Returns true if the object is not logged previously.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>object_is_unlogged(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
         <span class="kw">unsafe </span>{ S::UNLOG_BIT_SPEC.load::&lt;S::VM, u8&gt;(object, <span class="prelude-val">None</span>) != <span class="number">0 </span>}
     }
 
     <span class="doccomment">/// Attepmt to atomically log an object.
     /// Returns true if the object is not logged previously.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>log_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
         <span class="kw">loop </span>{
             <span class="kw">let </span>old_value =
@@ -410,8 +403,7 @@
         <span class="self">self</span>.semantics.flush();
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>object_reference_write_post(
+    <span class="kw">fn </span>object_reference_write_post(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
         slot: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMEdge,
@@ -422,8 +414,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>object_reference_write_slow(
+    <span class="kw">fn </span>object_reference_write_slow(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
         slot: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMEdge,
@@ -435,8 +426,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>memory_region_copy_post(
+    <span class="kw">fn </span>memory_region_copy_post(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMMemorySlice,
         dst: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMMemorySlice,

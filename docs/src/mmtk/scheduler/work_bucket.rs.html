@@ -294,23 +294,6 @@
 <span id="294">294</span>
 <span id="295">295</span>
 <span id="296">296</span>
-<span id="297">297</span>
-<span id="298">298</span>
-<span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
-<span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-<span id="306">306</span>
-<span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerGroup;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -330,26 +313,22 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.queue.is_empty()
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>steal_batch_and_pop(
+    <span class="kw">fn </span>steal_batch_and_pop(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         dest: <span class="kw-2">&amp;</span>Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
     ) -&gt; Steal&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
         <span class="self">self</span>.queue.steal_batch_and_pop(dest)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, w: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
+    <span class="kw">fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, w: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
         <span class="self">self</span>.queue.push(w);
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>push_all(<span class="kw-2">&amp;</span><span class="self">self</span>, ws: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) {
+    <span class="kw">fn </span>push_all(<span class="kw-2">&amp;</span><span class="self">self</span>, ws: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) {
         <span class="kw">for </span>w <span class="kw">in </span>ws {
             <span class="self">self</span>.queue.push(w);
         }
@@ -396,8 +375,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>notify_one_worker(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">fn </span>notify_one_worker(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// If the bucket is not activated, don&#39;t notify anyone.
         </span><span class="kw">if </span>!<span class="self">self</span>.is_activated() {
             <span class="kw">return</span>;
@@ -409,8 +387,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>notify_all_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">pub fn </span>notify_all_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// If the bucket is not activated, don&#39;t notify anyone.
         </span><span class="kw">if </span>!<span class="self">self</span>.is_activated() {
             <span class="kw">return</span>;
@@ -422,8 +399,7 @@
         }
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>is_activated(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub fn </span>is_activated(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.active.load(Ordering::SeqCst)
     }
 
@@ -433,7 +409,6 @@
     }
 
     <span class="doccomment">/// Test if the bucket is drained
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.queue.is_empty()
             &amp;&amp; <span class="self">self
@@ -443,8 +418,7 @@
                 .unwrap_or(<span class="bool-val">true</span>)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>is_drained(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub fn </span>is_drained(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.is_activated() &amp;&amp; <span class="self">self</span>.is_empty()
     }
 
@@ -456,21 +430,18 @@
 
     <span class="doccomment">/// Add a work packet to this bucket
     /// Panic if this bucket cannot receive prioritized packets.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>add_prioritized(<span class="kw-2">&amp;</span><span class="self">self</span>, work: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
         <span class="self">self</span>.prioritized_queue.as_ref().unwrap().push(work);
         <span class="self">self</span>.notify_one_worker();
     }
 
     <span class="doccomment">/// Add a work packet to this bucket
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>add&lt;W: GCWork&lt;VM&gt;&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, work: W) {
         <span class="self">self</span>.queue.push(Box::new(work));
         <span class="self">self</span>.notify_one_worker();
     }
 
     <span class="doccomment">/// Add a work packet to this bucket
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>add_boxed(<span class="kw-2">&amp;</span><span class="self">self</span>, work: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
         <span class="self">self</span>.queue.push(work);
         <span class="self">self</span>.notify_one_worker();
@@ -478,7 +449,6 @@
 
     <span class="doccomment">/// Add multiple packets with a higher priority.
     /// Panic if this bucket cannot receive prioritized packets.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>bulk_add_prioritized(<span class="kw-2">&amp;</span><span class="self">self</span>, work_vec: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) {
         <span class="self">self</span>.prioritized_queue.as_ref().unwrap().push_all(work_vec);
         <span class="kw">if </span><span class="self">self</span>.is_activated() {
@@ -487,7 +457,6 @@
     }
 
     <span class="doccomment">/// Add multiple packets
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>bulk_add(<span class="kw-2">&amp;</span><span class="self">self</span>, work_vec: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) {
         <span class="kw">if </span>work_vec.is_empty() {
             <span class="kw">return</span>;
@@ -499,7 +468,6 @@
     }
 
     <span class="doccomment">/// Get a work packet from this bucket
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) -&gt; Steal&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
         <span class="kw">if </span>!<span class="self">self</span>.is_activated() || <span class="self">self</span>.is_empty() {
             <span class="kw">return </span>Steal::Empty;
@@ -530,8 +498,7 @@
         sentinel.is_some()
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">pub fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) -&gt; bool {
+    <span class="kw">pub fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) -&gt; bool {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(can_open) = <span class="self">self</span>.can_open.as_ref() {
             <span class="kw">if </span>!<span class="self">self</span>.is_activated() &amp;&amp; can_open(scheduler) {
                 <span class="self">self</span>.activate();
@@ -619,8 +586,7 @@
 }
 
 <span class="kw">impl </span>WorkBucketStage {
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>first_stw_stage() -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>first_stw_stage() -&gt; <span class="self">Self </span>{
         WorkBucketStage::from_usize(<span class="number">1</span>)
     }
 }

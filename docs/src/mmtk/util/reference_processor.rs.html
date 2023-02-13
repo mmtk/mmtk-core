@@ -550,11 +550,6 @@
 <span id="550">550</span>
 <span id="551">551</span>
 <span id="552">552</span>
-<span id="553">553</span>
-<span id="554">554</span>
-<span id="555">555</span>
-<span id="556">556</span>
-<span id="557">557</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -743,7 +738,6 @@
     }
 
     <span class="doccomment">/// Add a candidate.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>add_candidate&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, reff: ObjectReference) {
         <span class="kw">if </span>!<span class="self">self</span>.allow_new_candidate.load(Ordering::SeqCst) {
             <span class="kw">return</span>;
@@ -765,7 +759,6 @@
     // and 2. to get the new object reference if the object is copied. The functions are intended to make the code
     // easier to understand.
 
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>get_forwarded_referent&lt;E: ProcessEdgesWork&gt;(
         e: <span class="kw-2">&amp;mut </span>E,
         referent: ObjectReference,
@@ -773,16 +766,14 @@
         e.trace_object(referent)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>get_forwarded_reference&lt;E: ProcessEdgesWork&gt;(
+    <span class="kw">fn </span>get_forwarded_reference&lt;E: ProcessEdgesWork&gt;(
         e: <span class="kw-2">&amp;mut </span>E,
         object: ObjectReference,
     ) -&gt; ObjectReference {
         e.trace_object(object)
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>keep_referent_alive&lt;E: ProcessEdgesWork&gt;(
+    <span class="kw">fn </span>keep_referent_alive&lt;E: ProcessEdgesWork&gt;(
         e: <span class="kw-2">&amp;mut </span>E,
         referent: ObjectReference,
     ) -&gt; ObjectReference {
@@ -836,7 +827,6 @@
         <span class="macro">debug!</span>(<span class="string">&quot;Starting ReferenceProcessor.forward({:?})&quot;</span>, <span class="self">self</span>.semantics);
 
         <span class="comment">// Forward a single reference
-        </span><span class="attribute">#[inline(always)]
         </span><span class="kw">fn </span>forward_reference&lt;E: ProcessEdgesWork&gt;(
             trace: <span class="kw-2">&amp;mut </span>E,
             reference: ObjectReference,

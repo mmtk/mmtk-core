@@ -125,11 +125,6 @@
 <span id="125">125</span>
 <span id="126">126</span>
 <span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module works around limitations of the Rust programming language, and provides missing
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
@@ -153,12 +148,10 @@
 // [1]: https://github.com/rust-lang/hashbrown/blob/a41bd76de0a53838725b997c6085e024c47a0455/src/raw/mod.rs#L48-L70
 // [2]: https://users.rust-lang.org/t/compiler-hint-for-unlikely-likely-for-if-branches/62102/3
 </span><span class="attribute">#[cfg(not(feature = <span class="string">&quot;nightly&quot;</span>))]
-#[inline]
 #[cold]
 </span><span class="kw">fn </span>cold() {}
 
 <span class="attribute">#[cfg(not(feature = <span class="string">&quot;nightly&quot;</span>))]
-#[inline]
 </span><span class="kw">pub fn </span>likely(b: bool) -&gt; bool {
     <span class="kw">if </span>!b {
         cold();
@@ -166,7 +159,6 @@
     b
 }
 <span class="attribute">#[cfg(not(feature = <span class="string">&quot;nightly&quot;</span>))]
-#[inline]
 </span><span class="kw">pub fn </span>unlikely(b: bool) -&gt; bool {
     <span class="kw">if </span>b {
         cold();
@@ -208,7 +200,6 @@
     }
 
     <span class="doccomment">/// Get the value. This should only be used after initialize_once()
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>get_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T {
         <span class="comment">// We only assert in debug builds.
         </span><span class="macro">debug_assert!</span>(<span class="self">self</span>.once.is_completed());
@@ -218,8 +209,7 @@
 
 <span class="kw">impl</span>&lt;T&gt; std::ops::Deref <span class="kw">for </span>InitializeOnce&lt;T&gt; {
     <span class="kw">type </span>Target = T;
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
         <span class="self">self</span>.get_ref()
     }
 }

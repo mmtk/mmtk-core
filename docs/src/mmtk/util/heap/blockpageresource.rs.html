@@ -393,26 +393,6 @@
 <span id="393">393</span>
 <span id="394">394</span>
 <span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use super</span>::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -443,18 +423,15 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding, B: Region&gt; PageResource&lt;VM&gt; <span class="kw">for </span>BlockPageResource&lt;VM, B&gt; {
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPageResource {
+    <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPageResource {
         <span class="self">self</span>.flpr.common()
     }
 
-    <span class="attribute">#[inline(always)]
-    </span><span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPageResource {
+    <span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPageResource {
         <span class="self">self</span>.flpr.common_mut()
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">fn </span>alloc_pages(
+    <span class="kw">fn </span>alloc_pages(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
@@ -500,7 +477,6 @@
     }
 
     <span class="doccomment">/// Grow contiguous space
-    </span><span class="attribute">#[cold]
     </span><span class="kw">fn </span>alloc_pages_slow_sync(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         space_descriptor: SpaceDescriptor,
@@ -554,7 +530,6 @@
     }
 
     <span class="doccomment">/// Allocate a block
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>alloc_pages_fast(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         space_descriptor: SpaceDescriptor,
@@ -577,8 +552,7 @@
         </span><span class="self">self</span>.alloc_pages_slow_sync(space_descriptor, reserved_pages, required_pages, tls)
     }
 
-    <span class="attribute">#[inline]
-    </span><span class="kw">pub fn </span>release_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
+    <span class="kw">pub fn </span>release_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.common().contiguous);
         <span class="kw">let </span>pages = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_PAGES;
         <span class="macro">debug_assert!</span>(pages <span class="kw">as </span>usize &lt;= <span class="self">self</span>.common().accounting.get_committed_pages());
@@ -600,7 +574,6 @@
 
 <span class="kw">impl</span>&lt;B: Region&gt; BlockQueue&lt;B&gt; {
     <span class="doccomment">/// Create an array
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>default_block = B::from_aligned_address(Address::ZERO);
         <span class="self">Self </span>{
@@ -614,7 +587,6 @@
     <span class="kw">const </span>CAPACITY: usize = <span class="number">256</span>;
 
     <span class="doccomment">/// Get an entry
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>get_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) -&gt; B {
         <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i] }
     }
@@ -622,7 +594,6 @@
     <span class="doccomment">/// Set an entry.
     ///
     /// It&#39;s unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">unsafe fn </span>set_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize, block: B) {
         (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i] = block
     }
@@ -630,7 +601,6 @@
     <span class="doccomment">/// Non-atomically push an element.
     ///
     /// It&#39;s unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">unsafe fn </span>push_relaxed(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) -&gt; <span class="prelude-ty">Result</span>&lt;(), B&gt; {
         <span class="kw">let </span>i = <span class="self">self</span>.cursor.load(Ordering::Relaxed);
         <span class="kw">if </span>i &lt; <span class="self">Self</span>::CAPACITY {
@@ -643,7 +613,6 @@
     }
 
     <span class="doccomment">/// Atomically pop an element from the array.
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;B&gt; {
         <span class="kw">let </span>i = <span class="self">self
             </span>.cursor
@@ -662,19 +631,16 @@
     }
 
     <span class="doccomment">/// Get array size
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.cursor.load(Ordering::SeqCst)
     }
 
     <span class="doccomment">/// Test if the array is empty
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>is_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.len() == <span class="number">0
     </span>}
 
     <span class="doccomment">/// Iterate all elements in the array
-    </span><span class="attribute">#[inline]
     </span><span class="kw">fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(B)) {
         <span class="kw">let </span>len = <span class="self">self</span>.len();
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..len {
@@ -685,7 +651,6 @@
     <span class="doccomment">/// Replace the array with a new array.
     ///
     /// Return the old array
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>replace(<span class="kw-2">&amp;</span><span class="self">self</span>, new_array: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
         <span class="comment">// Swap cursor
         </span><span class="kw">let </span>temp = <span class="self">self</span>.cursor.load(Ordering::Relaxed);
@@ -735,7 +700,6 @@
     }
 
     <span class="doccomment">/// Push a block to the thread-local queue
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
         <span class="self">self</span>.count.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
         <span class="kw">let </span>id = <span class="kw">crate</span>::scheduler::current_worker_ordinal().unwrap();
@@ -755,7 +719,6 @@
     }
 
     <span class="doccomment">/// Pop a block from the global pool
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>pop(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;B&gt; {
         <span class="kw">if </span><span class="self">self</span>.len() == <span class="number">0 </span>{
             <span class="kw">return </span><span class="prelude-val">None</span>;
@@ -788,7 +751,6 @@
     }
 
     <span class="doccomment">/// Flush a given thread-local queue to the global pool
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;</span><span class="self">self</span>, id: usize) {
         <span class="kw">if </span>!<span class="self">self</span>.worker_local_freed_blocks[id].is_empty() {
             <span class="kw">let </span>queue = <span class="self">self</span>.worker_local_freed_blocks[id].replace(BlockQueue::new());
@@ -809,13 +771,11 @@
     }
 
     <span class="doccomment">/// Get total number of blocks in the whole BlockQueue
-    </span><span class="attribute">#[inline(always)]
     </span><span class="kw">pub fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.count.load(Ordering::SeqCst)
     }
 
     <span class="doccomment">/// Iterate all the blocks in the BlockQueue
-    </span><span class="attribute">#[inline]
     </span><span class="kw">pub fn </span>iterate_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(B)) {
         <span class="kw">for </span>array <span class="kw">in </span><span class="kw-2">&amp;*</span><span class="self">self</span>.head_global_freed_blocks.read() {
             array.iterate_blocks(f)

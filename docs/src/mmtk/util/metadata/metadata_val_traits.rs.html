@@ -197,16 +197,6 @@
 <span id="197">197</span>
 <span id="198">198</span>
 <span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>core::sync::atomic::<span class="kw-2">*</span>;
 <span class="kw">use </span>num_traits::{FromPrimitive, ToPrimitive};
@@ -343,28 +333,23 @@
 <span class="macro">macro_rules! </span>impl_metadata_value_trait {
     (<span class="macro-nonterminal">$non_atomic</span>: ty, <span class="macro-nonterminal">$atomic</span>: ty) =&gt; {
         <span class="kw">impl </span>MetadataValue <span class="kw">for </span><span class="macro-nonterminal">$non_atomic </span>{
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>load(addr: Address) -&gt; <span class="self">Self </span>{
+            <span class="kw">unsafe fn </span>load(addr: Address) -&gt; <span class="self">Self </span>{
                 addr.load::&lt;<span class="macro-nonterminal">$non_atomic</span>&gt;()
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>load_atomic(addr: Address, order: Ordering) -&gt; <span class="self">Self </span>{
+            <span class="kw">unsafe fn </span>load_atomic(addr: Address, order: Ordering) -&gt; <span class="self">Self </span>{
                 addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().load(order)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>store(addr: Address, value: <span class="self">Self</span>) {
+            <span class="kw">unsafe fn </span>store(addr: Address, value: <span class="self">Self</span>) {
                 addr.store::&lt;<span class="macro-nonterminal">$non_atomic</span>&gt;(value)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>store_atomic(addr: Address, value: <span class="self">Self</span>, order: Ordering) {
+            <span class="kw">unsafe fn </span>store_atomic(addr: Address, value: <span class="self">Self</span>, order: Ordering) {
                 addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().store(value, order)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>compare_exchange(
+            <span class="kw">unsafe fn </span>compare_exchange(
                 addr: Address,
                 current: <span class="self">Self</span>,
                 new: <span class="self">Self</span>,
@@ -375,28 +360,23 @@
                     .compare_exchange(current, new, success, failure)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>fetch_add(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+            <span class="kw">unsafe fn </span>fetch_add(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
                 addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_add(value, order)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>fetch_sub(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+            <span class="kw">unsafe fn </span>fetch_sub(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
                 addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_sub(value, order)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>fetch_and(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+            <span class="kw">unsafe fn </span>fetch_and(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
                 addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_and(value, order)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>fetch_or(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
+            <span class="kw">unsafe fn </span>fetch_or(addr: Address, value: <span class="self">Self</span>, order: Ordering) -&gt; <span class="self">Self </span>{
                 addr.as_ref::&lt;<span class="macro-nonterminal">$atomic</span>&gt;().fetch_or(value, order)
             }
 
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">unsafe fn </span>fetch_update&lt;F&gt;(
+            <span class="kw">unsafe fn </span>fetch_update&lt;F&gt;(
                 addr: Address,
                 set_order: Ordering,
                 fetch_order: Ordering,

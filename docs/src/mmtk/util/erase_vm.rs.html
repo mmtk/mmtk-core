@@ -27,8 +27,6 @@
 <span id="27">27</span>
 <span id="28">28</span>
 <span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk uses [`crate::vm::VMBinding`], which allows us to call into bindings
 //! with little overhead. As a result, some types in MMTk are generic types with a type parameter `&lt;VM&gt;`.
 //! However, in some cases, using generic types is not allowed. For example, in an object-safe trait,
@@ -47,12 +45,10 @@
     (<span class="macro-nonterminal">$new_type</span>: ident = <span class="macro-nonterminal">$orig_type</span>: ty) =&gt; {
         <span class="kw">pub struct </span><span class="macro-nonterminal">$new_type</span>&lt;<span class="lifetime">&#39;a</span>&gt;(usize, PhantomData&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>()&gt;);
         <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; <span class="macro-nonterminal">$new_type</span>&lt;<span class="lifetime">&#39;a</span>&gt; {
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">pub fn </span>new&lt;VM: VMBinding&gt;(r: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="macro-nonterminal">$orig_type</span>) -&gt; <span class="self">Self </span>{
+            <span class="kw">pub fn </span>new&lt;VM: VMBinding&gt;(r: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="macro-nonterminal">$orig_type</span>) -&gt; <span class="self">Self </span>{
                 <span class="self">Self</span>(<span class="kw">unsafe </span>{ std::mem::transmute(r) }, PhantomData)
             }
-            <span class="attribute">#[inline(always)]
-            </span><span class="kw">pub fn </span>into_mut&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="macro-nonterminal">$orig_type </span>{
+            <span class="kw">pub fn </span>into_mut&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="macro-nonterminal">$orig_type </span>{
                 <span class="kw">unsafe </span>{ std::mem::transmute(<span class="self">self</span>.<span class="number">0</span>) }
             }
         }
