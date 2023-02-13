@@ -72,14 +72,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn force_full_heap_collection(&self) {
-        self.gen.force_full_heap_collection()
-    }
-
-    fn last_collection_full_heap(&self) -> bool {
-        self.gen.last_collection_full_heap()
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.gen.get_spaces();
         ret.push(&self.copyspace0);
@@ -184,6 +176,14 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
     }
 }
 

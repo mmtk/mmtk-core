@@ -322,6 +322,12 @@ pub trait GenerationalPlan: Plan {
 
     /// Return the number of used pages in the mature space.
     fn get_mature_reserved_pages(&self) -> usize;
+
+    /// Return whether last GC is a full GC.
+    fn last_collection_full_heap(&self) -> bool;
+
+    /// Force the next collection to be full heap.
+    fn force_full_heap_collection(&self);
 }
 
 /// This trait is the extension trait for [`GenerationalPlan`] (see Rust pattern for extension trait).

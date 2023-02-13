@@ -142,7 +142,10 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
-        // FIXME Do a full heap GC if we have generational GC
+        // For generational plans, force a full heap collection.
+        if let Some(gen) = self.plan.generational() {
+            gen.force_full_heap_collection();
+        }
         self.plan.handle_user_collection_request(tls, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();

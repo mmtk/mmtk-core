@@ -91,14 +91,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             )
     }
 
-    fn force_full_heap_collection(&self) {
-        self.gen.force_full_heap_collection()
-    }
-
-    fn last_collection_full_heap(&self) -> bool {
-        self.gen.last_collection_full_heap()
-    }
-
     fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
     where
         Self: Sized,
@@ -213,6 +205,14 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.immix.reserved_pages()
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
     }
 }
 

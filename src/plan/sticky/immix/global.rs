@@ -77,14 +77,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.common()
     }
 
-    fn force_full_heap_collection(&self) {
-        self.next_gc_full_heap.store(true, Ordering::SeqCst);
-    }
-
-    fn last_collection_full_heap(&self) -> bool {
-        self.gc_full_heap.load(Ordering::SeqCst)
-    }
-
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
@@ -161,6 +153,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.collection_required(space_full, space) || nursery_full
     }
 
+    fn last_collection_was_exhaustive(&self) -> bool {
+        self.gc_full_heap.load(Ordering::Relaxed) && self.immix.last_collection_was_exhaustive()
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.immix.get_collection_reserved_pages() + self.immix.immix_space.defrag_headroom_pages()
     }
@@ -233,6 +229,14 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.immix.immix_space.reserved_pages()
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.next_gc_full_heap.store(true, Ordering::SeqCst);
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gc_full_heap.load(Ordering::SeqCst)
     }
 }
 

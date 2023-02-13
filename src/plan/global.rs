@@ -311,18 +311,11 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     /// Return whether last GC was an exhaustive attempt to collect the heap.
-    /// For many collectors this is the same as asking whether the last GC was a full heap collection.
+    /// For example, for generational GCs, minor collection is not an exhaustive collection.
+    /// For example, for Immix, fast collection (no defragmentation) is not an exhaustive collection.
     fn last_collection_was_exhaustive(&self) -> bool {
-        self.last_collection_full_heap()
-    }
-
-    /// Return whether last GC is a full GC.
-    fn last_collection_full_heap(&self) -> bool {
         true
     }
-
-    /// Force the next collection to be full heap.
-    fn force_full_heap_collection(&self) {}
 
     fn modify_check(&self, object: ObjectReference) {
         assert!(
@@ -698,7 +691,9 @@ impl<VM: VMBinding> BasePlan<VM> {
             .store(emergency_collection, Ordering::Relaxed);
 
         if emergency_collection {
-            plan.force_full_heap_collection();
+            if let Some(gen) = plan.generational() {
+                gen.force_full_heap_collection();
+            }
         }
     }
 
