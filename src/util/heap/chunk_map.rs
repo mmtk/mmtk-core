@@ -15,13 +15,11 @@ pub struct Chunk(Address);
 impl Region for Chunk {
     const LOG_BYTES: usize = crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 
-    #[inline(always)]
     fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
 
-    #[inline(always)]
     fn start(&self) -> Address {
         self.0
     }
@@ -33,7 +31,6 @@ impl Chunk {
     pub const ZERO: Self = Self(Address::ZERO);
 
     /// Get an iterator for regions within this chunk.
-    #[inline(always)]
     pub fn iter_region<R: Region>(&self) -> RegionIterator<R> {
         // R should be smaller than a chunk
         debug_assert!(R::LOG_BYTES < Self::LOG_BYTES);

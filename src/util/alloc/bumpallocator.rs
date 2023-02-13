@@ -151,7 +151,6 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
     }
 
-    #[inline]
     fn acquire_block(
         &mut self,
         size: usize,

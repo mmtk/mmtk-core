@@ -100,7 +100,6 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     /// For malloc space, we just use the side metadata.
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
@@ -113,7 +112,6 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         set_alloc_bit::<VM>(object);
     }
 
-    #[inline(always)]
     fn sft_trace_object(
         &self,
         queue: &mut VectorObjectQueue,
@@ -219,7 +217,6 @@ use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -230,7 +227,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
         self.trace_object(queue, object)
     }
 
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         false
     }
@@ -397,7 +393,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    #[inline]
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -513,7 +508,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     /// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
-    #[inline(always)]
     fn get_malloc_addr_size(object: ObjectReference) -> (Address, bool, usize) {
         let obj_start = object.to_object_start::<VM>();
         let offset_malloc_bit = is_offset_malloc(obj_start);
@@ -798,7 +792,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
 struct MallocObjectSize<VM>(PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObjectSize<VM> {
-    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         let (_, _, bytes) = MallocSpace::<VM>::get_malloc_addr_size(object);
         bytes
@@ -816,7 +809,6 @@ pub struct MSSweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.ms.sweep_chunk(self.chunk);
     }

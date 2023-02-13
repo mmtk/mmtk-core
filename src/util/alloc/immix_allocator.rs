@@ -65,7 +65,6 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         crate::policy::immix::block::Block::BYTES
     }
 
-    #[inline(always)]
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         debug_assert!(
             size <= crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
@@ -191,7 +190,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         }
     }
 
-    #[inline(always)]
     pub fn immix_space(&self) -> &'static ImmixSpace<VM> {
         self.space
     }
@@ -214,7 +212,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     }
 
     /// Bump allocate small objects into recyclable lines (i.e. holes).
-    #[cold]
     fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("{:?}: alloc_slow_hot", self.tls);
         if self.acquire_recyclable_lines(size, align, offset) {
@@ -257,8 +254,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     end_line,
                     self.tls
                 );
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::bzero_alloc_bit(self.cursor, self.limit - self.cursor);
                 crate::util::memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(
                     align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit

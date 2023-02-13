@@ -51,6 +51,19 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
     }
+
+    fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        if !Block::containing::<VM>(object).is_defrag_source() {
+            return None;
+        }
+
+        if ForwardingWord::is_forwarded::<VM>(object) {
+            Some(ForwardingWord::read_forwarding_pointer::<VM>(object))
+        } else {
+            None
+        }
+    }
+
     fn is_live(&self, object: ObjectReference) -> bool {
         if !super::DEFRAG {
             // If defrag is disabled, we won't forward objects.
@@ -84,11 +97,9 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
-    #[inline(always)]
     fn sft_trace_object(
         &self,
         _queue: &mut VectorObjectQueue,
@@ -124,7 +135,6 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
@@ -141,7 +151,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         }
     }
 
-    #[inline(always)]
     fn post_scan_object(&self, object: ObjectReference) {
         if super::MARK_LINE_AT_SCAN_TIME && !super::BLOCK_ONLY {
             debug_assert!(self.in_space(object));
@@ -149,7 +158,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         }
     }
 
-    #[inline(always)]
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
@@ -173,6 +181,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
@@ -183,6 +193,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
@@ -242,7 +254,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Check if current GC is a defrag GC.
-    #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.defrag.in_defrag()
     }
@@ -398,7 +409,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Trace and mark objects without evacuation.
-    #[inline(always)]
     pub fn fast_trace_object(
         &self,
         trace: &mut impl ObjectQueue,
@@ -408,7 +418,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
-    #[inline(always)]
     pub fn trace_object(
         &self,
         trace: &mut impl ObjectQueue,
@@ -431,7 +440,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Trace and mark objects without evacuation.
-    #[inline(always)]
     pub fn trace_object_without_moving(
         &self,
         queue: &mut impl ObjectQueue,
@@ -454,7 +462,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Trace object and do evacuation if required.
     #[allow(clippy::assertions_on_constants)]
-    #[inline(always)]
     pub fn trace_object_with_opportunistic_copy(
         &self,
         queue: &mut impl ObjectQueue,
@@ -510,8 +517,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
                 ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
             debug_assert_eq!(
@@ -526,14 +531,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Mark all the lines that the given object spans.
     #[allow(clippy::assertions_on_constants)]
-    #[inline]
     pub fn mark_lines(&self, object: ObjectReference) {
         debug_assert!(!super::BLOCK_ONLY);
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
     /// Atomically mark an object.
-    #[inline(always)]
     fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
             let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
@@ -563,7 +566,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Check if an object is marked.
-    #[inline(always)]
     fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
@@ -574,7 +576,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Check if an object is pinned.
-    #[inline(always)]
     fn is_pinned(&self, _object: ObjectReference) -> bool {
         #[cfg(feature = "object_pinning")]
         return self.is_object_pinned(_object);
@@ -645,16 +646,22 @@ pub struct PrepareBlockState<VM: VMBinding> {
 
 impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
-    #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
+        // NOTE: We reset the mark bits because cyclic mark bit is currently not supported, yet.
+        // See `ImmixSpace::prepare`.
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(chunk.start(), Chunk::BYTES);
         }
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+        // NOTE: We don't need to reset the forwarding pointer metadata because it is meaningless
+        // until the forwarding bits are also set, at which time we also write the forwarding
+        // pointer.
     }
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         let defrag_threshold = self.defrag_threshold.unwrap_or(0);
         // Clear object mark table for this chunk
@@ -689,7 +696,6 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         let mut histogram = self.space.defrag.new_histogram();
         if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
@@ -760,7 +766,6 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         self.copy_allocator.reset();
         self.defrag_allocator.reset();
     }
-    #[inline(always)]
     fn alloc_copy(
         &mut self,
         _original: ObjectReference,
@@ -774,7 +779,6 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
             self.copy_allocator.alloc(bytes, align, offset)
         }
     }
-    #[inline(always)]
     fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
         // Mark the object
         VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
@@ -802,7 +806,6 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
         }
     }
 
-    #[inline(always)]
     fn get_space(&self) -> &ImmixSpace<VM> {
         // Both copy allocators should point to the same space.
         debug_assert_eq!(

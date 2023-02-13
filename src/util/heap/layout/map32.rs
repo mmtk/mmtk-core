@@ -195,8 +195,10 @@ impl Map for Map32 {
         for fl in self_mut.shared_fl_map.iter() {
             if let Some(fl) = fl {
                 #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut CommonFreeListPageResource =
-                    unsafe { &mut *(fl as *const _ as *mut _) };
+                let fl_mut: &mut CommonFreeListPageResource = unsafe {
+                    &mut *(*fl as *const CommonFreeListPageResource
+                        as *mut CommonFreeListPageResource)
+                };
                 fl_mut.resize_freelist(start_address);
             }
         }
