@@ -121,8 +121,8 @@
 
 <span class="attribute">#[cfg(feature = <span class="string">&quot;malloc_mimalloc&quot;</span>)]
 </span><span class="kw">mod </span>mimalloc {
-    <span class="comment">// MiMalloc 64K Page
-    </span><span class="kw">pub const </span>LOG_BYTES_IN_MALLOC_PAGE: u8 = <span class="number">16</span>;
+    <span class="comment">// Normal 4K page accounting
+    </span><span class="kw">pub const </span>LOG_BYTES_IN_MALLOC_PAGE: u8 = <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
     <span class="comment">// ANSI C
     </span><span class="kw">pub use </span>mimalloc_sys::{
         mi_calloc <span class="kw">as </span>calloc, mi_free <span class="kw">as </span>free, mi_malloc <span class="kw">as </span>malloc, mi_realloc <span class="kw">as </span>realloc,

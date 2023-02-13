@@ -320,6 +320,7 @@
 <span id="320">320</span>
 <span id="321">321</span>
 <span id="322">322</span>
+<span id="323">323</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::Block;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
@@ -489,7 +490,8 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MAX_BIN: usize = <span class="number">48</span>;
 
 <span class="doccomment">/// Largest object size allowed with our mimalloc implementation, in bytes
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MI_LARGE_OBJ_SIZE_MAX: usize = MAX_BIN_SIZE;
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>MI_LARGE_OBJ_SIZE_MAX: usize =
+    <span class="kw">crate</span>::util::rust_util::min_of_usize(Block::BYTES, MAX_BIN_SIZE);
 <span class="doccomment">/// Largest object size in words
 </span><span class="kw">const </span>MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 <span class="doccomment">/// The object size for the last bin. We should not try allocate objects larger than this with the allocator.
