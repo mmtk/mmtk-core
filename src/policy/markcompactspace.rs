@@ -34,7 +34,6 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         self.get_name()
     }
 
-    #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         let forwarding_pointer = Self::get_header_forwarding_pointer(object);
         if forwarding_pointer.is_null() {
@@ -79,12 +78,10 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
-    #[inline(always)]
     fn sft_trace_object(
         &self,
         _queue: &mut VectorObjectQueue,
@@ -124,7 +121,6 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -140,7 +136,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
             unreachable!()
         }
     }
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         if KIND == TRACE_KIND_MARK {
             false
@@ -170,19 +165,16 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     // From the cell address, `cell - GC_EXTRA_HEADER_WORD` is where we store the header forwarding pointer.
 
     /// Get the address for header forwarding pointer
-    #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
         object.to_object_start::<VM>() - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
-    #[inline(always)]
     fn get_header_forwarding_pointer(object: ObjectReference) -> ObjectReference {
         unsafe { Self::header_forwarding_pointer_address(object).load::<ObjectReference>() }
     }
 
     /// Store header forwarding pointer for an object
-    #[inline(always)]
     fn store_header_forwarding_pointer(
         object: ObjectReference,
         forwarding_pointer: ObjectReference,
@@ -194,7 +186,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     // Clear header forwarding pointer for an object
-    #[inline(always)]
     fn clear_header_forwarding_pointer(object: ObjectReference) {
         crate::util::memory::zero(
             Self::header_forwarding_pointer_address(object),
@@ -402,7 +393,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
 struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
-    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
     }

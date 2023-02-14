@@ -133,7 +133,6 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
-#[inline(always)]
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
@@ -167,7 +166,6 @@ pub fn alloc<VM: VMBinding>(
 /// * `refer`: The newly allocated object.
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
-#[inline(always)]
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     refer: ObjectReference,
@@ -191,7 +189,6 @@ pub fn post_alloc<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-#[inline(always)]
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -216,7 +213,6 @@ pub fn object_reference_write<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-#[inline(always)]
 pub fn object_reference_write_pre<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -243,7 +239,6 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-#[inline(always)]
 pub fn object_reference_write_post<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -270,7 +265,6 @@ pub fn object_reference_write_post<VM: VMBinding>(
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-#[inline(always)]
 pub fn memory_region_copy<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: VM::VMMemorySlice,
@@ -296,7 +290,6 @@ pub fn memory_region_copy<VM: VMBinding>(
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-#[inline(always)]
 pub fn memory_region_copy_pre<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: VM::VMMemorySlice,
@@ -322,7 +315,6 @@ pub fn memory_region_copy_pre<VM: VMBinding>(
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-#[inline(always)]
 pub fn memory_region_copy_post<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: VM::VMMemorySlice,
@@ -899,10 +891,4 @@ pub fn add_work_packets<VM: VMBinding>(
     packets: Vec<Box<dyn GCWork<VM>>>,
 ) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
-}
-
-/// Add a callback to be notified after the transitive closure is finished.
-/// The callback should return true if it add more work packets to the closure bucket.
-pub fn on_closure_end<VM: VMBinding>(mmtk: &'static MMTK<VM>, f: Box<dyn Send + Fn() -> bool>) {
-    mmtk.scheduler.on_closure_end(f)
 }

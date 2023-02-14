@@ -76,7 +76,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -121,10 +121,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
 
-            // VM-specific weak ref processing
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
-
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
                 .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
@@ -146,6 +142,17 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
                 .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }
+
+        // VM-specific weak ref processing
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new()));
+
+        // VM-specific weak ref forwarding
+        scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
+            .add(VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new());
+
+        // VM-specific work after forwarding, possible to implement ref enququing.
+        scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
 
         // Analysis GC work
         #[cfg(feature = "analysis")]

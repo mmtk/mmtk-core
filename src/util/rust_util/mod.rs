@@ -1,3 +1,10 @@
+//! This module works around limitations of the Rust programming language, and provides missing
+//! functionalities that we may expect the Rust programming language and its standard libraries
+//! to provide.
+
+pub mod rev_group;
+pub mod zeroed_alloc;
+
 /// Const function for min value of two usize numbers.
 pub const fn min_of_usize(a: usize, b: usize) -> usize {
     if a > b {
@@ -14,12 +21,10 @@ use core::intrinsics::{likely, unlikely};
 // [1]: https://github.com/rust-lang/hashbrown/blob/a41bd76de0a53838725b997c6085e024c47a0455/src/raw/mod.rs#L48-L70
 // [2]: https://users.rust-lang.org/t/compiler-hint-for-unlikely-likely-for-if-branches/62102/3
 #[cfg(not(feature = "nightly"))]
-#[inline]
 #[cold]
 fn cold() {}
 
 #[cfg(not(feature = "nightly"))]
-#[inline]
 pub fn likely(b: bool) -> bool {
     if !b {
         cold();
@@ -27,7 +32,6 @@ pub fn likely(b: bool) -> bool {
     b
 }
 #[cfg(not(feature = "nightly"))]
-#[inline]
 pub fn unlikely(b: bool) -> bool {
     if b {
         cold();
@@ -69,7 +73,6 @@ impl<T> InitializeOnce<T> {
     }
 
     /// Get the value. This should only be used after initialize_once()
-    #[inline(always)]
     pub fn get_ref(&self) -> &T {
         // We only assert in debug builds.
         debug_assert!(self.once.is_completed());
@@ -79,7 +82,6 @@ impl<T> InitializeOnce<T> {
 
 impl<T> std::ops::Deref for InitializeOnce<T> {
     type Target = T;
-    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.get_ref()
     }

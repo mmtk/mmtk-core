@@ -22,7 +22,6 @@ thread_local! {
 }
 
 /// Get current worker ordinal. Return `None` if the current thread is not a worker.
-#[inline(always)]
 pub fn current_worker_ordinal() -> Option<ThreadId> {
     WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed))
 }
@@ -123,7 +122,6 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Add a work packet to the work queue and mark it with a higher priority.
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket with a higher priority.
-    #[inline]
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
@@ -137,7 +135,6 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Add a work packet to the work queue.
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket.
-    #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
             || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
@@ -251,7 +248,6 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     }
 
     /// Get the number of workers in the group
-    #[inline(always)]
     pub fn worker_count(&self) -> usize {
         self.workers_shared.len()
     }
@@ -260,7 +256,6 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Called before a worker is parked.
     ///
     /// Return true if all the workers are parked.
-    #[inline(always)]
     pub fn inc_parked_workers(&self) -> bool {
         let old = self.parked_workers.fetch_add(1, Ordering::SeqCst);
         debug_assert!(old < self.worker_count());
@@ -269,20 +264,17 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
     /// Decrease the packed-workers counter.
     /// Called after a worker is resumed from the parked state.
-    #[inline(always)]
     pub fn dec_parked_workers(&self) {
         let old = self.parked_workers.fetch_sub(1, Ordering::SeqCst);
         debug_assert!(old <= self.worker_count());
     }
 
     /// Get the number of parked workers in the group
-    #[inline(always)]
     pub fn parked_workers(&self) -> usize {
         self.parked_workers.load(Ordering::SeqCst)
     }
 
     /// Check if all the workers are packed
-    #[inline(always)]
     pub fn all_parked(&self) -> bool {
         self.parked_workers() == self.worker_count()
     }
@@ -292,5 +284,31 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         self.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
+    }
+}
+
+/// This ensures the worker always decrements the parked worker count on all control flow paths.
+pub(crate) struct ParkingGuard<'a, VM: VMBinding> {
+    worker_group: &'a WorkerGroup<VM>,
+    all_parked: bool,
+}
+
+impl<'a, VM: VMBinding> ParkingGuard<'a, VM> {
+    pub fn new(worker_group: &'a WorkerGroup<VM>) -> Self {
+        let all_parked = worker_group.inc_parked_workers();
+        ParkingGuard {
+            worker_group,
+            all_parked,
+        }
+    }
+
+    pub fn all_parked(&self) -> bool {
+        self.all_parked
+    }
+}
+
+impl<'a, VM: VMBinding> Drop for ParkingGuard<'a, VM> {
+    fn drop(&mut self) {
+        self.worker_group.dec_parked_workers();
     }
 }

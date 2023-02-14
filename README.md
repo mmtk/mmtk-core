@@ -26,7 +26,7 @@ MMTk can build with a stable Rust toolchain. The minimal supported Rust version 
 $ cargo build
 ```
 
-MMTk also provides a list of optional features that users can choose from. 
+MMTk also provides a list of optional features that users can choose from.
 A full list of available features can be seen by examining [`Cargo.toml`](Cargo.toml).
 By passing the `--features` flag to the Rust compiler,
 we conditionally compile feature-related code.
@@ -40,6 +40,24 @@ The artefact produced produced by the build process can be found under
 `target/debug` (or `target/release` for the release build).
 
 [`ci-build.sh`](.github/scripts/ci-build.sh) shows the builds tested by the CI.
+
+### Profile-Guided Optimized Build
+
+For the best performance, we recommend using a profile-guided optimized (PGO)
+build. Rust supports [PGO builds](https://doc.rust-lang.org/rustc/profile-guided-optimization.html)
+by hooking into the LLVM profiling infrastructure. The idea is that we gather
+profiling data by running a representative benchmark and then later use the
+profiling data as a feedback on making optimization decisions.
+
+It is recommended to choose the best-performing GC for the profiling step. For
+example, `GenImmix` is used for our [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk).
+We recommend running the GC under stress (using `MMTK_STRESS_FACTOR` and
+`MMTK_PRECISE_STRESS=false`) in order to tune the profile sample data for the
+GC. Multiple invocations of the benchmark are also recommended to reduce
+variance.
+
+See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk#build) for an
+example of how to make a PGO build.
 
 ## Usage
 

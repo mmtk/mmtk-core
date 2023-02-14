@@ -1,6 +1,6 @@
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup};
+use super::worker::{GCWorker, GCWorkerShared, ParkingGuard, ThreadId, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
@@ -33,16 +33,6 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     coordinator_worker_shared: Arc<GCWorkerShared<VM>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    /// A callback to be fired after the `Closure` bucket is drained.
-    /// This callback should return `true` if it adds more work packets to the
-    /// `Closure` bucket. `WorkBucket::can_open` then consult this return value
-    /// to prevent the GC from proceeding to the next stage, if we still have
-    /// `Closure` work to do.
-    ///
-    /// We use this callback to process ephemeron objects. `closure_end` can re-enable
-    /// the `Closure` bucket multiple times to iteratively discover and process
-    /// more ephemeron objects.
-    closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
     /// Counter for pending coordinator messages.
     pub(super) pending_coordinator_packets: AtomicUsize,
     /// How to assign the affinity of each GC thread. Specified by the user.
@@ -68,10 +58,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::VMRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::VMRefForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
@@ -90,19 +82,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     let cur_stages = open_stages.clone();
                     work_buckets[stage].set_open_condition(
                         move |scheduler: &GCWorkScheduler<VM>| {
-                            let should_open = scheduler.are_buckets_drained(&cur_stages);
-                            // Additional check before the `RefClosure` bucket opens.
-                            if should_open && stage == LAST_CLOSURE_BUCKET {
-                                if let Some(closure_end) =
-                                    scheduler.closure_end.lock().unwrap().as_ref()
-                                {
-                                    if closure_end() {
-                                        // Don't open `LAST_CLOSURE_BUCKET` if `closure_end` added more works to `Closure`.
-                                        return false;
-                                    }
-                                }
-                            }
-                            should_open
+                            scheduler.are_buckets_drained(&cur_stages)
                         },
                     );
                     open_stages.push(stage);
@@ -117,13 +97,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_group,
             coordinator_worker_shared,
             worker_monitor,
-            closure_end: Mutex::new(None),
             pending_coordinator_packets: AtomicUsize::new(0),
             affinity,
         })
     }
 
-    #[inline]
     pub fn num_workers(&self) -> usize {
         self.worker_group.as_ref().worker_count()
     }
@@ -204,10 +182,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
-            // VM-specific weak ref processing
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
-
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::RefForwarding]
@@ -230,6 +204,38 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
             }
         }
+
+        // We add the VM-specific weak ref processing work regardless of MMTK-side options,
+        // including Options::no_finalizer and Options::no_reference_types.
+        //
+        // VMs need weak reference handling to function properly.  The VM may treat weak references
+        // as strong references, but it is not appropriate to simply disable weak reference
+        // handling from MMTk's side.  The VM, however, may choose to do nothing in
+        // `Collection::process_weak_refs` if appropriate.
+        //
+        // It is also not sound for MMTk core to turn off weak
+        // reference processing or finalization alone, because (1) not all VMs have the notion of
+        // weak references or finalizers, so it may not make sence, and (2) the VM may
+        // processing them together.
+
+        // VM-specific weak ref processing
+        // The `VMProcessWeakRefs` work packet is set as the sentinel so that it is executed when
+        // the `VMRefClosure` bucket is drained.  The VM binding may spawn new work packets into
+        // the `VMRefClosure` bucket, and request another `VMProcessWeakRefs` work packet to be
+        // executed again after this bucket is drained again.  Strictly speaking, the first
+        // `VMProcessWeakRefs` packet can be an ordinary packet (doesn't have to be a sentinel)
+        // because there are no other packets in the bucket.  We set it as sentinel for
+        // consistency.
+        self.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new()));
+
+        if plan.constraints().needs_forward_after_liveness {
+            // VM-specific weak ref forwarding
+            self.work_buckets[WorkBucketStage::VMRefForwarding]
+                .add(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new());
+        }
+
+        self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
@@ -240,12 +246,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
-    pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
-        *self.closure_end.lock().unwrap() = Some(f);
-    }
-
     pub fn all_buckets_empty(&self) -> bool {
         self.work_buckets.values().all(|bucket| bucket.is_empty())
+    }
+
+    /// Schedule "sentinel" work packets for all activated buckets.
+    fn schedule_sentinels(&self) -> bool {
+        let mut new_packets = false;
+        for (id, work_bucket) in self.work_buckets.iter() {
+            if work_bucket.is_activated() && work_bucket.maybe_schedule_sentinel() {
+                trace!("Scheduled sentinel packet into {:?}", id);
+                new_packets = true;
+            }
+        }
+        new_packets
     }
 
     /// Open buckets if their conditions are met.
@@ -267,8 +281,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
                 new_packets = new_packets || !bucket.is_drained();
-                // Quit the loop. There'are already new packets in the newly opened buckets.
                 if new_packets {
+                    // Quit the loop. There are already new packets in the newly opened buckets.
+                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    break;
+                }
+                new_packets = new_packets || bucket.maybe_schedule_sentinel();
+                if new_packets {
+                    // Quit the loop. A sentinel packet is added to the newly opened buckets.
+                    trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
                     break;
                 }
             }
@@ -313,7 +334,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    #[inline(always)]
     fn all_activated_buckets_are_empty(&self) -> bool {
         for bucket in self.work_buckets.values() {
             if bucket.is_activated() && !bucket.is_drained() {
@@ -324,7 +344,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Get a schedulable work packet without retry.
-    #[inline(always)]
     fn poll_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
         let mut should_retry = false;
         // Try find a packet that can be processed only by this worker.
@@ -358,7 +377,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Get a schedulable work packet.
-    #[inline]
     fn poll_schedulable_work(&self, worker: &GCWorker<VM>) -> Option<Box<dyn GCWork<VM>>> {
         // Loop until we successfully get a packet.
         loop {
@@ -379,25 +397,23 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Called by workers to get a schedulable work packet.
     /// Park the worker if there're no available packets.
-    #[inline]
     pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         self.poll_schedulable_work(worker)
             .unwrap_or_else(|| self.poll_slow(worker))
     }
 
-    #[cold]
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         // Note: The lock is released during `wait` in the loop.
         let mut guard = self.worker_monitor.0.lock().unwrap();
-        loop {
+        'polling_loop: loop {
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
             }
             // Prepare to park this worker
-            let all_parked = self.worker_group.inc_parked_workers();
+            let parking_guard = ParkingGuard::new(self.worker_group.as_ref());
             // If all workers are parked, try activate new buckets
-            if all_parked {
+            if parking_guard.all_parked() {
                 // If there're any designated work, resume the workers and process them
                 if self.worker_group.has_designated_work() {
                     assert!(
@@ -407,19 +423,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     self.worker_monitor.1.notify_all();
                     // The current worker is going to wait, because the designated work is not for it.
                 } else if self.pending_coordinator_packets.load(Ordering::SeqCst) == 0 {
+                    // See if any bucket has a sentinel.
+                    if self.schedule_sentinels() {
+                        // We're not going to sleep since new work packets are just scheduled.
+                        break 'polling_loop;
+                    }
+                    // Try to open new buckets.
                     if self.update_buckets() {
                         // We're not going to sleep since a new bucket is just open.
-                        self.worker_group.dec_parked_workers();
-                        // We guarantee that we can at least fetch one packet.
-                        let work = self.poll_schedulable_work(worker).unwrap();
-                        // Optimize for the case that a newly opened bucket only has one packet.
-                        // We only notify_all if there're more than one packets available.
-                        if !self.all_activated_buckets_are_empty() {
-                            // Have more jobs in this buckets. Notify other workers.
-                            self.worker_monitor.1.notify_all();
-                        }
-                        // Return this packet and execute it.
-                        return work;
+                        break 'polling_loop;
                     }
                     debug_assert!(!self.worker_group.has_designated_work());
                     // The current pause is finished if we can't open more buckets.
@@ -432,9 +444,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
             // Wait
             guard = self.worker_monitor.1.wait(guard).unwrap();
-            // Unpark this worker
-            self.worker_group.dec_parked_workers();
+            // The worker is unparked here where `parking_guard` goes out of scope.
         }
+
+        // We guarantee that we can at least fetch one packet when we reach here.
+        let work = self.poll_schedulable_work(worker).unwrap();
+        // Optimize for the case that a newly opened bucket only has one packet.
+        // We only notify_all if there're more than one packets available.
+        if !self.all_activated_buckets_are_empty() {
+            // Have more jobs in this buckets. Notify other workers.
+            self.worker_monitor.1.notify_all();
+        }
+        // Return this packet and execute it.
+        work
     }
 
     pub fn enable_stat(&self) {

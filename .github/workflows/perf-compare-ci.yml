@@ -25,7 +25,7 @@ jobs:
 
     # Figure out the core PR. We need to get the specific commit and repo from a pull request number.
     mmtk-refs:
-      runs-on: ubuntu-18.04
+      runs-on: ubuntu-22.04
       outputs:
         mmtk_repo: ${{ steps.print.outputs.mmtk_repo }}
         mmtk-ref: ${{ steps.print.outputs.mmtk_ref }}
