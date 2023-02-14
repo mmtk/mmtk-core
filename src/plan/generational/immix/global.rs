@@ -239,7 +239,7 @@ impl<VM: VMBinding> GenImmix<VM> {
             plan_args.get_space_args("immix_mature", true, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
-                log_object_when_traced: false,
+                unlog_object_when_traced: false,
             },
         );
 

@@ -330,7 +330,7 @@ pub trait GenerationalPlan: Plan {
     fn force_full_heap_collection(&self);
 }
 
-/// This trait is the extension trait for [`GenerationalPlan`] (see Rust pattern for extension trait).
+/// This trait is the extension trait for [`GenerationalPlan`] (see Rust's extension trait pattern).
 /// Generally any method should be put to [`GenerationalPlan`] if possible while keeping [`GenerationalPlan`]
 /// object safe. In this case, generic methods will be put to this extension trait.
 pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {

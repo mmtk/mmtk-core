@@ -325,8 +325,10 @@ pub trait Plan: 'static + Sync + Downcast {
         );
     }
 
-    /// An object is firstly reached by a sanity GC. A plan can implement this to
-    /// add plan/policy specific semantics to check if the object is properly traced.
+    /// An object is firstly reached by a sanity GC. So the object is reachable
+    /// in the current GC, and all the GC work has been done for the object (such as
+    /// tracing and releasing). A plan can implement this to
+    /// use plan specific semantics to check if the object is sane.
     /// Return true if the object is considered valid by the plan.
     fn sanity_check_object(&self, _object: ObjectReference) -> bool {
         true

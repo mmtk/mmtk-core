@@ -33,7 +33,7 @@ pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     #[fallback_trace]
     pub common: CommonPlan<VM>,
-    pub(in crate::plan) last_gc_was_defrag: AtomicBool,
+    last_gc_was_defrag: AtomicBool,
 }
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -132,7 +132,7 @@ impl<VM: VMBinding> Immix<VM> {
             plan_args,
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
-                log_object_when_traced: false,
+                unlog_object_when_traced: false,
             },
         )
     }
@@ -163,7 +163,7 @@ impl<VM: VMBinding> Immix<VM> {
         immix
     }
 
-    /// Schedule a full heap immix collection. This method is used by immix/gen immix/sticky immix
+    /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
     /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
     pub(crate) fn schedule_immix_full_heap_collection<
         FastContext: 'static + GCWorkContext<VM = VM>,
@@ -190,5 +190,9 @@ impl<VM: VMBinding> Immix<VM> {
             let fast_plan = unsafe { std::mem::transmute(plan) };
             scheduler.schedule_common_work::<FastContext>(fast_plan);
         }
+    }
+
+    pub(in crate::plan) fn set_last_gc_was_defrag(&self, defrag: bool, order: Ordering) {
+        self.last_gc_was_defrag.store(defrag, order)
     }
 }

@@ -29,7 +29,7 @@ pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
-    pub(crate) common: CommonSpace<VM>,
+    common: CommonSpace<VM>,
     pr: BlockPageResource<VM, Block>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
@@ -58,7 +58,7 @@ pub struct ImmixSpaceArgs {
     /// In sticky immix, we 'promote' an object to mature when we trace the object
     /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
     /// just set the log bit in the space when an object is traced.
-    pub log_object_when_traced: bool,
+    pub unlog_object_when_traced: bool,
     /// Reset log bit at the start of a major GC.
     /// Normally we do not need to do this. When immix is used as the mature space,
     /// any object should be set as unlogged, and that bit does not need to be cleared
@@ -91,9 +91,9 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_live(&self, object: ObjectReference) -> bool {
         if super::NEVER_MOVE_OBJECTS {
             // We won't forward objects.
-            self.is_marked(object, self.mark_state)
+            self.is_marked(object)
         } else {
-            self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+            self.is_marked(object) || ForwardingWord::is_forwarded::<VM>(object)
         }
     }
     #[cfg(feature = "object_pinning")]
@@ -166,19 +166,19 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        debug_assert!(
-            !crate::plan::is_nursery_gc(VM::VMActivePlan::global()),
-            "Calling PolicyTraceObject on Immix in nursery GC"
-        );
         if KIND == TRACE_KIND_DEFRAG {
             if Block::containing::<VM>(object).is_defrag_source() {
                 debug_assert!(self.in_defrag());
-                // This should not be nursery collection. Nursery collection does not use PolicyTraceObject.
+                debug_assert!(
+                    !crate::plan::is_nursery_gc(&*worker.mmtk.plan),
+                    "Calling PolicyTraceObject on Immix in nursery GC"
+                );
                 self.trace_object_with_opportunistic_copy(
                     queue,
                     object,
                     copy.unwrap(),
                     worker,
+                    // This should not be nursery collection. Nursery collection does not use PolicyTraceObject.
                     false,
                 )
             } else {
@@ -253,7 +253,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Block::LOG_BYTES
         );
 
-        if space_args.log_object_when_traced || space_args.reset_log_bit_in_major_gc {
+        if space_args.unlog_object_when_traced || space_args.reset_log_bit_in_major_gc {
             assert!(
                 args.constraints.needs_log_bit,
                 "Invalid args when the plan does not use log bit"
@@ -288,6 +288,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             lines_consumed: AtomicUsize::new(0),
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
+            // Set to the correct mark state when inititialized. We cannot rely on prepare to set it (prepare may get skipped in nursery GCs).
             mark_state: Self::MARKED_STATE,
             scheduler: scheduler.clone(),
             space_args,
@@ -537,7 +538,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 if new_object == object {
                     debug_assert!(
-                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || self.is_pinned(object),
+                        self.is_marked(object) || self.defrag.space_exhausted() || self.is_pinned(object),
                         "Forwarded object is the same as original object {} even though it should have been copied",
                         object,
                     );
@@ -552,7 +553,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 }
             }
             new_object
-        } else if self.is_marked(object, self.mark_state) {
+        } else if self.is_marked(object) {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
             debug_assert!(
@@ -590,7 +591,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
-        if self.space_args.log_object_when_traced {
+        if self.space_args.unlog_object_when_traced {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
     }
@@ -632,7 +633,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Check if an object is marked.
-    fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
+    fn is_marked_with(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
@@ -641,8 +642,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         old_value == mark_state
     }
 
-    pub(crate) fn is_marked_with_current_mark_state(&self, object: ObjectReference) -> bool {
-        self.is_marked(object, self.mark_state)
+    pub(crate) fn is_marked(&self, object: ObjectReference) -> bool {
+        self.is_marked_with(object, self.mark_state)
     }
 
     /// Check if an object is pinned.

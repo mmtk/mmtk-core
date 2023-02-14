@@ -54,7 +54,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
         let plan = unsafe { self.plan.assume_init() };
         if self.policy.is_gc_required(space_full, space, plan) {
             info!(
-                "[POLL] {}{} ({} used pages, {} total pages)",
+                "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {
                     format!("{}: ", space.get_name())
                 } else {

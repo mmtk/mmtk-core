@@ -224,7 +224,7 @@ pub struct EndOfGC(pub std::time::Duration);
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!(
-            "End of GC ({} used pages, {} total pages, took {} ms)",
+            "End of GC ({}/{} pages, took {} ms)",
             mmtk.plan.get_reserved_pages(),
             mmtk.plan.get_total_pages(),
             self.0.as_millis()

@@ -5,6 +5,7 @@ use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
 use crate::plan::GcStatus;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixSpace;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
 use crate::util::copy::CopyConfig;
@@ -28,7 +29,7 @@ use super::gc_work::StickyImmixNurseryGCWorkContext;
 #[derive(PlanTraceObject)]
 pub struct StickyImmix<VM: VMBinding> {
     #[fallback_trace]
-    pub(in crate::plan::sticky::immix) immix: immix::Immix<VM>,
+    immix: immix::Immix<VM>,
     gc_full_heap: AtomicBool,
     next_gc_full_heap: AtomicBool,
     full_heap_gc_count: Arc<Mutex<EventCounter>>,
@@ -55,7 +56,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         CopyConfig {
             copy_mapping: enum_map! {
                 CopySemantics::DefaultCopy => CopySelector::Immix(0),
-                // CopySemantics::PromoteToMature => CopySelector::Immix(0),
                 _ => CopySelector::Unused,
             },
             space_mapping: vec![(CopySelector::Immix(0), &self.immix.immix_space)],
@@ -125,8 +125,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         if self.is_current_gc_nursery() {
             let was_defrag = self.immix.immix_space.release(false);
             self.immix
-                .last_gc_was_defrag
-                .store(was_defrag, Ordering::Relaxed);
+                .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
             self.immix.common.los.release(false);
         } else {
             self.immix.release(tls);
@@ -167,34 +166,25 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn sanity_check_object(&self, object: crate::util::ObjectReference) -> bool {
         if self.is_current_gc_nursery() {
-            if self.immix.immix_space.in_space(object) {
-                // Every object should be logged
-                if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .is_unlogged::<VM>(object, Ordering::SeqCst)
-                {
-                    error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
-                    return false;
-                }
-                if !self
-                    .immix
-                    .immix_space
-                    .is_marked_with_current_mark_state(object)
-                {
-                    error!("Object {} is not marked (all objects that have been traced should be marked)", object);
-                    return false;
-                }
-            } else if self.immix.common.los.in_space(object) {
-                // Every object should be logged
-                if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .is_unlogged::<VM>(object, Ordering::SeqCst)
-                {
-                    error!("LOS Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
-                    return false;
-                }
-                if !self.immix.common.los.is_live(object) {
-                    error!("LOS Object {} is not marked", object);
-                    return false;
-                }
+            // Every reachable object should be logged
+            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+                error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                return false;
+            }
+
+            // Every reachable object should be marked
+            if self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
+            {
+                error!(
+                    "Object {} is not marked (all objects that have been traced should be marked)",
+                    object
+                );
+                return false;
+            } else if self.immix.common.los.in_space(object)
+                && !self.immix.common.los.is_live(object)
+            {
+                error!("LOS Object {} is not marked", object);
+                return false;
             }
         }
         true
@@ -207,11 +197,7 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
     }
 
     fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
-        self.immix.immix_space.in_space(object)
-            && !self
-                .immix
-                .immix_space
-                .is_marked_with_current_mark_state(object)
+        self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
     }
 
     // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
@@ -219,6 +205,7 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
     // whether an address is in nursery or not. In this case, we just return false -- this is a conservative return value
     // for the memory slice copying barrier. It means we will treat the object as if it is in mature space, and will
     // push it to the remembered set.
+    // FIXME: this will remember excessive objects, and can cause serious slowdown in some cases.
     fn is_address_in_nursery(&self, _addr: crate::util::Address) -> bool {
         false
     }
@@ -257,6 +244,8 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,
+                        // We just use default copy here. We have set args for ImmixSpace to deal with unlogged bit,
+                        // and we do not need to use CopySemantics::PromoteToMature.
                         CopySemantics::DefaultCopy,
                         worker,
                         true,
@@ -314,7 +303,12 @@ impl<VM: VMBinding> StickyImmix<VM> {
         let immix = immix::Immix::new_with_args(
             plan_args,
             crate::policy::immix::ImmixSpaceArgs {
-                log_object_when_traced: true,
+                // Every object we trace in nursery GC becomes a mature object.
+                // Every object we trace in full heap GC is a mature object. Thus in both cases,
+                // they should be unlogged.
+                unlog_object_when_traced: true,
+                // In full heap GC, mature objects may die, and their unlogged bit needs to be reset.
+                // Along with the option above, we unlog them again during tracing.
                 reset_log_bit_in_major_gc: true,
             },
         );
@@ -354,5 +348,9 @@ impl<VM: VMBinding> StickyImmix<VM> {
         } else {
             false
         }
+    }
+
+    pub fn get_immix_space(&self) -> &ImmixSpace<VM> {
+        &self.immix.immix_space
     }
 }
