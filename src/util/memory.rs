@@ -51,6 +51,12 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
+    // On macOS, we do not have MAP_FXIED_NOREPLACE. We check it first.
+    #[cfg(target_os = "macos")]
+    if os_is_mapped(start, size) {
+        return Err(std::io::Error::from(std::io::ErrorKind::AlreadyExists));
+    }
+
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = MMAP_FLAGS;
     let ret = mmap_fixed(start, size, prot, flags);
@@ -127,17 +133,30 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 // Be very careful about using this function.
 #[cfg(target_os = "linux")]
 pub fn panic_if_unmapped(start: Address, size: usize) {
-    let prot = PROT_READ | PROT_WRITE;
-    let flags = MMAP_FLAGS;
-    match mmap_fixed(start, size, prot, flags) {
-        Ok(_) => panic!("{} of size {} is not mapped", start, size),
-        Err(e) => {
-            assert!(
-                e.kind() == std::io::ErrorKind::AlreadyExists,
-                "Failed to check mapped: {:?}",
-                e
-            );
+    if size == 0 {
+        return;
+    }
+
+    if !os_is_mapped(start, size) {
+        panic!("{} of size {} is not mapped", start, size)
+    }
+}
+
+/// Check the OS whether the memory range is mapped with at least read protection (so any memory we 'reserved'/'quarantined' is not counted as 'mapped'). This is a heavy-weight operation as we need to do syscall.
+pub fn os_is_mapped(start: Address, size: usize) -> bool {
+    match region::query_range::<u8>(start.to_ptr(), size) {
+        Ok(mut region_iter) => {
+            let mut count = 0;
+            let all_mapped = region_iter.all(|r| {
+                count += 1;
+                r.is_ok() && r.as_ref().unwrap().is_readable()
+            });
+            count != 0 && all_mapped
         }
+        Err(e) => panic!(
+            "Query range starting {} for {} bytes failed: {:?}",
+            start, size, e
+        ),
     }
 }
 

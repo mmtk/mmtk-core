@@ -909,10 +909,7 @@ mod tests {
                     std::env::set_var("MMTK_THREAD_AFFINITY", "0");
 
                     let options = Options::default();
-                    assert_eq!(
-                        *options.thread_affinity,
-                        AffinityKind::RoundRobin(vec![0_u16])
-                    );
+                    assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec![0]));
                 },
                 || {
                     std::env::remove_var("MMTK_THREAD_AFFINITY");
@@ -927,7 +924,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let mut vec = vec![0_u16];
+                    let mut vec = vec![0];
                     let mut cpu_list = String::new();
                     let num_cpus = get_total_num_cpus();
 
@@ -952,7 +949,7 @@ mod tests {
     fn test_thread_affinity_single_range() {
         serial_test(|| {
             let affinity = "0-1".parse::<AffinityKind>();
-            assert_eq!(affinity, Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16])));
+            assert_eq!(affinity, Ok(AffinityKind::RoundRobin(vec![0, 1])));
         })
     }
 
@@ -960,10 +957,7 @@ mod tests {
     fn test_thread_affinity_complex_core_list() {
         serial_test(|| {
             let affinity = "0,1-2,4".parse::<AffinityKind>();
-            assert_eq!(
-                affinity,
-                Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16, 2_u16, 4_u16]))
-            );
+            assert_eq!(affinity, Ok(AffinityKind::RoundRobin(vec![0, 1, 2, 4])));
         })
     }
 

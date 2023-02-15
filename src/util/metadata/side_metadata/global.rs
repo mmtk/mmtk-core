@@ -311,6 +311,7 @@ impl SideMetadataSpec {
         #[cfg(debug_assertions)]
         {
             self.assert_value_type::<T>(input);
+            #[cfg(feature = "extreme_assertions")]
             self.assert_metadata_mapped(data_addr);
         }
 
