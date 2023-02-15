@@ -219,7 +219,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
 impl<E: ProcessEdgesWork> CoordinatorWork<E::VM> for StopMutators<E> {}
 
 #[derive(Default)]
-pub struct EndOfGC(pub std::time::Duration);
+pub struct EndOfGC {
+    pub elapsed: std::time::Duration,
+}
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
@@ -227,7 +229,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             "End of GC ({}/{} pages, took {} ms)",
             mmtk.plan.get_reserved_pages(),
             mmtk.plan.get_total_pages(),
-            self.0.as_millis()
+            self.elapsed.as_millis()
         );
 
         // We assume this is the only running work packet that accesses plan at the point of execution

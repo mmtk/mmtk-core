@@ -93,6 +93,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             use crate::plan::immix::Immix;
             use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
             Immix::schedule_immix_full_heap_collection::<
+                StickyImmix<VM>,
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
             >(self, &self.immix.immix_space, scheduler);

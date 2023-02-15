@@ -199,7 +199,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         trace!(
             "LOS object {} {} a nursery object",
             object,
-            if nursery_object { "is" } else { "is not " }
+            if nursery_object { "is" } else { "is not" }
         );
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects

@@ -734,7 +734,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
             } else {
                 // If the log bit is not in side metadata, we cannot bulk zero. We can either
                 // clear the bit for dead objects in major GC, or clear the log bit for new
-                // objects. In both cases, we do not need to set log bit at tracing.
+                // objects. In either cases, we do not need to set log bit at tracing.
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }

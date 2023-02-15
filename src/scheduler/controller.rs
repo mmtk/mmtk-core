@@ -126,8 +126,6 @@ impl<VM: VMBinding> GCController<VM> {
         }
         self.scheduler.deactivate_all();
 
-        let gc_elapsed = std::time::Instant::now() - gc_start;
-
         // Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.
         self.mmtk.plan.base().gc_trigger.policy.on_gc_end(self.mmtk);
 
@@ -136,7 +134,10 @@ impl<VM: VMBinding> GCController<VM> {
         //       Otherwise, for generational GCs, workers will receive and process
         //       newly generated remembered-sets from those open buckets.
         //       But these remsets should be preserved until next GC.
-        EndOfGC(gc_elapsed).do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
+        EndOfGC {
+            elapsed: gc_start.elapsed(),
+        }
+        .do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
     }

@@ -83,6 +83,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         Self::schedule_immix_full_heap_collection::<
+            Immix<VM>,
             ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
             ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>,
         >(self, &self.immix_space, scheduler)
@@ -166,8 +167,9 @@ impl<VM: VMBinding> Immix<VM> {
     /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
     /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
     pub(crate) fn schedule_immix_full_heap_collection<
-        FastContext: 'static + GCWorkContext<VM = VM>,
-        DefragContext: 'static + GCWorkContext<VM = VM>,
+        PlanType: Plan<VM = VM>,
+        FastContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
+        DefragContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
     >(
         plan: &'static DefragContext::PlanType,
         immix_space: &ImmixSpace<VM>,
@@ -184,11 +186,7 @@ impl<VM: VMBinding> Immix<VM> {
         if in_defrag {
             scheduler.schedule_common_work::<DefragContext>(plan);
         } else {
-            // The type of plan is `DefragContext::PlanType`, and we need it as `FastContext::PlanType`.
-            // They should be the same plan. But I don't find a way to tell Rust compiler that
-            // those PlanTypes are the same. So just do a unsafe transmute here.
-            let fast_plan = unsafe { std::mem::transmute(plan) };
-            scheduler.schedule_common_work::<FastContext>(fast_plan);
+            scheduler.schedule_common_work::<FastContext>(plan);
         }
     }
 
