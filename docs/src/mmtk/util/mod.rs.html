@@ -80,9 +80,6 @@
 <span id="80">80</span>
 <span id="81">81</span>
 <span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
 </span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
@@ -160,13 +157,10 @@
 <span class="doccomment">/// Implementation of GenericFreeList backed by raw memory, allocated
 /// on demand direct from the OS (via mmap).
 </span><span class="kw">mod </span>raw_memory_freelist;
-<span class="comment">// TODO: This is not used. Probably we can remoev this.
-</span><span class="kw">mod </span>synchronized_counter;
 
 <span class="kw">pub use </span><span class="self">self</span>::address::Address;
 <span class="kw">pub use </span><span class="self">self</span>::address::ObjectReference;
 <span class="kw">pub use </span><span class="self">self</span>::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">pub use </span><span class="self">self</span>::reference_processor::ReferenceProcessor;
-<span class="kw">pub use </span><span class="self">self</span>::synchronized_counter::SynchronizedCounter;
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>
