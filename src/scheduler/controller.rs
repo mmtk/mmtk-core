@@ -101,7 +101,18 @@ impl<VM: VMBinding> GCController<VM> {
     /// Coordinate workers to perform GC in response to a GC request.
     pub fn do_gc_until_completion(&mut self) {
         // Schedule collection.
+        // Note: GC workers will start executing work packets as soon as individual work packets
+        // are added.  This means workers may open subsequent buckets while `schedule_collection`
+        // still has packets to be added to prior buckets.
+        // We use the`pending_coordinator_packets` to prevent the workers from opening any work
+        // buckets.
+        self.scheduler.pending_coordinator_packets.fetch_add(1, Ordering::SeqCst);
         ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
+        self.scheduler.pending_coordinator_packets.fetch_sub(1, Ordering::SeqCst);
+        {
+            let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
+            self.scheduler.worker_monitor.1.notify_all();
+        }
 
         // Tell GC trigger that GC started - this happens after ScheduleCollection so we
         // will know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
