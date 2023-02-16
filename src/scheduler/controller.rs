@@ -106,9 +106,13 @@ impl<VM: VMBinding> GCController<VM> {
         // still has packets to be added to prior buckets.
         // We use the`pending_coordinator_packets` to prevent the workers from opening any work
         // buckets.
-        self.scheduler.pending_coordinator_packets.fetch_add(1, Ordering::SeqCst);
+        self.scheduler
+            .pending_coordinator_packets
+            .fetch_add(1, Ordering::SeqCst);
         ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
-        self.scheduler.pending_coordinator_packets.fetch_sub(1, Ordering::SeqCst);
+        self.scheduler
+            .pending_coordinator_packets
+            .fetch_sub(1, Ordering::SeqCst);
         {
             let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
             self.scheduler.worker_monitor.1.notify_all();
