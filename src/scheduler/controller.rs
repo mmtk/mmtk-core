@@ -128,7 +128,11 @@ impl<VM: VMBinding> GCController<VM> {
                 CoordinatorMessage::Finish => {}
             }
         }
-        self.scheduler.deactivate_all();
+
+        {
+            let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
+            self.scheduler.deactivate_all();
+        }
 
         // Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.
         self.mmtk.plan.base().gc_trigger.policy.on_gc_end(self.mmtk);
