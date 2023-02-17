@@ -1,4 +1,57 @@
-0.16.0 (2022-12-006)
+0.17.0 (2023-02-17)
+===
+
+Plan
+---
+* Fix a bug where `SemiSpace::get_available_pages` returned unused pages as 'available pages'. It should return half of the unused pages as 'available'.
+* Fix a bug where generational plans may make full-heap GC decision before all the releasing work is done. Now plans have a `Plan::end_of_gc()` method
+  that is executed after all the GC work is done.
+* Fix a bug where generational plans tended to trigger full heap GCs when heap is full. Now we properly use Appel-style nursery and allow
+  the nursery to extend to the heap size.
+* Add a feature `immix_zero_on_release` as a debug feature for Immix to eagerly zero any reclaimed memory.
+* Fix a bug where the alloc bits for dead objects were still set after the objects were reclaimed. Now Immix eagerly clears the alloc bits
+  once the memory is reclaimed.
+* Fix a bug where Immix uses forwarding bits and forwarding pointers but did not declare it.
+
+
+Allocator
+---
+* Fix a bug about the maximum object size in `FreeListAllocator`. The allowed maximum object size depends on both the block size and the largest bin size.
+
+
+Scheduler
+---
+* Add a 'sentinel' mechanism to execute a specified 'sentinel' work packet when a bucket is drained, and prevent the GC from entering the next stage depending
+  on the sentinel packet. This makes it possible to expand the transitive closure multiple times. It replaces `GCWorkScheduler::closure_end()`.
+
+
+API
+---
+* Add a new set of APIs to support binding-specific weak reference processing:
+  * Add `Scanning::process_weak_refs()` and `Scanning::forward_weak_refs()`. They both supply an `ObjectTracerContext` argument for retaining and
+    updating weak references. `Scanning::process_weak_refs()` allows a boolean return value to indicate if the method should be called again
+    by MMTk after finishing transitive closures for the weak references, which can be used to implement ephemeral weak references.
+  * Add `Collection::post_forwarding()` which is called by MMTk after all weak reference related work is done. A binding can use this call
+    for any post processing for weak references, such as enqueue cleared weak references to a queue (Java).
+  * These replace old methods for the same purpose, like `Collection::process_weak_refs()`, `Collection::vm_release()`, and `memory_manager::on_closure_end`.
+
+
+Misc
+---
+* Improve the boot time significantly for MMTk:
+  * Space descriptor map is created as an zeroed vector.
+  * Mmapper coalesces the mmap requests for adjancent chunks, and reduces our `mmap` system calls at boot time.
+* Add `GCTrigger` to allow different heuristics to trigger a GC:
+  * Implement `FixedHeapSizeTrigger` that triggers the GC when the maximum heap size is reached (the current approach).
+  * Implement `MemBalancerTrigger` (https://dl.acm.org/doi/pdf/10.1145/3563323) as the dynamic heap resize heuristic.
+* Refactor `SFTMap` so it is dynamically created now.
+* Fix a bug where `Address::store` dropped the value after store.
+* Fix a bug about an incorrect pointer cast in unsafe code in `CommonFreeListPageResource`.
+* Remove all inline directives from our code base. We rely on Rust compiler and PGO for inlining decisions.
+* Remove `SynchronizedCounter`.
+
+
+0.16.0 (2022-12-06)
 ===
 
 Plan

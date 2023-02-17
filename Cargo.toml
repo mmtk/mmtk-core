@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.16.0"
+version = "0.17.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -20,7 +20,7 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { version = "0.16.0", path = "macros/" }
+mmtk-macros = { version = "0.17.0", path = "macros/" }
 
 libc = "0.2"
 jemalloc-sys = { version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
