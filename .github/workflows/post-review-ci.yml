@@ -39,6 +39,7 @@ jobs:
           rm -rf mmtk-v8/repos/*
           mkdir -p mmtk-v8/repos/mmtk-core
           cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+          cp mmtk-core/rust-toolchain mmtk-v8/mmtk
       - name: Setup
         run: |
           cd mmtk-v8
@@ -76,7 +77,9 @@ jobs:
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
+        run: |
+          cp -r mmtk-core mmtk-openjdk/repos/
+          cp mmtk-core/rust-toolchain mmtk-openjdk/mmtk
       - name: Test
         run: |
           cd mmtk-openjdk
@@ -109,6 +112,7 @@ jobs:
       - name: Overwrite MMTk core in JikesRVM binding
         run: |
           cp -r mmtk-core mmtk-jikesrvm/repos
+          cp mmtk-core/rust-toolchain mmtk-jikesrvm/mmtk
       - name: Test
         run: |
           cd mmtk-jikesrvm
@@ -142,6 +146,7 @@ jobs:
         run: |
           mkdir -p mmtk-julia/repos/mmtk-core
           cp -r mmtk-core/* mmtk-julia/repos/mmtk-core
+          cp mmtk-core/rust-toolchain mmtk-julia/mmtk
       - name: debug
         run: |
           ls mmtk-julia
