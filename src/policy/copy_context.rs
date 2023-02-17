@@ -22,6 +22,5 @@ pub trait PolicyCopyContext: 'static + Send {
         align: usize,
         offset: isize,
     ) -> Address;
-    #[inline(always)]
     fn post_copy(&mut self, _obj: ObjectReference, _bytes: usize) {}
 }

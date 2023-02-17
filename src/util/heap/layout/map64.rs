@@ -208,7 +208,6 @@ impl Map for Map64 {
         self.finalized
     }
 
-    #[inline]
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = Self::space_index(address).unwrap();
         self.descriptor_map[index]

@@ -131,12 +131,11 @@ pub trait Scanning<VM: VMBinding> {
     /// For maximum performance, the VM should support edge-enqueuing for as many objects as
     /// practical.  Also note that this method is called for every object to be scanned, so it
     /// must be fast.  The VM binding should avoid expensive checks and keep it as efficient as
-    /// possible.  Add `#[inline(always)]` to ensure it is inlined.
+    /// possible.
     ///
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    #[inline(always)]
     fn support_edge_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -> bool {
         true
     }
