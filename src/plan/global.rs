@@ -305,8 +305,21 @@ pub trait Plan: 'static + Sync + Downcast {
         self.base().emergency_collection.load(Ordering::Relaxed)
     }
 
-    /// The application code has requested a collection.
-    fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
+    /// The application code has requested a collection. This is just a GC hint, and
+    /// we may ignore it.
+    ///
+    /// # Arguments
+    /// * `tls`: The mutator thread that requests the GC
+    /// * `force`: The request cannot be ignored (except for NoGC)
+    /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
+    fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool, exhaustive: bool) {
+        // For exhaustive on generational plans, we force a full heap GC.
+        // A plan may implement this method themselves to handle the exhaustive GC.
+        if exhaustive {
+            if let Some(gen) = self.generational() {
+                gen.force_full_heap_collection();
+            }
+        }
         self.base().handle_user_collection_request(tls, force)
     }
 
