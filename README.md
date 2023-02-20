@@ -20,7 +20,7 @@ We maintain an up to date list of the prerequisite for building MMTk and its bin
 
 ## Build
 
-MMTk can build with a stable Rust toolchain. The minimal supported Rust version is 1.57.0, and MMTk is tested with 1.59.0.
+MMTk can build with a stable Rust toolchain. The minimal supported Rust version is 1.57.0, and MMTk is tested with 1.66.1.
 
 ```console
 $ cargo build
