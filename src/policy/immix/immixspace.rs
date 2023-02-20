@@ -574,10 +574,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
-                let new_object =
-                    ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
-                Block::containing::<VM>(new_object).set_state(BlockState::Marked);
-                new_object
+                // We are forwarding objects. When the copy allocator allocates the block, it should
+                // mark the block. So we do not need to explicitly mark it here.
+                ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
             debug_assert_eq!(
                 Block::containing::<VM>(new_object).get_state(),
@@ -709,6 +708,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub(crate) fn get_pages_allocated(&self) -> usize {
         self.lines_consumed.load(Ordering::SeqCst) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
     }
+
+    /// Post copy routine for Immix copy contexts
+    fn post_copy(&self, object: ObjectReference, _bytes: usize) {
+        // Mark the object
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
+            object,
+            self.mark_state,
+            None,
+            Ordering::SeqCst,
+        );
+        // Mark the line
+        if !super::MARK_LINE_AT_SCAN_TIME {
+            self.mark_lines(object);
+        }
+    }
 }
 
 /// A work packet to prepare each block for a major GC.
@@ -835,13 +849,60 @@ use crate::policy::copy_context::PolicyCopyContext;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
 
-/// Immix copy allocator
+/// Normal immix copy context. It has one copying Immix allocator.
+/// Most immix plans use this copy context.
 pub struct ImmixCopyContext<VM: VMBinding> {
+    allocator: ImmixAllocator<VM>,
+}
+
+impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
+    type VM = VM;
+
+    fn prepare(&mut self) {
+        self.allocator.reset();
+    }
+    fn release(&mut self) {
+        self.allocator.reset();
+    }
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+    ) -> Address {
+        self.allocator.alloc(bytes, align, offset)
+    }
+    fn post_copy(&mut self, obj: ObjectReference, bytes: usize) {
+        self.get_space().post_copy(obj, bytes)
+    }
+}
+
+impl<VM: VMBinding> ImmixCopyContext<VM> {
+    pub fn new(
+        tls: VMWorkerThread,
+        plan: &'static dyn Plan<VM = VM>,
+        space: &'static ImmixSpace<VM>,
+    ) -> Self {
+        ImmixCopyContext {
+            allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
+        }
+    }
+
+    fn get_space(&self) -> &ImmixSpace<VM> {
+        self.allocator.immix_space()
+    }
+}
+
+/// Hybrid Immix copy context. It includes two different immix allocators. One with `copy = true`
+/// is used for defrag GCs, and the other is used for other purposes (such as promoting objects from
+/// nursery to Immix mature space). This is used by generational immix.
+pub struct ImmixHybridCopyContext<VM: VMBinding> {
     copy_allocator: ImmixAllocator<VM>,
     defrag_allocator: ImmixAllocator<VM>,
 }
 
-impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
+impl<VM: VMBinding> PolicyCopyContext for ImmixHybridCopyContext<VM> {
     type VM = VM;
 
     fn prepare(&mut self) {
@@ -865,28 +926,18 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
             self.copy_allocator.alloc(bytes, align, offset)
         }
     }
-    fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
-        // Mark the object
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
-            obj,
-            self.get_space().mark_state,
-            None,
-            Ordering::SeqCst,
-        );
-        // Mark the line
-        if !super::MARK_LINE_AT_SCAN_TIME {
-            self.get_space().mark_lines(obj);
-        }
+    fn post_copy(&mut self, obj: ObjectReference, bytes: usize) {
+        self.get_space().post_copy(obj, bytes)
     }
 }
 
-impl<VM: VMBinding> ImmixCopyContext<VM> {
+impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
     pub fn new(
         tls: VMWorkerThread,
         plan: &'static dyn Plan<VM = VM>,
         space: &'static ImmixSpace<VM>,
     ) -> Self {
-        ImmixCopyContext {
+        ImmixHybridCopyContext {
             copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),
             defrag_allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
         }
