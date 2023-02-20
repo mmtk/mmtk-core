@@ -240,6 +240,8 @@ impl<VM: VMBinding> GenImmix<VM> {
             plan_args.get_space_args("immix_mature", true, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
+                // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
+                // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
                 unlog_object_when_traced: false,
             },
         );
