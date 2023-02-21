@@ -144,7 +144,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     pub fn force_full_heap_collection(&self) {
-        self.next_gc_full_heap.store(true, Ordering::Relaxed);
+        self.next_gc_full_heap.store(true, Ordering::SeqCst);
     }
 
     pub fn last_collection_full_heap(&self) -> bool {
