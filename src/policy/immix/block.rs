@@ -131,7 +131,8 @@ impl Block {
     /// Test if the block is marked for defragmentation.
     pub fn is_defrag_source(&self) -> bool {
         let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
-        debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
+        // The byte should be 0 (not defrag source) or 255 (defrag source) if this is a major defrag GC, as we set the values in PrepareBlockState.
+        // But it could be any value in a nursery GC.
         byte == Self::DEFRAG_SOURCE_STATE
     }
 
