@@ -38,6 +38,7 @@ API
 
 Misc
 ---
+* Upgrade the Rust toolchain we use to 1.66.1 and upgrade MSRV to 1.61.0.
 * Improve the boot time significantly for MMTk:
   * Space descriptor map is created as an zeroed vector.
   * Mmapper coalesces the mmap requests for adjancent chunks, and reduces our `mmap` system calls at boot time.
