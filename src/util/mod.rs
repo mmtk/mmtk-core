@@ -75,11 +75,8 @@ mod int_array_freelist;
 /// Implementation of GenericFreeList backed by raw memory, allocated
 /// on demand direct from the OS (via mmap).
 mod raw_memory_freelist;
-// TODO: This is not used. Probably we can remoev this.
-mod synchronized_counter;
 
 pub use self::address::Address;
 pub use self::address::ObjectReference;
 pub use self::opaque_pointer::*;
 pub use self::reference_processor::ReferenceProcessor;
-pub use self::synchronized_counter::SynchronizedCounter;
