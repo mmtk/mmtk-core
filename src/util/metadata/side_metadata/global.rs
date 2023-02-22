@@ -473,6 +473,36 @@ impl SideMetadataSpec {
         }
     }
 
+    /// Atomically store one to the side metadata for the data address with the _possible_ side effect of corrupting
+    /// and setting the entire byte in the side metadata to 0xff. This can only be used for side metadata smaller
+    /// than a byte.
+    /// This means it does not only set the side metadata for the data address, and it may also have a side effect of
+    /// corrupting and setting the side metadata for the adjacent data addresses. This method is only intended to be
+    /// used as an optimization to skip masking and setting bits in some scenarios where setting adjancent bits to 1 is benign.
+    ///
+    /// # Safety
+    /// This method _may_ corrupt and set adjacent bits in the side metadata as a side effect. The user must
+    /// make sure that this behavior is correct and must not rely on the side effect of this method to set bits.
+    pub unsafe fn set_raw_byte_atomic(&self, data_addr: Address, order: Ordering) {
+        debug_assert!(self.log_num_of_bits < 3);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "extreme_assertions")] {
+                // For extreme assertions, we only set 1 to the given address.
+                self.store_atomic::<u8>(data_addr, 1, order)
+            } else {
+                self.side_metadata_access::<u8, _, _, _>(
+                    data_addr,
+                    Some(1u8),
+                    || {
+                        let meta_addr = address_to_meta_address(self, data_addr);
+                        u8::store_atomic(meta_addr, 0xffu8, order);
+                    },
+                    |_| {}
+                )
+            }
+        }
+    }
+
     pub fn compare_exchange_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
