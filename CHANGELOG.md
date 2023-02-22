@@ -30,7 +30,7 @@ API
 * Add a new set of APIs to support binding-specific weak reference processing:
   * Add `Scanning::process_weak_refs()` and `Scanning::forward_weak_refs()`. They both supply an `ObjectTracerContext` argument for retaining and
     updating weak references. `Scanning::process_weak_refs()` allows a boolean return value to indicate if the method should be called again
-    by MMTk after finishing transitive closures for the weak references, which can be used to implement ephemeral weak references.
+    by MMTk after finishing transitive closures for the weak references, which can be used to implement ephemeron.
   * Add `Collection::post_forwarding()` which is called by MMTk after all weak reference related work is done. A binding can use this call
     for any post processing for weak references, such as enqueue cleared weak references to a queue (Java).
   * These replace old methods for the same purpose, like `Collection::process_weak_refs()`, `Collection::vm_release()`, and `memory_manager::on_closure_end`.
