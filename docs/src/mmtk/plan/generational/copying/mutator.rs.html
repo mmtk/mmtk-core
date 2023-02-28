@@ -50,7 +50,6 @@
 <span id="50">50</span>
 <span id="51">51</span>
 <span id="52">52</span>
-<span id="53">53</span>
 </pre><pre class="rust"><code><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="kw">super</span>::<span class="kw">super</span>::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">super</span>::GenCopy;
 <span class="kw">use </span><span class="kw">crate</span>::plan::barriers::ObjectBarrier;
@@ -96,8 +95,7 @@
     Mutator {
         allocators: Allocators::&lt;VM&gt;::new(mutator_tls, <span class="kw-2">&amp;*</span>mmtk.plan, <span class="kw-2">&amp;</span>config.space_mapping),
         barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
-            mmtk,
-            <span class="kw-2">&amp;</span>gencopy.gen,
+            mmtk, gencopy,
         ))),
         mutator_tls,
         config,

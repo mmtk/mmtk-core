@@ -9,6 +9,10 @@
 <span id="9">9</span>
 <span id="10">10</span>
 <span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMGlobalLogBitSpec;
@@ -19,6 +23,10 @@
     </span><span class="kw">pub fn </span>mark_as_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) {
         <span class="self">self</span>.store_atomic::&lt;VM, u8&gt;(object, <span class="number">1</span>, <span class="prelude-val">None</span>, order)
     }
+
+    <span class="kw">pub fn </span>is_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) -&gt; bool {
+        <span class="self">self</span>.load_atomic::&lt;VM, u8&gt;(object, <span class="prelude-val">None</span>, order) == <span class="number">1
+    </span>}
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

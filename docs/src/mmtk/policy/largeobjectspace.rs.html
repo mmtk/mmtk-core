@@ -316,6 +316,17 @@
 <span id="316">316</span>
 <span id="317">317</span>
 <span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -514,9 +525,15 @@
             object
         );
         <span class="kw">let </span>nursery_object = <span class="self">self</span>.is_in_nursery(object);
+        <span class="macro">trace!</span>(
+            <span class="string">&quot;LOS object {} {} a nursery object&quot;</span>,
+            object,
+            <span class="kw">if </span>nursery_object { <span class="string">&quot;is&quot; </span>} <span class="kw">else </span>{ <span class="string">&quot;is not&quot; </span>}
+        );
         <span class="kw">if </span>!<span class="self">self</span>.in_nursery_gc || nursery_object {
             <span class="comment">// Note that test_and_mark() has side effects
             </span><span class="kw">if </span><span class="self">self</span>.test_and_mark(object, <span class="self">self</span>.mark_state) {
+                <span class="macro">trace!</span>(<span class="string">&quot;LOS object {} is being marked now&quot;</span>, object);
                 <span class="self">self</span>.treadmill.copy(object, nursery_object);
                 <span class="self">self</span>.clear_nursery(object);
                 <span class="comment">// We just moved the object out of the logical nursery, mark it as unlogged.
@@ -525,6 +542,11 @@
                         .mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
                 }
                 queue.enqueue(object);
+            } <span class="kw">else </span>{
+                <span class="macro">trace!</span>(
+                    <span class="string">&quot;LOS object {} is not being marked now, it was marked before&quot;</span>,
+                    object
+                );
             }
         }
         object

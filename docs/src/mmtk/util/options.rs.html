@@ -1082,6 +1082,7 @@
 <span id="1082">1082</span>
 <span id="1083">1083</span>
 <span id="1084">1084</span>
+<span id="1085">1085</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -1108,6 +1109,7 @@
     PageProtect,
     Immix,
     MarkCompact,
+    StickyImmix,
 }
 
 <span class="doccomment">/// MMTk option for perf events

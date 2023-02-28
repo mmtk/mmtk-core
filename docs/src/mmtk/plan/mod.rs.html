@@ -59,6 +59,12 @@
 <span id="59">59</span>
 <span id="60">60</span>
 <span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
 </pre><pre class="rust"><code><span class="doccomment">//! GC algorithms from the MMTk suite.
 //!
 //! This module provides various GC plans, each of which implements a GC algorithm.
@@ -99,7 +105,11 @@
 <span class="kw">mod </span>tracing;
 <span class="kw">pub use </span>tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};
 
-<span class="kw">mod </span>generational;
+<span class="doccomment">/// Generational plans (with a copying nursery)
+</span><span class="kw">mod </span>generational;
+<span class="doccomment">/// Sticky plans (using sticky marks for generational behaviors without a copying nursery)
+</span><span class="kw">mod </span>sticky;
+
 <span class="kw">mod </span>immix;
 <span class="kw">mod </span>markcompact;
 <span class="kw">mod </span>marksweep;
@@ -114,11 +124,13 @@
 // it is possible for performance reasons that they want the constraints as constants.
 
 </span><span class="kw">pub use </span>generational::copying::GENCOPY_CONSTRAINTS;
+<span class="kw">pub use </span>generational::immix::GENIMMIX_CONSTRAINTS;
 <span class="kw">pub use </span>immix::IMMIX_CONSTRAINTS;
 <span class="kw">pub use </span>markcompact::MARKCOMPACT_CONSTRAINTS;
 <span class="kw">pub use </span>marksweep::MS_CONSTRAINTS;
 <span class="kw">pub use </span>nogc::NOGC_CONSTRAINTS;
 <span class="kw">pub use </span>pageprotect::PP_CONSTRAINTS;
 <span class="kw">pub use </span>semispace::SS_CONSTRAINTS;
+<span class="kw">pub use </span>sticky::immix::STICKY_IMMIX_CONSTRAINTS;
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

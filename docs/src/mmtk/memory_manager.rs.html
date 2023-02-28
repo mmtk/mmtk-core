@@ -892,6 +892,7 @@
 <span id="892">892</span>
 <span id="893">893</span>
 <span id="894">894</span>
+<span id="895">895</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -972,6 +973,7 @@
         }
     }
     <span class="kw">let </span>mmtk = builder.build();
+
     <span class="macro">info!</span>(<span class="string">&quot;Initialized MMTk with {:?}&quot;</span>, <span class="kw-2">*</span>mmtk.options.plan);
     <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
     </span><span class="macro">warn!</span>(<span class="string">&quot;The feature &#39;extreme_assertions&#39; is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.&quot;</span>);
@@ -1456,7 +1458,7 @@
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
 </span><span class="kw">pub fn </span>handle_user_collection_request&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, tls: VMMutatorThread) {
-    mmtk.plan.handle_user_collection_request(tls, <span class="bool-val">false</span>);
+    mmtk.plan.handle_user_collection_request(tls, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
 }
 
 <span class="doccomment">/// Is the object alive?

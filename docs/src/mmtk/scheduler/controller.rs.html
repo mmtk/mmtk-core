@@ -182,7 +182,6 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
-<span id="185">185</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The GC controller thread.
 //!
 //! MMTk has many GC threads.  There are many GC worker threads and one GC controller thread.
@@ -242,12 +241,7 @@
             <span class="self">self</span>.requester.wait_for_request();
             <span class="macro">debug!</span>(<span class="string">&quot;[STWController: Request recieved.]&quot;</span>);
 
-            <span class="comment">// For heap growth logic
-            // FIXME: This is not used. However, we probably want to set a &#39;user_triggered&#39; flag
-            // when GC is requested.
-            // let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
-
-            </span><span class="self">self</span>.do_gc_until_completion();
+            <span class="self">self</span>.do_gc_until_completion();
             <span class="macro">debug!</span>(<span class="string">&quot;[STWController: Worker threads complete!]&quot;</span>);
         }
     }
@@ -272,6 +266,7 @@
 
     <span class="doccomment">/// Coordinate workers to perform GC in response to a GC request.
     </span><span class="kw">pub fn </span>do_gc_until_completion(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>gc_start = std::time::Instant::now();
         <span class="comment">// Schedule collection.
         </span><span class="self">self</span>.initiate_coordinator_work(<span class="kw-2">&amp;mut </span>ScheduleCollection, <span class="bool-val">true</span>);
 
@@ -317,7 +312,10 @@
         //       Otherwise, for generational GCs, workers will receive and process
         //       newly generated remembered-sets from those open buckets.
         //       But these remsets should be preserved until next GC.
-        </span><span class="self">self</span>.initiate_coordinator_work(<span class="kw-2">&amp;mut </span>EndOfGC, <span class="bool-val">false</span>);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>end_of_gc = EndOfGC {
+            elapsed: gc_start.elapsed(),
+        };
+        <span class="self">self</span>.initiate_coordinator_work(<span class="kw-2">&amp;mut </span>end_of_gc, <span class="bool-val">false</span>);
 
         <span class="self">self</span>.scheduler.debug_assert_all_buckets_deactivated();
     }

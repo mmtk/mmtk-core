@@ -1021,6 +1021,15 @@
 <span id="1021">1021</span>
 <span id="1022">1022</span>
 <span id="1023">1023</span>
+<span id="1024">1024</span>
+<span id="1025">1025</span>
+<span id="1026">1026</span>
+<span id="1027">1027</span>
+<span id="1028">1028</span>
+<span id="1029">1029</span>
+<span id="1030">1030</span>
+<span id="1031">1031</span>
+<span id="1032">1032</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1242,11 +1251,18 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; CoordinatorWork&lt;E::VM&gt; <span class="kw">for </span>StopMutators&lt;E&gt; {}
 
 <span class="attribute">#[derive(Default)]
-</span><span class="kw">pub struct </span>EndOfGC;
+</span><span class="kw">pub struct </span>EndOfGC {
+    <span class="kw">pub </span>elapsed: std::time::Duration,
+}
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>EndOfGC {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">info!</span>(<span class="string">&quot;End of GC&quot;</span>);
+        <span class="macro">info!</span>(
+            <span class="string">&quot;End of GC ({}/{} pages, took {} ms)&quot;</span>,
+            mmtk.plan.get_reserved_pages(),
+            mmtk.plan.get_total_pages(),
+            <span class="self">self</span>.elapsed.as_millis()
+        );
 
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
         </span><span class="attribute">#[allow(clippy::cast_ref_to_mut)]
@@ -1829,6 +1845,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>closure = ObjectsClosure::&lt;<span class="self">Self</span>::E&gt;::new(worker);
             <span class="kw">for </span>object <span class="kw">in </span>objects_to_scan.iter().copied() {
                 <span class="kw">if </span>&lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::support_edge_enqueuing(tls, object) {
+                    <span class="macro">trace!</span>(<span class="string">&quot;Scan object (edge) {}&quot;</span>, object);
                     <span class="comment">// If an object supports edge-enqueuing, we enqueue its edges.
                     </span>&lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_object(tls, object, <span class="kw-2">&amp;mut </span>closure);
                     <span class="self">self</span>.post_scan_object(object);
@@ -1854,6 +1871,7 @@
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 <span class="comment">// Scan objects and trace their edges at the same time.
                 </span><span class="kw">for </span>object <span class="kw">in </span>scan_later.iter().copied() {
+                    <span class="macro">trace!</span>(<span class="string">&quot;Scan object (node) {}&quot;</span>, object);
                     &lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_object_and_trace_edges(
                         tls,
                         object,

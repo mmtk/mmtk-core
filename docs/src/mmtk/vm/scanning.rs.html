@@ -287,6 +287,12 @@
 <span id="287">287</span>
 <span id="288">288</span>
 <span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -303,6 +309,12 @@
 <span class="doccomment">/// This lets us use closures as EdgeVisitor.
 </span><span class="kw">impl</span>&lt;ES: Edge, F: FnMut(ES)&gt; EdgeVisitor&lt;ES&gt; <span class="kw">for </span>F {
     <span class="kw">fn </span>visit_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, edge: ES) {
+        <span class="attribute">#[cfg(debug_assertions)]
+        </span><span class="macro">trace!</span>(
+            <span class="string">&quot;(FunctionClosure) Visit edge {:?} (pointing to {})&quot;</span>,
+            edge,
+            edge.load()
+        );
         <span class="self">self</span>(edge)
     }
 }

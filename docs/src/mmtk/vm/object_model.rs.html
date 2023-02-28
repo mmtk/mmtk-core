@@ -522,6 +522,12 @@
 <span id="522">522</span>
 <span id="523">523</span>
 <span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="self">self</span>::specs::<span class="kw-2">*</span>;
@@ -954,6 +960,12 @@
     /// Arguments:
     /// * `object`: The object to be dumped.
     </span><span class="kw">fn </span>dump_object(object: ObjectReference);
+
+    <span class="doccomment">/// Return if an object is valid from the runtime point of view. This is used
+    /// to debug MMTk.
+    </span><span class="kw">fn </span>is_object_sane(_object: ObjectReference) -&gt; bool {
+        <span class="bool-val">true
+    </span>}
 }
 
 <span class="kw">pub mod </span>specs {

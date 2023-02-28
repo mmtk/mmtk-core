@@ -161,7 +161,6 @@
 <span id="161">161</span>
 <span id="162">162</span>
 <span id="163">163</span>
-<span id="164">164</span>
 </pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
@@ -306,8 +305,7 @@
     }
 
     <span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
-        <span class="comment">// FIXME Do a full heap GC if we have generational GC
-        </span><span class="self">self</span>.plan.handle_user_collection_request(tls, <span class="bool-val">true</span>);
+        <span class="self">self</span>.plan.handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="self">self</span>.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
         <span class="self">self</span>.plan.base().stats.start_all();
         <span class="self">self</span>.scheduler.enable_stat();

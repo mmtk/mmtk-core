@@ -161,6 +161,39 @@
 <span id="161">161</span>
 <span id="162">162</span>
 <span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
@@ -171,6 +204,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpaceArgs;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
@@ -244,21 +278,11 @@
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
         <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
         <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
-        <span class="kw">let </span>in_defrag = <span class="self">self</span>.immix_space.decide_whether_to_defrag(
-            <span class="self">self</span>.is_emergency_collection(),
-            <span class="bool-val">true</span>,
-            <span class="self">self</span>.base().cur_collection_attempts.load(Ordering::SeqCst),
-            <span class="self">self</span>.base().is_user_triggered_collection(),
-            <span class="kw-2">*</span><span class="self">self</span>.base().options.full_heap_system_gc,
-        );
-
-        <span class="comment">// The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        </span><span class="attribute">#[allow(clippy::if_same_then_else)]
-        </span><span class="kw">if </span>in_defrag {
-            scheduler.schedule_common_work::&lt;ImmixGCWorkContext&lt;VM, TRACE_KIND_DEFRAG&gt;&gt;(<span class="self">self</span>);
-        } <span class="kw">else </span>{
-            scheduler.schedule_common_work::&lt;ImmixGCWorkContext&lt;VM, TRACE_KIND_FAST&gt;&gt;(<span class="self">self</span>);
-        }
+        <span class="self">Self</span>::schedule_immix_full_heap_collection::&lt;
+            Immix&lt;VM&gt;,
+            ImmixGCWorkContext&lt;VM, TRACE_KIND_FAST&gt;,
+            ImmixGCWorkContext&lt;VM, TRACE_KIND_DEFRAG&gt;,
+        &gt;(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.immix_space, scheduler)
     }
 
     <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
@@ -296,17 +320,29 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Immix&lt;VM&gt; {
     <span class="kw">pub fn </span>new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span><span class="kw-2">mut </span>plan_args = CreateSpecificPlanArgs {
+        <span class="kw">let </span>plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: <span class="kw-2">&amp;</span>IMMIX_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[]),
         };
+        <span class="self">Self</span>::new_with_args(
+            plan_args,
+            ImmixSpaceArgs {
+                reset_log_bit_in_major_gc: <span class="bool-val">false</span>,
+                unlog_object_when_traced: <span class="bool-val">false</span>,
+            },
+        )
+    }
+
+    <span class="kw">pub fn </span>new_with_args(
+        <span class="kw-2">mut </span>plan_args: CreateSpecificPlanArgs&lt;VM&gt;,
+        space_args: ImmixSpaceArgs,
+    ) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>immix = Immix {
-            immix_space: ImmixSpace::new(plan_args.get_space_args(
-                <span class="string">&quot;immix&quot;</span>,
-                <span class="bool-val">true</span>,
-                VMRequest::discontiguous(),
-            )),
+            immix_space: ImmixSpace::new(
+                plan_args.get_space_args(<span class="string">&quot;immix&quot;</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+                space_args,
+            ),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(<span class="bool-val">false</span>),
         };
@@ -322,6 +358,36 @@
         }
 
         immix
+    }
+
+    <span class="doccomment">/// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
+    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_immix_full_heap_collection&lt;
+        PlanType: Plan&lt;VM = VM&gt;,
+        FastContext: <span class="lifetime">&#39;static </span>+ GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
+        DefragContext: <span class="lifetime">&#39;static </span>+ GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
+    &gt;(
+        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>DefragContext::PlanType,
+        immix_space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,
+        scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;,
+    ) {
+        <span class="kw">let </span>in_defrag = immix_space.decide_whether_to_defrag(
+            plan.is_emergency_collection(),
+            <span class="bool-val">true</span>,
+            plan.base().cur_collection_attempts.load(Ordering::SeqCst),
+            plan.base().is_user_triggered_collection(),
+            <span class="kw-2">*</span>plan.base().options.full_heap_system_gc,
+        );
+
+        <span class="kw">if </span>in_defrag {
+            scheduler.schedule_common_work::&lt;DefragContext&gt;(plan);
+        } <span class="kw">else </span>{
+            scheduler.schedule_common_work::&lt;FastContext&gt;(plan);
+        }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">fn </span>set_last_gc_was_defrag(<span class="kw-2">&amp;</span><span class="self">self</span>, defrag: bool, order: Ordering) {
+        <span class="self">self</span>.last_gc_was_defrag.store(defrag, order)
     }
 }
 </code></pre></div>

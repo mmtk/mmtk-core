@@ -304,6 +304,7 @@
 <span id="304">304</span>
 <span id="305">305</span>
 <span id="306">306</span>
+<span id="307">307</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::Histogram;
 <span class="kw">use </span><span class="kw">super</span>::line::Line;
 <span class="kw">use </span><span class="kw">super</span>::ImmixSpace;
@@ -437,8 +438,9 @@
     <span class="doccomment">/// Test if the block is marked for defragmentation.
     </span><span class="kw">pub fn </span>is_defrag_source(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>byte = <span class="self">Self</span>::DEFRAG_STATE_TABLE.load_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), Ordering::SeqCst);
-        <span class="macro">debug_assert!</span>(byte == <span class="number">0 </span>|| byte == <span class="self">Self</span>::DEFRAG_SOURCE_STATE);
-        byte == <span class="self">Self</span>::DEFRAG_SOURCE_STATE
+        <span class="comment">// The byte should be 0 (not defrag source) or 255 (defrag source) if this is a major defrag GC, as we set the values in PrepareBlockState.
+        // But it could be any value in a nursery GC.
+        </span>byte == <span class="self">Self</span>::DEFRAG_SOURCE_STATE
     }
 
     <span class="doccomment">/// Mark the block for defragmentation.

@@ -32,6 +32,16 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
 </pre><pre class="rust"><code><span class="kw">pub mod </span>block;
 <span class="kw">pub mod </span>defrag;
 <span class="kw">pub mod </span>immixspace;
@@ -50,6 +60,16 @@
 
 <span class="doccomment">/// Opportunistic copying
 </span><span class="kw">pub const </span>DEFRAG: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_no_defrag&quot;</span>);
+
+<span class="doccomment">/// If Immix is used as a nursery space, do we prefer copy?
+/// If this is true, we copy nursery objects if possible.
+</span><span class="kw">pub const </span>PREFER_COPY_ON_NURSERY_GC: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_no_nursery_copy&quot;</span>);
+
+<span class="doccomment">/// In some cases/settings, Immix may never move objects.
+/// Currently we only have two cases where we move objects: 1. defrag, 2. nursery copy.
+/// If we do neither, we will not move objects.
+/// If we have other reasons to move objects, we need to add them here.
+</span><span class="kw">pub const </span>NEVER_MOVE_OBJECTS: bool = !DEFRAG &amp;&amp; !PREFER_COPY_ON_NURSERY_GC;
 
 <span class="doccomment">/// Mark lines when scanning objects.
 /// Otherwise, do it at mark time.

@@ -113,7 +113,7 @@
     immix_allocator.reset();
 }
 
-<span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+<span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plan) <span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_immix: <span class="number">1</span>,
     ..ReservedAllocators::DEFAULT
 };

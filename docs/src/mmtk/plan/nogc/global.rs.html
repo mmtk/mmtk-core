@@ -119,6 +119,11 @@
 <span id="119">119</span>
 <span id="120">120</span>
 <span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
@@ -197,7 +202,12 @@
             + <span class="self">self</span>.base.get_used_pages()
     }
 
-    <span class="kw">fn </span>handle_user_collection_request(<span class="kw-2">&amp;</span><span class="self">self</span>, _tls: VMMutatorThread, _force: bool) {
+    <span class="kw">fn </span>handle_user_collection_request(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _tls: VMMutatorThread,
+        _force: bool,
+        _exhaustive: bool,
+    ) {
         <span class="macro">warn!</span>(<span class="string">&quot;User attempted a collection request, but it is not supported in NoGC. The request is ignored.&quot;</span>);
     }
 }

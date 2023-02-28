@@ -148,11 +148,9 @@
 <span id="148">148</span>
 <span id="149">149</span>
 <span id="150">150</span>
-<span id="151">151</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
-<span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
-<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{gc_work::<span class="kw-2">*</span>, GCWork, GCWorker};
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::{Edge, MemorySlice};
@@ -161,22 +159,26 @@
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::ops::{Deref, DerefMut};
 
+<span class="kw">use </span><span class="kw">super</span>::global::GenerationalPlanExt;
+
 <span class="doccomment">/// Process edges for a nursery GC. This type is provided if a generational plan does not use
 /// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,
 /// it does not need to use this type.
-</span><span class="kw">pub struct </span>GenNurseryProcessEdges&lt;VM: VMBinding&gt; {
-    gen: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CommonGenPlan&lt;VM&gt;,
+</span><span class="kw">pub struct </span>GenNurseryProcessEdges&lt;VM: VMBinding, P: GenerationalPlanExt&lt;VM&gt; + PlanTraceObject&lt;VM&gt;&gt; {
+    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>P,
     base: ProcessEdgesBase&lt;VM&gt;,
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; ProcessEdgesWork <span class="kw">for </span>GenNurseryProcessEdges&lt;VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding, P: GenerationalPlanExt&lt;VM&gt; + PlanTraceObject&lt;VM&gt;&gt; ProcessEdgesWork
+    <span class="kw">for </span>GenNurseryProcessEdges&lt;VM, P&gt;
+{
     <span class="kw">type </span>VM = VM;
-    <span class="kw">type </span>ScanObjectsWorkType = ScanObjects&lt;<span class="self">Self</span>&gt;;
+    <span class="kw">type </span>ScanObjectsWorkType = PlanScanObjects&lt;<span class="self">Self</span>, P&gt;;
 
     <span class="kw">fn </span>new(edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;, roots: bool, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>base = ProcessEdgesBase::new(edges, roots, mmtk);
-        <span class="kw">let </span>gen = base.plan().generational().unwrap().common_gen();
-        <span class="self">Self </span>{ gen, base }
+        <span class="kw">let </span>plan = base.plan().downcast_ref().unwrap();
+        <span class="self">Self </span>{ plan, base }
     }
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
         <span class="kw">if </span>object.is_null() {
@@ -184,29 +186,37 @@
         }
         <span class="comment">// We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         </span><span class="kw">let </span>worker = <span class="self">self</span>.worker();
-        <span class="self">self</span>.gen
+        <span class="self">self</span>.plan
             .trace_object_nursery(<span class="kw-2">&amp;mut </span><span class="self">self</span>.base.nodes, object, worker)
     }
     <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span>object = slot.load();
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
-        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.gen.nursery.in_space(new_object));
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.plan.is_object_in_nursery(new_object));
         slot.store(new_object);
     }
 
-    <span class="kw">fn </span>create_scan_work(<span class="kw-2">&amp;</span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;<span class="self">Self</span>&gt; {
-        ScanObjects::&lt;<span class="self">Self</span>&gt;::new(nodes, <span class="bool-val">false</span>, roots)
+    <span class="kw">fn </span>create_scan_work(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        nodes: Vec&lt;ObjectReference&gt;,
+        roots: bool,
+    ) -&gt; <span class="self">Self</span>::ScanObjectsWorkType {
+        PlanScanObjects::new(<span class="self">self</span>.plan, nodes, <span class="bool-val">false</span>, roots)
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; Deref <span class="kw">for </span>GenNurseryProcessEdges&lt;VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding, P: GenerationalPlanExt&lt;VM&gt; + PlanTraceObject&lt;VM&gt;&gt; Deref
+    <span class="kw">for </span>GenNurseryProcessEdges&lt;VM, P&gt;
+{
     <span class="kw">type </span>Target = ProcessEdgesBase&lt;VM&gt;;
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding&gt; DerefMut <span class="kw">for </span>GenNurseryProcessEdges&lt;VM&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding, P: GenerationalPlanExt&lt;VM&gt; + PlanTraceObject&lt;VM&gt;&gt; DerefMut
+    <span class="kw">for </span>GenNurseryProcessEdges&lt;VM, P&gt;
+{
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.base
     }
@@ -242,13 +252,7 @@
             );
         }
         <span class="comment">// scan modbuf only if the current GC is a nursery GC
-        </span><span class="kw">if </span>mmtk
-            .plan
-            .generational()
-            .unwrap()
-            .common_gen()
-            .is_current_gc_nursery()
-        {
+        </span><span class="kw">if </span>mmtk.plan.generational().unwrap().is_current_gc_nursery() {
             <span class="comment">// Scan objects in the modbuf and forward pointers
             </span><span class="kw">let </span>modbuf = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.modbuf);
             GCWork::do_work(
@@ -281,13 +285,7 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>ProcessRegionModBuf&lt;E&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="comment">// Scan modbuf only if the current GC is a nursery GC
-        </span><span class="kw">if </span>mmtk
-            .plan
-            .generational()
-            .unwrap()
-            .common_gen()
-            .is_current_gc_nursery()
-        {
+        </span><span class="kw">if </span>mmtk.plan.generational().unwrap().is_current_gc_nursery() {
             <span class="comment">// Collect all the entries in all the slices
             </span><span class="kw">let </span><span class="kw-2">mut </span>edges = <span class="macro">vec!</span>[];
             <span class="kw">for </span>slice <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.modbuf {

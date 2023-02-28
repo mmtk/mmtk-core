@@ -1038,6 +1038,36 @@
 <span id="1038">1038</span>
 <span id="1039">1039</span>
 <span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
+<span id="1043">1043</span>
+<span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1098,6 +1128,9 @@
         PlanSelector::MarkCompact =&gt; {
             <span class="kw">crate</span>::plan::markcompact::mutator::create_markcompact_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan)
         }
+        PlanSelector::StickyImmix =&gt; {
+            <span class="kw">crate</span>::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -1140,6 +1173,9 @@
         }
         PlanSelector::MarkCompact =&gt; {
             Box::new(<span class="kw">crate</span>::plan::markcompact::MarkCompact::new(args)) <span class="kw">as </span>Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;
+        }
+        PlanSelector::StickyImmix =&gt; {
+            Box::new(<span class="kw">crate</span>::plan::sticky::immix::StickyImmix::new(args)) <span class="kw">as </span>Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;
         }
     };
 
@@ -1308,7 +1344,14 @@
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
-        </span><span class="self">self</span>.get_total_pages()
+        </span><span class="macro">trace!</span>(
+            <span class="string">&quot;Total pages = {}, reserved pages = {}, available pages = {}&quot;</span>,
+            <span class="self">self</span>.get_total_pages(),
+            <span class="self">self</span>.get_reserved_pages(),
+            <span class="self">self</span>.get_reserved_pages()
+                .saturating_sub(<span class="self">self</span>.get_reserved_pages())
+        );
+        <span class="self">self</span>.get_total_pages()
             .saturating_sub(<span class="self">self</span>.get_reserved_pages())
     }
 
@@ -1332,24 +1375,30 @@
         <span class="self">self</span>.base().emergency_collection.load(Ordering::Relaxed)
     }
 
-    <span class="doccomment">/// The application code has requested a collection.
-    </span><span class="kw">fn </span>handle_user_collection_request(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread, force: bool) {
+    <span class="doccomment">/// The application code has requested a collection. This is just a GC hint, and
+    /// we may ignore it.
+    ///
+    /// # Arguments
+    /// * `tls`: The mutator thread that requests the GC
+    /// * `force`: The request cannot be ignored (except for NoGC)
+    /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
+    </span><span class="kw">fn </span>handle_user_collection_request(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread, force: bool, exhaustive: bool) {
+        <span class="comment">// For exhaustive on generational plans, we force a full heap GC.
+        // A plan may implement this method themselves to handle the exhaustive GC.
+        </span><span class="kw">if </span>exhaustive {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(gen) = <span class="self">self</span>.generational() {
+                gen.force_full_heap_collection();
+            }
+        }
         <span class="self">self</span>.base().handle_user_collection_request(tls, force)
     }
 
     <span class="doccomment">/// Return whether last GC was an exhaustive attempt to collect the heap.
-    /// For many collectors this is the same as asking whether the last GC was a full heap collection.
+    /// For example, for generational GCs, minor collection is not an exhaustive collection.
+    /// For example, for Immix, fast collection (no defragmentation) is not an exhaustive collection.
     </span><span class="kw">fn </span>last_collection_was_exhaustive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.last_collection_full_heap()
-    }
-
-    <span class="doccomment">/// Return whether last GC is a full GC.
-    </span><span class="kw">fn </span>last_collection_full_heap(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="bool-val">true
     </span>}
-
-    <span class="doccomment">/// Force the next collection to be full heap.
-    </span><span class="kw">fn </span>force_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {}
 
     <span class="kw">fn </span>modify_check(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="macro">assert!</span>(
@@ -1358,6 +1407,15 @@
             object
         );
     }
+
+    <span class="doccomment">/// An object is firstly reached by a sanity GC. So the object is reachable
+    /// in the current GC, and all the GC work has been done for the object (such as
+    /// tracing and releasing). A plan can implement this to
+    /// use plan specific semantics to check if the object is sane.
+    /// Return true if the object is considered valid by the plan.
+    </span><span class="kw">fn </span>sanity_check_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
+        <span class="bool-val">true
+    </span>}
 }
 
 <span class="macro">impl_downcast!</span>(Plan assoc VM);
@@ -1718,7 +1776,9 @@ BasePlan should contain all plan-related state and functions that are _fundament
             .store(emergency_collection, Ordering::Relaxed);
 
         <span class="kw">if </span>emergency_collection {
-            plan.force_full_heap_collection();
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(gen) = plan.generational() {
+                gen.force_full_heap_collection();
+            }
         }
     }
 

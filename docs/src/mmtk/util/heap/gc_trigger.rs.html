@@ -503,6 +503,8 @@
 <span id="503">503</span>
 <span id="504">504</span>
 <span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -559,14 +561,16 @@
         <span class="kw">let </span>plan = <span class="kw">unsafe </span>{ <span class="self">self</span>.plan.assume_init() };
         <span class="kw">if </span><span class="self">self</span>.policy.is_gc_required(space_full, space, plan) {
             <span class="macro">info!</span>(
-                <span class="string">&quot;[POLL] {}{}&quot;</span>,
+                <span class="string">&quot;[POLL] {}{} ({}/{} pages)&quot;</span>,
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(space) = space {
                     <span class="macro">format!</span>(<span class="string">&quot;{}: &quot;</span>, space.get_name())
                 } <span class="kw">else </span>{
                     <span class="string">&quot;&quot;</span>.to_string()
                 },
-                <span class="string">&quot;Triggering collection&quot;
-            </span>);
+                <span class="string">&quot;Triggering collection&quot;</span>,
+                plan.get_reserved_pages(),
+                plan.get_total_pages(),
+            );
             plan.base().gc_requester.request();
             <span class="kw">return </span><span class="bool-val">true</span>;
         }
@@ -735,7 +739,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
     ) {
-        <span class="kw">if </span>!plan.common_gen().is_current_gc_nursery() {
+        <span class="kw">if </span>!plan.is_current_gc_nursery() {
             <span class="self">self</span>.gc_release_live_pages = plan.get_mature_reserved_pages();
 
             <span class="comment">// Calculate the promoted pages (including pre tentured objects)
@@ -758,7 +762,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
     ) -&gt; bool {
-        <span class="kw">if </span>!plan.common_gen().is_current_gc_nursery() {
+        <span class="kw">if </span>!plan.is_current_gc_nursery() {
             <span class="self">self</span>.gc_end_live_pages = plan.get_mature_reserved_pages();
             <span class="self">self</span>.collection_pages = (<span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(

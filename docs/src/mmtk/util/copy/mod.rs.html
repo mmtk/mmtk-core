@@ -248,6 +248,33 @@
 <span id="248">248</span>
 <span id="249">249</span>
 <span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -255,8 +282,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpaceCopyContext;
-<span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::{ImmixCopyContext, ImmixHybridCopyContext};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::VMWorkerThread;
@@ -269,7 +296,8 @@
 <span class="kw">use </span>enum_map::EnumMap;
 
 <span class="kw">const </span>MAX_COPYSPACE_COPY_ALLOCATORS: usize = <span class="number">1</span>;
-<span class="kw">const </span>MAX_IMMIX_COPY_ALLOCATORS: usize = <span class="number">2</span>;
+<span class="kw">const </span>MAX_IMMIX_COPY_ALLOCATORS: usize = <span class="number">1</span>;
+<span class="kw">const </span>MAX_IMMIX_HYBRID_COPY_ALLOCATORS: usize = <span class="number">1</span>;
 
 <span class="kw">type </span>CopySpaceMapping&lt;VM&gt; = Vec&lt;(CopySelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt;;
 
@@ -303,6 +331,8 @@
     </span><span class="kw">pub </span>copy: [MaybeUninit&lt;CopySpaceCopyContext&lt;VM&gt;&gt;; MAX_COPYSPACE_COPY_ALLOCATORS],
     <span class="doccomment">/// Copy allocators for ImmixSpace
     </span><span class="kw">pub </span>immix: [MaybeUninit&lt;ImmixCopyContext&lt;VM&gt;&gt;; MAX_IMMIX_COPY_ALLOCATORS],
+    <span class="doccomment">/// Copy allocators for ImmixSpace
+    </span><span class="kw">pub </span>immix_hybrid: [MaybeUninit&lt;ImmixHybridCopyContext&lt;VM&gt;&gt;; MAX_IMMIX_HYBRID_COPY_ALLOCATORS],
     <span class="doccomment">/// The config for the plan
     </span>config: CopyConfig&lt;VM&gt;,
 }
@@ -339,6 +369,10 @@
             }
             CopySelector::Immix(index) =&gt; <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[index <span class="kw">as </span>usize].assume_init_mut() }
                 .alloc_copy(original, bytes, align, offset),
+            CopySelector::ImmixHybrid(index) =&gt; {
+                <span class="kw">unsafe </span>{ <span class="self">self</span>.immix_hybrid[index <span class="kw">as </span>usize].assume_init_mut() }
+                    .alloc_copy(original, bytes, align, offset)
+            }
             CopySelector::Unused =&gt; <span class="macro">unreachable!</span>(),
         }
     }
@@ -375,6 +409,10 @@
             CopySelector::Immix(index) =&gt; {
                 <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[index <span class="kw">as </span>usize].assume_init_mut() }.post_copy(object, bytes)
             }
+            CopySelector::ImmixHybrid(index) =&gt; {
+                <span class="kw">unsafe </span>{ <span class="self">self</span>.immix_hybrid[index <span class="kw">as </span>usize].assume_init_mut() }
+                    .post_copy(object, bytes)
+            }
             CopySelector::Unused =&gt; <span class="macro">unreachable!</span>(),
         }
     }
@@ -389,6 +427,9 @@
                 }
                 CopySelector::Immix(index) =&gt; {
                     <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.prepare()
+                }
+                CopySelector::ImmixHybrid(index) =&gt; {
+                    <span class="kw">unsafe </span>{ <span class="self">self</span>.immix_hybrid[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.prepare()
                 }
                 CopySelector::Unused =&gt; {}
             }
@@ -405,6 +446,9 @@
                 }
                 CopySelector::Immix(index) =&gt; {
                     <span class="kw">unsafe </span>{ <span class="self">self</span>.immix[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.release()
+                }
+                CopySelector::ImmixHybrid(index) =&gt; {
+                    <span class="kw">unsafe </span>{ <span class="self">self</span>.immix_hybrid[<span class="kw-2">*</span>index <span class="kw">as </span>usize].assume_init_mut() }.release()
                 }
                 CopySelector::Unused =&gt; {}
             }
@@ -425,6 +469,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>ret = GCWorkerCopyContext {
             copy: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             immix: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
+            immix_hybrid: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             config,
         };
 
@@ -445,6 +490,13 @@
                         space.downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
                     ));
                 }
+                CopySelector::ImmixHybrid(index) =&gt; {
+                    ret.immix_hybrid[index <span class="kw">as </span>usize].write(ImmixHybridCopyContext::new(
+                        worker_tls,
+                        plan,
+                        space.downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
+                    ));
+                }
                 CopySelector::Unused =&gt; <span class="macro">unreachable!</span>(),
             }
         }
@@ -457,6 +509,7 @@
         GCWorkerCopyContext {
             copy: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             immix: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
+            immix_hybrid: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             config: CopyConfig::default(),
         }
     }
@@ -490,6 +543,7 @@
 </span><span class="kw">pub enum </span>CopySelector {
     CopySpace(u8),
     Immix(u8),
+    ImmixHybrid(u8),
     Unused,
 }
 

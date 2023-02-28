@@ -251,11 +251,35 @@
 <span id="251">251</span>
 <span id="252">252</span>
 <span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
+<span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlanExt;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -271,8 +295,11 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::ObjectQueue;
 <span class="kw">use </span>enum_map::EnumMap;
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
 
@@ -319,14 +346,6 @@
         </span><span class="self">Self</span>: Sized,
     {
         <span class="self">self</span>.gen.collection_required(<span class="self">self</span>, space_full, space)
-    }
-
-    <span class="kw">fn </span>force_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.gen.force_full_heap_collection()
-    }
-
-    <span class="kw">fn </span>last_collection_full_heap(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.gen.last_collection_full_heap()
     }
 
     <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
@@ -415,8 +434,16 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GenerationalPlan <span class="kw">for </span>GenCopy&lt;VM&gt; {
-    <span class="kw">fn </span>common_gen(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonGenPlan&lt;<span class="self">Self</span>::VM&gt; {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.gen
+    <span class="kw">fn </span>is_current_gc_nursery(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.gen.is_current_gc_nursery()
+    }
+
+    <span class="kw">fn </span>is_object_in_nursery(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
+        <span class="self">self</span>.gen.nursery.in_space(object)
+    }
+
+    <span class="kw">fn </span>is_address_in_nursery(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
+        <span class="self">self</span>.gen.nursery.address_in_space(addr)
     }
 
     <span class="kw">fn </span>get_mature_physical_pages_available(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
@@ -425,6 +452,25 @@
 
     <span class="kw">fn </span>get_mature_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.tospace().reserved_pages()
+    }
+
+    <span class="kw">fn </span>force_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.gen.force_full_heap_collection()
+    }
+
+    <span class="kw">fn </span>last_collection_full_heap(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.gen.last_collection_full_heap()
+    }
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GenerationalPlanExt&lt;VM&gt; <span class="kw">for </span>GenCopy&lt;VM&gt; {
+    <span class="kw">fn </span>trace_object_nursery&lt;Q: ObjectQueue&gt;(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        queue: <span class="kw-2">&amp;mut </span>Q,
+        object: ObjectReference,
+        worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+    ) -&gt; ObjectReference {
+        <span class="self">self</span>.gen.trace_object_nursery(queue, object, worker)
     }
 }
 

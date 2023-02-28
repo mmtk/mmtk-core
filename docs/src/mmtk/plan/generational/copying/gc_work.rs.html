@@ -29,7 +29,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::scheduler::GCWorkContext <span class="kw">for </span>GenCopyNurseryGCWorkContext&lt;VM&gt; {
     <span class="kw">type </span>VM = VM;
     <span class="kw">type </span>PlanType = GenCopy&lt;VM&gt;;
-    <span class="kw">type </span>ProcessEdgesWorkType = GenNurseryProcessEdges&lt;<span class="self">Self</span>::VM&gt;;
+    <span class="kw">type </span>ProcessEdgesWorkType = GenNurseryProcessEdges&lt;<span class="self">Self</span>::VM, <span class="self">Self</span>::PlanType&gt;;
 }
 
 <span class="kw">pub struct </span>GenCopyGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
