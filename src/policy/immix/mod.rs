@@ -17,6 +17,16 @@ pub const BLOCK_ONLY: bool = false;
 /// Opportunistic copying
 pub const DEFRAG: bool = !cfg!(feature = "immix_no_defrag");
 
+/// If Immix is used as a nursery space, do we prefer copy?
+/// If this is true, we copy nursery objects if possible.
+pub const PREFER_COPY_ON_NURSERY_GC: bool = !cfg!(feature = "immix_no_nursery_copy");
+
+/// In some cases/settings, Immix may never move objects.
+/// Currently we only have two cases where we move objects: 1. defrag, 2. nursery copy.
+/// If we do neither, we will not move objects.
+/// If we have other reasons to move objects, we need to add them here.
+pub const NEVER_MOVE_OBJECTS: bool = !DEFRAG && !PREFER_COPY_ON_NURSERY_GC;
+
 /// Mark lines when scanning objects.
 /// Otherwise, do it at mark time.
 pub const MARK_LINE_AT_SCAN_TIME: bool = true;

@@ -11,14 +11,19 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
+use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
+use crate::scheduler::GCWorker;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::ObjectQueue;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
@@ -70,11 +75,11 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         use enum_map::enum_map;
         CopyConfig {
             copy_mapping: enum_map! {
-                CopySemantics::PromoteToMature => CopySelector::Immix(0),
-                CopySemantics::Mature => CopySelector::Immix(0),
+                CopySemantics::PromoteToMature => CopySelector::ImmixHybrid(0),
+                CopySemantics::Mature => CopySelector::ImmixHybrid(0),
                 _ => CopySelector::Unused,
             },
-            space_mapping: vec![(CopySelector::Immix(0), &self.immix)],
+            space_mapping: vec![(CopySelector::ImmixHybrid(0), &self.immix)],
             constraints: &GENIMMIX_CONSTRAINTS,
         }
     }
@@ -84,14 +89,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             && ImmixSpace::<VM>::is_last_gc_exhaustive(
                 self.last_gc_was_defrag.load(Ordering::Relaxed),
             )
-    }
-
-    fn force_full_heap_collection(&self) {
-        self.gen.force_full_heap_collection()
-    }
-
-    fn last_collection_full_heap(&self) -> bool {
-        self.gen.last_collection_full_heap()
     }
 
     fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
@@ -117,29 +114,16 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        let defrag = if is_full_heap {
-            self.immix.decide_whether_to_defrag(
-                self.is_emergency_collection(),
-                true,
-                self.base().cur_collection_attempts.load(Ordering::SeqCst),
-                self.base().is_user_triggered_collection(),
-                *self.base().options.full_heap_system_gc,
-            )
-        } else {
-            false
-        };
 
         if !is_full_heap {
             debug!("Nursery GC");
             scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
-        } else if defrag {
-            debug!("Full heap GC Defrag");
-            scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self);
         } else {
-            debug!("Full heap GC Fast");
-            scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>>(self);
+            crate::plan::immix::Immix::schedule_immix_full_heap_collection::<
+                GenImmix<VM>,
+                GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
+                GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
+            >(self, &self.immix, scheduler);
         }
     }
 
@@ -204,8 +188,16 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 }
 
 impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
-    fn common_gen(&self) -> &CommonGenPlan<Self::VM> {
-        &self.gen
+    fn is_current_gc_nursery(&self) -> bool {
+        self.gen.is_current_gc_nursery()
+    }
+
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
+        self.gen.nursery.in_space(object)
+    }
+
+    fn is_address_in_nursery(&self, addr: Address) -> bool {
+        self.gen.nursery.address_in_space(addr)
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {
@@ -214,6 +206,25 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.immix.reserved_pages()
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
+    }
+}
+
+impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> for GenImmix<VM> {
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.gen.trace_object_nursery(queue, object, worker)
     }
 }
 
@@ -225,11 +236,15 @@ impl<VM: VMBinding> GenImmix<VM> {
             global_side_metadata_specs:
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
-        let immix_space = ImmixSpace::new(plan_args.get_space_args(
-            "immix_mature",
-            true,
-            VMRequest::discontiguous(),
-        ));
+        let immix_space = ImmixSpace::new(
+            plan_args.get_space_args("immix_mature", true, VMRequest::discontiguous()),
+            ImmixSpaceArgs {
+                reset_log_bit_in_major_gc: false,
+                // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
+                // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
+                unlog_object_when_traced: false,
+            },
+        );
 
         let genimmix = GenImmix {
             gen: CommonGenPlan::new(plan_args),

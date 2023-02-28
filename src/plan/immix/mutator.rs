@@ -37,7 +37,7 @@ pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMW
     immix_allocator.reset();
 }
 
-const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+pub(in crate::plan) const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_immix: 1,
     ..ReservedAllocators::DEFAULT
 };
