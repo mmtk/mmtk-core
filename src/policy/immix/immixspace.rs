@@ -591,7 +591,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
         if self.space_args.unlog_object_when_traced {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            // Every immix line is 256 bytes, which is mapped to 4 bytes in the side metadata.
+            // If we have one object in the line that is mature, we can assume all the objects in the line are mature objects.
+            // So we can just mark the byte.
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }
 

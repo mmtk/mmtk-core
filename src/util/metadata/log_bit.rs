@@ -15,11 +15,7 @@ impl VMGlobalLogBitSpec {
     /// it may unlog adjacent objects. This method should only be used
     /// when adjacent objects are also in the mature space, and there is no harm if we also unlog them.
     /// This method is meant to be an optimization, and can always be replaced with `mark_as_unlogged`.
-    pub fn mark_byte_as_unlogged<VM: VMBinding>(
-        &self,
-        object: ObjectReference,
-        order: Ordering,
-    ) {
+    pub fn mark_byte_as_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) {
         match self.as_spec() {
             // If the log bit is in the header, there is nothing we can do. We just call `mark_as_unlogged`.
             MetadataSpec::InHeader(_) => self.mark_as_unlogged::<VM>(object, order),
