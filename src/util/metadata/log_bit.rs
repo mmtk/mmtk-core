@@ -11,10 +11,11 @@ impl VMGlobalLogBitSpec {
         self.store_atomic::<VM, u8>(object, 1, None, order)
     }
 
-    /// Mark the log bit as unlogged for an object in the mature space. This method should only be used
-    /// if the object is in the mature space (i.e. every object in the same space is mature object).
+    /// Mark the entire byte as unlogged if the log bit is in the side metadata. As it marks the entire byte,
+    /// it may unlog adjacent objects. This method should only be used
+    /// when adjacent objects are also in the mature space, and there is no harm if we also unlog them.
     /// This method is meant to be an optimization, and can always be replaced with `mark_as_unlogged`.
-    pub fn mark_as_unlogged_in_mature_space<VM: VMBinding>(
+    pub fn mark_byte_as_unlogged<VM: VMBinding>(
         &self,
         object: ObjectReference,
         order: Ordering,
@@ -29,5 +30,9 @@ impl VMGlobalLogBitSpec {
                 spec.set_raw_byte_atomic(object.to_address::<VM>(), order)
             },
         }
+    }
+
+    pub fn is_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) -> bool {
+        self.load_atomic::<VM, u8>(object, None, order) == 1
     }
 }

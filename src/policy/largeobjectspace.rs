@@ -196,9 +196,15 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             object
         );
         let nursery_object = self.is_in_nursery(object);
+        trace!(
+            "LOS object {} {} a nursery object",
+            object,
+            if nursery_object { "is" } else { "is not" }
+        );
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
+                trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
                 self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
@@ -207,6 +213,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
                 queue.enqueue(object);
+            } else {
+                trace!(
+                    "LOS object {} is not being marked now, it was marked before",
+                    object
+                );
             }
         }
         object

@@ -101,6 +101,7 @@ impl<P: Plan> SanityPrepare<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        info!("Sanity GC prepare");
         mmtk.plan.enter_sanity();
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
@@ -129,6 +130,7 @@ impl<P: Plan> SanityRelease<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        info!("Sanity GC release");
         mmtk.plan.leave_sanity();
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
@@ -180,8 +182,24 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);
+
+            // Let plan check object
+            assert!(
+                self.mmtk().plan.sanity_check_object(object),
+                "Invalid reference {:?}",
+                object
+            );
+
+            // Let VM check object
+            assert!(
+                VM::VMObjectModel::is_object_sane(object),
+                "Invalid reference {:?}",
+                object
+            );
+
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
+            trace!("Sanity mark object {}", object);
             self.nodes.enqueue(object);
         }
         object

@@ -43,7 +43,7 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
         let trace_object_function = plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
-        let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(&post_scan_spaces, &ty_generics);
+        let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(&post_scan_spaces, &fallback, &ty_generics);
         let may_move_objects_function = plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
