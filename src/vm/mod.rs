@@ -20,7 +20,7 @@ use crate::util::constants::*;
 mod active_plan;
 mod collection;
 pub mod edge_shape;
-mod object_model;
+pub(crate) mod object_model;
 mod reference_glue;
 mod scanning;
 pub use self::active_plan::ActivePlan;

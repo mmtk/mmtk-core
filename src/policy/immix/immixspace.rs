@@ -591,7 +591,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
         if self.space_args.unlog_object_when_traced {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            // Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
+            // use `mark_as_unlogged` instead to mark the bit.
+            const_assert!(
+                Line::BYTES
+                    >= (1
+                        << (crate::util::constants::LOG_BITS_IN_BYTE
+                            + crate::util::constants::LOG_MIN_OBJECT_SIZE))
+            );
+            const_assert_eq!(
+                crate::vm::object_model::specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
+                0
+            ); // We should put this to the addition, but type casting is not allowed in constant assertions.
+
+            // Every immix line is 256 bytes, which is mapped to 4 bytes in the side metadata.
+            // If we have one object in the line that is mature, we can assume all the objects in the line are mature objects.
+            // So we can just mark the byte.
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }
 
