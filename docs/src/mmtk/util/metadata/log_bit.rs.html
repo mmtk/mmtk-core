@@ -13,15 +13,53 @@
 <span id="13">13</span>
 <span id="14">14</span>
 <span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMGlobalLogBitSpec;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
+<span class="kw">use </span><span class="kw">super</span>::MetadataSpec;
+
 <span class="kw">impl </span>VMGlobalLogBitSpec {
     <span class="doccomment">/// Mark the log bit as unlogged (1 means unlogged)
     </span><span class="kw">pub fn </span>mark_as_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) {
         <span class="self">self</span>.store_atomic::&lt;VM, u8&gt;(object, <span class="number">1</span>, <span class="prelude-val">None</span>, order)
+    }
+
+    <span class="doccomment">/// Mark the entire byte as unlogged if the log bit is in the side metadata. As it marks the entire byte,
+    /// it may unlog adjacent objects. This method should only be used
+    /// when adjacent objects are also in the mature space, and there is no harm if we also unlog them.
+    /// This method is meant to be an optimization, and can always be replaced with `mark_as_unlogged`.
+    </span><span class="kw">pub fn </span>mark_byte_as_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) {
+        <span class="kw">match </span><span class="self">self</span>.as_spec() {
+            <span class="comment">// If the log bit is in the header, there is nothing we can do. We just call `mark_as_unlogged`.
+            </span>MetadataSpec::InHeader(<span class="kw">_</span>) =&gt; <span class="self">self</span>.mark_as_unlogged::&lt;VM&gt;(object, order),
+            <span class="comment">// If the log bit is in the side metadata, we can simply set the entire byte to 0xff. Because we
+            // know we are setting log bit for mature space, and every object in the space should have log
+            // bit as 1.
+            </span>MetadataSpec::OnSide(spec) =&gt; <span class="kw">unsafe </span>{
+                spec.set_raw_byte_atomic(object.to_address::&lt;VM&gt;(), order)
+            },
+        }
     }
 
     <span class="kw">pub fn </span>is_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) -&gt; bool {

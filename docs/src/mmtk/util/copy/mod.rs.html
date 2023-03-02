@@ -275,6 +275,7 @@
 <span id="275">275</span>
 <span id="276">276</span>
 <span id="277">277</span>
+<span id="278">278</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -399,7 +400,8 @@
         <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.
         </span><span class="kw">if </span>semantics.is_mature() &amp;&amp; <span class="self">self</span>.config.constraints.needs_log_bit {
             <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
-            </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
+            </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::&lt;VM&gt;(object, Ordering::Relaxed);
         }
         <span class="comment">// Policy specific post copy.
         </span><span class="kw">match </span><span class="self">self</span>.config.copy_mapping[semantics] {

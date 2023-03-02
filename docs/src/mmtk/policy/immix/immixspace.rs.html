@@ -953,6 +953,23 @@
 <span id="953">953</span>
 <span id="954">954</span>
 <span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1546,7 +1563,24 @@
 
     <span class="kw">fn </span>unlog_object_if_needed(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
         <span class="kw">if </span><span class="self">self</span>.space_args.unlog_object_when_traced {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
+            <span class="comment">// Make sure the side metadata for the line can fit into one byte. For smaller line size, we should
+            // use `mark_as_unlogged` instead to mark the bit.
+            </span><span class="macro">const_assert!</span>(
+                Line::BYTES
+                    &gt;= (<span class="number">1
+                        </span>&lt;&lt; (<span class="kw">crate</span>::util::constants::LOG_BITS_IN_BYTE
+                            + <span class="kw">crate</span>::util::constants::LOG_MIN_OBJECT_SIZE))
+            );
+            <span class="macro">const_assert_eq!</span>(
+                <span class="kw">crate</span>::vm::object_model::specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
+                <span class="number">0
+            </span>); <span class="comment">// We should put this to the addition, but type casting is not allowed in constant assertions.
+
+            // Every immix line is 256 bytes, which is mapped to 4 bytes in the side metadata.
+            // If we have one object in the line that is mature, we can assume all the objects in the line are mature objects.
+            // So we can just mark the byte.
+            </span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                .mark_byte_as_unlogged::&lt;VM&gt;(object, Ordering::Relaxed);
         }
     }
 
