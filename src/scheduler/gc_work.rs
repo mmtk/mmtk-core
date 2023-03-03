@@ -597,7 +597,7 @@ pub trait ProcessEdgesWork:
             .sanity_checker
             .lock()
             .unwrap()
-            .add_roots(self.edges.clone());
+            .add_root_edges(self.edges.clone());
     }
 
     /// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
@@ -651,7 +651,6 @@ pub trait ProcessEdgesWork:
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("ProcessEdgesWork");
         self.set_worker(worker);
         self.process_edges();
         if !self.nodes.is_empty() {
@@ -775,6 +774,16 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
     ) {
         let tls = worker.tls;
+
+        #[cfg(feature = "sanity")]
+        {
+            if self.roots() {
+                mmtk.sanity_checker
+                    .lock()
+                    .unwrap()
+                    .add_root_nodes(buffer.to_vec());
+            }
+        }
 
         // If this is a root packet, the objects in this packet will have not been traced, yet.
         //
