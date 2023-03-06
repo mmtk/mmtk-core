@@ -1030,6 +1030,15 @@
 <span id="1030">1030</span>
 <span id="1031">1031</span>
 <span id="1032">1032</span>
+<span id="1033">1033</span>
+<span id="1034">1034</span>
+<span id="1035">1035</span>
+<span id="1036">1036</span>
+<span id="1037">1037</span>
+<span id="1038">1038</span>
+<span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1629,7 +1638,7 @@
             .sanity_checker
             .lock()
             .unwrap()
-            .add_roots(<span class="self">self</span>.edges.clone());
+            .add_root_edges(<span class="self">self</span>.edges.clone());
     }
 
     <span class="doccomment">/// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
@@ -1683,7 +1692,6 @@
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>E {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;ProcessEdgesWork&quot;</span>);
         <span class="self">self</span>.set_worker(worker);
         <span class="self">self</span>.process_edges();
         <span class="kw">if </span>!<span class="self">self</span>.nodes.is_empty() {
@@ -1807,6 +1815,16 @@
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;&lt;<span class="self">Self</span>::E <span class="kw">as </span>ProcessEdgesWork&gt;::VM&gt;,
     ) {
         <span class="kw">let </span>tls = worker.tls;
+
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+        </span>{
+            <span class="kw">if </span><span class="self">self</span>.roots() {
+                mmtk.sanity_checker
+                    .lock()
+                    .unwrap()
+                    .add_root_nodes(buffer.to_vec());
+            }
+        }
 
         <span class="comment">// If this is a root packet, the objects in this packet will have not been traced, yet.
         //

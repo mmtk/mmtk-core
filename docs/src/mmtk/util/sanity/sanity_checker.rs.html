@@ -213,6 +213,24 @@
 <span id="213">213</span>
 <span id="214">214</span>
 <span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -229,7 +247,9 @@
     <span class="doccomment">/// Visited objects
     </span>refs: HashSet&lt;ObjectReference&gt;,
     <span class="doccomment">/// Cached root edges for sanity root scanning
-    </span>roots: Vec&lt;Vec&lt;ES&gt;&gt;,
+    </span>root_edges: Vec&lt;Vec&lt;ES&gt;&gt;,
+    <span class="doccomment">/// Cached root nodes for sanity root scanning
+    </span>root_nodes: Vec&lt;Vec&lt;ObjectReference&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;ES: Edge&gt; Default <span class="kw">for </span>SanityChecker&lt;ES&gt; {
@@ -242,18 +262,24 @@
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             refs: HashSet::new(),
-            roots: <span class="macro">vec!</span>[],
+            root_edges: <span class="macro">vec!</span>[],
+            root_nodes: <span class="macro">vec!</span>[],
         }
     }
 
     <span class="doccomment">/// Cache a list of root edges to the sanity checker.
-    </span><span class="kw">pub fn </span>add_roots(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: Vec&lt;ES&gt;) {
-        <span class="self">self</span>.roots.push(roots)
+    </span><span class="kw">pub fn </span>add_root_edges(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: Vec&lt;ES&gt;) {
+        <span class="self">self</span>.root_edges.push(roots)
+    }
+
+    <span class="kw">pub fn </span>add_root_nodes(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: Vec&lt;ObjectReference&gt;) {
+        <span class="self">self</span>.root_nodes.push(roots)
     }
 
     <span class="doccomment">/// Reset roots cache at the end of the sanity gc.
     </span><span class="kw">fn </span>clear_roots_cache(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.roots.clear();
+        <span class="self">self</span>.root_edges.clear();
+        <span class="self">self</span>.root_nodes.clear();
     }
 }
 
@@ -288,10 +314,20 @@
         //     scheduler.work_buckets[WorkBucketStage::Prepare]
         //         .add(ScanStackRoot::&lt;SanityGCProcessEdges&lt;P::VM&gt;&gt;(mutator));
         // }
-        </span><span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.sanity_checker.lock().unwrap().roots {
-            scheduler.work_buckets[WorkBucketStage::Closure].add(
-                SanityGCProcessEdges::&lt;P::VM&gt;::new(roots.clone(), <span class="bool-val">true</span>, mmtk),
-            );
+        </span>{
+            <span class="kw">let </span>sanity_checker = mmtk.sanity_checker.lock().unwrap();
+            <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_edges {
+                scheduler.work_buckets[WorkBucketStage::Closure].add(
+                    SanityGCProcessEdges::&lt;P::VM&gt;::new(roots.clone(), <span class="bool-val">true</span>, mmtk),
+                );
+            }
+            <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_nodes {
+                scheduler.work_buckets[WorkBucketStage::Closure].add(ScanObjects::&lt;
+                    SanityGCProcessEdges&lt;P::VM&gt;,
+                &gt;::new(
+                    roots.clone(), <span class="bool-val">false</span>, <span class="bool-val">true
+                </span>));
+            }
         }
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(ScanVMSpecificRoots::&lt;SanityGCProcessEdges&lt;P::VM&gt;&gt;::new());
