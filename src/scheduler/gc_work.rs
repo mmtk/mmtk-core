@@ -356,7 +356,17 @@ impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
 
     fn with_tracer<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType, &mut GCWorker<E::VM>) -> R,
+        F: FnOnce(&mut Self::TracerType) -> R,
+    {
+        self.with_tracer_and_worker(worker, |tracer, _| func(tracer))
+    }
+}
+
+impl<E: ProcessEdgesWork> ProcessEdgesWorkTracerContext<E> {
+    // This Also exposes worker to the callback function. This is not a public method.
+    fn with_tracer_and_worker<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
+    where
+        F: FnOnce(&mut ProcessEdgesWorkTracer<E>, &mut GCWorker<E::VM>) -> R,
     {
         let mmtk = worker.mmtk;
 
@@ -885,7 +895,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 phantom_data: PhantomData,
             };
 
-            object_tracer_context.with_tracer(worker, |object_tracer, _worker| {
+            object_tracer_context.with_tracer_and_worker(worker, |object_tracer, _worker| {
                 // Scan objects and trace their edges at the same time.
                 for object in scan_later.iter().copied() {
                     trace!("Scan object (node) {}", object);
