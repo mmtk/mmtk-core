@@ -1039,6 +1039,7 @@
 <span id="1039">1039</span>
 <span id="1040">1040</span>
 <span id="1041">1041</span>
+<span id="1042">1042</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1838,6 +1839,7 @@
         </span><span class="kw">let </span>scanned_root_objects = <span class="self">self</span>.roots().then(|| {
             <span class="comment">// We create an instance of E to use its `trace_object` method and its object queue.
             </span><span class="kw">let </span><span class="kw-2">mut </span>process_edges_work = <span class="self">Self</span>::E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk);
+            process_edges_work.set_worker(worker);
 
             <span class="kw">for </span>object <span class="kw">in </span>buffer.iter().copied() {
                 <span class="kw">let </span>new_object = process_edges_work.trace_object(object);
