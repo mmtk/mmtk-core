@@ -124,6 +124,18 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            self.plan
+                .base()
+                .live_bytes_in_last_gc
+                .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 }
 
@@ -232,6 +244,28 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             self.elapsed.as_millis()
         );
 
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .plan
+                .base()
+                .live_bytes_in_last_gc
+                .load(std::sync::atomic::Ordering::SeqCst);
+            let used_bytes =
+                mmtk.plan.get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+            debug_assert!(
+                live_bytes <= used_bytes,
+                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                live_bytes, used_bytes
+            );
+            info!(
+                "Live objects = {} bytes ({:04.1}% of {} used pages)",
+                live_bytes,
+                live_bytes as f64 * 100.0 / used_bytes as f64,
+                mmtk.plan.get_used_pages()
+            );
+        }
+
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { &mut *(&*mmtk.plan as *const _ as *mut _) };
@@ -322,7 +356,7 @@ impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
 
     fn with_tracer<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType) -> R,
+        F: FnOnce(&mut Self::TracerType, &mut GCWorker<E::VM>) -> R,
     {
         let mmtk = worker.mmtk;
 
@@ -339,7 +373,7 @@ impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
         };
 
         // The caller can use the tracer here.
-        let result = func(&mut tracer);
+        let result = func(&mut tracer, worker);
 
         // Flush the queued nodes.
         tracer.flush_if_not_empty();
@@ -826,6 +860,12 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                     // If an object supports edge-enqueuing, we enqueue its edges.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
+
+                    #[cfg(feature = "count_live_bytes_in_gc")]
+                    closure
+                        .worker
+                        .shared
+                        .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
                 } else {
                     // If an object does not support edge-enqueuing, we have to use
                     // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
@@ -845,7 +885,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 phantom_data: PhantomData,
             };
 
-            object_tracer_context.with_tracer(worker, |object_tracer| {
+            object_tracer_context.with_tracer(worker, |object_tracer, _worker| {
                 // Scan objects and trace their edges at the same time.
                 for object in scan_later.iter().copied() {
                     trace!("Scan object (node) {}", object);
@@ -855,6 +895,11 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                         object_tracer,
                     );
                     self.post_scan_object(object);
+
+                    #[cfg(feature = "count_live_bytes_in_gc")]
+                    _worker
+                        .shared
+                        .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
                 }
             });
         }

@@ -76,7 +76,7 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
     /// Returns: The return value of `func`.
     fn with_tracer<R, F>(&self, worker: &mut GCWorker<VM>, func: F) -> R
     where
-        F: FnOnce(&mut Self::TracerType) -> R;
+        F: FnOnce(&mut Self::TracerType, &mut GCWorker<VM>) -> R;
 }
 
 /// Root-scanning methods use this trait to create work packets for processing roots.
