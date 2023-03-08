@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::plan::gc_requester::GCRequester;
 use crate::scheduler::gc_work::{EndOfGC, ScheduleCollection};
-use crate::scheduler::CoordinatorMessage;
+use crate::scheduler::{CoordinatorMessage, GCWork};
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -131,7 +131,16 @@ impl<VM: VMBinding> GCController<VM> {
         let mut end_of_gc = EndOfGC {
             elapsed: gc_start.elapsed(),
         };
-        self.initiate_coordinator_work(&mut end_of_gc, false);
+
+        // Note: We cannot use `initiate_coordinator_work` here.  If we increment the
+        // `pending_coordinator_packets` counter when a worker spuriously wakes up, it may try to
+        // open new buckets and result in an assertion error.  That counter was there to prevent
+        // GC workers from opening more work packets while the coordinator is scheduling more work
+        // packets for the workers.  The only two other coordinator, i.e. `ScheduleCollection` and
+        // `StopMutators`, belong to that category.  `EndOfGC` doesn't add new work packets, so it
+        // doesn't need to prevent the workers from opening buckets (as there are none to be
+        // opened.)
+        end_of_gc.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
     }
