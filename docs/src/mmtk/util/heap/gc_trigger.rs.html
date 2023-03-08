@@ -505,6 +505,16 @@
 <span id="505">505</span>
 <span id="506">506</span>
 <span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -743,7 +753,9 @@
             <span class="self">self</span>.gc_release_live_pages = plan.get_mature_reserved_pages();
 
             <span class="comment">// Calculate the promoted pages (including pre tentured objects)
-            </span><span class="kw">let </span>promoted = <span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages;
+            </span><span class="kw">let </span>promoted = <span class="self">self
+                </span>.gc_release_live_pages
+                .saturating_sub(<span class="self">self</span>.gc_end_live_pages);
             <span class="self">self</span>.allocation_pages = promoted <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;promoted = mature live before release {} - mature live at prev gc end {} = {}&quot;</span>,
@@ -764,7 +776,9 @@
     ) -&gt; bool {
         <span class="kw">if </span>!plan.is_current_gc_nursery() {
             <span class="self">self</span>.gc_end_live_pages = plan.get_mature_reserved_pages();
-            <span class="self">self</span>.collection_pages = (<span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
+            <span class="self">self</span>.collection_pages = <span class="self">self
+                </span>.gc_release_live_pages
+                .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;collected pages = mature live at gc end {} - mature live at gc release {} = {}&quot;</span>,
                 <span class="self">self</span>.gc_release_live_pages,
@@ -782,7 +796,10 @@
     // * collection = live pages at the end of GC - live pages before release
 
     </span><span class="kw">fn </span>non_generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="self">self</span>.allocation_pages = (mmtk.plan.get_reserved_pages() - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
+        <span class="self">self</span>.allocation_pages = mmtk
+            .plan
+            .get_reserved_pages()
+            .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
             <span class="string">&quot;allocated pages = used {} - live in last gc {} = {}&quot;</span>,
             mmtk.plan.get_reserved_pages(),
@@ -797,7 +814,9 @@
     <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.gc_end_live_pages = mmtk.plan.get_reserved_pages();
         <span class="macro">trace!</span>(<span class="string">&quot;live pages = {}&quot;</span>, <span class="self">self</span>.gc_end_live_pages);
-        <span class="self">self</span>.collection_pages = (<span class="self">self</span>.gc_release_live_pages - <span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
+        <span class="self">self</span>.collection_pages = <span class="self">self
+            </span>.gc_release_live_pages
+            .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
             <span class="string">&quot;collected pages = live at gc end {} - live at gc release {} = {}&quot;</span>,
             <span class="self">self</span>.gc_release_live_pages,
@@ -980,14 +999,15 @@
         stats.collection_time = <span class="number">0f64</span>;
 
         <span class="comment">// Calculate the square root
-        </span><span class="kw">let </span>e: f64 = <span class="kw">if </span>gc_mem != <span class="number">0f64 </span>{
+        </span><span class="kw">let </span>e: f64 = <span class="kw">if </span>alloc_mem != <span class="number">0f64 </span>&amp;&amp; gc_mem != <span class="number">0f64 </span>&amp;&amp; alloc_time != <span class="number">0f64 </span>&amp;&amp; gc_time != <span class="number">0f64
+        </span>{
             <span class="kw">let </span><span class="kw-2">mut </span>e = live <span class="kw">as </span>f64;
             e <span class="kw-2">*</span>= alloc_mem / alloc_time;
             e /= TUNING_FACTOR;
             e /= gc_mem / gc_time;
             e.sqrt()
         } <span class="kw">else </span>{
-            <span class="comment">// If collected memory is zero, we cannot do division by zero. So use an estimate value instead.
+            <span class="comment">// If any collected stat is abnormal, we use the fallback heuristics.
             </span>(live <span class="kw">as </span>f64 * <span class="number">4096f64</span>).sqrt()
         };
 
