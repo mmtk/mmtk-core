@@ -90,7 +90,7 @@ is_mmtk_object = ["global_alloc_bit"]
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []
 
-# The following two features are useful for using Immix for VMs that do not support moving GC.
+# The following features are useful for using Immix for VMs that do not support moving GC.
 
 # Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
 immix_no_defrag = []
@@ -98,8 +98,22 @@ immix_no_defrag = []
 immix_no_nursery_copy = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
+
+# The following features are useful for debugging moving GC when using Immix.
+# If the VM cannot use Semispace for this purpose (for example, if the VM needs object pinning),
+# these features will make Immix copy as many objects as possible.
+
+# Make every GC a defragment GC.
+immix_stress_defrag = []
+# Make Immix copy as many objects as possible.
+# It makes every GC a defragment GC and marks every allocated block as defragmentation source.
+immix_stress_copy = ["immix_stress_defrag"]
+
+# General Immix features
+
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
 immix_zero_on_release = []
+
 
 # Run sanity GC
 sanity = []
