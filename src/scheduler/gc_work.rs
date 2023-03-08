@@ -831,6 +831,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         let scanned_root_objects = self.roots().then(|| {
             // We create an instance of E to use its `trace_object` method and its object queue.
             let mut process_edges_work = Self::E::new(vec![], false, mmtk);
+            process_edges_work.set_worker(worker);
 
             for object in buffer.iter().copied() {
                 let new_object = process_edges_work.trace_object(object);
