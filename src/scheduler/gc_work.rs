@@ -358,16 +358,6 @@ impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
     where
         F: FnOnce(&mut Self::TracerType) -> R,
     {
-        self.with_tracer_and_worker(worker, |tracer, _| func(tracer))
-    }
-}
-
-impl<E: ProcessEdgesWork> ProcessEdgesWorkTracerContext<E> {
-    // This Also exposes worker to the callback function. This is not a public method.
-    fn with_tracer_and_worker<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
-    where
-        F: FnOnce(&mut ProcessEdgesWorkTracer<E>, &mut GCWorker<E::VM>) -> R,
-    {
         let mmtk = worker.mmtk;
 
         // Prepare the underlying ProcessEdgesWork
@@ -383,7 +373,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesWorkTracerContext<E> {
         };
 
         // The caller can use the tracer here.
-        let result = func(&mut tracer, worker);
+        let result = func(&mut tracer);
 
         // Flush the queued nodes.
         tracer.flush_if_not_empty();
@@ -865,17 +855,18 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker);
             for object in objects_to_scan.iter().copied() {
+                // For any object we need to scan, we count its liv bytes
+                #[cfg(feature = "count_live_bytes_in_gc")]
+                closure
+                    .worker
+                    .shared
+                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
                 if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
                     trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
-
-                    #[cfg(feature = "count_live_bytes_in_gc")]
-                    closure
-                        .worker
-                        .shared
-                        .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
                 } else {
                     // If an object does not support edge-enqueuing, we have to use
                     // `Scanning::scan_object_and_trace_edges` and offload the job of updating the
@@ -895,7 +886,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 phantom_data: PhantomData,
             };
 
-            object_tracer_context.with_tracer_and_worker(worker, |object_tracer, _worker| {
+            object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their edges at the same time.
                 for object in scan_later.iter().copied() {
                     trace!("Scan object (node) {}", object);
@@ -905,11 +896,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                         object_tracer,
                     );
                     self.post_scan_object(object);
-
-                    #[cfg(feature = "count_live_bytes_in_gc")]
-                    _worker
-                        .shared
-                        .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
                 }
             });
         }
