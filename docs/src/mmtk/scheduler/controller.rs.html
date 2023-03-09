@@ -182,6 +182,20 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The GC controller thread.
 //!
 //! MMTk has many GC threads.  There are many GC worker threads and one GC controller thread.
@@ -192,7 +206,7 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{EndOfGC, ScheduleCollection};
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::CoordinatorMessage;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{CoordinatorMessage, GCWork};
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
@@ -315,7 +329,21 @@
         </span><span class="kw">let </span><span class="kw-2">mut </span>end_of_gc = EndOfGC {
             elapsed: gc_start.elapsed(),
         };
-        <span class="self">self</span>.initiate_coordinator_work(<span class="kw-2">&amp;mut </span>end_of_gc, <span class="bool-val">false</span>);
+
+        <span class="comment">// Note: We cannot use `initiate_coordinator_work` here.  If we increment the
+        // `pending_coordinator_packets` counter when a worker spuriously wakes up, it may try to
+        // open new buckets and result in an assertion error.
+        // See: https://github.com/mmtk/mmtk-core/issues/770
+        //
+        // The `pending_coordinator_packets` counter and the `initiate_coordinator_work` function
+        // were introduced to prevent any buckets from being opened while `ScheduleCollection` or
+        // `StopMutators` is being executed. (See the doc comment of `initiate_coordinator_work`.)
+        // `EndOfGC` doesn&#39;t add any new work packets, therefore it does not need this layer of
+        // synchronization.
+        //
+        // FIXME: We should redesign the synchronization mechanism to properly address the opening
+        // condition of buckets.  See: https://github.com/mmtk/mmtk-core/issues/774
+        </span>end_of_gc.do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>.coordinator_worker, <span class="self">self</span>.mmtk);
 
         <span class="self">self</span>.scheduler.debug_assert_all_buckets_deactivated();
     }
