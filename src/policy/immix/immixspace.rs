@@ -792,8 +792,10 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             }
             // Check if this block needs to be defragmented.
             block.set_as_defrag_source(
-                super::DEFRAG_EVERY_BLOCK ||
-                super::DEFRAG && defrag_threshold != 0 && block.get_holes() > defrag_threshold,
+                super::DEFRAG_EVERY_BLOCK
+                    || super::DEFRAG
+                        && defrag_threshold != 0
+                        && block.get_holes() > defrag_threshold,
             );
             // Clear block mark data.
             block.set_state(BlockState::Unmarked);

@@ -14,17 +14,15 @@ pub const MAX_IMMIX_OBJECT_SIZE: usize = Block::BYTES >> 1;
 /// Mark/sweep memory for block-level only
 pub const BLOCK_ONLY: bool = false;
 
-#[cfg(all(feature = "immix_no_defrag", feature = "immix_stress_defrag"))]
-compile_error!("feature \"immix_no_defrag\" and feature \"immix_stress_defrag\" cannot be enabled at the same time");
-
 /// Opportunistic copying
 pub const DEFRAG: bool = !cfg!(feature = "immix_no_defrag");
 
 /// Make every GC a defragment GC. (for debugging)
-pub const STRESS_DEFRAG: bool = cfg!(feature = "immix_stress_defrag");
+pub const STRESS_DEFRAG: bool = false;
 
 /// Mark every allocated block as defragmentation source before GC. (for debugging)
-pub const DEFRAG_EVERY_BLOCK: bool = cfg!(feature = "immix_stress_copy");
+/// Set both this and `STRESS_DEFRAG` to true to make Immix move as many objects as possible.
+pub const DEFRAG_EVERY_BLOCK: bool = false;
 
 /// If Immix is used as a nursery space, do we prefer copy?
 /// If this is true, we copy nursery objects if possible.
