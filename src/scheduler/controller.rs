@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::plan::gc_requester::GCRequester;
 use crate::scheduler::gc_work::{EndOfGC, ScheduleCollection};
-use crate::scheduler::CoordinatorMessage;
+use crate::scheduler::{CoordinatorMessage, GCWork};
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -131,7 +131,21 @@ impl<VM: VMBinding> GCController<VM> {
         let mut end_of_gc = EndOfGC {
             elapsed: gc_start.elapsed(),
         };
-        self.initiate_coordinator_work(&mut end_of_gc, false);
+
+        // Note: We cannot use `initiate_coordinator_work` here.  If we increment the
+        // `pending_coordinator_packets` counter when a worker spuriously wakes up, it may try to
+        // open new buckets and result in an assertion error.
+        // See: https://github.com/mmtk/mmtk-core/issues/770
+        //
+        // The `pending_coordinator_packets` counter and the `initiate_coordinator_work` function
+        // were introduced to prevent any buckets from being opened while `ScheduleCollection` or
+        // `StopMutators` is being executed. (See the doc comment of `initiate_coordinator_work`.)
+        // `EndOfGC` doesn't add any new work packets, therefore it does not need this layer of
+        // synchronization.
+        //
+        // FIXME: We should redesign the synchronization mechanism to properly address the opening
+        // condition of buckets.  See: https://github.com/mmtk/mmtk-core/issues/774
+        end_of_gc.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
     }
