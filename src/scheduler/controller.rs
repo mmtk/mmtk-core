@@ -134,12 +134,17 @@ impl<VM: VMBinding> GCController<VM> {
 
         // Note: We cannot use `initiate_coordinator_work` here.  If we increment the
         // `pending_coordinator_packets` counter when a worker spuriously wakes up, it may try to
-        // open new buckets and result in an assertion error.  That counter was there to prevent
-        // GC workers from opening more work packets while the coordinator is scheduling more work
-        // packets for the workers.  The only two other coordinator, i.e. `ScheduleCollection` and
-        // `StopMutators`, belong to that category.  `EndOfGC` doesn't add new work packets, so it
-        // doesn't need to prevent the workers from opening buckets (as there are none to be
-        // opened.)
+        // open new buckets and result in an assertion error.
+        // See: https://github.com/mmtk/mmtk-core/issues/770
+        //
+        // The `pending_coordinator_packets` counter and the `initiate_coordinator_work` function
+        // were introduced to prevent any buckets from being opened while `ScheduleCollection` or
+        // `StopMutators` is being executed. (See the doc comment of `initiate_coordinator_work`.)
+        // `EndOfGC` doesn't add any new work packets, therefore it does not need this layer of
+        // synchronization.
+        //
+        // FIXME: We should redesign the synchronization mechanism to properly address the opening
+        // condition of buckets.  See: https://github.com/mmtk/mmtk-core/issues/774
         end_of_gc.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
