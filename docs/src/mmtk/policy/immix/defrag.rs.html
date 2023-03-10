@@ -198,7 +198,6 @@
 <span id="198">198</span>
 <span id="199">199</span>
 <span id="200">200</span>
-<span id="201">201</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{
     block::{Block, BlockState},
     line::Line,
@@ -230,7 +229,6 @@
     <span class="kw">const </span>NUM_BINS: usize = (Block::LINES &gt;&gt; <span class="number">1</span>) + <span class="number">1</span>;
     <span class="kw">const </span>DEFRAG_LINE_REUSE_RATIO: f32 = <span class="number">0.99</span>;
     <span class="kw">const </span>MIN_SPILL_THRESHOLD: usize = <span class="number">2</span>;
-    <span class="kw">const </span>DEFRAG_STRESS: bool = <span class="bool-val">false</span>;
     <span class="kw">const </span>DEFRAG_HEADROOM_PERCENT: usize = <span class="number">2</span>;
 
     <span class="doccomment">/// Allocate a new local histogram.
@@ -262,7 +260,7 @@
             &amp;&amp; (emergency_collection
                 || (collection_attempts &gt; <span class="number">1</span>)
                 || !exhausted_reusable_space
-                || <span class="self">Self</span>::DEFRAG_STRESS
+                || <span class="kw">super</span>::STRESS_DEFRAG
                 || (collect_whole_heap &amp;&amp; user_triggered &amp;&amp; full_heap_system_gc));
         <span class="comment">// println!(&quot;Defrag: {}&quot;, in_defrag);
         </span><span class="self">self</span>.in_defrag_collection
