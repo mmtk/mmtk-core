@@ -266,16 +266,6 @@
 <span id="266">266</span>
 <span id="267">267</span>
 <span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -385,18 +375,8 @@
     /// * `bytes`: The size of the object in bytes.
     /// * `semantics`: The copy semantic used for the copying.
     </span><span class="kw">pub fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference, bytes: usize, semantics: CopySemantics) {
-        <span class="comment">// Clear forwarding bits if the forwarding bits are in the header.
-        </span><span class="kw">if </span>!VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
-            object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
-        } <span class="kw">else </span>{
-            <span class="comment">// NOTE: If the forwarding bits were on the side, they would have been cleared when
-            // preparing the space.  See:
-            // - `CopySpace::prepare` and
-            // - `PrepareBlockState::reset_object_mark`.
-            </span><span class="macro">debug_assert!</span>(!object_forwarding::is_forwarded_or_being_forwarded::&lt;VM&gt;(
-                object
-            ));
-        }
+        <span class="comment">// Clear forwarding bits.
+        </span>object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
         <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.
         </span><span class="kw">if </span>semantics.is_mature() &amp;&amp; <span class="self">self</span>.config.constraints.needs_log_bit {
             <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)

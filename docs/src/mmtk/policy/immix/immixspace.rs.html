@@ -978,6 +978,12 @@
 <span id="978">978</span>
 <span id="979">979</span>
 <span id="980">980</span>
+<span id="981">981</span>
+<span id="982">982</span>
+<span id="983">983</span>
+<span id="984">984</span>
+<span id="985">985</span>
+<span id="986">986</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1749,13 +1755,7 @@
                 </span><span class="macro">unimplemented!</span>(<span class="string">&quot;We cannot bulk zero unlogged bit.&quot;</span>)
             }
         }
-        <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            side.bzero_metadata(<span class="self">self</span>.chunk.start(), Chunk::BYTES);
-        }
-        <span class="comment">// NOTE: We don&#39;t need to reset the forwarding pointer metadata because it is meaningless
-        // until the forwarding bits are also set, at which time we also write the forwarding
-        // pointer.
-    </span>}
+    }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareBlockState&lt;VM&gt; {
@@ -1788,7 +1788,19 @@
             </span>block.set_state(BlockState::Unmarked);
             <span class="macro">debug_assert!</span>(!block.get_state().is_reusable());
             <span class="macro">debug_assert_ne!</span>(block.get_state(), BlockState::Marked);
-        }
+            <span class="comment">// Clear forwarding bits if necessary.
+            </span><span class="kw">if </span>is_defrag_source {
+                <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+                    <span class="comment">// Clear on-the-side forwarding bits.
+                    // NOTE: In theory, we only need to clear the forwarding bits of occupied lines of
+                    // blocks that are defrag sources.
+                    </span>side.bzero_metadata(block.start(), Block::BYTES);
+                }
+            }
+            <span class="comment">// NOTE: We don&#39;t need to reset the forwarding pointer metadata because it is meaningless
+            // until the forwarding bits are also set, at which time we also write the forwarding
+            // pointer.
+        </span>}
     }
 }
 
