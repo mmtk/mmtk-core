@@ -62,10 +62,7 @@ pub struct WorkBucket<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
-    pub(crate) fn new(
-        active: bool,
-        monitor: Arc<WorkerMonitor>,
-    ) -> Self {
+    pub(crate) fn new(active: bool, monitor: Arc<WorkerMonitor>) -> Self {
         Self {
             active: AtomicBool::new(active),
             queue: BucketQueue::new(),

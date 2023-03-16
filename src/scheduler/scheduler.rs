@@ -437,6 +437,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.plan.base().gc_requester.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
+        // Note: This is the only place where a non-coordinator thread opens a bucket.
+        // If the `StopMutators` is executed by the coordinator thread, it will open
+        // the `Prepare` bucket and let workers start executing packets while the coordinator
+        // can still add more work packets to `Prepare`.  However, since `Prepare` is the first STW
+        // bucket and only the coordinator can open any subsequent buckets, workers cannot execute
+        // work packets out of order.  This is not generally true if we are not opening the first
+        // STW bucket.  In the future, we should redesign the opening condition of work buckets to
+        // make the synchronization more robust,
         first_stw_bucket.activate();
         self.worker_monitor.notify_work_available(true);
     }

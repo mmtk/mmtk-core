@@ -1,15 +1,15 @@
 use super::*;
 
-/// The synchronized parts of `Channel`.
-struct ChannelSync<VM: VMBinding> {
-    coordinator_packets: Vec<Box<dyn CoordinatorWork<VM>>>,
-    all_workers_parked: bool,
-}
-
 /// A one-way channel for workers to send coordinator packets and notifications to the controller.
 struct Channel<VM: VMBinding> {
     sync: Mutex<ChannelSync<VM>>,
     cond: Condvar,
+}
+
+/// The synchronized parts of `Channel`.
+struct ChannelSync<VM: VMBinding> {
+    coordinator_packets: Vec<Box<dyn CoordinatorWork<VM>>>,
+    all_workers_parked: bool,
 }
 
 /// Each worker holds an instance of this, mainly for access control.
@@ -30,7 +30,7 @@ impl<VM: VMBinding> Sender<VM> {
     pub fn add_coordinator_work(&self, work: Box<dyn CoordinatorWork<VM>>) {
         let mut sync = self.chan.sync.lock().unwrap();
         sync.coordinator_packets.push(work);
-        debug!("Submitted coordinator work!");
+        debug!("A worker has sent a coordinator work packet.");
         self.chan.cond.notify_one();
     }
 
@@ -38,7 +38,7 @@ impl<VM: VMBinding> Sender<VM> {
     pub fn notify_all_workers_parked(&self) {
         let mut sync = self.chan.sync.lock().unwrap();
         sync.all_workers_parked = true;
-        debug!("Notified all workers parked!");
+        debug!("Notified the coordinator that all workers have parked.");
         self.chan.cond.notify_one();
     }
 }
@@ -55,7 +55,7 @@ impl<VM: VMBinding> Receiver<VM> {
         loop {
             // Make sure the coordinator always sees packets before seeing "all parked".
             if let Some(work) = sync.coordinator_packets.pop() {
-                debug!("Received coordinator packet.");
+                debug!("Received a coordinator packet.");
                 return WorkerToControllerEvent::Work(work);
             }
 
@@ -72,7 +72,7 @@ impl<VM: VMBinding> Receiver<VM> {
     pub fn reset_all_workers_parked(&self) {
         let mut sync = self.chan.sync.lock().unwrap();
         sync.all_workers_parked = false;
-        debug!("All-workers-parked state reset.");
+        debug!("The all_workers_parked state is reset.");
     }
 }
 

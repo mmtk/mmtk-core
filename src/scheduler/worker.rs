@@ -50,6 +50,16 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     }
 }
 
+/// Used to synchronize mutually exclusive operations between workers and controller,
+/// and also waking up workers when more work packets are available.
+/// NOTE: All fields are public in order to support the complex control structure
+/// in `GCWorkScheduler::poll_slow`.
+pub(crate) struct WorkerMonitor {
+    pub sync: Mutex<WorkerMonitorSync>,
+    pub cond: Condvar,
+}
+
+/// The synchronized part of `WorkerMonitor`.
 pub(crate) struct WorkerMonitorSync {
     /// This flag is set to true when all workers have parked.
     /// No workers can unpark when this is set.
@@ -58,15 +68,6 @@ pub(crate) struct WorkerMonitorSync {
     /// The main purpose of this flag is handling spurious wake-ups so that workers will not
     /// attempt to inspect bucket states while the coordinator is opening/closing buckets.
     pub group_sleep: bool,
-}
-
-/// Used to synchronize mutually exclusive operations between workers and controller,
-/// and also waking up workers when more work packets are available.
-/// NOTE: The `sync` and `cond` fields are public in order to support the complex control structure
-/// in `GCWorkScheduler::poll_slow`.
-pub(crate) struct WorkerMonitor {
-    pub sync: Mutex<WorkerMonitorSync>,
-    pub cond: Condvar,
 }
 
 impl Default for WorkerMonitor {
@@ -79,6 +80,8 @@ impl Default for WorkerMonitor {
 }
 
 impl WorkerMonitor {
+    /// Wake up workers when more work packets are made available for workers.
+    /// This function will get workers out of the "group sleeping" state.
     pub(crate) fn notify_work_available(&self, all: bool) {
         let mut sync = self.sync.lock().unwrap();
         sync.group_sleep = false;
@@ -89,6 +92,7 @@ impl WorkerMonitor {
         }
     }
 
+    /// Test if workers are in group sleeping state.  Used for debugging.
     pub fn is_group_sleeping(&self) -> bool {
         let sync = self.sync.lock().unwrap();
         sync.group_sleep

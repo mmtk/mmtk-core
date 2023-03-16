@@ -17,8 +17,6 @@ use super::{CoordinatorWork, GCWorkScheduler, GCWorker};
 
 pub(crate) mod channel;
 
-
-
 /// The thread local struct for the GC controller, the counterpart of `GCWorker`.
 pub struct GCController<VM: VMBinding> {
     /// The reference to the MMTk instance.
@@ -27,7 +25,7 @@ pub struct GCController<VM: VMBinding> {
     requester: Arc<GCRequester<VM>>,
     /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
-    /// Receive messages from GC workers through this.
+    /// Receive coordinator work packets and notifications from GC workers through this.
     receiver: Receiver<VM>,
     /// The `GCWorker` is used to execute packets. The controller is also a `GCWorker`.
     coordinator_worker: GCWorker<VM>,
@@ -81,22 +79,24 @@ impl<VM: VMBinding> GCController<VM> {
             return true;
         }
 
+        // If all fo the above failed, it means GC has finished.
         false
     }
 
-    fn resume_workers(&mut self) {
+    /// Reset the "all workers parked" state and resume workers.
+    fn reset_and_resume_workers(&mut self) {
         self.receiver.reset_all_workers_parked();
         self.scheduler.worker_monitor.notify_work_available(true);
         debug!("Workers resumed");
     }
 
-    fn on_all_parked(&mut self) -> bool {
+    fn on_all_workers_parked(&mut self) -> bool {
         assert!(self.scheduler.all_activated_buckets_are_empty());
 
         let new_work_available = self.find_more_work_for_workers();
 
         if new_work_available {
-            self.resume_workers();
+            self.reset_and_resume_workers();
             // If there is more work to do, GC has not finished.
             return false;
         }
@@ -113,7 +113,7 @@ impl<VM: VMBinding> GCController<VM> {
                 self.execute_coordinator_work(work.as_mut(), true);
                 false
             }
-            WorkerToControllerEvent::AllParked => self.on_all_parked(),
+            WorkerToControllerEvent::AllParked => self.on_all_workers_parked(),
         }
     }
 
@@ -174,7 +174,7 @@ impl<VM: VMBinding> GCController<VM> {
         work.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         if notify_workers {
-            self.resume_workers();
+            self.reset_and_resume_workers();
         };
     }
 }
