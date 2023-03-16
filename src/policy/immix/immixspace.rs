@@ -246,7 +246,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        #[cfg(feature = "immix_no_defrag")]
+        #[cfg(feature = "immix_non_moving")]
         info!(
             "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
             args.name,
