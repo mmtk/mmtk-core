@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use super::*;
 
 /// A one-way channel for workers to send coordinator packets and notifications to the controller.
@@ -8,7 +10,7 @@ struct Channel<VM: VMBinding> {
 
 /// The synchronized parts of `Channel`.
 struct ChannelSync<VM: VMBinding> {
-    coordinator_packets: Vec<Box<dyn CoordinatorWork<VM>>>,
+    coordinator_packets: VecDeque<Box<dyn CoordinatorWork<VM>>>,
     all_workers_parked: bool,
 }
 
@@ -29,7 +31,7 @@ impl<VM: VMBinding> Sender<VM> {
     /// Send a coordinator work packet to the coordinator.
     pub fn add_coordinator_work(&self, work: Box<dyn CoordinatorWork<VM>>) {
         let mut sync = self.chan.sync.lock().unwrap();
-        sync.coordinator_packets.push(work);
+        sync.coordinator_packets.push_back(work);
         debug!("A worker has sent a coordinator work packet.");
         self.chan.cond.notify_one();
     }
@@ -54,7 +56,7 @@ impl<VM: VMBinding> Receiver<VM> {
         let mut sync = self.chan.sync.lock().unwrap();
         loop {
             // Make sure the coordinator always sees packets before seeing "all parked".
-            if let Some(work) = sync.coordinator_packets.pop() {
+            if let Some(work) = sync.coordinator_packets.pop_front() {
                 debug!("Received a coordinator packet.");
                 return WorkerToControllerEvent::Work(work);
             }
