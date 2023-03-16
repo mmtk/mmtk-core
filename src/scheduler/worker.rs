@@ -7,11 +7,10 @@ use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
-use crossbeam::deque::{self, Stealer};
+use crossbeam::deque::{self, Stealer, Worker};
 use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 /// Represents the ID of a GC worker thread.
 pub type ThreadId = usize;
@@ -51,6 +50,51 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     }
 }
 
+pub(crate) struct WorkerMonitorSync {
+    /// This flag is set to true when all workers have parked.
+    /// No workers can unpark when this is set.
+    /// This flag is cleared if a work packet is added to an open bucket,
+    /// or a new bucket is opened.
+    /// The main purpose of this flag is handling spurious wake-ups so that workers will not
+    /// attempt to inspect bucket states while the coordinator is opening/closing buckets.
+    pub group_sleep: bool,
+}
+
+/// Used to synchronize mutually exclusive operations between workers and controller,
+/// and also waking up workers when more work packets are available.
+/// NOTE: The `sync` and `cond` fields are public in order to support the complex control structure
+/// in `GCWorkScheduler::poll_slow`.
+pub(crate) struct WorkerMonitor {
+    pub sync: Mutex<WorkerMonitorSync>,
+    pub cond: Condvar,
+}
+
+impl Default for WorkerMonitor {
+    fn default() -> Self {
+        Self {
+            sync: Mutex::new(WorkerMonitorSync { group_sleep: false }),
+            cond: Default::default(),
+        }
+    }
+}
+
+impl WorkerMonitor {
+    pub(crate) fn notify_work_available(&self, all: bool) {
+        let mut sync = self.sync.lock().unwrap();
+        sync.group_sleep = false;
+        if all {
+            self.cond.notify_all();
+        } else {
+            self.cond.notify_one();
+        }
+    }
+
+    pub fn is_group_sleeping(&self) -> bool {
+        let sync = self.sync.lock().unwrap();
+        sync.group_sleep
+    }
+}
+
 /// A GC worker.  This part is privately owned by a worker thread.
 /// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
 pub struct GCWorker<VM: VMBinding> {
@@ -64,7 +108,7 @@ pub struct GCWorker<VM: VMBinding> {
     /// The copy context, used to implement copying GC.
     copy: GCWorkerCopyContext<VM>,
     /// The sending end of the channel to send message to the controller thread.
-    pub sender: Sender<CoordinatorMessage<VM>>,
+    pub(crate) sender: controller::monitor::Sender<VM>,
     /// The reference to the MMTk instance.
     pub mmtk: &'static MMTK<VM>,
     /// True if this struct is the embedded GCWorker of the controller thread.
@@ -94,12 +138,12 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 }
 
 impl<VM: VMBinding> GCWorker<VM> {
-    pub fn new(
+    pub(crate) fn new(
         mmtk: &'static MMTK<VM>,
         ordinal: ThreadId,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
-        sender: Sender<CoordinatorMessage<VM>>,
+        sender: controller::monitor::Sender<VM>,
         shared: Arc<GCWorkerShared<VM>>,
         local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
     ) -> Self {
@@ -194,7 +238,7 @@ impl<VM: VMBinding> GCWorker<VM> {
 }
 
 /// A worker group to manage all the GC workers (except the coordinator worker).
-pub struct WorkerGroup<VM: VMBinding> {
+pub(crate) struct WorkerGroup<VM: VMBinding> {
     /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
     parked_workers: AtomicUsize,
@@ -227,7 +271,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn spawn(
         &self,
         mmtk: &'static MMTK<VM>,
-        sender: Sender<CoordinatorMessage<VM>>,
+        sender: controller::monitor::Sender<VM>,
         tls: VMThread,
     ) {
         let mut unspawned_local_work_queues = self.unspawned_local_work_queues.lock().unwrap();

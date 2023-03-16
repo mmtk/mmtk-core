@@ -1,6 +1,6 @@
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, ParkingGuard, ThreadId, WorkerGroup};
+use super::worker::{GCWorker, GCWorkerShared, ParkingGuard, ThreadId, WorkerGroup, WorkerMonitor};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
@@ -12,29 +12,17 @@ use enum_map::Enum;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
-
-pub enum CoordinatorMessage<VM: VMBinding> {
-    /// Send a work-packet to the coordinator thread/
-    Work(Box<dyn CoordinatorWork<VM>>),
-    /// Notify the coordinator thread that all GC tasks are finished.
-    /// When sending this message, all the work buckets should be
-    /// empty, and all the workers should be parked.
-    Finish,
-}
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Workers
-    pub worker_group: Arc<WorkerGroup<VM>>,
+    pub(crate) worker_group: Arc<WorkerGroup<VM>>,
     /// The shared part of the GC worker object of the controller thread
     coordinator_worker_shared: Arc<GCWorkerShared<VM>>,
     /// Condition Variable for worker synchronization
-    pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    /// Counter for pending coordinator messages.
-    pub(super) pending_coordinator_packets: AtomicUsize,
+    pub(crate) worker_monitor: Arc<WorkerMonitor>,
     /// How to assign the affinity of each GC thread. Specified by the user.
     affinity: AffinityKind,
 }
@@ -46,7 +34,7 @@ unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
-        let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
+        let worker_monitor: Arc<WorkerMonitor> = Default::default();
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
@@ -97,7 +85,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_group,
             coordinator_worker_shared,
             worker_monitor,
-            pending_coordinator_packets: AtomicUsize::new(0),
             affinity,
         })
     }
@@ -109,7 +96,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Create GC threads, including the controller thread and all workers.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
         // Create the communication channel.
-        let (sender, receiver) = channel::<CoordinatorMessage<VM>>();
+        let (sender, receiver) = controller::monitor::make_channel();
 
         // Spawn the controller thread.
         let coordinator_worker = GCWorker::new(
@@ -239,10 +226,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
-        debug_assert!(
-            self.pending_coordinator_packets.load(Ordering::SeqCst) == 0,
-            "GCWorker attempted to open buckets when there are pending coordinator work packets"
-        );
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
@@ -251,7 +234,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Schedule "sentinel" work packets for all activated buckets.
-    fn schedule_sentinels(&self) -> bool {
+    pub(crate) fn schedule_sentinels(&self) -> bool {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
             if work_bucket.is_activated() && work_bucket.maybe_schedule_sentinel() {
@@ -268,7 +251,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// No workers will be waked up by this function. The caller is responsible for that.
     ///
     /// Return true if there're any non-empty buckets updated.
-    fn update_buckets(&self) -> bool {
+    pub(crate) fn update_buckets(&self) -> bool {
         let mut buckets_updated = false;
         let mut new_packets = false;
         for i in 0..WorkBucketStage::LENGTH {
@@ -322,15 +305,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 }
             });
         }
-    }
-
-    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
-        self.pending_coordinator_packets
-            .fetch_add(1, Ordering::SeqCst);
-        worker
-            .sender
-            .send(CoordinatorMessage::Work(Box::new(work)))
-            .unwrap();
     }
 
     /// Check if all the work buckets are empty
@@ -404,59 +378,40 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         // Note: The lock is released during `wait` in the loop.
-        let mut guard = self.worker_monitor.0.lock().unwrap();
-        'polling_loop: loop {
+        let mut sync = self.worker_monitor.sync.lock().unwrap();
+        loop {
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
             }
             // Prepare to park this worker
             let parking_guard = ParkingGuard::new(self.worker_group.as_ref());
-            // If all workers are parked, try activate new buckets
             if parking_guard.all_parked() {
-                // If there're any designated work, resume the workers and process them
-                if self.worker_group.has_designated_work() {
-                    assert!(
-                        worker.shared.designated_work.is_empty(),
-                        "The last parked worker has designated work."
-                    );
-                    self.worker_monitor.1.notify_all();
-                    // The current worker is going to wait, because the designated work is not for it.
-                } else if self.pending_coordinator_packets.load(Ordering::SeqCst) == 0 {
-                    // See if any bucket has a sentinel.
-                    if self.schedule_sentinels() {
-                        // We're not going to sleep since new work packets are just scheduled.
-                        break 'polling_loop;
-                    }
-                    // Try to open new buckets.
-                    if self.update_buckets() {
-                        // We're not going to sleep since a new bucket is just open.
-                        break 'polling_loop;
-                    }
-                    debug_assert!(!self.worker_group.has_designated_work());
-                    // The current pause is finished if we can't open more buckets.
-                    worker.sender.send(CoordinatorMessage::Finish).unwrap();
-                }
-                // Otherwise, if there is still pending coordinator work, the last parked
-                // worker will wait on the monitor, too.  The coordinator will notify a
-                // worker (maybe not the current one) once it finishes executing all
-                // coordinator work packets.
+                // If all workers are parked, enter "group sleeping" and notify controller.
+                sync.group_sleep = true;
+                debug!("Entered group-sleeping state");
+                worker.sender.notify_all_workers_parked();
+            } else {
+                // Otherwise wait until notified.
+                sync = self.worker_monitor.cond.wait(sync).unwrap();
             }
-            // Wait
-            guard = self.worker_monitor.1.wait(guard).unwrap();
+
+            // Keep waiting if we have entered "group sleeping" state.
+            // The coordinator will let the worker leave the "group sleeping" state
+            // once the coordinator finished its work.
+            //
+            // Note: `wait_while` checks `sync.group_sleep` before actually starting to wait.
+            // This is expected because the controller may run so fast that it opened new buckets
+            // and unset `sync.group_sleep` before we even reached here.  If that happens, waiting
+            // blindly will result in all workers sleeping forever.  So we should always check
+            // `sync.group_sleep` before waiting.
+            sync = self
+                .worker_monitor
+                .cond
+                .wait_while(sync, |sync| sync.group_sleep)
+                .unwrap();
             // The worker is unparked here where `parking_guard` goes out of scope.
         }
-
-        // We guarantee that we can at least fetch one packet when we reach here.
-        let work = self.poll_schedulable_work(worker).unwrap();
-        // Optimize for the case that a newly opened bucket only has one packet.
-        // We only notify_all if there're more than one packets available.
-        if !self.all_activated_buckets_are_empty() {
-            // Have more jobs in this buckets. Notify other workers.
-            self.worker_monitor.1.notify_all();
-        }
-        // Return this packet and execute it.
-        work
     }
 
     pub fn enable_stat(&self) {
@@ -484,7 +439,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
         first_stw_bucket.activate();
-        let _guard = self.worker_monitor.0.lock().unwrap();
-        self.worker_monitor.1.notify_all();
+        self.worker_monitor.notify_work_available(true);
     }
 }
