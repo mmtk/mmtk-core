@@ -11,8 +11,7 @@ use crossbeam::deque::{self, Steal};
 use enum_map::Enum;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::Arc;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
@@ -96,7 +95,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Create GC threads, including the controller thread and all workers.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
         // Create the communication channel.
-        let (sender, receiver) = controller::monitor::make_channel();
+        let (sender, receiver) = controller::channel::make_channel();
 
         // Spawn the controller thread.
         let coordinator_worker = GCWorker::new(

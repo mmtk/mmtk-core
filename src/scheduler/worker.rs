@@ -108,7 +108,7 @@ pub struct GCWorker<VM: VMBinding> {
     /// The copy context, used to implement copying GC.
     copy: GCWorkerCopyContext<VM>,
     /// The sending end of the channel to send message to the controller thread.
-    pub(crate) sender: controller::monitor::Sender<VM>,
+    pub(crate) sender: controller::channel::Sender<VM>,
     /// The reference to the MMTk instance.
     pub mmtk: &'static MMTK<VM>,
     /// True if this struct is the embedded GCWorker of the controller thread.
@@ -143,7 +143,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         ordinal: ThreadId,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
-        sender: controller::monitor::Sender<VM>,
+        sender: controller::channel::Sender<VM>,
         shared: Arc<GCWorkerShared<VM>>,
         local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
     ) -> Self {
@@ -271,7 +271,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn spawn(
         &self,
         mmtk: &'static MMTK<VM>,
-        sender: controller::monitor::Sender<VM>,
+        sender: controller::channel::Sender<VM>,
         tls: VMThread,
     ) {
         let mut unspawned_local_work_queues = self.unspawned_local_work_queues.lock().unwrap();

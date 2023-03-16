@@ -11,104 +11,13 @@ use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-use self::monitor::Receiver;
+use self::channel::{Receiver, WorkerToControllerEvent};
 
 use super::{CoordinatorWork, GCWorkScheduler, GCWorker};
 
-pub(crate) mod monitor {
-    use super::*;
+pub(crate) mod channel;
 
-    struct ControllerMonitorSync<VM: VMBinding> {
-        coordinator_packets: Vec<Box<dyn CoordinatorWork<VM>>>,
-        all_workers_parked: bool,
-    }
 
-    struct ControllerMonitor<VM: VMBinding> {
-        sync: Mutex<ControllerMonitorSync<VM>>,
-        cond: Condvar,
-    }
-
-    pub struct Sender<VM: VMBinding> {
-        w2c: Arc<ControllerMonitor<VM>>,
-    }
-
-    impl<VM: VMBinding> Clone for Sender<VM> {
-        fn clone(&self) -> Self {
-            Self {
-                w2c: self.w2c.clone(),
-            }
-        }
-    }
-
-    impl<VM: VMBinding> Sender<VM> {
-        pub fn add_coordinator_work(&self, work: Box<dyn CoordinatorWork<VM>>) {
-            let mut sync = self.w2c.sync.lock().unwrap();
-            sync.coordinator_packets.push(work);
-            debug!("Submitted coordinator work!");
-            self.w2c.cond.notify_one();
-        }
-
-        pub fn notify_all_workers_parked(&self) {
-            let mut sync = self.w2c.sync.lock().unwrap();
-            sync.all_workers_parked = true;
-            debug!("Notified all workers parked!");
-            self.w2c.cond.notify_one();
-        }
-    }
-
-    pub struct Receiver<VM: VMBinding> {
-        w2c: Arc<ControllerMonitor<VM>>,
-    }
-
-    impl<VM: VMBinding> Receiver<VM> {
-        pub(super) fn poll_event(&self) -> WorkerToControllerEvent<VM> {
-            let mut sync = self.w2c.sync.lock().unwrap();
-            loop {
-                // Make sure the coordinator always sees packets before seeing "all parked".
-                if let Some(work) = sync.coordinator_packets.pop() {
-                    debug!("Received coordinator packet.");
-                    return WorkerToControllerEvent::Work(work);
-                }
-
-                if sync.all_workers_parked {
-                    debug!("Observed all workers parked.");
-                    return WorkerToControllerEvent::AllParked;
-                }
-
-                sync = self.w2c.cond.wait(sync).unwrap();
-            }
-        }
-
-        pub fn reset_all_workers_parked(&self) {
-            let mut sync = self.w2c.sync.lock().unwrap();
-            sync.all_workers_parked = false;
-            debug!("All-workers-parked state reset.");
-        }
-    }
-
-    pub(crate) fn make_channel<VM: VMBinding>() -> (Sender<VM>, Receiver<VM>) {
-        let w2c = Arc::new(ControllerMonitor {
-            sync: Mutex::new(ControllerMonitorSync {
-                coordinator_packets: Default::default(),
-                all_workers_parked: false,
-            }),
-            cond: Default::default(),
-        });
-
-        let worker_end = Sender { w2c: w2c.clone() };
-        let controller_end = Receiver { w2c };
-        (worker_end, controller_end)
-    }
-}
-
-enum WorkerToControllerEvent<VM: VMBinding> {
-    /// Send a work-packet to the coordinator thread/
-    Work(Box<dyn CoordinatorWork<VM>>),
-    /// Notify the coordinator thread that all GC tasks are finished.
-    /// When sending this message, all the work buckets should be
-    /// empty, and all the workers should be parked.
-    AllParked,
-}
 
 /// The thread local struct for the GC controller, the counterpart of `GCWorker`.
 pub struct GCController<VM: VMBinding> {
