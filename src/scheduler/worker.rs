@@ -7,7 +7,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
-use crossbeam::deque::{self, Stealer, Worker};
+use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -311,16 +311,6 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn dec_parked_workers(&self) {
         let old = self.parked_workers.fetch_sub(1, Ordering::SeqCst);
         debug_assert!(old <= self.worker_count());
-    }
-
-    /// Get the number of parked workers in the group
-    pub fn parked_workers(&self) -> usize {
-        self.parked_workers.load(Ordering::SeqCst)
-    }
-
-    /// Check if all the workers are packed
-    pub fn all_parked(&self) -> bool {
-        self.parked_workers() == self.worker_count()
     }
 
     /// Return true if there're any pending designated work

@@ -38,22 +38,22 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Create work buckets for workers.
         let mut work_buckets = enum_map! {
-            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::VMRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::VMRefForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
+            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::VMRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::VMRefForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
         };
 
         // Set the open condition of each bucket.
@@ -307,7 +307,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    fn all_activated_buckets_are_empty(&self) -> bool {
+    pub(crate) fn all_activated_buckets_are_empty(&self) -> bool {
         for bucket in self.work_buckets.values() {
             if bucket.is_activated() && !bucket.is_drained() {
                 return false;

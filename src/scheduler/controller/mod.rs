@@ -91,6 +91,8 @@ impl<VM: VMBinding> GCController<VM> {
     }
 
     fn on_all_parked(&mut self) -> bool {
+        assert!(self.scheduler.all_activated_buckets_are_empty());
+
         let new_work_available = self.find_more_work_for_workers();
 
         if new_work_available {

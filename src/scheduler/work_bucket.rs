@@ -1,4 +1,4 @@
-use super::worker::{WorkerGroup, WorkerMonitor};
+use super::worker::WorkerMonitor;
 use super::*;
 use crate::vm::VMBinding;
 use crossbeam::deque::{Injector, Steal, Worker};
@@ -59,14 +59,12 @@ pub struct WorkBucket<VM: VMBinding> {
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
-    group: Arc<WorkerGroup<VM>>,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
     pub(crate) fn new(
         active: bool,
         monitor: Arc<WorkerMonitor>,
-        group: Arc<WorkerGroup<VM>>,
     ) -> Self {
         Self {
             active: AtomicBool::new(active),
@@ -75,7 +73,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
             monitor,
             can_open: None,
             sentinel: Mutex::new(None),
-            group,
         }
     }
 
