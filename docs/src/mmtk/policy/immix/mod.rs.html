@@ -48,7 +48,6 @@
 <span id="48">48</span>
 <span id="49">49</span>
 <span id="50">50</span>
-<span id="51">51</span>
 </pre><pre class="rust"><code><span class="kw">pub mod </span>block;
 <span class="kw">pub mod </span>defrag;
 <span class="kw">pub mod </span>immixspace;
@@ -65,10 +64,10 @@
 <span class="doccomment">/// Mark/sweep memory for block-level only
 </span><span class="kw">pub const </span>BLOCK_ONLY: bool = <span class="bool-val">false</span>;
 
-<span class="doccomment">/// Opportunistic copying
-</span><span class="kw">pub const </span>DEFRAG: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_no_defrag&quot;</span>);
+<span class="doccomment">/// Do we allow Immix to do defragmentation?
+</span><span class="kw">pub const </span>DEFRAG: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_non_moving&quot;</span>); <span class="comment">// defrag if we are allowed to move.
 
-<span class="doccomment">/// Make every GC a defragment GC. (for debugging)
+</span><span class="doccomment">/// Make every GC a defragment GC. (for debugging)
 </span><span class="kw">pub const </span>STRESS_DEFRAG: bool = <span class="bool-val">false</span>;
 
 <span class="doccomment">/// Mark every allocated block as defragmentation source before GC. (for debugging)
@@ -76,10 +75,9 @@
 </span><span class="kw">pub const </span>DEFRAG_EVERY_BLOCK: bool = <span class="bool-val">false</span>;
 
 <span class="doccomment">/// If Immix is used as a nursery space, do we prefer copy?
-/// If this is true, we copy nursery objects if possible.
-</span><span class="kw">pub const </span>PREFER_COPY_ON_NURSERY_GC: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_no_nursery_copy&quot;</span>);
+</span><span class="kw">pub const </span>PREFER_COPY_ON_NURSERY_GC: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_non_moving&quot;</span>); <span class="comment">// copy nursery objects if we are allowed to move.
 
-<span class="doccomment">/// In some cases/settings, Immix may never move objects.
+</span><span class="doccomment">/// In some cases/settings, Immix may never move objects.
 /// Currently we only have two cases where we move objects: 1. defrag, 2. nursery copy.
 /// If we do neither, we will not move objects.
 /// If we have other reasons to move objects, we need to add them here.

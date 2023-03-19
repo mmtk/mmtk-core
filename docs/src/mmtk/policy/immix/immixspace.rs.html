@@ -1232,7 +1232,7 @@
         args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;,
         space_args: ImmixSpaceArgs,
     ) -&gt; <span class="self">Self </span>{
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;immix_no_defrag&quot;</span>)]
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;immix_non_moving&quot;</span>)]
         </span><span class="macro">info!</span>(
             <span class="string">&quot;Creating non-moving ImmixSpace: {}. Block size: 2^{}&quot;</span>,
             args.name,
