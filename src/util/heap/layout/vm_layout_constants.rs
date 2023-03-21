@@ -50,17 +50,13 @@ pub const LOG_SPACE_EXTENT: usize = 31;
  */
 pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 
-pub(crate) const HEAP_START_32: Address =
-    chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
-pub(crate) const HEAP_START_64: Address =
-    chunk_align_down(unsafe { Address::from_usize(0x0000_0200_0000_0000usize) });
-
 // FIXME: HEAP_START, HEAP_END are VM-dependent
 /** Lowest virtual address used by the virtual machine */
 #[cfg(target_pointer_width = "32")]
-pub const HEAP_START: Address = HEAP_START_32;
+pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
 #[cfg(target_pointer_width = "64")]
-pub const HEAP_START: Address = HEAP_START_64;
+pub const HEAP_START: Address =
+    chunk_align_down(unsafe { Address::from_usize(0x0000_0200_0000_0000usize) });
 
 /** Highest virtual address used by the virtual machine */
 #[cfg(target_pointer_width = "32")]
