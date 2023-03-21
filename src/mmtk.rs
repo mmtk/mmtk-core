@@ -34,6 +34,7 @@ lazy_static! {
     pub static ref VM_MAP: Box<dyn Map> =  if cfg!(target_pointer_width = "32") {
         Box::new(Map32::new())
     } else {
+        // Note: for compressed pointers support, we will switch to a different `Map` here in the future.
         Box::new(Map64::new())
     };
 
