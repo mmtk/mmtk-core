@@ -136,7 +136,6 @@ impl SideMetadataSpec {
 
     /// Check with the mmapper to see if side metadata is mapped for the spec for the data address.
     pub(crate) fn is_mapped(&self, data_addr: Address) -> bool {
-        use crate::util::heap::layout::Mmapper;
         use crate::MMAPPER;
         let meta_addr = address_to_meta_address(self, data_addr);
         MMAPPER.is_mapped_address(meta_addr)
