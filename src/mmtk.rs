@@ -6,9 +6,7 @@ use crate::scheduler::GCWorkScheduler;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
-use crate::util::heap::layout::heap_layout::{Map, Map64};
-use crate::util::heap::layout::heap_layout::{Mmapper, Mmapper32, Mmapper64};
-use crate::util::heap::layout::map32::Map32;
+use crate::util::heap::layout::{self, Map, Mmapper};
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
@@ -31,19 +29,10 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     /// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    pub static ref VM_MAP: Box<dyn Map> =  if cfg!(target_pointer_width = "32") {
-        Box::new(Map32::new())
-    } else {
-        // Note: for compressed pointers support, we will switch to a different `Map` here in the future.
-        Box::new(Map64::new())
-    };
+    pub static ref VM_MAP: Box<dyn Map> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<dyn Mmapper> = if cfg!(target_pointer_width = "32") {
-        Box::new(Mmapper32::new())
-    } else {
-        Box::new(Mmapper64::new())
-    };
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;

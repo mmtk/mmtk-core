@@ -21,6 +21,8 @@ const MANTISSA_SHIFT: usize = EXPONENT_SHIFT + EXPONENT_BITS;
 const MANTISSA_BITS: usize = 14;
 const BASE_EXPONENT: usize = BITS_IN_INT - MANTISSA_BITS;
 
+// get_index() is only implemented for 64 bits
+#[cfg(target_pointer_width = "64")]
 const INDEX_MASK: usize = !TYPE_MASK;
 const INDEX_SHIFT: usize = TYPE_BITS;
 
@@ -120,8 +122,8 @@ impl SpaceDescriptor {
         chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
     }
 
+    #[cfg(target_pointer_width = "64")]
     pub fn get_index(self) -> usize {
-        debug_assert!(cfg!(target_pointer_width = "64"));
         (self.0 & INDEX_MASK) >> INDEX_SHIFT
     }
 }

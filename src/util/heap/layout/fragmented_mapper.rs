@@ -348,7 +348,7 @@ impl Default for FragmentedMapper {
     }
 }
 
-#[cfg(all(test, target_pointer_width = "64"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::util::constants::LOG_BYTES_IN_PAGE;

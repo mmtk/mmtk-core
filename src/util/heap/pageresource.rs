@@ -4,7 +4,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::ActivePlan;
 use std::sync::Mutex;
 
-use super::layout::map::Map;
+use super::layout::Map;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::PageAccounting;
 use crate::vm::VMBinding;

@@ -1,8 +1,8 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
-use super::layout::map::Map;
 use super::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
+use super::layout::Map;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
 use crate::mmtk::MMAPPER;
