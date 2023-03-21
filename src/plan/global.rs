@@ -538,7 +538,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             stats,
             heap: args.global_args.heap,
             gc_trigger: args.global_args.gc_trigger,
-            // vm_map: args.global_args.vm_map,
             options: args.global_args.options,
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
