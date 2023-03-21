@@ -94,6 +94,14 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
 
     /// Full post-barrier for array copy
     fn memory_region_copy_post(&mut self, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
+
+    /// OpenJDK C2 slowpath allocated object
+    ///
+    /// The C2 slowpath allocation code can do deoptimization after the allocation and before
+    /// returning to C2 compiled code. The deoptimization itself contains a safepoint. For generational
+    /// plans, if a GC happens at this safepoint, the allocated object will be promoted, and all the
+    /// subsequent field initialization should be recorded.
+    fn on_slowpath_allocation_exit(&mut self, _obj: ObjectReference) {}
 }
 
 impl_downcast!(Barrier<VM> where VM: VMBinding);
@@ -136,6 +144,9 @@ pub trait BarrierSemantics: 'static + Send {
         src: <Self::VM as VMBinding>::VMMemorySlice,
         dst: <Self::VM as VMBinding>::VMMemorySlice,
     );
+
+    /// OpenJDK C2 slowpath allocated object
+    fn on_slowpath_allocation_exit(&mut self, _obj: ObjectReference) {}
 }
 
 /// Generic object barrier with a type argument defining it's slow-path behaviour.
@@ -214,5 +225,11 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         dst: <S::VM as VMBinding>::VMMemorySlice,
     ) {
         self.semantics.memory_region_copy_slow(src, dst);
+    }
+
+    fn on_slowpath_allocation_exit(&mut self, obj: ObjectReference) {
+        if self.object_is_unlogged(obj) {
+            self.semantics.on_slowpath_allocation_exit(obj);
+        }
     }
 }
