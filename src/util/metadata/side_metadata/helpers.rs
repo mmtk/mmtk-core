@@ -11,13 +11,12 @@ use crate::MMAPPER;
 use std::io::Result;
 
 /// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
-#[inline(always)]
 pub(crate) fn address_to_contiguous_meta_address(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
-    let log_bytes_in_region = metadata_spec.log_bytes_in_region as usize;
+    let log_bytes_in_region = metadata_spec.log_bytes_in_region;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
@@ -88,7 +87,6 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
 }
 
 /// Performs the translation of data address (`data_addr`) to metadata address for the specified metadata (`metadata_spec`).
-#[inline(always)]
 pub(crate) fn address_to_meta_address(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
@@ -120,12 +118,10 @@ pub(crate) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
 }
 
 #[allow(dead_code)]
-#[inline(always)]
 pub const fn metadata_address_range_size(metadata_spec: &SideMetadataSpec) -> usize {
     1usize << (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) as usize)
 }
 
-#[inline(always)]
 pub(crate) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits as i32;
     if bits_num_log >= 3 {
@@ -136,7 +132,6 @@ pub(crate) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Addr
         as u8
 }
 
-#[inline(always)]
 pub(crate) fn meta_byte_mask(metadata_spec: &SideMetadataSpec) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
     ((1usize << (1usize << bits_num_log)) - 1) as u8

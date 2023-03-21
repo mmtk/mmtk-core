@@ -8,6 +8,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -81,25 +82,15 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        let in_defrag = self.immix_space.decide_whether_to_defrag(
-            self.is_emergency_collection(),
-            true,
-            self.base().cur_collection_attempts.load(Ordering::SeqCst),
-            self.base().is_user_triggered_collection(),
-            *self.base().options.full_heap_system_gc,
-        );
-
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        #[allow(clippy::if_same_then_else)]
-        if in_defrag {
-            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self);
-        } else {
-            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_FAST>>(self);
-        }
+        Self::schedule_immix_full_heap_collection::<
+            Immix<VM>,
+            ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
+            ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>,
+        >(self, &self.immix_space, scheduler)
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -133,17 +124,29 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
 impl<VM: VMBinding> Immix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut plan_args = CreateSpecificPlanArgs {
+        let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &IMMIX_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
+        Self::new_with_args(
+            plan_args,
+            ImmixSpaceArgs {
+                reset_log_bit_in_major_gc: false,
+                unlog_object_when_traced: false,
+            },
+        )
+    }
+
+    pub fn new_with_args(
+        mut plan_args: CreateSpecificPlanArgs<VM>,
+        space_args: ImmixSpaceArgs,
+    ) -> Self {
         let immix = Immix {
-            immix_space: ImmixSpace::new(plan_args.get_space_args(
-                "immix",
-                true,
-                VMRequest::discontiguous(),
-            )),
+            immix_space: ImmixSpace::new(
+                plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
+                space_args,
+            ),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };
@@ -159,5 +162,35 @@ impl<VM: VMBinding> Immix<VM> {
         }
 
         immix
+    }
+
+    /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
+    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
+    pub(crate) fn schedule_immix_full_heap_collection<
+        PlanType: Plan<VM = VM>,
+        FastContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
+        DefragContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
+    >(
+        plan: &'static DefragContext::PlanType,
+        immix_space: &ImmixSpace<VM>,
+        scheduler: &GCWorkScheduler<VM>,
+    ) {
+        let in_defrag = immix_space.decide_whether_to_defrag(
+            plan.is_emergency_collection(),
+            true,
+            plan.base().cur_collection_attempts.load(Ordering::SeqCst),
+            plan.base().is_user_triggered_collection(),
+            *plan.base().options.full_heap_system_gc,
+        );
+
+        if in_defrag {
+            scheduler.schedule_common_work::<DefragContext>(plan);
+        } else {
+            scheduler.schedule_common_work::<FastContext>(plan);
+        }
+    }
+
+    pub(in crate::plan) fn set_last_gc_was_defrag(&self, defrag: bool, order: Ordering) {
+        self.last_gc_was_defrag.store(defrag, order)
     }
 }

@@ -62,7 +62,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<VM>) {
@@ -76,7 +76,12 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             + self.base.get_used_pages()
     }
 
-    fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
+    fn handle_user_collection_request(
+        &self,
+        _tls: VMMutatorThread,
+        _force: bool,
+        _exhaustive: bool,
+    ) {
         warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }

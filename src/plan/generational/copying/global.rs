@@ -3,6 +3,7 @@ use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
+use crate::plan::generational::global::GenerationalPlanExt;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -18,8 +19,11 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::ObjectQueue;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -68,14 +72,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn force_full_heap_collection(&self) {
-        self.gen.force_full_heap_collection()
-    }
-
-    fn last_collection_full_heap(&self) -> bool {
-        self.gen.last_collection_full_heap()
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.gen.get_spaces();
         ret.push(&self.copyspace0);
@@ -95,7 +91,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -162,8 +158,16 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
-    fn common_gen(&self) -> &CommonGenPlan<Self::VM> {
-        &self.gen
+    fn is_current_gc_nursery(&self) -> bool {
+        self.gen.is_current_gc_nursery()
+    }
+
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
+        self.gen.nursery.in_space(object)
+    }
+
+    fn is_address_in_nursery(&self, addr: Address) -> bool {
+        self.gen.nursery.address_in_space(addr)
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {
@@ -172,6 +176,25 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
 
     fn get_mature_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlanExt<VM> for GenCopy<VM> {
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.gen.trace_object_nursery(queue, object, worker)
     }
 }
 

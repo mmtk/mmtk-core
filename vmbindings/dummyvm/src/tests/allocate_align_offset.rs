@@ -2,13 +2,13 @@
 
 use crate::api;
 use crate::DummyVM;
-use crate::tests::fixtures::{Fixture, MutatorFixture};
+use crate::tests::fixtures::{SerialFixture, MutatorFixture};
 use mmtk::plan::AllocationSemantics;
 use mmtk::vm::VMBinding;
 use log::info;
 
 lazy_static! {
-    static ref MUTATOR: Fixture<MutatorFixture> = Fixture::new();
+    static ref MUTATOR: SerialFixture<MutatorFixture> = SerialFixture::new();
 }
 
 #[test]

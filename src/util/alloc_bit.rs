@@ -50,7 +50,6 @@ pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
 
 /// Check if an address can be turned directly into an object reference using the alloc bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
-#[inline]
 pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
     let addr = potential_object.to_address::<VM>();
@@ -74,7 +73,6 @@ pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectRefere
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
-#[inline]
 pub unsafe fn is_alloced_object_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
     let addr = potential_object.to_address::<VM>();

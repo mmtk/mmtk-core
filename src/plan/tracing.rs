@@ -47,12 +47,10 @@ impl<T> VectorQueue<T> {
     }
 
     /// Check if the buffer size reaches `CAPACITY`.
-    #[inline(always)]
     pub fn is_full(&self) -> bool {
         self.buffer.len() >= Self::CAPACITY
     }
 
-    #[inline(always)]
     pub fn push(&mut self, v: T) {
         if self.buffer.is_empty() {
             self.buffer.reserve(Self::CAPACITY);
@@ -68,7 +66,6 @@ impl<T> Default for VectorQueue<T> {
 }
 
 impl ObjectQueue for VectorQueue<ObjectReference> {
-    #[inline(always)]
     fn enqueue(&mut self, v: ObjectReference) {
         self.push(v);
     }
@@ -100,8 +97,16 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
 }
 
 impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
-    #[inline(always)]
     fn visit_edge(&mut self, slot: EdgeOf<E>) {
+        #[cfg(debug_assertions)]
+        {
+            use crate::vm::edge_shape::Edge;
+            trace!(
+                "(ObjectsClosure) Visit edge {:?} (pointing to {})",
+                slot,
+                slot.load()
+            );
+        }
         self.buffer.push(slot);
         if self.buffer.is_full() {
             self.flush();
@@ -110,7 +115,6 @@ impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
 }
 
 impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
-    #[inline(always)]
     fn drop(&mut self) {
         self.flush();
     }

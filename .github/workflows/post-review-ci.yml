@@ -34,6 +34,9 @@ jobs:
           repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
           path: mmtk-v8
           ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+      - name: Use mmtk-core Rust toolchain for bindings
+        run: |
+          cp mmtk-core/rust-toolchain mmtk-v8/mmtk
       - name: Overwrite MMTk core in V8 binding
         run: |
           rm -rf mmtk-v8/repos/*
@@ -68,6 +71,9 @@ jobs:
           repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
           path: mmtk-openjdk
           ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      - name: Use mmtk-core Rust toolchain for bindings
+        run: |
+          cp mmtk-core/rust-toolchain mmtk-openjdk/mmtk
       - name: Setup
         run: |
           cd mmtk-openjdk
@@ -76,7 +82,8 @@ jobs:
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
+        run: |
+          cp -r mmtk-core mmtk-openjdk/repos/
       - name: Test
         run: |
           cd mmtk-openjdk
@@ -99,6 +106,9 @@ jobs:
           repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
           path: mmtk-jikesrvm
           ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
+      - name: Use mmtk-core Rust toolchain for bindings
+        run: |
+          cp mmtk-core/rust-toolchain mmtk-jikesrvm/mmtk
       - name: Setup
         run: |
           cd mmtk-jikesrvm
@@ -112,6 +122,48 @@ jobs:
       - name: Test
         run: |
           cd mmtk-jikesrvm
+          export RUST_BACKTRACE=1
+          ./.github/scripts/ci-test.sh
+          ./.github/scripts/ci-style.sh
+
+  julia-binding-test:
+    runs-on: ubuntu-22.04
+    needs: binding-refs
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout Julia Binding
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ needs.binding-refs.outputs.julia_binding_repo }}
+          path: mmtk-julia
+          ref: ${{ needs.binding-refs.outputs.julia_binding_ref }}
+      - name: Use mmtk-core Rust toolchain for bindings
+        run: |
+          cp mmtk-core/rust-toolchain mmtk-julia/mmtk
+      - name: Setup
+        run: |
+          cd mmtk-julia
+          ./.github/scripts/ci-checkout.sh
+          ./.github/scripts/ci-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      - name: Overwrite MMTk core in Julia binding
+        run: |
+          mkdir -p mmtk-julia/repos/mmtk-core
+          cp -r mmtk-core/* mmtk-julia/repos/mmtk-core
+      - name: debug
+        run: |
+          ls mmtk-julia
+          ls mmtk-julia/repos
+          ls mmtk-julia/repos/mmtk-core
+          cat mmtk-julia/mmtk/Cargo.toml
+      - name: Test
+        run: |
+          cd mmtk-julia
           export RUST_BACKTRACE=1
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh

@@ -114,7 +114,7 @@ pub fn create_ms_mutator<VM: VMBinding>(
     plan: &'static dyn Plan<VM = VM>,
 ) -> Mutator<VM> {
     let config = MutatorConfig {
-        allocator_mapping: &*ALLOCATOR_MAPPING,
+        allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: create_space_mapping(plan),
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,

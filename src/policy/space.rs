@@ -66,8 +66,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+
+            // Clear the request, and inform GC trigger about the pending allocation.
+            pr.clear_request(pages_reserved);
+            self.get_gc_trigger()
+                .policy
+                .on_pending_allocation(pages_reserved);
+
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-            pr.clear_request(pages_reserved); // clear the pages after GC. We need those reserved pages so we can compute new heap size properly.
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -173,8 +179,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
                     let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
+
+                    // Clear the request, and inform GC trigger about the pending allocation.
+                    pr.clear_request(pages_reserved);
+                    self.get_gc_trigger()
+                        .policy
+                        .on_pending_allocation(pages_reserved);
+
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
-                    pr.clear_request(pages_reserved); // clear the pages after GC. We need those reserved pages so we can compute new heap size properly.
                     unsafe { Address::zero() }
                 }
             }

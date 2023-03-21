@@ -83,11 +83,9 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.treadmill.add_to_treadmill(object, alloc);
     }
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
-    #[inline(always)]
     fn sft_trace_object(
         &self,
         queue: &mut VectorObjectQueue,
@@ -126,7 +124,6 @@ use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjectSpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -136,7 +133,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjec
     ) -> ObjectReference {
         self.trace_object(queue, object)
     }
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         false
     }
@@ -200,9 +196,15 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             object
         );
         let nursery_object = self.is_in_nursery(object);
+        trace!(
+            "LOS object {} {} a nursery object",
+            object,
+            if nursery_object { "is" } else { "is not" }
+        );
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
+                trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
                 self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
@@ -211,6 +213,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
                 queue.enqueue(object);
+            } else {
+                trace!(
+                    "LOS object {} is not being marked now, it was marked before",
+                    object
+                );
             }
         }
         object

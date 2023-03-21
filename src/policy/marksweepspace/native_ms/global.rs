@@ -112,7 +112,6 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
@@ -174,6 +173,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
 pub const MAX_OBJECT_SIZE: usize = crate::policy::marksweepspace::native_ms::MI_LARGE_OBJ_SIZE_MAX;
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
+    // Allow ptr_arg as we want to keep the function signature the same as for malloc marksweep
+    #[allow(clippy::ptr_arg)]
     pub fn extend_global_side_metadata_specs(_specs: &mut Vec<SideMetadataSpec>) {
         // MarkSweepSpace does not need any special global specs. This method exists, as
         // we need this method for MallocSpace, and we want those two spaces to be used interchangably.
@@ -245,7 +246,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
     }
 
-    #[inline]
     pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
         Block::NEXT_BLOCK_TABLE
     }
@@ -335,7 +335,6 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
         // number of allocated blocks.

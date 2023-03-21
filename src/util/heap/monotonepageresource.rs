@@ -272,7 +272,6 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
-    #[inline]
     unsafe fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
         // TODO: concurrent zeroing
         if self.common().contiguous {

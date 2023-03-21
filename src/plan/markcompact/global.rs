@@ -76,7 +76,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
