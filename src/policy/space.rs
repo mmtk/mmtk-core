@@ -24,8 +24,8 @@ use crate::policy::sft::SFT;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::layout::Map;
 use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
@@ -391,7 +391,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
     pub head_discontiguous_region: Address,
 
-    pub vm_map: &'static dyn Map,
+    pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
 
     pub metadata: SideMetadataContext,
@@ -422,7 +422,7 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub zeroed: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
-    pub vm_map: &'static dyn Map,
+    pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
     pub heap: &'a mut HeapMeta,
     pub constraints: &'a PlanConstraints,
@@ -560,7 +560,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
     }
 
-    pub fn vm_map(&self) -> &'static dyn Map {
+    pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
     }
 }

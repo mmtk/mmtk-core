@@ -8,18 +8,18 @@ mod byte_map_mmapper;
 mod fragmented_mapper;
 
 mod map;
-pub use self::map::Map;
+pub use self::map::VMMap;
 mod map32;
 #[cfg(target_pointer_width = "64")]
 mod map64;
 
 #[cfg(target_pointer_width = "32")]
-pub fn create_vm_map() -> Box<dyn Map> {
+pub fn create_vm_map() -> Box<dyn VMMap> {
     Box::new(map32::Map32::new())
 }
 
 #[cfg(target_pointer_width = "64")]
-pub fn create_vm_map() -> Box<dyn Map> {
+pub fn create_vm_map() -> Box<dyn VMMap> {
     // TODO: Map32 for compressed pointers
     Box::new(map64::Map64::new())
 }

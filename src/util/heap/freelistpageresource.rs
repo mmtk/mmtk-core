@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use super::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
-use super::layout::Map;
+use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
 use crate::mmtk::MMAPPER;
@@ -147,7 +147,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 }
 
 impl<VM: VMBinding> FreeListPageResource<VM> {
-    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn Map) -> Self {
+    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
         let common_flpr = {
             let common_flpr = Box::new(CommonFreeListPageResource {
@@ -175,7 +175,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn new_discontiguous(vm_map: &'static dyn Map) -> Self {
+    pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
         let common_flpr = {
             let start = AVAILABLE_START;
             let common_flpr = Box::new(CommonFreeListPageResource {

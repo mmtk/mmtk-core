@@ -14,8 +14,8 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::analysis::AnalysisManager;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::Map;
 use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -66,7 +66,7 @@ pub fn create_mutator<VM: VMBinding>(
 
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
-    vm_map: &'static dyn Map,
+    vm_map: &'static dyn VMMap,
     mmapper: &'static dyn Mmapper,
     options: Arc<Options>,
     scheduler: Arc<GCWorkScheduler<VM>>,
@@ -451,7 +451,7 @@ pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> 
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
 /// is passed to each plan's constructor.
 pub struct CreateGeneralPlanArgs<VM: VMBinding> {
-    pub vm_map: &'static dyn Map,
+    pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
     pub heap: HeapMeta,
     pub options: Arc<Options>,
