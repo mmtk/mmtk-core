@@ -25,9 +25,13 @@ impl MmapTestRegion {
     }
 }
 
+// Make sure we use the address range before our heap start. Use 32bit heap start here, as 64bit heap start
+// is too large for byte map mmapper.
+const TEST_ADDRESS: Address = HEAP_START_32;
+
 // util::heap::layout::fragmented_mmapper
 pub(crate) const FRAGMENTED_MMAPPER_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before_address(HEAP_START, MMAP_CHUNK_BYTES * 2);
+    MmapTestRegion::reserve_before_address(TEST_ADDRESS, MMAP_CHUNK_BYTES * 2);
 // util::heap::layout::byte_map_mmaper
 pub(crate) const BYTE_MAP_MMAPPER_TEST_REGION: MmapTestRegion =
     MmapTestRegion::reserve_before(FRAGMENTED_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES * 2);

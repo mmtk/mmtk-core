@@ -153,7 +153,7 @@ impl Default for ByteMapMmapper {
     }
 }
 
-#[cfg(all(test, target_pointer_width = "32"))]
+#[cfg(test)]
 mod tests {
     use crate::util::heap::layout::{ByteMapMmapper, Mmapper};
     use crate::util::Address;
