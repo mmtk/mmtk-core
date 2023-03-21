@@ -33,8 +33,12 @@ impl Map64 {
         let mut high_water = vec![Address::ZERO; MAX_SPACES];
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
 
+        assert!(cfg!(target_pointer_width = "64"), "Use Map32 for 32-bit targets");
         for i in 0..MAX_SPACES {
+            #[cfg(target_pointer_width = "64")]
             let base = unsafe { Address::from_usize(i << LOG_SPACE_SIZE_64) };
+            #[cfg(target_pointer_width = "32")]
+            let base = Address::ZERO; // workaround to make 32-bit build work
             high_water[i] = base;
             base_address[i] = base;
         }
