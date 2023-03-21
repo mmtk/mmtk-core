@@ -122,8 +122,8 @@ impl SpaceDescriptor {
         chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
     }
 
-    #[cfg(target_pointer_width = "64")]
     pub fn get_index(self) -> usize {
+        debug_assert!(cfg!(target_pointer_width = "64"));
         (self.0 & INDEX_MASK) >> INDEX_SHIFT
     }
 }
