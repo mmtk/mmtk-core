@@ -248,10 +248,10 @@
 <span id="248">248</span>
 <span id="249">249</span>
 <span id="250">250</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::Map;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
-<span class="kw">use </span><span class="kw">crate</span>::util::generic_freelist::GenericFreeList;
+<span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
@@ -278,10 +278,8 @@
     </span>cumulative_committed_pages: AtomicUsize,
 }
 
-<span class="kw">impl </span>Map <span class="kw">for </span>Map64 {
-    <span class="kw">type </span>FreeList = RawMemoryFreeList;
-
-    <span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
+<span class="kw">impl </span>Map64 {
+    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>high_water = <span class="macro">vec!</span>[Address::ZERO; MAX_SPACES];
         <span class="kw">let </span><span class="kw-2">mut </span>base_address = <span class="macro">vec!</span>[Address::ZERO; MAX_SPACES];
 
@@ -306,7 +304,9 @@
             cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
         }
     }
+}
 
+<span class="kw">impl </span>VMMap <span class="kw">for </span>Map64 {
     <span class="kw">fn </span>insert(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         <span class="macro">debug_assert!</span>(<span class="self">Self</span>::is_space_start(start));
         <span class="macro">debug_assert!</span>(extent &lt;= SPACE_SIZE_64);
@@ -317,7 +317,7 @@
         self_mut.descriptor_map[index] = descriptor;
     }
 
-    <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Box&lt;<span class="self">Self</span>::FreeList&gt; {
+    <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
         <span class="kw">let </span>units = SPACE_SIZE_64 &gt;&gt; LOG_BYTES_IN_PAGE;
         <span class="self">self</span>.create_parent_freelist(start, units, units <span class="kw">as _</span>)
     }
@@ -327,7 +327,7 @@
         start: Address,
         <span class="kw-2">mut </span>units: usize,
         grain: i32,
-    ) -&gt; Box&lt;<span class="self">Self</span>::FreeList&gt; {
+    ) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
         <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         </span><span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         <span class="kw">let </span>index = <span class="self">Self</span>::space_index(start).unwrap();

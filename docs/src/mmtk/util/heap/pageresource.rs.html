@@ -182,15 +182,13 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
-<span id="185">185</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ActivePlan;
 <span class="kw">use </span>std::sync::Mutex;
 
-<span class="kw">use </span><span class="kw">super</span>::layout::map::Map;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
+<span class="kw">use </span><span class="kw">super</span>::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::PageAccounting;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -289,7 +287,7 @@
 
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPageResource;
     <span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPageResource;
-    <span class="kw">fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap {
+    <span class="kw">fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap {
         <span class="self">self</span>.common().vm_map
     }
 }
@@ -307,12 +305,12 @@
     <span class="kw">pub </span>contiguous: bool,
     <span class="kw">pub </span>growable: bool,
 
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
     head_discontiguous_region: Mutex&lt;Address&gt;,
 }
 
 <span class="kw">impl </span>CommonPageResource {
-    <span class="kw">pub fn </span>new(contiguous: bool, growable: bool, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap) -&gt; CommonPageResource {
+    <span class="kw">pub fn </span>new(contiguous: bool, growable: bool, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; CommonPageResource {
         CommonPageResource {
             accounting: PageAccounting::new(),
 

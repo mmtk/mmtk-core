@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["COALESC_MASK",""],["FAILURE",""],["FREE_MASK",""],["MAX_HEADS",""],["MAX_UNITS",""],["MULTI_MASK",""],["NEXT_MASK",""],["PREV_MASK",""],["SIZE_MASK",""],["TOTAL_BITS",""],["UNIT_BITS",""]],"trait":[["FreeList",""]]};

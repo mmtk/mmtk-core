@@ -1062,12 +1062,6 @@
 <span id="1062">1062</span>
 <span id="1063">1063</span>
 <span id="1064">1064</span>
-<span id="1065">1065</span>
-<span id="1066">1066</span>
-<span id="1067">1067</span>
-<span id="1068">1068</span>
-<span id="1069">1069</span>
-<span id="1070">1070</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1084,8 +1078,8 @@
 </span><span class="kw">use </span><span class="kw">crate</span>::util::analysis::AnalysisManager;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::{CopyConfig, GCWorkerCopyContext};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::HeapMeta;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
@@ -1136,8 +1130,8 @@
 
 <span class="kw">pub fn </span>create_plan&lt;VM: VMBinding&gt;(
     plan: PlanSelector,
-    vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
-    mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mmapper,
+    vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
+    mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
     options: Arc&lt;Options&gt;,
     scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
 ) -&gt; Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt; {
@@ -1255,9 +1249,6 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan&lt;VM = <span class="self">Self</span>::VM&gt;&gt; {
         <span class="prelude-val">None
     </span>}
-    <span class="kw">fn </span>mmapper(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mmapper {
-        <span class="self">self</span>.base().mmapper
-    }
     <span class="kw">fn </span>options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base().options
     }
@@ -1451,9 +1442,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
     </span><span class="kw">pub </span>cur_collection_attempts: AtomicUsize,
     <span class="kw">pub </span>gc_requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
     <span class="kw">pub </span>stats: Stats,
-    mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mmapper,
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
-    <span class="kw">pub </span>options: Arc&lt;Options&gt;,
+    <span class="comment">// pub vm_map: &amp;&#39;static dyn Map,
+    </span><span class="kw">pub </span>options: Arc&lt;Options&gt;,
     <span class="kw">pub </span>heap: HeapMeta,
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
@@ -1525,8 +1515,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
 <span class="doccomment">/// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
 /// is passed to each plan&#39;s constructor.
 </span><span class="kw">pub struct </span>CreateGeneralPlanArgs&lt;VM: VMBinding&gt; {
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
-    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mmapper,
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
+    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
     <span class="kw">pub </span>heap: HeapMeta,
     <span class="kw">pub </span>options: Arc&lt;Options&gt;,
     <span class="kw">pub </span>gc_trigger: Arc&lt;<span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger&lt;VM&gt;&gt;,
@@ -1610,11 +1600,9 @@ BasePlan should contain all plan-related state and functions that are _fundament
             cur_collection_attempts: AtomicUsize::new(<span class="number">0</span>),
             gc_requester: Arc::new(GCRequester::new()),
             stats,
-            mmapper: args.global_args.mmapper,
             heap: args.global_args.heap,
             gc_trigger: args.global_args.gc_trigger,
-            vm_map: args.global_args.vm_map,
-            options: args.global_args.options.clone(),
+            options: args.global_args.options,
             <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
             </span>inside_sanity: AtomicBool::new(<span class="bool-val">false</span>),
             scanned_stacks: AtomicUsize::new(<span class="number">0</span>),

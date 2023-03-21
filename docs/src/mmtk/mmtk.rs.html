@@ -159,8 +159,6 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
-<span id="162">162</span>
-<span id="163">163</span>
 </pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
@@ -169,9 +167,7 @@
 <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::edge_logger::EdgeLogger;
 <span class="kw">use </span><span class="kw">crate</span>::util::finalizable_processor::FinalizableProcessor;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::map::Map;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::{<span class="self">self</span>, Mmapper, VMMap};
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
 <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::ReferenceProcessors;
@@ -194,10 +190,10 @@
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     </span><span class="doccomment">/// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    </span><span class="kw">pub static </span><span class="kw-2">ref </span>VM_MAP: VMMap = VMMap::new();
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>VM_MAP: Box&lt;<span class="kw">dyn </span>VMMap&gt; = layout::create_vm_map();
 
     <span class="doccomment">/// A global Mmapper for mmaping and protection of virtual memory.
-    </span><span class="kw">pub static </span><span class="kw-2">ref </span>MMAPPER: Mmapper = Mmapper::new();
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>MMAPPER: Box&lt;<span class="kw">dyn </span>Mmapper&gt; = layout::create_mmapper();
 }
 
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::InitializeOnce;
@@ -274,8 +270,8 @@
 
         <span class="kw">let </span>plan = <span class="kw">crate</span>::plan::create_plan(
             <span class="kw-2">*</span>options.plan,
-            <span class="kw-2">&amp;</span>VM_MAP,
-            <span class="kw-2">&amp;</span>MMAPPER,
+            VM_MAP.as_ref(),
+            MMAPPER.as_ref(),
             options.clone(),
             scheduler.clone(),
         );

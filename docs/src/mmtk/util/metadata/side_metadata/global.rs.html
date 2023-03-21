@@ -1512,7 +1512,6 @@
 <span id="1512">1512</span>
 <span id="1513">1513</span>
 <span id="1514">1514</span>
-<span id="1515">1515</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
@@ -1651,7 +1650,6 @@
 
     <span class="doccomment">/// Check with the mmapper to see if side metadata is mapped for the spec for the data address.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>is_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address) -&gt; bool {
-        <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
         <span class="kw">use </span><span class="kw">crate</span>::MMAPPER;
         <span class="kw">let </span>meta_addr = address_to_meta_address(<span class="self">self</span>, data_addr);
         MMAPPER.is_mapped_address(meta_addr)

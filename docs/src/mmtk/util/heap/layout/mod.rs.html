@@ -17,24 +17,58 @@
 <span id="17">17</span>
 <span id="18">18</span>
 <span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
 </pre><pre class="rust"><code><span class="kw">pub mod </span>heap_parameters;
-<span class="attribute">#[macro_use]
-</span><span class="kw">pub mod </span>vm_layout_constants;
-<span class="kw">pub mod </span>mmapper;
+<span class="kw">pub mod </span>vm_layout_constants;
+
+<span class="kw">mod </span>mmapper;
 <span class="kw">pub use </span><span class="self">self</span>::mmapper::Mmapper;
-<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">mod </span>byte_map_mmapper;
-<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub use </span><span class="self">self</span>::byte_map_mmapper::ByteMapMmapper;
+<span class="kw">mod </span>byte_map_mmapper;
 <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
 </span><span class="kw">mod </span>fragmented_mapper;
+
+<span class="kw">mod </span>map;
+<span class="kw">pub use </span><span class="self">self</span>::map::VMMap;
+<span class="kw">mod </span>map32;
 <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
-</span><span class="kw">pub use </span><span class="self">self</span>::fragmented_mapper::FragmentedMapper;
-<span class="kw">pub mod </span>heap_layout;
-<span class="kw">pub mod </span>map;
+</span><span class="kw">mod </span>map64;
+
 <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub mod </span>map32;
+</span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap&gt; {
+    Box::new(map32::Map32::new())
+}
+
 <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
-</span><span class="kw">pub mod </span>map64;
+</span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap&gt; {
+    <span class="comment">// TODO: Map32 for compressed pointers
+    </span>Box::new(map64::Map64::new())
+}
+
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper&gt; {
+    Box::new(byte_map_mmapper::ByteMapMmapper::new())
+}
+
+<span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper&gt; {
+    <span class="comment">// TODO: ByteMapMmapper for 39-bit or less virtual space
+    </span>Box::new(fragmented_mapper::FragmentedMapper::new())
+}
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

@@ -218,7 +218,7 @@
 <span class="kw">use </span>std::io::Result;
 
 <span class="doccomment">/// Generic mmap and protection functionality
-</span><span class="kw">pub trait </span>Mmapper {
+</span><span class="kw">pub trait </span>Mmapper: Sync {
     <span class="doccomment">/// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///

@@ -367,21 +367,19 @@
 <span id="367">367</span>
 <span id="368">368</span>
 <span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::{Deref, DerefMut};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
-<span class="kw">use </span><span class="kw">super</span>::layout::map::Map;
 <span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
+<span class="kw">use </span><span class="kw">super</span>::layout::VMMap;
 <span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use </span><span class="kw">super</span>::PageResource;
+<span class="kw">use </span><span class="kw">crate</span>::mmtk::MMAPPER;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::embedded_meta_data::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
-<span class="kw">use </span><span class="kw">crate</span>::util::generic_freelist;
-<span class="kw">use </span><span class="kw">crate</span>::util::generic_freelist::GenericFreeList;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
+<span class="kw">use </span><span class="kw">crate</span>::util::freelist;
+<span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
@@ -393,7 +391,7 @@
 <span class="kw">const </span>UNINITIALIZED_WATER_MARK: i32 = -<span class="number">1</span>;
 
 <span class="kw">pub struct </span>CommonFreeListPageResource {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) free_list: Box&lt;&lt;VMMap <span class="kw">as </span>Map&gt;::FreeList&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) free_list: Box&lt;<span class="kw">dyn </span>FreeList&gt;,
     start: Address,
 }
 
@@ -472,13 +470,13 @@
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>new_chunk = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>page_offset = self_mut.free_list.alloc(required_pages <span class="kw">as _</span>);
-        <span class="kw">if </span>page_offset == generic_freelist::FAILURE &amp;&amp; <span class="self">self</span>.common.growable {
+        <span class="kw">if </span>page_offset == freelist::FAILURE &amp;&amp; <span class="self">self</span>.common.growable {
             page_offset =
                 self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, <span class="kw-2">&amp;mut </span>sync);
             new_chunk = <span class="bool-val">true</span>;
         }
 
-        <span class="kw">if </span>page_offset == generic_freelist::FAILURE {
+        <span class="kw">if </span>page_offset == freelist::FAILURE {
             <span class="kw">return </span>Result::Err(PRAllocFail);
         } <span class="kw">else </span>{
             sync.pages_currently_on_freelist -= required_pages;
@@ -496,8 +494,6 @@
         <span class="comment">// The meta-data portion of reserved Pages was committed above.
         </span><span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
         <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release &amp;&amp; !new_chunk {
-            <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
-            <span class="kw">use </span><span class="kw">crate</span>::MMAPPER;
             <span class="comment">// This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
             // See https://github.com/mmtk/mmtk-core/issues/400.
             // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
@@ -520,7 +516,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; FreeListPageResource&lt;VM&gt; {
-    <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>pages = conversions::bytes_to_pages(bytes);
         <span class="kw">let </span>common_flpr = {
             <span class="kw">let </span>common_flpr = Box::new(CommonFreeListPageResource {
@@ -548,7 +544,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>common_flpr = {
             <span class="kw">let </span>start = AVAILABLE_START;
             <span class="kw">let </span>common_flpr = Box::new(CommonFreeListPageResource {
@@ -617,7 +613,7 @@
         <span class="kw">let </span>page_offset =
             self_mut.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, <span class="kw-2">&amp;mut </span>sync);
 
-        <span class="kw">if </span>page_offset == generic_freelist::FAILURE {
+        <span class="kw">if </span>page_offset == freelist::FAILURE {
             <span class="kw">return </span>Result::Err(PRAllocFail);
         } <span class="kw">else </span>{
             sync.pages_currently_on_freelist -= PAGES_IN_CHUNK;
@@ -640,7 +636,7 @@
         pages: usize,
         sync: <span class="kw-2">&amp;mut </span>MutexGuard&lt;FreeListPageResourceSync&gt;,
     ) -&gt; i32 {
-        <span class="kw">let </span><span class="kw-2">mut </span>rtn = generic_freelist::FAILURE;
+        <span class="kw">let </span><span class="kw-2">mut </span>rtn = freelist::FAILURE;
         <span class="kw">let </span>required_chunks = <span class="kw">crate</span>::policy::space::required_chunks(pages);
         <span class="kw">let </span>region = <span class="self">self
             </span>.common
@@ -727,12 +723,12 @@
                 <span class="comment">// region_start is guaranteed to be positive. Otherwise this line will fail due to subtraction overflow.
                 </span>region_start -= PAGES_IN_CHUNK;
             }
-            <span class="kw">while </span>next_region_start &lt; generic_freelist::MAX_UNITS <span class="kw">as </span>usize
+            <span class="kw">while </span>next_region_start &lt; freelist::MAX_UNITS <span class="kw">as </span>usize
                 &amp;&amp; <span class="self">self</span>.free_list.is_coalescable(next_region_start <span class="kw">as _</span>)
             {
                 next_region_start += PAGES_IN_CHUNK;
             }
-            <span class="macro">debug_assert!</span>(next_region_start &lt; generic_freelist::MAX_UNITS <span class="kw">as </span>usize);
+            <span class="macro">debug_assert!</span>(next_region_start &lt; freelist::MAX_UNITS <span class="kw">as </span>usize);
             <span class="kw">if </span>pages_freed == next_region_start - region_start {
                 <span class="kw">let </span>start = <span class="self">self</span>.start;
                 <span class="self">self</span>.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start), sync);

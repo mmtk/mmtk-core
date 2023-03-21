@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":[["Map",""]]};
+window.SIDEBAR_ITEMS = {"trait":[["VMMap",""]]};

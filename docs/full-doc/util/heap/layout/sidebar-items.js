@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["fragmented_mapper",""],["heap_layout",""],["heap_parameters",""],["map",""],["map64",""],["mmapper",""],["vm_layout_constants",""]]};
+window.SIDEBAR_ITEMS = {"fn":[["create_mmapper",""],["create_vm_map",""]],"mod":[["byte_map_mmapper",""],["fragmented_mapper",""],["heap_parameters",""],["map",""],["map32",""],["map64",""],["mmapper",""],["vm_layout_constants",""]]};

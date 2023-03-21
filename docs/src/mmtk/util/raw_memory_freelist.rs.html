@@ -547,10 +547,7 @@
 <span id="547">547</span>
 <span id="548">548</span>
 <span id="549">549</span>
-<span id="550">550</span>
-<span id="551">551</span>
-<span id="552">552</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::generic_freelist::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::freelist::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -577,7 +574,7 @@
     pages_per_block: i32,
 }
 
-<span class="kw">impl </span>GenericFreeList <span class="kw">for </span>RawMemoryFreeList {
+<span class="kw">impl </span>FreeList <span class="kw">for </span>RawMemoryFreeList {
     <span class="kw">fn </span>head(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i32 {
         <span class="self">self</span>.head
     }
@@ -781,7 +778,7 @@
  */
 </span><span class="attribute">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
-    <span class="kw">use </span><span class="kw">super</span>::GenericFreeList;
+    <span class="kw">use </span><span class="kw">super</span>::FreeList;
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
@@ -810,10 +807,7 @@
             <span class="prelude-val">Ok</span>(guard) =&gt; guard,
             <span class="prelude-val">Err</span>(poisoned) =&gt; poisoned.into_inner(),
         };
-        <span class="attribute">#[cfg(target_os = <span class="string">&quot;linux&quot;</span>)]
-        </span><span class="kw">let </span>start = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x8000_0000</span>) };
-        <span class="attribute">#[cfg(target_os = <span class="string">&quot;macos&quot;</span>)]
-        </span><span class="kw">let </span>start = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x2400_0000_0000</span>) };
+        <span class="kw">let </span>start = <span class="kw">crate</span>::util::test_util::RAW_MEMORY_FREELIST_TEST_REGION.start;
         <span class="kw">let </span>extent = BYTES_IN_PAGE;
         <span class="kw">let </span>pages_per_block = RawMemoryFreeList::default_block_size(list_size <span class="kw">as _</span>, <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(pages_per_block, <span class="number">1</span>);

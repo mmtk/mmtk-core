@@ -54,38 +54,22 @@
 <span id="54">54</span>
 <span id="55">55</span>
 <span id="56">56</span>
-<span id="57">57</span>
-<span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
-<span id="61">61</span>
-<span id="62">62</span>
-<span id="63">63</span>
-<span id="64">64</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::generic_freelist::GenericFreeList;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-<span class="kw">pub trait </span>Map: Sized {
-    <span class="kw">type </span>FreeList: GenericFreeList;
-
-    <span class="kw">fn </span>new() -&gt; <span class="self">Self</span>;
-
+<span class="kw">pub trait </span>VMMap: Sync {
     <span class="kw">fn </span>insert(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     <span class="doccomment">/// Create a free-list for a discontiguous space. Must only be called at boot time.
     /// bind_freelist() must be called by the caller after this method.
-    </span><span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Box&lt;<span class="self">Self</span>::FreeList&gt;;
+    </span><span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt;;
 
     <span class="doccomment">/// Create a free-list for a contiguous space. Must only be called at boot time.
     /// bind_freelist() must be called by the caller after this method.
-    </span><span class="kw">fn </span>create_parent_freelist(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        start: Address,
-        units: usize,
-        grain: i32,
-    ) -&gt; Box&lt;<span class="self">Self</span>::FreeList&gt;;
+    </span><span class="kw">fn </span>create_parent_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, units: usize, grain: i32)
+        -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt;;
 
     <span class="doccomment">/// Bind a created freelist with the page resource.
     /// This must called after create_freelist() or create_parent_freelist().

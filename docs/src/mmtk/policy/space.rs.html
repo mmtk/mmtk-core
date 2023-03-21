@@ -582,9 +582,6 @@
 <span id="582">582</span>
 <span id="583">583</span>
 <span id="584">584</span>
-<span id="585">585</span>
-<span id="586">586</span>
-<span id="587">587</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -610,11 +607,9 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::map::Map;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper <span class="kw">as </span>IMmapper;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::HeapMeta;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory;
@@ -852,7 +847,6 @@
             </span><span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }
 
-        <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::mmapper::Mmapper;
         <span class="self">self</span>.common()
             .mmapper
             .mark_as_mapped(<span class="self">self</span>.common().start, <span class="self">self</span>.common().extent);
@@ -981,8 +975,8 @@
     <span class="kw">pub </span>extent: usize,
     <span class="kw">pub </span>head_discontiguous_region: Address,
 
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
-    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mmapper,
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
+    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
 
     <span class="kw">pub </span>metadata: SideMetadataContext,
 
@@ -1012,8 +1006,8 @@
     <span class="kw">pub </span>zeroed: bool,
     <span class="kw">pub </span>vmrequest: VMRequest,
     <span class="kw">pub </span>global_side_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap,
-    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mmapper,
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
+    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
     <span class="kw">pub </span>heap: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>HeapMeta,
     <span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>PlanConstraints,
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
@@ -1150,7 +1144,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap {
+    <span class="kw">pub fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap {
         <span class="self">self</span>.vm_map
     }
 }

@@ -317,7 +317,6 @@
 <span id="317">317</span>
 <span id="318">318</span>
 <span id="319">319</span>
-<span id="320">320</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -329,10 +328,9 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 
-<span class="kw">use </span><span class="kw">super</span>::layout::map::Map;
+<span class="kw">use </span><span class="kw">super</span>::layout::VMMap;
 <span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use </span><span class="kw">super</span>::PageResource;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>std::marker::PhantomData;
@@ -473,7 +471,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MonotonePageResource&lt;VM&gt; {
-    <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>sentinel = start + bytes;
 
         MonotonePageResource {
@@ -492,7 +490,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMMap) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         MonotonePageResource {
             common: CommonPageResource::new(<span class="bool-val">false</span>, <span class="bool-val">true</span>, vm_map),
             sync: Mutex::new(MonotonePageResourceSync {
