@@ -95,13 +95,19 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     /// Full post-barrier for array copy
     fn memory_region_copy_post(&mut self, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
 
-    /// OpenJDK C2 slowpath allocated object
-    ///
-    /// The C2 slowpath allocation code can do deoptimization after the allocation and before
-    /// returning to C2 compiled code. The deoptimization itself contains a safepoint. For generational
-    /// plans, if a GC happens at this safepoint, the allocated object will be promoted, and all the
+    /// A pre-barrier indicating that some fields of the object will probably be modified soon.
+    /// Specifically, the caller should ensure that:
+    ///     * The barrier must called before any field modification.
+    ///     * Some fields (unknown at the time of calling this barrier) might be modified soon, without a write barrier.
+    ///     * There are no safepoints between the barrier call and the field writes.
+    /// 
+    /// Currently, this is only used by the OpenJDK binding. The OpenJDK C2 slowpath allocation code
+    /// can do deoptimization after the allocation and before returning to C2 compiled code.
+    /// The deoptimization itself contains a safepoint. For generational plans, if a GC
+    /// happens at this safepoint, the allocated object will be promoted, and all the
     /// subsequent field initialization should be recorded.
-    fn on_slowpath_allocation_exit(&mut self, _obj: ObjectReference) {}
+    /// TODO: Review any potential use cases for other VM bindings.
+    fn object_probable_write(&mut self, _obj: ObjectReference) {}
 }
 
 impl_downcast!(Barrier<VM> where VM: VMBinding);
@@ -145,8 +151,8 @@ pub trait BarrierSemantics: 'static + Send {
         dst: <Self::VM as VMBinding>::VMMemorySlice,
     );
 
-    /// OpenJDK C2 slowpath allocated object
-    fn on_slowpath_allocation_exit(&mut self, _obj: ObjectReference) {}
+    /// Object will probably be modified
+    fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
 }
 
 /// Generic object barrier with a type argument defining it's slow-path behaviour.
@@ -227,9 +233,9 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         self.semantics.memory_region_copy_slow(src, dst);
     }
 
-    fn on_slowpath_allocation_exit(&mut self, obj: ObjectReference) {
+    fn object_probable_write(&mut self, obj: ObjectReference) {
         if self.object_is_unlogged(obj) {
-            self.semantics.on_slowpath_allocation_exit(obj);
+            self.semantics.object_probable_write_slow(obj);
         }
     }
 }

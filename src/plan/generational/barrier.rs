@@ -97,7 +97,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
         }
     }
 
-    fn on_slowpath_allocation_exit(&mut self, obj: ObjectReference) {
+    fn object_probable_write_slow(&mut self, obj: ObjectReference) {
         // enqueue the object
         self.modbuf.push(obj);
         self.modbuf.is_full().then(|| self.flush_modbuf());
