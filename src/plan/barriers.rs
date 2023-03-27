@@ -100,7 +100,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     ///     * The barrier must called before any field modification.
     ///     * Some fields (unknown at the time of calling this barrier) might be modified soon, without a write barrier.
     ///     * There are no safepoints between the barrier call and the field writes.
-    /// 
+    ///
     /// Currently, this is only used by the OpenJDK binding. The OpenJDK C2 slowpath allocation code
     /// can do deoptimization after the allocation and before returning to C2 compiled code.
     /// The deoptimization itself contains a safepoint. For generational plans, if a GC
