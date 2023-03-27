@@ -216,6 +216,32 @@
 <span id="216">216</span>
 <span id="217">217</span>
 <span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::{Edge, MemorySlice};
@@ -312,6 +338,23 @@
 
     <span class="doccomment">/// Full post-barrier for array copy
     </span><span class="kw">fn </span>memory_region_copy_post(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
+
+    <span class="doccomment">/// A pre-barrier indicating that some fields of the object will probably be modified soon.
+    /// Specifically, the caller should ensure that:
+    ///     * The barrier must called before any field modification.
+    ///     * Some fields (unknown at the time of calling this barrier) might be modified soon, without a write barrier.
+    ///     * There are no safepoints between the barrier call and the field writes.
+    ///
+    /// **Example use case for mmtk-openjdk:**
+    ///
+    /// The OpenJDK C2 slowpath allocation code
+    /// can do deoptimization after the allocation and before returning to C2 compiled code.
+    /// The deoptimization itself contains a safepoint. For generational plans, if a GC
+    /// happens at this safepoint, the allocated object will be promoted, and all the
+    /// subsequent field initialization should be recorded.
+    ///
+    </span><span class="comment">// TODO: Review any potential use cases for other VM bindings.
+    </span><span class="kw">fn </span>object_probable_write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _obj: ObjectReference) {}
 }
 
 <span class="macro">impl_downcast!</span>(Barrier&lt;VM&gt; <span class="kw">where </span>VM: VMBinding);
@@ -354,6 +397,9 @@
         src: &lt;<span class="self">Self</span>::VM <span class="kw">as </span>VMBinding&gt;::VMMemorySlice,
         dst: &lt;<span class="self">Self</span>::VM <span class="kw">as </span>VMBinding&gt;::VMMemorySlice,
     );
+
+    <span class="doccomment">/// Object will probably be modified
+    </span><span class="kw">fn </span>object_probable_write_slow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _obj: ObjectReference) {}
 }
 
 <span class="doccomment">/// Generic object barrier with a type argument defining it&#39;s slow-path behaviour.
@@ -432,6 +478,12 @@
         dst: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMMemorySlice,
     ) {
         <span class="self">self</span>.semantics.memory_region_copy_slow(src, dst);
+    }
+
+    <span class="kw">fn </span>object_probable_write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, obj: ObjectReference) {
+        <span class="kw">if </span><span class="self">self</span>.object_is_unlogged(obj) {
+            <span class="self">self</span>.semantics.object_probable_write_slow(obj);
+        }
     }
 }
 </code></pre></div>
