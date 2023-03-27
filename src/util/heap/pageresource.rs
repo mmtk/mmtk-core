@@ -4,8 +4,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::ActivePlan;
 use std::sync::Mutex;
 
-use super::layout::map::Map;
-use crate::util::heap::layout::heap_layout::VMMap;
+use super::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::PageAccounting;
 use crate::vm::VMBinding;
@@ -104,7 +103,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
 
     fn common(&self) -> &CommonPageResource;
     fn common_mut(&mut self) -> &mut CommonPageResource;
-    fn vm_map(&self) -> &'static VMMap {
+    fn vm_map(&self) -> &'static dyn VMMap {
         self.common().vm_map
     }
 }
@@ -122,12 +121,12 @@ pub struct CommonPageResource {
     pub contiguous: bool,
     pub growable: bool,
 
-    pub vm_map: &'static VMMap,
+    pub vm_map: &'static dyn VMMap,
     head_discontiguous_region: Mutex<Address>,
 }
 
 impl CommonPageResource {
-    pub fn new(contiguous: bool, growable: bool, vm_map: &'static VMMap) -> CommonPageResource {
+    pub fn new(contiguous: bool, growable: bool, vm_map: &'static dyn VMMap) -> CommonPageResource {
         CommonPageResource {
             accounting: PageAccounting::new(),
 

@@ -6,7 +6,7 @@ use atomic::{Atomic, Ordering};
 use std::io::Result;
 
 /// Generic mmap and protection functionality
-pub trait Mmapper {
+pub trait Mmapper: Sync {
     /// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///
