@@ -6,9 +6,7 @@ use crate::scheduler::GCWorkScheduler;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::map::Map;
+use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
@@ -31,10 +29,10 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     /// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    pub static ref VM_MAP: VMMap = VMMap::new();
+    pub static ref VM_MAP: Box<dyn VMMap> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Mmapper = Mmapper::new();
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
@@ -111,8 +109,8 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let plan = crate::plan::create_plan(
             *options.plan,
-            &VM_MAP,
-            &MMAPPER,
+            VM_MAP.as_ref(),
+            MMAPPER.as_ref(),
             options.clone(),
             scheduler.clone(),
         );
