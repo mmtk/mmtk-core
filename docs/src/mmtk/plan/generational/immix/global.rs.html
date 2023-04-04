@@ -318,7 +318,7 @@
     <span class="doccomment">/// An immix space as the mature space.
     </span><span class="attribute">#[post_scan]
     #[trace(CopySemantics::Mature)]
-    </span><span class="kw">pub </span>immix: ImmixSpace&lt;VM&gt;,
+    </span><span class="kw">pub </span>immix_space: ImmixSpace&lt;VM&gt;,
     <span class="doccomment">/// Whether the last GC was a defrag GC for the immix space.
     </span><span class="kw">pub </span>last_gc_was_defrag: AtomicBool,
     <span class="doccomment">/// Whether the last GC was a full heap GC
@@ -354,7 +354,7 @@
                 CopySemantics::Mature =&gt; CopySelector::ImmixHybrid(<span class="number">0</span>),
                 <span class="kw">_ </span>=&gt; CopySelector::Unused,
             },
-            space_mapping: <span class="macro">vec!</span>[(CopySelector::ImmixHybrid(<span class="number">0</span>), <span class="kw-2">&amp;</span><span class="self">self</span>.immix)],
+            space_mapping: <span class="macro">vec!</span>[(CopySelector::ImmixHybrid(<span class="number">0</span>), <span class="kw-2">&amp;</span><span class="self">self</span>.immix_space)],
             constraints: <span class="kw-2">&amp;</span>GENIMMIX_CONSTRAINTS,
         }
     }
@@ -375,7 +375,7 @@
 
     <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.gen.get_spaces();
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.immix);
+        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.immix_space);
         ret
     }
 
@@ -398,7 +398,7 @@
                 GenImmix&lt;VM&gt;,
                 GenImmixMatureGCWorkContext&lt;VM, TRACE_KIND_FAST&gt;,
                 GenImmixMatureGCWorkContext&lt;VM, TRACE_KIND_DEFRAG&gt;,
-            &gt;(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.immix, scheduler);
+            &gt;(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.immix_space, scheduler);
         }
     }
 
@@ -410,7 +410,7 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.prepare(tls);
         <span class="kw">if </span>full_heap {
-            <span class="self">self</span>.immix.prepare(full_heap);
+            <span class="self">self</span>.immix_space.prepare(full_heap);
         }
     }
 
@@ -418,7 +418,7 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.release(tls);
         <span class="kw">if </span>full_heap {
-            <span class="kw">let </span>did_defrag = <span class="self">self</span>.immix.release(full_heap);
+            <span class="kw">let </span>did_defrag = <span class="self">self</span>.immix_space.release(full_heap);
             <span class="self">self</span>.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
         } <span class="kw">else </span>{
             <span class="self">self</span>.last_gc_was_defrag.store(<span class="bool-val">false</span>, Ordering::Relaxed);
@@ -433,11 +433,11 @@
     }
 
     <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.gen.get_collection_reserved_pages() + <span class="self">self</span>.immix.defrag_headroom_pages()
+        <span class="self">self</span>.gen.get_collection_reserved_pages() + <span class="self">self</span>.immix_space.defrag_headroom_pages()
     }
 
     <span class="kw">fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.gen.get_used_pages() + <span class="self">self</span>.immix.reserved_pages()
+        <span class="self">self</span>.gen.get_used_pages() + <span class="self">self</span>.immix_space.reserved_pages()
     }
 
     <span class="doccomment">/// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
@@ -476,11 +476,11 @@
     }
 
     <span class="kw">fn </span>get_mature_physical_pages_available(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.immix.available_physical_pages()
+        <span class="self">self</span>.immix_space.available_physical_pages()
     }
 
     <span class="kw">fn </span>get_mature_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.immix.reserved_pages()
+        <span class="self">self</span>.immix_space.reserved_pages()
     }
 
     <span class="kw">fn </span>force_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -523,7 +523,7 @@
 
         <span class="kw">let </span>genimmix = GenImmix {
             gen: CommonGenPlan::new(plan_args),
-            immix: immix_space,
+            immix_space,
             last_gc_was_defrag: AtomicBool::new(<span class="bool-val">false</span>),
             last_gc_was_full_heap: AtomicBool::new(<span class="bool-val">false</span>),
         };
@@ -537,7 +537,7 @@
                 .gen
                 .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
             genimmix
-                .immix
+                .immix_space
                 .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
         }
 

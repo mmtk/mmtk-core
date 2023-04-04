@@ -504,7 +504,7 @@
     ) -&gt; bool {
         <span class="kw">let </span>nursery_full =
             <span class="self">self</span>.immix.immix_space.get_pages_allocated() &gt; <span class="self">self</span>.options().get_max_nursery_pages();
-        <span class="kw">if </span>space_full &amp;&amp; space.is_some() &amp;&amp; space.unwrap().name() == <span class="self">self</span>.immix.immix_space.name() {
+        <span class="kw">if </span>space_full &amp;&amp; space.is_some() &amp;&amp; space.unwrap().name() != <span class="self">self</span>.immix.immix_space.name() {
             <span class="self">self</span>.next_gc_full_heap.store(<span class="bool-val">true</span>, Ordering::SeqCst);
         }
         <span class="self">self</span>.immix.collection_required(space_full, space) || nursery_full
@@ -515,7 +515,7 @@
     }
 
     <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.immix.get_collection_reserved_pages() + <span class="self">self</span>.immix.immix_space.defrag_headroom_pages()
+        <span class="self">self</span>.immix.get_collection_reserved_pages()
     }
 
     <span class="kw">fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

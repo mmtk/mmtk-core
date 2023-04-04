@@ -625,7 +625,7 @@
         <span class="kw">let </span>min_nursery = plan.base().options.get_min_nursery_pages();
         <span class="kw">let </span>next_gc_full_heap = available &lt; min_nursery;
         <span class="macro">trace!</span>(
-            <span class="string">&quot;next gc will be full heap? {}, availabe pages = {}, min nursery = {}&quot;</span>,
+            <span class="string">&quot;next gc will be full heap? {}, available pages = {}, min nursery = {}&quot;</span>,
             next_gc_full_heap,
             available,
             min_nursery
@@ -640,7 +640,7 @@
     }
 
     <span class="doccomment">/// Get pages reserved for the collection by a generational plan. A generational plan should
-    /// add their own reservatioin with the value returned by this method.
+    /// add their own reservation with the value returned by this method.
     </span><span class="kw">pub fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.nursery.reserved_pages()
     }
