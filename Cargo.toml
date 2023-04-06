@@ -92,10 +92,9 @@ object_pinning = []
 
 # The following two features are useful for using Immix for VMs that do not support moving GC.
 
-# Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
-immix_no_defrag = []
-# Disable nursery copy for ImmixSpace. This along with immix_no_defrag makes StickyImmix a non-moving plan.
-immix_no_nursery_copy = []
+# Disable any object copying in Immix. This makes Immix a non-moving policy.
+immix_non_moving = []
+
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.

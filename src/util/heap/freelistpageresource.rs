@@ -1,16 +1,16 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
-use super::layout::map::Map;
 use super::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
+use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
+use crate::mmtk::MMAPPER;
 use crate::util::address::Address;
 use crate::util::alloc::embedded_meta_data::*;
 use crate::util::conversions;
-use crate::util::generic_freelist;
-use crate::util::generic_freelist::GenericFreeList;
-use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::freelist;
+use crate::util::freelist::FreeList;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 
 pub struct CommonFreeListPageResource {
-    pub(crate) free_list: Box<<VMMap as Map>::FreeList>,
+    pub(crate) free_list: Box<dyn FreeList>,
     start: Address,
 }
 
@@ -101,13 +101,13 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let mut sync = self.sync.lock().unwrap();
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
-        if page_offset == generic_freelist::FAILURE && self.common.growable {
+        if page_offset == freelist::FAILURE && self.common.growable {
             page_offset =
                 self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);
             new_chunk = true;
         }
 
-        if page_offset == generic_freelist::FAILURE {
+        if page_offset == freelist::FAILURE {
             return Result::Err(PRAllocFail);
         } else {
             sync.pages_currently_on_freelist -= required_pages;
@@ -125,8 +125,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
         if self.protect_memory_on_release && !new_chunk {
-            use crate::util::heap::layout::Mmapper;
-            use crate::MMAPPER;
             // This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
             // See https://github.com/mmtk/mmtk-core/issues/400.
             // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
@@ -149,7 +147,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 }
 
 impl<VM: VMBinding> FreeListPageResource<VM> {
-    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static VMMap) -> Self {
+    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
         let common_flpr = {
             let common_flpr = Box::new(CommonFreeListPageResource {
@@ -177,7 +175,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn new_discontiguous(vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
         let common_flpr = {
             let start = AVAILABLE_START;
             let common_flpr = Box::new(CommonFreeListPageResource {
@@ -246,7 +244,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let page_offset =
             self_mut.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, &mut sync);
 
-        if page_offset == generic_freelist::FAILURE {
+        if page_offset == freelist::FAILURE {
             return Result::Err(PRAllocFail);
         } else {
             sync.pages_currently_on_freelist -= PAGES_IN_CHUNK;
@@ -269,7 +267,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         pages: usize,
         sync: &mut MutexGuard<FreeListPageResourceSync>,
     ) -> i32 {
-        let mut rtn = generic_freelist::FAILURE;
+        let mut rtn = freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
         let region = self
             .common
@@ -356,12 +354,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 // region_start is guaranteed to be positive. Otherwise this line will fail due to subtraction overflow.
                 region_start -= PAGES_IN_CHUNK;
             }
-            while next_region_start < generic_freelist::MAX_UNITS as usize
+            while next_region_start < freelist::MAX_UNITS as usize
                 && self.free_list.is_coalescable(next_region_start as _)
             {
                 next_region_start += PAGES_IN_CHUNK;
             }
-            debug_assert!(next_region_start < generic_freelist::MAX_UNITS as usize);
+            debug_assert!(next_region_start < freelist::MAX_UNITS as usize);
             if pages_freed == next_region_start - region_start {
                 let start = self.start;
                 self.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start), sync);
