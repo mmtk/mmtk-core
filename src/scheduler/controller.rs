@@ -11,7 +11,7 @@ use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-use self::channel::{Receiver, WorkerToControllerEvent};
+use self::channel::{Event, Receiver};
 
 use super::{CoordinatorWork, GCWorkScheduler, GCWorker};
 
@@ -90,6 +90,7 @@ impl<VM: VMBinding> GCController<VM> {
         debug!("Workers resumed");
     }
 
+    /// Handle the "all workers have parked" event.  Return true if GC is finished.
     fn on_all_workers_parked(&mut self) -> bool {
         assert!(self.scheduler.all_activated_buckets_are_empty());
 
@@ -107,13 +108,13 @@ impl<VM: VMBinding> GCController<VM> {
     }
 
     /// Process an event. Return true if the GC is finished.
-    fn process_event(&mut self, message: WorkerToControllerEvent<VM>) -> bool {
+    fn process_event(&mut self, message: Event<VM>) -> bool {
         match message {
-            WorkerToControllerEvent::Work(mut work) => {
+            Event::Work(mut work) => {
                 self.execute_coordinator_work(work.as_mut(), true);
                 false
             }
-            WorkerToControllerEvent::AllParked => self.on_all_workers_parked(),
+            Event::AllParked => self.on_all_workers_parked(),
         }
     }
 
@@ -145,8 +146,10 @@ impl<VM: VMBinding> GCController<VM> {
         debug_assert!(self.scheduler.worker_monitor.is_group_sleeping());
         debug_assert!(!self.scheduler.worker_group.has_designated_work());
 
+        // Deactivate all work buckets to prepare for the next GC.
+        // NOTE: There is no need to hold any lock.
         // All GC workers are doing "group sleeping" now,
-        // so they will not wake up when we deactivate buckets.
+        // so they will not wake up while we deactivate buckets.
         self.scheduler.deactivate_all();
 
         // Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.
