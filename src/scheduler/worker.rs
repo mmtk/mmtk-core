@@ -75,7 +75,7 @@ pub(crate) struct WorkerMonitorSync {
 }
 
 impl WorkerMonitor {
-    pub(crate) fn new(worker_count: usize) -> Self {
+    pub fn new(worker_count: usize) -> Self {
         Self {
             sync: Mutex::new(WorkerMonitorSync {
                 worker_count,
@@ -88,7 +88,7 @@ impl WorkerMonitor {
 
     /// Wake up workers when more work packets are made available for workers.
     /// This function will get workers out of the "group sleeping" state.
-    pub(crate) fn notify_work_available(&self, all: bool) {
+    pub fn notify_work_available(&self, all: bool) {
         let mut sync = self.sync.lock().unwrap();
         sync.group_sleep = false;
         if all {
