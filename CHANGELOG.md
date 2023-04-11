@@ -3,7 +3,7 @@
 
 Plan
 ---
-* Add a new plan, `StickyImmix`. This is an variant of immix using a sticky mark bit. This plan allows generatinoal behaviors without using a compulsory copying nursery.
+* Add a new plan, `StickyImmix`. This is an variant of immix using a sticky mark bit. This plan allows generational behaviors without using a compulsory copying nursery.
 * Side log bits in generational plans are now set using relaxed store for the entire byte as an optimization.
 
 Policy
