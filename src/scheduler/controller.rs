@@ -143,7 +143,7 @@ impl<VM: VMBinding> GCController<VM> {
         }
 
         // All GC workers must have parked by now.
-        debug_assert!(self.scheduler.worker_monitor.is_group_sleeping());
+        debug_assert!(self.scheduler.worker_monitor.debug_is_group_sleeping());
         debug_assert!(!self.scheduler.worker_group.has_designated_work());
 
         // Deactivate all work buckets to prepare for the next GC.

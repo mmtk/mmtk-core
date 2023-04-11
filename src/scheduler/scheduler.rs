@@ -1,6 +1,6 @@
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, ParkingGuard, ThreadId, WorkerGroup, WorkerMonitor};
+use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
@@ -33,7 +33,7 @@ unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
-        let worker_monitor: Arc<WorkerMonitor> = Default::default();
+        let worker_monitor: Arc<WorkerMonitor> = Arc::new(WorkerMonitor::new(num_workers));
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
@@ -383,15 +383,21 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
             }
-            // Prepare to park this worker
-            let parking_guard = ParkingGuard::new(self.worker_group.as_ref());
-            if parking_guard.all_parked() {
+
+            // Park this worker
+            let all_parked = sync.inc_parked_workers();
+
+            if all_parked {
                 // If all workers are parked, enter "group sleeping" and notify controller.
                 sync.group_sleep = true;
                 debug!("Entered group-sleeping state");
                 worker.sender.notify_all_workers_parked();
             } else {
                 // Otherwise wait until notified.
+                // Note: The condition for this `cond.wait` is "more work is available".
+                // If this worker spuriously wakes up, then in the next loop iteration, the
+                // `poll_schedulable_work` invocation above will fail, and the worker will reach
+                // here and wait again.
                 sync = self.worker_monitor.cond.wait(sync).unwrap();
             }
 
@@ -409,7 +415,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 .cond
                 .wait_while(sync, |sync| sync.group_sleep)
                 .unwrap();
-            // The worker is unparked here where `parking_guard` goes out of scope.
+
+            // Unpark this worker.
+            sync.dec_parked_workers();
         }
     }
 
