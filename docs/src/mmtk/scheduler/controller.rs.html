@@ -181,38 +181,24 @@
 <span id="181">181</span>
 <span id="182">182</span>
 <span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The GC controller thread.
 //!
 //! MMTk has many GC threads.  There are many GC worker threads and one GC controller thread.
 //! The GC controller thread responds to GC requests and coordinates the workers to perform GC.
 
-</span><span class="kw">use </span>std::sync::mpsc::Receiver;
-<span class="kw">use </span>std::sync::Arc;
+</span><span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{EndOfGC, ScheduleCollection};
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::{CoordinatorMessage, GCWork};
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
-<span class="kw">use </span>atomic::Ordering;
+
+<span class="kw">use </span><span class="self">self</span>::channel::{Event, Receiver};
 
 <span class="kw">use super</span>::{CoordinatorWork, GCWorkScheduler, GCWorker};
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>channel;
 
 <span class="doccomment">/// The thread local struct for the GC controller, the counterpart of `GCWorker`.
 </span><span class="kw">pub struct </span>GCController&lt;VM: VMBinding&gt; {
@@ -222,18 +208,18 @@
     </span>requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
     <span class="doccomment">/// The reference to the scheduler.
     </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-    <span class="doccomment">/// The receiving end of the channel to get controller/coordinator message from workers.
-    </span>receiver: Receiver&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+    <span class="doccomment">/// Receive coordinator work packets and notifications from GC workers through this.
+    </span>receiver: Receiver&lt;VM&gt;,
     <span class="doccomment">/// The `GCWorker` is used to execute packets. The controller is also a `GCWorker`.
     </span>coordinator_worker: GCWorker&lt;VM&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCController&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
         requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
         scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-        receiver: Receiver&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+        receiver: Receiver&lt;VM&gt;,
         coordinator_worker: GCWorker&lt;VM&gt;,
     ) -&gt; Box&lt;GCController&lt;VM&gt;&gt; {
         Box::new(<span class="self">Self </span>{
@@ -260,21 +246,58 @@
         }
     }
 
-    <span class="doccomment">/// Process a message. Return true if the GC is finished.
-    </span><span class="kw">fn </span>process_message(<span class="kw-2">&amp;mut </span><span class="self">self</span>, message: CoordinatorMessage&lt;VM&gt;) -&gt; bool {
+    <span class="doccomment">/// Find more work for workers to do.  Return true if more work is available.
+    </span><span class="kw">fn </span>find_more_work_for_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.scheduler.worker_group.has_designated_work() {
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// See if any bucket has a sentinel.
+        </span><span class="kw">if </span><span class="self">self</span>.scheduler.schedule_sentinels() {
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// Try to open new buckets.
+        </span><span class="kw">if </span><span class="self">self</span>.scheduler.update_buckets() {
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// If all fo the above failed, it means GC has finished.
+        </span><span class="bool-val">false
+    </span>}
+
+    <span class="doccomment">/// Reset the &quot;all workers parked&quot; state and resume workers.
+    </span><span class="kw">fn </span>reset_and_resume_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.receiver.reset_all_workers_parked();
+        <span class="self">self</span>.scheduler.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
+        <span class="macro">debug!</span>(<span class="string">&quot;Workers resumed&quot;</span>);
+    }
+
+    <span class="doccomment">/// Handle the &quot;all workers have parked&quot; event.  Return true if GC is finished.
+    </span><span class="kw">fn </span>on_all_workers_parked(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">assert!</span>(<span class="self">self</span>.scheduler.all_activated_buckets_are_empty());
+
+        <span class="kw">let </span>new_work_available = <span class="self">self</span>.find_more_work_for_workers();
+
+        <span class="kw">if </span>new_work_available {
+            <span class="self">self</span>.reset_and_resume_workers();
+            <span class="comment">// If there is more work to do, GC has not finished.
+            </span><span class="kw">return </span><span class="bool-val">false</span>;
+        }
+
+        <span class="macro">assert!</span>(<span class="self">self</span>.scheduler.all_buckets_empty());
+
+        <span class="bool-val">true
+    </span>}
+
+    <span class="doccomment">/// Process an event. Return true if the GC is finished.
+    </span><span class="kw">fn </span>process_event(<span class="kw-2">&amp;mut </span><span class="self">self</span>, message: Event&lt;VM&gt;) -&gt; bool {
         <span class="kw">match </span>message {
-            CoordinatorMessage::Work(<span class="kw-2">mut </span>work) =&gt; {
+            Event::Work(<span class="kw-2">mut </span>work) =&gt; {
                 <span class="self">self</span>.execute_coordinator_work(work.as_mut(), <span class="bool-val">true</span>);
                 <span class="bool-val">false
             </span>}
-            CoordinatorMessage::Finish =&gt; {
-                <span class="comment">// Quit only if all the buckets are empty.
-                // For concurrent GCs, the coordinator thread may receive this message when
-                // some buckets are still not empty. Under such case, the coordinator
-                // should ignore the message.
-                </span><span class="kw">let </span>_guard = <span class="self">self</span>.scheduler.worker_monitor.<span class="number">0</span>.lock().unwrap();
-                <span class="self">self</span>.scheduler.worker_group.all_parked() &amp;&amp; <span class="self">self</span>.scheduler.all_buckets_empty()
-            }
+            Event::AllParked =&gt; <span class="self">self</span>.on_all_workers_parked(),
         }
     }
 
@@ -282,7 +305,7 @@
     </span><span class="kw">pub fn </span>do_gc_until_completion(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>gc_start = std::time::Instant::now();
         <span class="comment">// Schedule collection.
-        </span><span class="self">self</span>.initiate_coordinator_work(<span class="kw-2">&amp;mut </span>ScheduleCollection, <span class="bool-val">true</span>);
+        </span><span class="self">self</span>.execute_coordinator_work(<span class="kw-2">&amp;mut </span>ScheduleCollection, <span class="bool-val">true</span>);
 
         <span class="comment">// Tell GC trigger that GC started - this happens after ScheduleCollection so we
         // will know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
@@ -293,30 +316,24 @@
             .policy
             .on_gc_start(<span class="self">self</span>.mmtk);
 
-        <span class="comment">// Drain the message queue and execute coordinator work.
+        <span class="comment">// React to worker-generated events until finished.
         </span><span class="kw">loop </span>{
-            <span class="kw">let </span>message = <span class="self">self</span>.receiver.recv().unwrap();
-            <span class="kw">let </span>finished = <span class="self">self</span>.process_message(message);
+            <span class="kw">let </span>event = <span class="self">self</span>.receiver.poll_event();
+            <span class="kw">let </span>finished = <span class="self">self</span>.process_event(event);
             <span class="kw">if </span>finished {
                 <span class="kw">break</span>;
             }
         }
-        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.scheduler.worker_group.has_designated_work());
-        <span class="comment">// Sometimes multiple finish messages will be sent. Skip them.
-        </span><span class="kw">for </span>message <span class="kw">in </span><span class="self">self</span>.receiver.try_iter() {
-            <span class="kw">match </span>message {
-                CoordinatorMessage::Work(<span class="kw">_</span>) =&gt; <span class="macro">unreachable!</span>(),
-                CoordinatorMessage::Finish =&gt; {}
-            }
-        }
 
-        {
-            <span class="comment">// Note: GC workers may spuriously wake up, examining the states of work buckets and
-            // trying to open them.  Use lock to ensure workers do not wake up when we deactivate
-            // buckets.
-            </span><span class="kw">let </span>_guard = <span class="self">self</span>.scheduler.worker_monitor.<span class="number">0</span>.lock().unwrap();
-            <span class="self">self</span>.scheduler.deactivate_all();
-        }
+        <span class="comment">// All GC workers must have parked by now.
+        </span><span class="macro">debug_assert!</span>(<span class="self">self</span>.scheduler.worker_monitor.debug_is_group_sleeping());
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.scheduler.worker_group.has_designated_work());
+
+        <span class="comment">// Deactivate all work buckets to prepare for the next GC.
+        // NOTE: There is no need to hold any lock.
+        // All GC workers are doing &quot;group sleeping&quot; now,
+        // so they will not wake up while we deactivate buckets.
+        </span><span class="self">self</span>.scheduler.deactivate_all();
 
         <span class="comment">// Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.
         </span><span class="self">self</span>.mmtk.plan.base().gc_trigger.policy.on_gc_end(<span class="self">self</span>.mmtk);
@@ -330,48 +347,9 @@
             elapsed: gc_start.elapsed(),
         };
 
-        <span class="comment">// Note: We cannot use `initiate_coordinator_work` here.  If we increment the
-        // `pending_coordinator_packets` counter when a worker spuriously wakes up, it may try to
-        // open new buckets and result in an assertion error.
-        // See: https://github.com/mmtk/mmtk-core/issues/770
-        //
-        // The `pending_coordinator_packets` counter and the `initiate_coordinator_work` function
-        // were introduced to prevent any buckets from being opened while `ScheduleCollection` or
-        // `StopMutators` is being executed. (See the doc comment of `initiate_coordinator_work`.)
-        // `EndOfGC` doesn&#39;t add any new work packets, therefore it does not need this layer of
-        // synchronization.
-        //
-        // FIXME: We should redesign the synchronization mechanism to properly address the opening
-        // condition of buckets.  See: https://github.com/mmtk/mmtk-core/issues/774
-        </span>end_of_gc.do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>.coordinator_worker, <span class="self">self</span>.mmtk);
+        <span class="self">self</span>.execute_coordinator_work(<span class="kw-2">&amp;mut </span>end_of_gc, <span class="bool-val">false</span>);
 
         <span class="self">self</span>.scheduler.debug_assert_all_buckets_deactivated();
-    }
-
-    <span class="doccomment">/// The controller uses this method to start executing a coordinator work immediately.
-    ///
-    /// Note: GC workers will start executing work packets as soon as individual work packets
-    /// are added.  If the coordinator work (such as `ScheduleCollection`) adds multiple work
-    /// packets into different buckets, workers may open subsequent buckets while the coordinator
-    /// work still has packets to be added to prior buckets.  For this reason, we use the
-    /// `pending_coordinator_packets` to prevent the workers from opening any work buckets while
-    /// this coordinator work is being executed.
-    ///
-    /// # Arguments
-    ///
-    /// -   `work`: The work to execute.
-    /// -   `notify_workers`: Notify one worker after the work is finished. Useful for proceeding
-    ///     to the next work bucket stage.
-    </span><span class="kw">fn </span>initiate_coordinator_work(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        work: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>CoordinatorWork&lt;VM&gt;,
-        notify_workers: bool,
-    ) {
-        <span class="self">self</span>.scheduler
-            .pending_coordinator_packets
-            .fetch_add(<span class="number">1</span>, Ordering::SeqCst);
-
-        <span class="self">self</span>.execute_coordinator_work(work, notify_workers)
     }
 
     <span class="kw">fn </span>execute_coordinator_work(
@@ -381,16 +359,8 @@
     ) {
         work.do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>.coordinator_worker, <span class="self">self</span>.mmtk);
 
-        <span class="self">self</span>.scheduler
-            .pending_coordinator_packets
-            .fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
-
         <span class="kw">if </span>notify_workers {
-            <span class="comment">// When a coordinator work finishes, there is a chance that all GC workers parked, and
-            // no work packets are added to any open buckets.  We need to wake up one GC worker so
-            // that it can open more work buckets.
-            </span><span class="kw">let </span>_guard = <span class="self">self</span>.scheduler.worker_monitor.<span class="number">0</span>.lock().unwrap();
-            <span class="self">self</span>.scheduler.worker_monitor.<span class="number">1</span>.notify_one();
+            <span class="self">self</span>.reset_and_resume_workers();
         };
     }
 }

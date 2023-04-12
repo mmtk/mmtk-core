@@ -282,25 +282,13 @@
 <span id="282">282</span>
 <span id="283">283</span>
 <span id="284">284</span>
-<span id="285">285</span>
-<span id="286">286</span>
-<span id="287">287</span>
-<span id="288">288</span>
-<span id="289">289</span>
-<span id="290">290</span>
-<span id="291">291</span>
-<span id="292">292</span>
-<span id="293">293</span>
-<span id="294">294</span>
-<span id="295">295</span>
-<span id="296">296</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerGroup;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerMonitor;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>crossbeam::deque::{Injector, Steal, Worker};
 <span class="kw">use </span>enum_map::Enum;
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
-<span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
+<span class="kw">use </span>std::sync::{Arc, Mutex};
 
 <span class="kw">struct </span>BucketQueue&lt;VM: VMBinding&gt; {
     queue: Injector&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
@@ -341,7 +329,7 @@
     active: AtomicBool,
     queue: BucketQueue&lt;VM&gt;,
     prioritized_queue: <span class="prelude-ty">Option</span>&lt;BucketQueue&lt;VM&gt;&gt;,
-    monitor: Arc&lt;(Mutex&lt;()&gt;, Condvar)&gt;,
+    monitor: Arc&lt;WorkerMonitor&gt;,
     can_open: <span class="prelude-ty">Option</span>&lt;BucketOpenCondition&lt;VM&gt;&gt;,
     <span class="doccomment">/// After this bucket is activated and all pending work packets (including the packets in this
     /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
@@ -355,15 +343,10 @@
     /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
     </span>sentinel: Mutex&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
-    group: Arc&lt;WorkerGroup&lt;VM&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkBucket&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
-        active: bool,
-        monitor: Arc&lt;(Mutex&lt;()&gt;, Condvar)&gt;,
-        group: Arc&lt;WorkerGroup&lt;VM&gt;&gt;,
-    ) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(active: bool, monitor: Arc&lt;WorkerMonitor&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             active: AtomicBool::new(active),
             queue: BucketQueue::new(),
@@ -371,7 +354,6 @@
             monitor,
             can_open: <span class="prelude-val">None</span>,
             sentinel: Mutex::new(<span class="prelude-val">None</span>),
-            group,
         }
     }
 
@@ -381,10 +363,7 @@
             <span class="kw">return</span>;
         }
         <span class="comment">// Notify one if there&#39;re any parked workers.
-        </span><span class="kw">if </span><span class="self">self</span>.group.parked_workers() &gt; <span class="number">0 </span>{
-            <span class="kw">let </span>_guard = <span class="self">self</span>.monitor.<span class="number">0</span>.lock().unwrap();
-            <span class="self">self</span>.monitor.<span class="number">1</span>.notify_one()
-        }
+        </span><span class="self">self</span>.monitor.notify_work_available(<span class="bool-val">false</span>);
     }
 
     <span class="kw">pub fn </span>notify_all_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -393,10 +372,7 @@
             <span class="kw">return</span>;
         }
         <span class="comment">// Notify all if there&#39;re any parked workers.
-        </span><span class="kw">if </span><span class="self">self</span>.group.parked_workers() &gt; <span class="number">0 </span>{
-            <span class="kw">let </span>_guard = <span class="self">self</span>.monitor.<span class="number">0</span>.lock().unwrap();
-            <span class="self">self</span>.monitor.<span class="number">1</span>.notify_all()
-        }
+        </span><span class="self">self</span>.monitor.notify_work_available(<span class="bool-val">true</span>);
     }
 
     <span class="kw">pub fn </span>is_activated(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {

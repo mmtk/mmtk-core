@@ -1040,6 +1040,7 @@
 <span id="1040">1040</span>
 <span id="1041">1041</span>
 <span id="1042">1042</span>
+<span id="1043">1043</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1219,8 +1220,9 @@
         <span class="comment">// If the VM requires that only the coordinator thread can stop the world,
         // we delegate the work to the coordinator.
         </span><span class="kw">if </span>&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::COORDINATOR_ONLY_STW &amp;&amp; !worker.is_coordinator() {
-            mmtk.scheduler
-                .add_coordinator_work(StopMutators::&lt;E&gt;::new(), worker);
+            worker
+                .sender
+                .add_coordinator_work(Box::new(StopMutators::&lt;E&gt;::new()));
             <span class="kw">return</span>;
         }
 

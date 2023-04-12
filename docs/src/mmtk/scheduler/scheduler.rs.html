@@ -457,40 +457,9 @@
 <span id="457">457</span>
 <span id="458">458</span>
 <span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
-<span id="467">467</span>
-<span id="468">468</span>
-<span id="469">469</span>
-<span id="470">470</span>
-<span id="471">471</span>
-<span id="472">472</span>
-<span id="473">473</span>
-<span id="474">474</span>
-<span id="475">475</span>
-<span id="476">476</span>
-<span id="477">477</span>
-<span id="478">478</span>
-<span id="479">479</span>
-<span id="480">480</span>
-<span id="481">481</span>
-<span id="482">482</span>
-<span id="483">483</span>
-<span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
-<span id="487">487</span>
-<span id="488">488</span>
-<span id="489">489</span>
-<span id="490">490</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ParkingGuard, ThreadId, WorkerGroup};
+<span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -501,30 +470,17 @@
 <span class="kw">use </span>enum_map::Enum;
 <span class="kw">use </span>enum_map::{enum_map, EnumMap};
 <span class="kw">use </span>std::collections::HashMap;
-<span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
-<span class="kw">use </span>std::sync::mpsc::channel;
-<span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
-
-<span class="kw">pub enum </span>CoordinatorMessage&lt;VM: VMBinding&gt; {
-    <span class="doccomment">/// Send a work-packet to the coordinator thread/
-    </span>Work(Box&lt;<span class="kw">dyn </span>CoordinatorWork&lt;VM&gt;&gt;),
-    <span class="doccomment">/// Notify the coordinator thread that all GC tasks are finished.
-    /// When sending this message, all the work buckets should be
-    /// empty, and all the workers should be parked.
-    </span>Finish,
-}
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">pub struct </span>GCWorkScheduler&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Work buckets
     </span><span class="kw">pub </span>work_buckets: EnumMap&lt;WorkBucketStage, WorkBucket&lt;VM&gt;&gt;,
     <span class="doccomment">/// Workers
-    </span><span class="kw">pub </span>worker_group: Arc&lt;WorkerGroup&lt;VM&gt;&gt;,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) worker_group: Arc&lt;WorkerGroup&lt;VM&gt;&gt;,
     <span class="doccomment">/// The shared part of the GC worker object of the controller thread
     </span>coordinator_worker_shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
     <span class="doccomment">/// Condition Variable for worker synchronization
-    </span><span class="kw">pub </span>worker_monitor: Arc&lt;(Mutex&lt;()&gt;, Condvar)&gt;,
-    <span class="doccomment">/// Counter for pending coordinator messages.
-    </span><span class="kw">pub</span>(<span class="kw">super</span>) pending_coordinator_packets: AtomicUsize,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) worker_monitor: Arc&lt;WorkerMonitor&gt;,
     <span class="doccomment">/// How to assign the affinity of each GC thread. Specified by the user.
     </span>affinity: AffinityKind,
 }
@@ -536,27 +492,27 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkScheduler&lt;VM&gt; {
     <span class="kw">pub fn </span>new(num_workers: usize, affinity: AffinityKind) -&gt; Arc&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>worker_monitor: Arc&lt;(Mutex&lt;()&gt;, Condvar)&gt; = Default::default();
+        <span class="kw">let </span>worker_monitor: Arc&lt;WorkerMonitor&gt; = Arc::new(WorkerMonitor::new(num_workers));
         <span class="kw">let </span>worker_group = WorkerGroup::new(num_workers);
 
         <span class="comment">// Create work buckets for workers.
         </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = <span class="macro">enum_map! </span>{
-            WorkBucketStage::Unconstrained =&gt; WorkBucket::new(<span class="bool-val">true</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Prepare =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Closure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::SoftRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::WeakRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::FinalRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::PhantomRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::VMRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::CalculateForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::SecondRoots =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::RefForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::FinalizableForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::VMRefForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Compact =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Release =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Final =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Unconstrained =&gt; WorkBucket::new(<span class="bool-val">true</span>, worker_monitor.clone()),
+            WorkBucketStage::Prepare =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::Closure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::SoftRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::WeakRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::FinalRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::PhantomRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::VMRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::CalculateForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::SecondRoots =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::RefForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::FinalizableForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::VMRefForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::Compact =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::Release =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
+            WorkBucketStage::Final =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
         };
 
         <span class="comment">// Set the open condition of each bucket.
@@ -587,7 +543,6 @@
             worker_group,
             coordinator_worker_shared,
             worker_monitor,
-            pending_coordinator_packets: AtomicUsize::new(<span class="number">0</span>),
             affinity,
         })
     }
@@ -599,7 +554,7 @@
     <span class="doccomment">/// Create GC threads, including the controller thread and all workers.
     </span><span class="kw">pub fn </span>spawn_gc_threads(<span class="self">self</span>: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;, tls: VMThread) {
         <span class="comment">// Create the communication channel.
-        </span><span class="kw">let </span>(sender, receiver) = channel::&lt;CoordinatorMessage&lt;VM&gt;&gt;();
+        </span><span class="kw">let </span>(sender, receiver) = controller::channel::make_channel();
 
         <span class="comment">// Spawn the controller thread.
         </span><span class="kw">let </span>coordinator_worker = GCWorker::new(
@@ -729,10 +684,6 @@
     }
 
     <span class="kw">fn </span>are_buckets_drained(<span class="kw-2">&amp;</span><span class="self">self</span>, buckets: <span class="kw-2">&amp;</span>[WorkBucketStage]) -&gt; bool {
-        <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.pending_coordinator_packets.load(Ordering::SeqCst) == <span class="number">0</span>,
-            <span class="string">&quot;GCWorker attempted to open buckets when there are pending coordinator work packets&quot;
-        </span>);
         buckets.iter().all(|<span class="kw-2">&amp;</span>b| <span class="self">self</span>.work_buckets[b].is_drained())
     }
 
@@ -741,7 +692,7 @@
     }
 
     <span class="doccomment">/// Schedule &quot;sentinel&quot; work packets for all activated buckets.
-    </span><span class="kw">fn </span>schedule_sentinels(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_sentinels(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span><span class="kw-2">mut </span>new_packets = <span class="bool-val">false</span>;
         <span class="kw">for </span>(id, work_bucket) <span class="kw">in </span><span class="self">self</span>.work_buckets.iter() {
             <span class="kw">if </span>work_bucket.is_activated() &amp;&amp; work_bucket.maybe_schedule_sentinel() {
@@ -758,7 +709,7 @@
     /// No workers will be waked up by this function. The caller is responsible for that.
     ///
     /// Return true if there&#39;re any non-empty buckets updated.
-    </span><span class="kw">fn </span>update_buckets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>update_buckets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span><span class="kw-2">mut </span>buckets_updated = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>new_packets = <span class="bool-val">false</span>;
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..WorkBucketStage::LENGTH {
@@ -814,17 +765,8 @@
         }
     }
 
-    <span class="kw">pub fn </span>add_coordinator_work(<span class="kw-2">&amp;</span><span class="self">self</span>, work: <span class="kw">impl </span>CoordinatorWork&lt;VM&gt;, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) {
-        <span class="self">self</span>.pending_coordinator_packets
-            .fetch_add(<span class="number">1</span>, Ordering::SeqCst);
-        worker
-            .sender
-            .send(CoordinatorMessage::Work(Box::new(work)))
-            .unwrap();
-    }
-
     <span class="doccomment">/// Check if all the work buckets are empty
-    </span><span class="kw">fn </span>all_activated_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>all_activated_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">for </span>bucket <span class="kw">in </span><span class="self">self</span>.work_buckets.values() {
             <span class="kw">if </span>bucket.is_activated() &amp;&amp; !bucket.is_drained() {
                 <span class="kw">return </span><span class="bool-val">false</span>;
@@ -894,59 +836,48 @@
 
     <span class="kw">fn </span>poll_slow(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
         <span class="comment">// Note: The lock is released during `wait` in the loop.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="self">self</span>.worker_monitor.<span class="number">0</span>.lock().unwrap();
-        <span class="lifetime">&#39;polling_loop</span>: <span class="kw">loop </span>{
+        </span><span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.worker_monitor.sync.lock().unwrap();
+        <span class="kw">loop </span>{
             <span class="comment">// Retry polling
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.poll_schedulable_work(worker) {
                 <span class="kw">return </span>work;
             }
-            <span class="comment">// Prepare to park this worker
-            </span><span class="kw">let </span>parking_guard = ParkingGuard::new(<span class="self">self</span>.worker_group.as_ref());
-            <span class="comment">// If all workers are parked, try activate new buckets
-            </span><span class="kw">if </span>parking_guard.all_parked() {
-                <span class="comment">// If there&#39;re any designated work, resume the workers and process them
-                </span><span class="kw">if </span><span class="self">self</span>.worker_group.has_designated_work() {
-                    <span class="macro">assert!</span>(
-                        worker.shared.designated_work.is_empty(),
-                        <span class="string">&quot;The last parked worker has designated work.&quot;
-                    </span>);
-                    <span class="self">self</span>.worker_monitor.<span class="number">1</span>.notify_all();
-                    <span class="comment">// The current worker is going to wait, because the designated work is not for it.
-                </span>} <span class="kw">else if </span><span class="self">self</span>.pending_coordinator_packets.load(Ordering::SeqCst) == <span class="number">0 </span>{
-                    <span class="comment">// See if any bucket has a sentinel.
-                    </span><span class="kw">if </span><span class="self">self</span>.schedule_sentinels() {
-                        <span class="comment">// We&#39;re not going to sleep since new work packets are just scheduled.
-                        </span><span class="kw">break </span><span class="lifetime">&#39;polling_loop</span>;
-                    }
-                    <span class="comment">// Try to open new buckets.
-                    </span><span class="kw">if </span><span class="self">self</span>.update_buckets() {
-                        <span class="comment">// We&#39;re not going to sleep since a new bucket is just open.
-                        </span><span class="kw">break </span><span class="lifetime">&#39;polling_loop</span>;
-                    }
-                    <span class="macro">debug_assert!</span>(!<span class="self">self</span>.worker_group.has_designated_work());
-                    <span class="comment">// The current pause is finished if we can&#39;t open more buckets.
-                    </span>worker.sender.send(CoordinatorMessage::Finish).unwrap();
-                }
-                <span class="comment">// Otherwise, if there is still pending coordinator work, the last parked
-                // worker will wait on the monitor, too.  The coordinator will notify a
-                // worker (maybe not the current one) once it finishes executing all
-                // coordinator work packets.
-            </span>}
-            <span class="comment">// Wait
-            </span>guard = <span class="self">self</span>.worker_monitor.<span class="number">1</span>.wait(guard).unwrap();
-            <span class="comment">// The worker is unparked here where `parking_guard` goes out of scope.
-        </span>}
 
-        <span class="comment">// We guarantee that we can at least fetch one packet when we reach here.
-        </span><span class="kw">let </span>work = <span class="self">self</span>.poll_schedulable_work(worker).unwrap();
-        <span class="comment">// Optimize for the case that a newly opened bucket only has one packet.
-        // We only notify_all if there&#39;re more than one packets available.
-        </span><span class="kw">if </span>!<span class="self">self</span>.all_activated_buckets_are_empty() {
-            <span class="comment">// Have more jobs in this buckets. Notify other workers.
-            </span><span class="self">self</span>.worker_monitor.<span class="number">1</span>.notify_all();
+            <span class="comment">// Park this worker
+            </span><span class="kw">let </span>all_parked = sync.inc_parked_workers();
+
+            <span class="kw">if </span>all_parked {
+                <span class="comment">// If all workers are parked, enter &quot;group sleeping&quot; and notify controller.
+                </span>sync.group_sleep = <span class="bool-val">true</span>;
+                <span class="macro">debug!</span>(<span class="string">&quot;Entered group-sleeping state&quot;</span>);
+                worker.sender.notify_all_workers_parked();
+            } <span class="kw">else </span>{
+                <span class="comment">// Otherwise wait until notified.
+                // Note: The condition for this `cond.wait` is &quot;more work is available&quot;.
+                // If this worker spuriously wakes up, then in the next loop iteration, the
+                // `poll_schedulable_work` invocation above will fail, and the worker will reach
+                // here and wait again.
+                </span>sync = <span class="self">self</span>.worker_monitor.cond.wait(sync).unwrap();
+            }
+
+            <span class="comment">// Keep waiting if we have entered &quot;group sleeping&quot; state.
+            // The coordinator will let the worker leave the &quot;group sleeping&quot; state
+            // once the coordinator finished its work.
+            //
+            // Note: `wait_while` checks `sync.group_sleep` before actually starting to wait.
+            // This is expected because the controller may run so fast that it opened new buckets
+            // and unset `sync.group_sleep` before we even reached here.  If that happens, waiting
+            // blindly will result in all workers sleeping forever.  So we should always check
+            // `sync.group_sleep` before waiting.
+            </span>sync = <span class="self">self
+                </span>.worker_monitor
+                .cond
+                .wait_while(sync, |sync| sync.group_sleep)
+                .unwrap();
+
+            <span class="comment">// Unpark this worker.
+            </span>sync.dec_parked_workers();
         }
-        <span class="comment">// Return this packet and execute it.
-        </span>work
     }
 
     <span class="kw">pub fn </span>enable_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -973,9 +904,16 @@
         mmtk.plan.base().gc_requester.clear_request();
         <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::first_stw_stage()];
         <span class="macro">debug_assert!</span>(!first_stw_bucket.is_activated());
-        first_stw_bucket.activate();
-        <span class="kw">let </span>_guard = <span class="self">self</span>.worker_monitor.<span class="number">0</span>.lock().unwrap();
-        <span class="self">self</span>.worker_monitor.<span class="number">1</span>.notify_all();
+        <span class="comment">// Note: This is the only place where a non-coordinator thread opens a bucket.
+        // If the `StopMutators` is executed by the coordinator thread, it will open
+        // the `Prepare` bucket and let workers start executing packets while the coordinator
+        // can still add more work packets to `Prepare`.  However, since `Prepare` is the first STW
+        // bucket and only the coordinator can open any subsequent buckets, workers cannot execute
+        // work packets out of order.  This is not generally true if we are not opening the first
+        // STW bucket.  In the future, we should redesign the opening condition of work buckets to
+        // make the synchronization more robust,
+        </span>first_stw_bucket.activate();
+        <span class="self">self</span>.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
     }
 }
 </code></pre></div>

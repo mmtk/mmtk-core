@@ -30,14 +30,12 @@
 <span id="30">30</span>
 <span id="31">31</span>
 <span id="32">32</span>
-<span id="33">33</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
 </span><span class="kw">pub mod </span>affinity;
 
 <span class="attribute">#[allow(clippy::module_inception)]
 </span><span class="kw">mod </span>scheduler;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>scheduler::CoordinatorMessage;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>scheduler::GCWorkScheduler;
 
 <span class="kw">mod </span>stat;

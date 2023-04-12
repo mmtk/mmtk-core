@@ -312,6 +312,29 @@
 <span id="312">312</span>
 <span id="313">313</span>
 <span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -323,9 +346,8 @@
 <span class="kw">use </span>atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 <span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Stealer};
 <span class="kw">use </span>crossbeam::queue::ArrayQueue;
-<span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
-<span class="kw">use </span>std::sync::mpsc::Sender;
-<span class="kw">use </span>std::sync::{Arc, Mutex};
+<span class="kw">use </span>std::sync::atomic::Ordering;
+<span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
 
 <span class="doccomment">/// Represents the ID of a GC worker thread.
 </span><span class="kw">pub type </span>ThreadId = usize;
@@ -365,6 +387,85 @@
     }
 }
 
+<span class="doccomment">/// Used to synchronize mutually exclusive operations between workers and controller,
+/// and also waking up workers when more work packets are available.
+/// NOTE: All fields are public in order to support the complex control structure
+/// in `GCWorkScheduler::poll_slow`.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerMonitor {
+    <span class="kw">pub </span>sync: Mutex&lt;WorkerMonitorSync&gt;,
+    <span class="kw">pub </span>cond: Condvar,
+}
+
+<span class="doccomment">/// The synchronized part of `WorkerMonitor`.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerMonitorSync {
+    <span class="doccomment">/// The total number of workers.
+    </span>worker_count: usize,
+    <span class="doccomment">/// Number of parked workers.
+    </span>parked_workers: usize,
+    <span class="doccomment">/// This flag is set to true when all workers have parked,
+    /// and cleared if a work packet is added to an open bucket, or a new bucket is opened.
+    /// No workers can unpark while this flag is set.
+    ///
+    /// Note that testing this flag is *not* equivalent to testing `parked_workers == num_workers`.
+    /// This field is used to *receive notification* for the event of more work becoming available.
+    </span><span class="kw">pub </span>group_sleep: bool,
+}
+
+<span class="kw">impl </span>WorkerMonitor {
+    <span class="kw">pub fn </span>new(worker_count: usize) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            sync: Mutex::new(WorkerMonitorSync {
+                worker_count,
+                parked_workers: <span class="number">0</span>,
+                group_sleep: <span class="bool-val">false</span>,
+            }),
+            cond: Default::default(),
+        }
+    }
+
+    <span class="doccomment">/// Wake up workers when more work packets are made available for workers.
+    /// This function will get workers out of the &quot;group sleeping&quot; state.
+    </span><span class="kw">pub fn </span>notify_work_available(<span class="kw-2">&amp;</span><span class="self">self</span>, all: bool) {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.group_sleep = <span class="bool-val">false</span>;
+        <span class="kw">if </span>all {
+            <span class="self">self</span>.cond.notify_all();
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.cond.notify_one();
+        }
+    }
+
+    <span class="doccomment">/// Test if workers are in group sleeping state.  Used for debugging.
+    </span><span class="kw">pub fn </span>debug_is_group_sleeping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.group_sleep
+    }
+}
+
+<span class="kw">impl </span>WorkerMonitorSync {
+    <span class="doccomment">/// Increase the packed-workers counter.
+    /// Called before a worker is parked.
+    ///
+    /// Return true if all the workers are parked.
+    </span><span class="kw">pub fn </span>inc_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers;
+        <span class="macro">debug_assert!</span>(old &lt; <span class="self">self</span>.worker_count);
+        <span class="kw">let </span>new = old + <span class="number">1</span>;
+        <span class="self">self</span>.parked_workers = new;
+        new == <span class="self">self</span>.worker_count
+    }
+
+    <span class="doccomment">/// Decrease the packed-workers counter.
+    /// Called after a worker is resumed from the parked state.
+    </span><span class="kw">pub fn </span>dec_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers;
+        <span class="macro">debug_assert!</span>(old &lt;= <span class="self">self</span>.worker_count);
+        <span class="macro">debug_assert!</span>(old &gt; <span class="number">0</span>);
+        <span class="kw">let </span>new = old - <span class="number">1</span>;
+        <span class="self">self</span>.parked_workers = new;
+    }
+}
+
 <span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.
 /// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
 </span><span class="kw">pub struct </span>GCWorker&lt;VM: VMBinding&gt; {
@@ -378,7 +479,7 @@
     <span class="doccomment">/// The copy context, used to implement copying GC.
     </span>copy: GCWorkerCopyContext&lt;VM&gt;,
     <span class="doccomment">/// The sending end of the channel to send message to the controller thread.
-    </span><span class="kw">pub </span>sender: Sender&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) sender: controller::channel::Sender&lt;VM&gt;,
     <span class="doccomment">/// The reference to the MMTk instance.
     </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
     <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.
@@ -408,12 +509,12 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorker&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
         ordinal: ThreadId,
         scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
         is_coordinator: bool,
-        sender: Sender&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+        sender: controller::channel::Sender&lt;VM&gt;,
         shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
         local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
@@ -508,10 +609,9 @@
 }
 
 <span class="doccomment">/// A worker group to manage all the GC workers (except the coordinator worker).
-</span><span class="kw">pub struct </span>WorkerGroup&lt;VM: VMBinding&gt; {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerGroup&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Shared worker data
     </span><span class="kw">pub </span>workers_shared: Vec&lt;Arc&lt;GCWorkerShared&lt;VM&gt;&gt;&gt;,
-    parked_workers: AtomicUsize,
     unspawned_local_work_queues: Mutex&lt;Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;&gt;,
 }
 
@@ -532,7 +632,6 @@
 
         Arc::new(<span class="self">Self </span>{
             workers_shared,
-            parked_workers: Default::default(),
             unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
         })
     }
@@ -541,7 +640,7 @@
     </span><span class="kw">pub fn </span>spawn(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
-        sender: Sender&lt;CoordinatorMessage&lt;VM&gt;&gt;,
+        sender: controller::channel::Sender&lt;VM&gt;,
         tls: VMThread,
     ) {
         <span class="kw">let </span><span class="kw-2">mut </span>unspawned_local_work_queues = <span class="self">self</span>.unspawned_local_work_queues.lock().unwrap();
@@ -566,64 +665,11 @@
         <span class="self">self</span>.workers_shared.len()
     }
 
-    <span class="doccomment">/// Increase the packed-workers counter.
-    /// Called before a worker is parked.
-    ///
-    /// Return true if all the workers are parked.
-    </span><span class="kw">pub fn </span>inc_parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
-        <span class="macro">debug_assert!</span>(old &lt; <span class="self">self</span>.worker_count());
-        old + <span class="number">1 </span>== <span class="self">self</span>.worker_count()
-    }
-
-    <span class="doccomment">/// Decrease the packed-workers counter.
-    /// Called after a worker is resumed from the parked state.
-    </span><span class="kw">pub fn </span>dec_parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
-        <span class="macro">debug_assert!</span>(old &lt;= <span class="self">self</span>.worker_count());
-    }
-
-    <span class="doccomment">/// Get the number of parked workers in the group
-    </span><span class="kw">pub fn </span>parked_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.parked_workers.load(Ordering::SeqCst)
-    }
-
-    <span class="doccomment">/// Check if all the workers are packed
-    </span><span class="kw">pub fn </span>all_parked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.parked_workers() == <span class="self">self</span>.worker_count()
-    }
-
     <span class="doccomment">/// Return true if there&#39;re any pending designated work
     </span><span class="kw">pub fn </span>has_designated_work(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
-    }
-}
-
-<span class="doccomment">/// This ensures the worker always decrements the parked worker count on all control flow paths.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ParkingGuard&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
-    worker_group: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WorkerGroup&lt;VM&gt;,
-    all_parked: bool,
-}
-
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; ParkingGuard&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
-    <span class="kw">pub fn </span>new(worker_group: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WorkerGroup&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>all_parked = worker_group.inc_parked_workers();
-        ParkingGuard {
-            worker_group,
-            all_parked,
-        }
-    }
-
-    <span class="kw">pub fn </span>all_parked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.all_parked
-    }
-}
-
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; Drop <span class="kw">for </span>ParkingGuard&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
-    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.worker_group.dec_parked_workers();
     }
 }
 </code></pre></div>
