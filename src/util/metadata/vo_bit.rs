@@ -1,3 +1,5 @@
+//! Valid-object bit (VO-bit)
+
 use atomic::Ordering;
 
 use crate::util::metadata::side_metadata::SideMetadataSpec;
