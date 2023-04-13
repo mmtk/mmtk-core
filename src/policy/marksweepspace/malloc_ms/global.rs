@@ -622,16 +622,21 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             // For bulk xor'ing 128-bit vectors on architectures with vector instructions
             // Each bit represents an object of LOG_MIN_OBJ_SIZE size
-            let bulk_load_size: usize =
-                128 * (1 << crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region);
+            let bulk_load_size: usize = 128
+                * (1 << crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC
+                    .log_bytes_in_region);
 
             // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
             let mut empty_page_start = Address::ZERO;
 
             // Scan the chunk by every 'bulk_load_size' region.
             while address < chunk_end {
-                let alloc_128: u128 =
-                    unsafe { load128(&crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC, address) };
+                let alloc_128: u128 = unsafe {
+                    load128(
+                        &crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC,
+                        address,
+                    )
+                };
                 let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
                 // Check if there are dead objects in the bulk loaded region

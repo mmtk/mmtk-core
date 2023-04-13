@@ -30,7 +30,8 @@ pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
 
 // Base address of VO bit, public to VM bindings which may need to use this.
-pub const VO_BIT_SIDE_METADATA_ADDR: Address = crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_ADDR;
+pub const VO_BIT_SIDE_METADATA_ADDR: Address =
+    crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_ADDR;
 
 /// This constant represents the worst-case ratio of source data size to global side metadata.
 /// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.

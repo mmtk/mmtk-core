@@ -9,8 +9,7 @@ use std::marker::PhantomData;
 /// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit
 /// non-atomically is correct (e.g. a single thread is scanning this address range, and
 /// it is the only thread that accesses VO bit).
-pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
-{
+pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> {
     start: Address,
     end: Address,
     cursor: Address,

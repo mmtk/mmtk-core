@@ -1,10 +1,10 @@
 use super::*;
-#[cfg(feature = "vo_bit")]
-use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::metadata::metadata_val_traits::*;
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
 use num_traits::FromPrimitive;
 use std::fmt;
