@@ -488,7 +488,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
         if self.attempt_mark(object, self.mark_state) {
@@ -523,7 +523,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);

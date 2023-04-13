@@ -287,7 +287,7 @@ impl Block {
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)
             {
-                // clear alloc bit if it is ever set. It is possible that the alloc bit is never set for this cell (i.e. there was no object in this cell before this GC),
+                // clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
                 #[cfg(feature = "vo_bit")]
                 crate::util::vo_bit::unset_vo_bit_nocheck::<VM>(potential_object);
@@ -353,7 +353,7 @@ impl Block {
                         self, cell, last
                     );
 
-                    // Clear alloc bit: we don't know where the object reference actually is, so we bulk zero the cell.
+                    // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "vo_bit")]
                     crate::util::vo_bit::bzero_vo_bit(cell, cell_size);
 

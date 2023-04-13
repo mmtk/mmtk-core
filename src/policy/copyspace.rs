@@ -184,7 +184,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     unsafe fn reset_vo_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            // If we have allocated something into this space, we need to clear its alloc bit.
+            // If we have allocated something into this space, we need to clear its VO bit.
             if current_chunk != self.common.start {
                 crate::util::vo_bit::bzero_vo_bit(
                     self.common.start,
@@ -221,7 +221,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
 

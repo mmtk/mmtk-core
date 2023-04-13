@@ -195,7 +195,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
         if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {

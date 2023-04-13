@@ -105,7 +105,7 @@ fn map_active_chunk_metadata(chunk_start: Address) {
     );
 }
 
-/// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
+/// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
 pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize) {
@@ -161,7 +161,7 @@ pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Check if there is an object allocated by malloc at the address.
 ///
 /// This function doesn't check if `addr` is aligned.
-/// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
+/// If not, it will try to load the VO bit for the address rounded down to the metadata's granularity.
 #[cfg(feature = "is_mmtk_object")]
 pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<ObjectReference> {
     if !is_meta_space_mapped_for_address(addr) {

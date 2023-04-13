@@ -219,7 +219,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
@@ -235,7 +235,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
         // from this stage and onwards, mark bit is no longer needed
@@ -363,7 +363,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 start, end,
             );
         for obj in linear_scan {
-            // clear the alloc bit
+            // clear the VO bit
             vo_bit::unset_vo_bit::<VM>(obj);
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);

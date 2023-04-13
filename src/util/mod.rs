@@ -29,7 +29,7 @@ pub mod options;
 pub mod reference_processor;
 
 // The following modules are only public in the mmtk crate. They should only be used in MMTk core.
-/// Alloc bit
+/// Valid object bit
 pub(crate) mod vo_bit;
 /// An analysis framework for collecting data and profiling in GC.
 #[cfg(feature = "analysis")]

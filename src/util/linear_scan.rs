@@ -5,10 +5,10 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-/// Iterate over an address range, and find each object by alloc bit.
-/// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading alloc bit
+/// Iterate over an address range, and find each object by VO bit.
+/// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit
 /// non-atomically is correct (e.g. a single thread is scanning this address range, and
-/// it is the only thread that accesses alloc bit).
+/// it is the only thread that accesses VO bit).
 pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
 {
     start: Address,
@@ -21,7 +21,7 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
     ObjectIterator<VM, S, ATOMIC_LOAD_VO_BIT>
 {
     /// Create an iterator for the address range. The caller must ensure
-    /// that the alloc bit metadata is mapped for the address range.
+    /// that the VO bit metadata is mapped for the address range.
     pub fn new(start: Address, end: Address) -> Self {
         debug_assert!(start < end);
         ObjectIterator {

@@ -192,7 +192,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO bit not set",
             object
         );
         let nursery_object = self.is_in_nursery(object);
