@@ -155,7 +155,7 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
 /// Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
     is_meta_space_mapped_for_address(object.to_address::<VM>())
-        && vo_bit::is_alloced::<VM>(object)
+        && vo_bit::is_vo_bit_set::<VM>(object)
 }
 
 /// Check if there is an object allocated by malloc at the address.
@@ -167,7 +167,7 @@ pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<Obje
     if !is_meta_space_mapped_for_address(addr) {
         return None;
     }
-    vo_bit::is_alloced_object::<VM>(addr)
+    vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {
@@ -218,8 +218,8 @@ pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
     ACTIVE_CHUNK_METADATA_SPEC.load::<u8>(chunk_start) == 1
 }
 
-pub fn set_alloc_bit<VM: VMBinding>(object: ObjectReference) {
-    vo_bit::set_alloc_bit::<VM>(object);
+pub fn set_vo_bit<VM: VMBinding>(object: ObjectReference) {
+    vo_bit::set_vo_bit::<VM>(object);
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) {
@@ -227,8 +227,8 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) 
 }
 
 #[allow(unused)]
-pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
-    vo_bit::unset_alloc_bit::<VM>(object);
+pub fn unset_vo_bit<VM: VMBinding>(object: ObjectReference) {
+    vo_bit::unset_vo_bit::<VM>(object);
 }
 
 #[allow(unused)]
@@ -255,8 +255,8 @@ pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
     OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0);
 }
 
-pub unsafe fn unset_alloc_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
-    vo_bit::unset_alloc_bit_unsafe::<VM>(object);
+pub unsafe fn unset_vo_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
+    vo_bit::unset_vo_bit_unsafe::<VM>(object);
 }
 
 #[allow(unused)]

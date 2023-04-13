@@ -1,6 +1,6 @@
 use super::*;
 #[cfg(feature = "vo_bit")]
-use crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC;
+use crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
@@ -840,7 +840,7 @@ impl SideMetadataContext {
         let mut ret = vec![];
 
         #[cfg(feature = "vo_bit")]
-        ret.push(ALLOC_SIDE_METADATA_SPEC);
+        ret.push(VO_BIT_SIDE_METADATA_SPEC);
 
         if let Some(spec) = crate::mmtk::SFT_MAP.get_side_metadata() {
             if spec.is_global {

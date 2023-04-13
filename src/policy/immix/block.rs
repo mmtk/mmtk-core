@@ -167,7 +167,7 @@ impl Block {
     /// Deinitalize a block before releasing.
     pub fn deinit(&self) {
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::bzero_alloc_bit(self.start(), Self::BYTES);
+        crate::util::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
         self.set_state(BlockState::Unallocated);
     }
 
@@ -225,7 +225,7 @@ impl Block {
                     }
 
                     #[cfg(feature = "vo_bit")]
-                    crate::util::vo_bit::bzero_alloc_bit(line.start(), Line::BYTES);
+                    crate::util::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
 
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);

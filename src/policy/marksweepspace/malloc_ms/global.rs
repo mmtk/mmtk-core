@@ -109,7 +109,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        set_alloc_bit::<VM>(object);
+        set_vo_bit::<VM>(object);
     }
 
     fn sft_trace_object(
@@ -241,7 +241,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // MallocSpace needs to use alloc bit. If the feature is turned on, the alloc bit spec is in the global specs.
         // Otherwise, we manually add it.
         if !cfg!(feature = "vo_bit") {
-            specs.push(crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC);
+            specs.push(crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC);
         }
         // MallocSpace also need a global chunk metadata.
         // TODO: I don't know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
@@ -538,7 +538,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
             trace!("free object {}", object);
-            unsafe { unset_alloc_bit_unsafe::<VM>(object) };
+            unsafe { unset_vo_bit_unsafe::<VM>(object) };
 
             true
         } else {
@@ -615,7 +615,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let chunk_end = chunk_start + BYTES_IN_CHUNK;
 
             debug_assert!(
-                crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
                     == mark_bit_spec.log_bytes_in_region,
                 "Alloc-bit and mark-bit metadata have different minimum object sizes!"
             );
@@ -623,7 +623,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // For bulk xor'ing 128-bit vectors on architectures with vector instructions
             // Each bit represents an object of LOG_MIN_OBJ_SIZE size
             let bulk_load_size: usize =
-                128 * (1 << crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
+                128 * (1 << crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region);
 
             // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
             let mut empty_page_start = Address::ZERO;
@@ -631,7 +631,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Scan the chunk by every 'bulk_load_size' region.
             while address < chunk_end {
                 let alloc_128: u128 =
-                    unsafe { load128(&crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC, address) };
+                    unsafe { load128(&crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC, address) };
                 let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
                 // Check if there are dead objects in the bulk loaded region

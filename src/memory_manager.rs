@@ -582,9 +582,9 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// 2.  Also return true if there exists an `objref: ObjectReference` such that
 ///     -   `objref` is a valid object reference to an object in any space in MMTk, and
 ///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(ALLOC_BIT_REGION_SIZE)` and
-///         -   `hi = lo + ALLOC_BIT_REGION_SIZE` and
-///         -   `ALLOC_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
+///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
+///         -   `hi = lo + VO_BIT_REGION_SIZE` and
+///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
 ///             It is the byte granularity of the alloc bit.
 /// 3.  Return false otherwise.  This function never panics.
 ///
@@ -603,7 +603,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
 /// function.  For most VMs, valid object references are always aligned to the word size, so
 /// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
-/// always check against [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
+/// always check against [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
