@@ -79,12 +79,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::set_vo_bit::<VM>(object);
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
         self.treadmill.add_to_treadmill(object, alloc);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -191,7 +191,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );
@@ -226,7 +226,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
-            crate::util::vo_bit::unset_vo_bit::<VM>(object);
+            crate::util::metadata::vo_bit::unset_vo_bit::<VM>(object);
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
         };

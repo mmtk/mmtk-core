@@ -393,7 +393,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         // unset allocation bit
         unsafe {
-            crate::util::vo_bit::unset_vo_bit_unsafe::<VM>(ObjectReference::from_raw_address(
+            crate::util::metadata::vo_bit::unset_vo_bit_unsafe::<VM>(ObjectReference::from_raw_address(
                 addr,
             ))
         };

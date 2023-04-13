@@ -1,6 +1,6 @@
 use super::*;
 #[cfg(feature = "vo_bit")]
-use crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
+use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;

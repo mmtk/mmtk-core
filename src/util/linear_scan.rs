@@ -1,4 +1,4 @@
-use crate::util::vo_bit;
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;

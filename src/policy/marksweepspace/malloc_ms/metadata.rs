@@ -1,4 +1,4 @@
-use crate::util::vo_bit;
+use crate::util::metadata::vo_bit;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::side_metadata;

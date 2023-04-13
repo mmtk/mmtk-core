@@ -118,11 +118,11 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::set_vo_bit::<VM>(_object);
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -487,7 +487,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );
@@ -522,7 +522,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );

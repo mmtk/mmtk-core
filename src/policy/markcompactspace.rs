@@ -8,8 +8,8 @@ use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::extract_side_metadata;
-use crate::util::{vo_bit, Address, ObjectReference};
+use crate::util::metadata::{extract_side_metadata, vo_bit};
+use crate::util::{Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
@@ -69,7 +69,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        crate::util::vo_bit::set_vo_bit::<VM>(object);
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
     }
 
     #[cfg(feature = "sanity")]
@@ -79,7 +79,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
 
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(
@@ -218,7 +218,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );
@@ -234,7 +234,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );

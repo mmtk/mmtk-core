@@ -290,7 +290,7 @@ impl Block {
                 // clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
                 #[cfg(feature = "vo_bit")]
-                crate::util::vo_bit::unset_vo_bit_nocheck::<VM>(potential_object);
+                crate::util::metadata::vo_bit::unset_vo_bit_nocheck::<VM>(potential_object);
                 unsafe {
                     cell.store::<Address>(last);
                 }
@@ -355,7 +355,7 @@ impl Block {
 
                     // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "vo_bit")]
-                    crate::util::vo_bit::bzero_vo_bit(cell, cell_size);
+                    crate::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
 
                     // store the previous cell to make the free list
                     debug_assert!(last.is_zero() || (last >= self.start() && last < self.end()));
