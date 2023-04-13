@@ -166,7 +166,7 @@ impl Block {
 
     /// Deinitalize a block before releasing.
     pub fn deinit(&self) {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         crate::util::alloc_bit::bzero_alloc_bit(self.start(), Self::BYTES);
         self.set_state(BlockState::Unallocated);
     }
@@ -224,7 +224,7 @@ impl Block {
                         holes += 1;
                     }
 
-                    #[cfg(feature = "global_alloc_bit")]
+                    #[cfg(feature = "vo_bit")]
                     crate::util::alloc_bit::bzero_alloc_bit(line.start(), Line::BYTES);
 
                     #[cfg(feature = "immix_zero_on_release")]

@@ -78,7 +78,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         crate::util::alloc_bit::set_alloc_bit::<VM>(object);
         self.treadmill.add_to_treadmill(object, alloc);
     }
@@ -189,7 +189,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
@@ -225,7 +225,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
-            #[cfg(feature = "global_alloc_bit")]
+            #[cfg(feature = "vo_bit")]
             crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));

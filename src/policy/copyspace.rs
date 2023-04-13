@@ -5,7 +5,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
-#[cfg(feature = "global_alloc_bit")]
+#[cfg(feature = "vo_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
@@ -56,7 +56,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
     }
 
@@ -172,7 +172,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
-            #[cfg(feature = "global_alloc_bit")]
+            #[cfg(feature = "vo_bit")]
             self.reset_alloc_bit();
             self.pr.reset();
         }
@@ -180,7 +180,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space.store(false, Ordering::SeqCst);
     }
 
-    #[cfg(feature = "global_alloc_bit")]
+    #[cfg(feature = "vo_bit")]
     unsafe fn reset_alloc_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
@@ -218,7 +218,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         // This object is in from space, we will copy. Make sure we have a valid copy semantic.
         debug_assert!(semantics.is_some());
 
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",

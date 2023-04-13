@@ -82,10 +82,10 @@ ro_space = []
 code_space  = []
 
 # metadata
-global_alloc_bit = []
+vo_bit = []
 
 # conservative garbage collection support
-is_mmtk_object = ["global_alloc_bit"]
+is_mmtk_object = ["vo_bit"]
 
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []

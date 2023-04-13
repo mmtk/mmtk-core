@@ -75,7 +75,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         if self.common.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         crate::util::alloc_bit::set_alloc_bit::<VM>(object);
     }
     #[cfg(feature = "is_mmtk_object")]
@@ -192,7 +192,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",

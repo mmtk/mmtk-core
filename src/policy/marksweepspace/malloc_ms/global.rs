@@ -240,7 +240,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
         // MallocSpace needs to use alloc bit. If the feature is turned on, the alloc bit spec is in the global specs.
         // Otherwise, we manually add it.
-        if !cfg!(feature = "global_alloc_bit") {
+        if !cfg!(feature = "vo_bit") {
             specs.push(crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC);
         }
         // MallocSpace also need a global chunk metadata.

@@ -117,7 +117,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
@@ -485,7 +485,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
@@ -520,7 +520,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
