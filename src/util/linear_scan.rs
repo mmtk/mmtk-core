@@ -1,4 +1,4 @@
-use crate::util::alloc_bit;
+use crate::util::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
@@ -41,9 +41,9 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
             let is_object = if ATOMIC_LOAD_ALLOC_BIT {
-                alloc_bit::is_alloced_object::<VM>(self.cursor)
+                vo_bit::is_alloced_object::<VM>(self.cursor)
             } else {
-                unsafe { alloc_bit::is_alloced_object_unsafe::<VM>(self.cursor) }
+                unsafe { vo_bit::is_alloced_object_unsafe::<VM>(self.cursor) }
             };
 
             if let Some(object) = is_object {

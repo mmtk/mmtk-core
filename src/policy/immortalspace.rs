@@ -76,11 +76,11 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
+        crate::util::vo_bit::set_alloc_bit::<VM>(object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::vo_bit::is_alloced_object::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -194,7 +194,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
+            crate::util::vo_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );

@@ -82,7 +82,7 @@ pub fn forward_object<VM: VMBinding>(
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     #[cfg(feature = "vo_bit")]
-    crate::util::alloc_bit::set_alloc_bit::<VM>(new_object);
+    crate::util::vo_bit::set_alloc_bit::<VM>(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,

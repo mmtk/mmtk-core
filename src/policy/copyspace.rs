@@ -57,7 +57,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        crate::util::vo_bit::set_alloc_bit::<VM>(_object);
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
@@ -74,7 +74,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::vo_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(
@@ -186,7 +186,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         if self.common.contiguous {
             // If we have allocated something into this space, we need to clear its alloc bit.
             if current_chunk != self.common.start {
-                crate::util::alloc_bit::bzero_alloc_bit(
+                crate::util::vo_bit::bzero_alloc_bit(
                     self.common.start,
                     current_chunk + BYTES_IN_CHUNK - self.common.start,
                 );
@@ -220,7 +220,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
+            crate::util::vo_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );

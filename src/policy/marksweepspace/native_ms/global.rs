@@ -108,12 +108,12 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        crate::util::vo_bit::set_alloc_bit::<VM>(_object);
     }
 
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::vo_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(
@@ -284,7 +284,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             metadata_spec.set_zero_atomic(block.start(), Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
-        crate::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
+        crate::util::vo_bit::bzero_alloc_bit(block.start(), Block::BYTES);
     }
 
     pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {

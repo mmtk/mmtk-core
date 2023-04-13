@@ -9,7 +9,7 @@ use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::extract_side_metadata;
-use crate::util::{alloc_bit, Address, ObjectReference};
+use crate::util::{vo_bit, Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
@@ -69,7 +69,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
+        crate::util::vo_bit::set_alloc_bit::<VM>(object);
     }
 
     #[cfg(feature = "sanity")]
@@ -79,7 +79,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
 
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::vo_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(
@@ -218,7 +218,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
+            crate::util::vo_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -234,7 +234,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
+            crate::util::vo_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -364,7 +364,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             );
         for obj in linear_scan {
             // clear the alloc bit
-            alloc_bit::unset_alloc_bit::<VM>(obj);
+            vo_bit::unset_alloc_bit::<VM>(obj);
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 
@@ -378,7 +378,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 trace!(" copy from {} to {}", obj, new_object);
                 let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                 // update alloc_bit,
-                alloc_bit::set_alloc_bit::<VM>(new_object);
+                vo_bit::set_alloc_bit::<VM>(new_object);
                 to = new_object.to_object_start::<VM>() + copied_size;
                 debug_assert_eq!(end_of_new_object, to);
             }
