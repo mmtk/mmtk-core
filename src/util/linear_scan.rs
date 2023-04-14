@@ -5,8 +5,9 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-// FIXME: This linear scanning algorithm is only used by MarkCompact.  It should use a local
-// metadata (specific to the MarkCompactSpace) instead of using the global VO bit.
+// FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
+// It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
+// In the future, we should let MarkCompact do linear scanning using its local metadata instead.
 
 /// Iterate over an address range, and find each object by VO bit.
 /// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit
