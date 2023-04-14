@@ -81,7 +81,9 @@ ro_space = []
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
-# metadata
+# Global valid object (VO) bit metadata.
+# The VO bit is set when an object is allocated, and cleared when it is reclaimed.
+# See `src/util/metadata/vo_bit.rs`
 vo_bit = []
 
 # conservative garbage collection support

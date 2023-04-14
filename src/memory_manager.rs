@@ -585,11 +585,11 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 ///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
 ///         -   `hi = lo + VO_BIT_REGION_SIZE` and
 ///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///             It is the byte granularity of the VO bit.
+///             It is the byte granularity of the valid object (VO) bit.
 /// 3.  Return false otherwise.  This function never panics.
 ///
 /// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the "VO bits" side metadata, i.e. a bitmap.
+/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
 /// For space efficiency, each bit of the bitmap governs a small region of memory.
 /// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
 /// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),

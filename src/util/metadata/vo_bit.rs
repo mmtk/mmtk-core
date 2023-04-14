@@ -1,4 +1,11 @@
-//! Valid-object bit (VO-bit)
+//! Valid object bit (VO bit)
+//!
+//! The valid object bit, or "VO bit" for short", is a global per-address metadata.  It is set at
+//! the address of the `ObjectReference` of an object when the object is allocated, and cleared
+//! when the object is reclaimed by the GC.
+//!
+//! The main purpose of VO bit is supporting conservative GC.  It is the canonical source of
+//! information about whether there is an object in the MMTk heap at any given address.
 
 use atomic::Ordering;
 
