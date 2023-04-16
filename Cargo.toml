@@ -81,11 +81,13 @@ ro_space = []
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
-# metadata
-global_alloc_bit = []
+# Global valid object (VO) bit metadata.
+# The VO bit is set when an object is allocated, and cleared when it is reclaimed.
+# See `src/util/metadata/vo_bit.rs`
+vo_bit = []
 
 # conservative garbage collection support
-is_mmtk_object = ["global_alloc_bit"]
+is_mmtk_object = ["vo_bit"]
 
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []
