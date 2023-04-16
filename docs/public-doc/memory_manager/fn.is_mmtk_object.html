@@ -8,10 +8,10 @@ space in MMTk.</li>
 <li><code>objref</code> is a valid object reference to an object in any space in MMTk, and</li>
 <li><code>lo &lt;= objref.to_address() &lt; hi</code>, where
 <ul>
-<li><code>lo = addr.align_down(ALLOC_BIT_REGION_SIZE)</code> and</li>
-<li><code>hi = lo + ALLOC_BIT_REGION_SIZE</code> and</li>
-<li><code>ALLOC_BIT_REGION_SIZE</code> is <a href="../util/is_mmtk_object/constant.ALLOC_BIT_REGION_SIZE.html" title="crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE"><code>crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE</code></a>.
-It is the byte granularity of the alloc bit.</li>
+<li><code>lo = addr.align_down(VO_BIT_REGION_SIZE)</code> and</li>
+<li><code>hi = lo + VO_BIT_REGION_SIZE</code> and</li>
+<li><code>VO_BIT_REGION_SIZE</code> is <a href="../util/is_mmtk_object/constant.VO_BIT_REGION_SIZE.html" title="crate::util::is_mmtk_object::VO_BIT_REGION_SIZE"><code>crate::util::is_mmtk_object::VO_BIT_REGION_SIZE</code></a>.
+It is the byte granularity of the valid object (VO) bit.</li>
 </ul>
 </li>
 </ul>
@@ -19,20 +19,20 @@ It is the byte granularity of the alloc bit.</li>
 <li>Return false otherwise.  This function never panics.</li>
 </ol>
 <p>Case 2 means <strong>this function is imprecise for misaligned addresses</strong>.
-This function uses the “alloc bits” side metadata, i.e. a bitmap.
+This function uses the “valid object (VO) bits” side metadata, i.e. a bitmap.
 For space efficiency, each bit of the bitmap governs a small region of memory.
 The size of a region is currently defined as the <a href="../util/constants/constant.MIN_OBJECT_SIZE.html">minimum object size</a>,
 which is currently defined as the <a href="../util/constants/constant.BYTES_IN_WORD.html">word size</a>,
 which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
 The alignment of a region is also the region size.
-If an alloc bit is <code>1</code>, the bitmap cannot tell which address within the 4-byte or 8-byte region
+If a VO bit is <code>1</code>, the bitmap cannot tell which address within the 4-byte or 8-byte region
 is the valid object reference.
 Therefore, if the input <code>addr</code> is not properly aligned, but is close to a valid object
 reference, this function may still return true.</p>
 <p>For the reason above, the VM <strong>must check if <code>addr</code> is properly aligned</strong> before calling this
 function.  For most VMs, valid object references are always aligned to the word size, so
 checking <code>addr.is_aligned_to(BYTES_IN_WORD)</code> should usually work.  If you are paranoid, you can
-always check against <a href="../util/is_mmtk_object/constant.ALLOC_BIT_REGION_SIZE.html" title="crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE"><code>crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE</code></a>.</p>
+always check against <a href="../util/is_mmtk_object/constant.VO_BIT_REGION_SIZE.html" title="crate::util::is_mmtk_object::VO_BIT_REGION_SIZE"><code>crate::util::is_mmtk_object::VO_BIT_REGION_SIZE</code></a>.</p>
 <p>This function is useful for conservative root scanning.  The VM can iterate through all words in
 a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
 greater than <code>0x0000_7fff_ffff_ffff</code> on Linux on x86_64), and use this function to deside if the

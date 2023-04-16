@@ -465,13 +465,13 @@
     </span>}
 
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: <span class="kw">crate</span>::util::ObjectReference, _alloc: bool) {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-        </span><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit::&lt;VM&gt;(_object);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(_object);
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::alloc_bit::is_alloced_object::&lt;VM&gt;(addr).is_some()
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
     }
 
     <span class="kw">fn </span>sft_trace_object(
@@ -641,8 +641,8 @@
         <span class="kw">for </span>metadata_spec <span class="kw">in </span>Block::METADATA_SPECS {
             metadata_spec.set_zero_atomic(block.start(), Ordering::SeqCst);
         }
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-        </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
     <span class="kw">pub fn </span>acquire_block(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, size: usize, align: usize) -&gt; BlockAcquireResult {

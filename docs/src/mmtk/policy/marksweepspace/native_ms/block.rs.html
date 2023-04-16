@@ -717,10 +717,10 @@
             <span class="kw">if </span>!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::&lt;VM&gt;(potential_object, Ordering::SeqCst)
             {
-                <span class="comment">// clear alloc bit if it is ever set. It is possible that the alloc bit is never set for this cell (i.e. there was no object in this cell before this GC),
+                <span class="comment">// clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
-                </span><span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-                </span><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit_nocheck::&lt;VM&gt;(potential_object);
+                </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit_nocheck::&lt;VM&gt;(potential_object);
                 <span class="kw">unsafe </span>{
                     cell.store::&lt;Address&gt;(last);
                 }
@@ -783,9 +783,9 @@
                         <span class="self">self</span>, cell, last
                     );
 
-                    <span class="comment">// Clear alloc bit: we don&#39;t know where the object reference actually is, so we bulk zero the cell.
-                    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-                    </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(cell, cell_size);
+                    <span class="comment">// Clear VO bit: we don&#39;t know where the object reference actually is, so we bulk zero the cell.
+                    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                    </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
 
                     <span class="comment">// store the previous cell to make the free list
                     </span><span class="macro">debug_assert!</span>(last.is_zero() || (last &gt;= <span class="self">self</span>.start() &amp;&amp; last &lt; <span class="self">self</span>.end()));

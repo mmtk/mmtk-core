@@ -473,8 +473,8 @@
 
     <span class="doccomment">/// Deinitalize a block before releasing.
     </span><span class="kw">pub fn </span>deinit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-        </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
         <span class="self">self</span>.set_state(BlockState::Unallocated);
     }
 
@@ -531,8 +531,8 @@
                         holes += <span class="number">1</span>;
                     }
 
-                    <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-                    </span><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(line.start(), Line::BYTES);
+                    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                    </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
 
                     <span class="attribute">#[cfg(feature = <span class="string">&quot;immix_zero_on_release&quot;</span>)]
                     </span><span class="kw">crate</span>::util::memory::zero(line.start(), Line::BYTES);

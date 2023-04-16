@@ -407,8 +407,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_WORD;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
-<span class="kw">use </span><span class="kw">crate</span>::util::metadata::extract_side_metadata;
-<span class="kw">use </span><span class="kw">crate</span>::util::{alloc_bit, Address, ObjectReference};
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::{extract_side_metadata, vo_bit};
+<span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use crate</span>::{vm::<span class="kw-2">*</span>, ObjectQueue};
 <span class="kw">use </span>atomic::Ordering;
 
@@ -468,7 +468,7 @@
     </span>}
 
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
-        <span class="kw">crate</span>::util::alloc_bit::set_alloc_bit::&lt;VM&gt;(object);
+        <span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
     }
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
@@ -478,7 +478,7 @@
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::alloc_bit::is_alloced_object::&lt;VM&gt;(addr).is_some()
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
     }
 
     <span class="kw">fn </span>sft_trace_object(
@@ -617,8 +617,8 @@
         object: ObjectReference,
     ) -&gt; ObjectReference {
         <span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::alloc_bit::is_alloced::&lt;VM&gt;(object),
-            <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="string">&quot;{:x}: VO bit not set&quot;</span>,
             object
         );
         <span class="kw">if </span>MarkCompactSpace::&lt;VM&gt;::test_and_mark(object) {
@@ -633,8 +633,8 @@
         object: ObjectReference,
     ) -&gt; ObjectReference {
         <span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::alloc_bit::is_alloced::&lt;VM&gt;(object),
-            <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="string">&quot;{:x}: VO bit not set&quot;</span>,
             object
         );
         <span class="comment">// from this stage and onwards, mark bit is no longer needed
@@ -762,8 +762,8 @@
                 start, end,
             );
         <span class="kw">for </span>obj <span class="kw">in </span>linear_scan {
-            <span class="comment">// clear the alloc bit
-            </span>alloc_bit::unset_alloc_bit::&lt;VM&gt;(obj);
+            <span class="comment">// clear the VO bit
+            </span>vo_bit::unset_vo_bit::&lt;VM&gt;(obj);
 
             <span class="kw">let </span>forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(obj);
 
@@ -776,8 +776,8 @@
                 <span class="comment">// copy object
                 </span><span class="macro">trace!</span>(<span class="string">&quot; copy from {} to {}&quot;</span>, obj, new_object);
                 <span class="kw">let </span>end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                <span class="comment">// update alloc_bit,
-                </span>alloc_bit::set_alloc_bit::&lt;VM&gt;(new_object);
+                <span class="comment">// update VO bit,
+                </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
                 to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
                 <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
             }

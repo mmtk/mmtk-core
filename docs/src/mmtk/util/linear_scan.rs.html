@@ -243,30 +243,36 @@
 <span id="243">243</span>
 <span id="244">244</span>
 <span id="245">245</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit;
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>std::marker::PhantomData;
 
-<span class="doccomment">/// Iterate over an address range, and find each object by alloc bit.
-/// ATOMIC_LOAD_ALLOC_BIT can be set to false if it is known that loading alloc bit
+<span class="comment">// FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
+// It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
+// In the future, we should let MarkCompact do linear scanning using its local metadata instead.
+
+</span><span class="doccomment">/// Iterate over an address range, and find each object by VO bit.
+/// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit
 /// non-atomically is correct (e.g. a single thread is scanning this address range, and
-/// it is the only thread that accesses alloc bit).
-</span><span class="kw">pub struct </span>ObjectIterator&lt;VM: VMBinding, S: LinearScanObjectSize, <span class="kw">const </span>ATOMIC_LOAD_ALLOC_BIT: bool&gt;
-{
+/// it is the only thread that accesses VO bit).
+</span><span class="kw">pub struct </span>ObjectIterator&lt;VM: VMBinding, S: LinearScanObjectSize, <span class="kw">const </span>ATOMIC_LOAD_VO_BIT: bool&gt; {
     start: Address,
     end: Address,
     cursor: Address,
     _p: PhantomData&lt;(VM, S)&gt;,
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, S: LinearScanObjectSize, <span class="kw">const </span>ATOMIC_LOAD_ALLOC_BIT: bool&gt;
-    ObjectIterator&lt;VM, S, ATOMIC_LOAD_ALLOC_BIT&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, S: LinearScanObjectSize, <span class="kw">const </span>ATOMIC_LOAD_VO_BIT: bool&gt;
+    ObjectIterator&lt;VM, S, ATOMIC_LOAD_VO_BIT&gt;
 {
     <span class="doccomment">/// Create an iterator for the address range. The caller must ensure
-    /// that the alloc bit metadata is mapped for the address range.
+    /// that the VO bit metadata is mapped for the address range.
     </span><span class="kw">pub fn </span>new(start: Address, end: Address) -&gt; <span class="self">Self </span>{
         <span class="macro">debug_assert!</span>(start &lt; end);
         ObjectIterator {
@@ -278,17 +284,17 @@
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, S: LinearScanObjectSize, <span class="kw">const </span>ATOMIC_LOAD_ALLOC_BIT: bool&gt; std::iter::Iterator
-    <span class="kw">for </span>ObjectIterator&lt;VM, S, ATOMIC_LOAD_ALLOC_BIT&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, S: LinearScanObjectSize, <span class="kw">const </span>ATOMIC_LOAD_VO_BIT: bool&gt; std::iter::Iterator
+    <span class="kw">for </span>ObjectIterator&lt;VM, S, ATOMIC_LOAD_VO_BIT&gt;
 {
     <span class="kw">type </span>Item = ObjectReference;
 
     <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;&lt;<span class="self">Self </span><span class="kw">as </span>Iterator&gt;::Item&gt; {
         <span class="kw">while </span><span class="self">self</span>.cursor &lt; <span class="self">self</span>.end {
-            <span class="kw">let </span>is_object = <span class="kw">if </span>ATOMIC_LOAD_ALLOC_BIT {
-                alloc_bit::is_alloced_object::&lt;VM&gt;(<span class="self">self</span>.cursor)
+            <span class="kw">let </span>is_object = <span class="kw">if </span>ATOMIC_LOAD_VO_BIT {
+                vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(<span class="self">self</span>.cursor)
             } <span class="kw">else </span>{
-                <span class="kw">unsafe </span>{ alloc_bit::is_alloced_object_unsafe::&lt;VM&gt;(<span class="self">self</span>.cursor) }
+                <span class="kw">unsafe </span>{ vo_bit::is_vo_bit_set_unsafe::&lt;VM&gt;(<span class="self">self</span>.cursor) }
             };
 
             <span class="kw">if let </span><span class="prelude-val">Some</span>(object) = is_object {

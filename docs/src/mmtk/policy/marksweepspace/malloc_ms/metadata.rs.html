@@ -285,12 +285,12 @@
 <span id="285">285</span>
 <span id="286">286</span>
 <span id="287">287</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit;
-<span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{ObjectModel, VMBinding};
@@ -392,7 +392,7 @@
     </span>);
 }
 
-<span class="doccomment">/// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
+<span class="doccomment">/// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
 </span><span class="kw">pub fn </span>map_meta_space(metadata: <span class="kw-2">&amp;</span>SideMetadataContext, addr: Address, size: usize) {
@@ -442,19 +442,19 @@
 <span class="doccomment">/// Check if a given object was allocated by malloc
 </span><span class="kw">pub fn </span>is_alloced_by_malloc&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
     is_meta_space_mapped_for_address(object.to_address::&lt;VM&gt;())
-        &amp;&amp; alloc_bit::is_alloced::&lt;VM&gt;(object)
+        &amp;&amp; vo_bit::is_vo_bit_set::&lt;VM&gt;(object)
 }
 
 <span class="doccomment">/// Check if there is an object allocated by malloc at the address.
 ///
 /// This function doesn&#39;t check if `addr` is aligned.
-/// If not, it will try to load the alloc bit for the address rounded down to the metadata&#39;s granularity.
+/// If not, it will try to load the VO bit for the address rounded down to the metadata&#39;s granularity.
 </span><span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
 </span><span class="kw">pub fn </span>has_object_alloced_by_malloc&lt;VM: VMBinding&gt;(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
     <span class="kw">if </span>!is_meta_space_mapped_for_address(addr) {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
-    alloc_bit::is_alloced_object::&lt;VM&gt;(addr)
+    vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
 }
 
 <span class="kw">pub fn </span>is_marked&lt;VM: VMBinding&gt;(object: ObjectReference, ordering: Ordering) -&gt; bool {
@@ -505,8 +505,8 @@
     ACTIVE_CHUNK_METADATA_SPEC.load::&lt;u8&gt;(chunk_start) == <span class="number">1
 </span>}
 
-<span class="kw">pub fn </span>set_alloc_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    alloc_bit::set_alloc_bit::&lt;VM&gt;(object);
+<span class="kw">pub fn </span>set_vo_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    vo_bit::set_vo_bit::&lt;VM&gt;(object);
 }
 
 <span class="kw">pub fn </span>set_mark_bit&lt;VM: VMBinding&gt;(object: ObjectReference, ordering: Ordering) {
@@ -514,8 +514,8 @@
 }
 
 <span class="attribute">#[allow(unused)]
-</span><span class="kw">pub fn </span>unset_alloc_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit::&lt;VM&gt;(object);
+</span><span class="kw">pub fn </span>unset_vo_bit&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    vo_bit::unset_vo_bit::&lt;VM&gt;(object);
 }
 
 <span class="attribute">#[allow(unused)]
@@ -542,8 +542,8 @@
     OFFSET_MALLOC_METADATA_SPEC.store::&lt;u8&gt;(address, <span class="number">0</span>);
 }
 
-<span class="kw">pub unsafe fn </span>unset_alloc_bit_unsafe&lt;VM: VMBinding&gt;(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit_unsafe::&lt;VM&gt;(object);
+<span class="kw">pub unsafe fn </span>unset_vo_bit_unsafe&lt;VM: VMBinding&gt;(object: ObjectReference) {
+    vo_bit::unset_vo_bit_unsafe::&lt;VM&gt;(object);
 }
 
 <span class="attribute">#[allow(unused)]

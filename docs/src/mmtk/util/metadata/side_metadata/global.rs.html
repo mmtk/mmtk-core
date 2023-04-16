@@ -1513,12 +1513,12 @@
 <span id="1513">1513</span>
 <span id="1514">1514</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
-<span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-</span><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>num_traits::FromPrimitive;
 <span class="kw">use </span>std::fmt;
@@ -2353,8 +2353,8 @@
     </span><span class="kw">pub fn </span>new_global_specs(specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; Vec&lt;SideMetadataSpec&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="macro">vec!</span>[];
 
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-        </span>ret.push(ALLOC_SIDE_METADATA_SPEC);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span>ret.push(VO_BIT_SIDE_METADATA_SPEC);
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(spec) = <span class="kw">crate</span>::mmtk::SFT_MAP.get_side_metadata() {
             <span class="kw">if </span>spec.is_global {

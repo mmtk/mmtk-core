@@ -264,7 +264,7 @@
 </span><span class="macro">define_side_metadata_specs!</span>(
     last_spec_as LAST_GLOBAL_SIDE_METADATA_SPEC,
     <span class="comment">// Mark the start of an object
-    </span>ALLOC_BIT       = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_MIN_OBJECT_SIZE <span class="kw">as </span>usize),
+    </span>VO_BIT       = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">0</span>, log_bytes_in_region: LOG_MIN_OBJECT_SIZE <span class="kw">as </span>usize),
     <span class="comment">// Track chunks used by (malloc) marksweep
     </span>MS_ACTIVE_CHUNK = (global: <span class="bool-val">true</span>, log_num_of_bits: <span class="number">3</span>, log_bytes_in_region: LOG_BYTES_IN_CHUNK),
     <span class="comment">// Track the index in SFT map for a chunk (only used for SFT sparse chunk map)

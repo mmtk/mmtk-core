@@ -238,11 +238,11 @@
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
-<span class="attribute">#[cfg(not(feature = <span class="string">&quot;global_alloc_bit&quot;</span>))]
-</span><span class="kw">use </span><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+<span class="attribute">#[cfg(not(feature = <span class="string">&quot;vo_bit&quot;</span>))]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
@@ -403,15 +403,15 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompact&lt;VM&gt; {
     <span class="kw">pub fn </span>new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-        <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        <span class="comment">// if vo_bit is enabled, VO_BIT_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don&#39;t need to add it here.
-        </span><span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+        </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
         </span><span class="kw">let </span>global_side_metadata_specs = SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[]);
-        <span class="comment">// if global_alloc_bit is NOT enabled,
-        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
-        </span><span class="attribute">#[cfg(not(feature = <span class="string">&quot;global_alloc_bit&quot;</span>))]
+        <span class="comment">// if vo_bit is NOT enabled,
+        // we need to add VO_BIT_SIDE_METADATA_SPEC to SideMetadataContext here.
+        </span><span class="attribute">#[cfg(not(feature = <span class="string">&quot;vo_bit&quot;</span>))]
         </span><span class="kw">let </span>global_side_metadata_specs =
-            SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[ALLOC_SIDE_METADATA_SPEC]);
+            SideMetadataContext::new_global_specs(<span class="kw-2">&amp;</span>[VO_BIT_SIDE_METADATA_SPEC]);
 
         <span class="kw">let </span><span class="kw-2">mut </span>plan_args = CreateSpecificPlanArgs {
             global_args: args,

@@ -299,8 +299,8 @@
     copy_context: <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt;,
 ) -&gt; ObjectReference {
     <span class="kw">let </span>new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-    </span><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit::&lt;VM&gt;(new_object);
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+    </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
     <span class="kw">if let </span><span class="prelude-val">Some</span>(shift) = forwarding_bits_offset_in_forwarding_pointer::&lt;VM&gt;() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::&lt;VM, usize&gt;(
             object,

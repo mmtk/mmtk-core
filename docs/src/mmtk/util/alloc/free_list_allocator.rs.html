@@ -921,9 +921,9 @@
 
         <span class="comment">// unset allocation bit
         </span><span class="kw">unsafe </span>{
-            <span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit_unsafe::&lt;VM&gt;(ObjectReference::from_raw_address(
-                addr,
-            ))
+            <span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit_unsafe::&lt;VM&gt;(
+                ObjectReference::from_raw_address(addr),
+            )
         };
     }
 

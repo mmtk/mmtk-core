@@ -337,7 +337,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
-<span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{extract_side_metadata, MetadataSpec};
@@ -388,8 +388,8 @@
     }
 
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference, _alloc: bool) {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-        </span><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit::&lt;VM&gt;(_object);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(_object);
     }
 
     <span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
@@ -406,7 +406,7 @@
 
     <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::alloc_bit::is_alloced_object::&lt;VM&gt;(addr).is_some()
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
     }
 
     <span class="kw">fn </span>sft_trace_object(
@@ -504,21 +504,21 @@
 
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">unsafe </span>{
-            <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-            </span><span class="self">self</span>.reset_alloc_bit();
+            <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+            </span><span class="self">self</span>.reset_vo_bit();
             <span class="self">self</span>.pr.reset();
         }
         <span class="self">self</span>.common.metadata.reset();
         <span class="self">self</span>.from_space.store(<span class="bool-val">false</span>, Ordering::SeqCst);
     }
 
-    <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-    </span><span class="kw">unsafe fn </span>reset_alloc_bit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+    </span><span class="kw">unsafe fn </span>reset_vo_bit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let </span>current_chunk = <span class="self">self</span>.pr.get_current_chunk();
         <span class="kw">if </span><span class="self">self</span>.common.contiguous {
-            <span class="comment">// If we have allocated something into this space, we need to clear its alloc bit.
+            <span class="comment">// If we have allocated something into this space, we need to clear its VO bit.
             </span><span class="kw">if </span>current_chunk != <span class="self">self</span>.common.start {
-                <span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit(
+                <span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(
                     <span class="self">self</span>.common.start,
                     current_chunk + BYTES_IN_CHUNK - <span class="self">self</span>.common.start,
                 );
@@ -550,10 +550,10 @@
         <span class="comment">// This object is in from space, we will copy. Make sure we have a valid copy semantic.
         </span><span class="macro">debug_assert!</span>(semantics.is_some());
 
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
         </span><span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::alloc_bit::is_alloced::&lt;VM&gt;(object),
-            <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="string">&quot;{:x}: VO bit not set&quot;</span>,
             object
         );
 

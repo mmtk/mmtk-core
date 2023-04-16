@@ -229,11 +229,12 @@
 <span id="229">229</span>
 <span id="230">230</span>
 <span id="231">231</span>
+<span id="232">232</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This is a generic module to work with metadata including side metadata and in-object metadata.
 //!
 //! This module is designed to enable the implementation of a wide range of GC algorithms for VMs with various combinations of in-object and on-side space for GC-specific metadata (e.g. forwarding bits, marking bit, logging bit, etc.).
 //!
-//! The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. alloc-bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.
+//! The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. VO bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.
 //!
 //! MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the [&#39;ObjectModel&#39;](crate::vm::ObjectModel).
 //!
@@ -458,6 +459,7 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>log_bit;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>mark_bit;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>pin_bit;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>vo_bit;
 
 <span class="kw">pub use </span>global::<span class="kw-2">*</span>;
 </code></pre></div>

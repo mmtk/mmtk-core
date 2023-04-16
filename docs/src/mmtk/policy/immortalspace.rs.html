@@ -281,12 +281,12 @@
         <span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         }
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
-        </span><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit::&lt;VM&gt;(object);
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
     }
     <span class="attribute">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::alloc_bit::is_alloced_object::&lt;VM&gt;(addr).is_some()
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
     }
     <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -398,10 +398,10 @@
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
     ) -&gt; ObjectReference {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;global_alloc_bit&quot;</span>)]
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
         </span><span class="macro">debug_assert!</span>(
-            <span class="kw">crate</span>::util::alloc_bit::is_alloced::&lt;VM&gt;(object),
-            <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
+            <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
+            <span class="string">&quot;{:x}: VO bit not set&quot;</span>,
             object
         );
         <span class="kw">if </span>ImmortalSpace::&lt;VM&gt;::test_and_mark(object, <span class="self">self</span>.mark_state) {
