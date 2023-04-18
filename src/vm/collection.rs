@@ -12,13 +12,8 @@ pub enum GCThreadContext<VM: VMBinding> {
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
-    /// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.
-    /// If false, any GC thread can call these methods.
-    ///
-    /// This constant exists because some VMs require the thread that resumes a thread to be the same thread that
-    /// stopped it.  The MMTk Core will use the appropriate thread to stop or start the world according to the value of
-    /// this constant.  If a VM does not have such a requirement, the VM binding shall set this to false to reduce an
-    /// unnecessary context switch.
+    /// This const existed for historical reasons.  It has no effect now.
+    #[deprecated]
     const COORDINATOR_ONLY_STW: bool = true;
 
     /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
