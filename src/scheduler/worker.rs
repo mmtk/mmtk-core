@@ -52,8 +52,6 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 
 /// Used to synchronize mutually exclusive operations between workers and controller,
 /// and also waking up workers when more work packets are available.
-/// NOTE: All fields are public in order to support the complex control structure
-/// in `GCWorkScheduler::poll_slow`.
 pub(crate) struct WorkerMonitor {
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
