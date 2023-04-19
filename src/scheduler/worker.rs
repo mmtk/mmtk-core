@@ -112,7 +112,7 @@ impl WorkerMonitor {
     /// Wake up workers when more work packets are made available for workers.
     /// This function is called when adding work packets to buckets.
     /// This function doesn't change the `work_group_state` variable.
-    /// If workers are in the `Sleeping` , use `resume_and_wait` to resume workers.
+    /// If workers are in the `Sleeping` state, use `resume_and_wait` to resume workers.
     pub fn notify_work_available(&self, all: bool) {
         if all {
             self.work_available.notify_all();
