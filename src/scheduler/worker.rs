@@ -69,10 +69,12 @@ pub(crate) struct WorkerMonitor {
     all_workers_parked: Condvar,
 }
 
-/// The state of the worker group.  The worker group alternates between the `Sleeping` and the
-/// `Working` state.  Workers execute work packets in the `Working` state, but once workers entered
-/// the `Sleeping` state, they can not continue until the coordinator explicitly transitions the
-/// state back to `Working` after it found more work for workers to do.
+/// The state of the worker group.
+///
+/// The worker group alternates between the `Sleeping` and the `Working` state.  Workers are
+/// allowed to execute work packets in the `Working` state.  However, once workers entered the
+/// `Sleeping` state, they will not be allowed to packets from buckets until the coordinator
+/// explicitly transitions the state back to `Working` after it found more work for workers to do.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum WorkerGroupState {
     /// In this state, the coordinator can open new buckets and close buckets,
@@ -112,6 +114,14 @@ impl WorkerMonitor {
     /// This function doesn't change the `work_group_state` variable.
     /// If workers are in the `Sleeping` state, use `resume_and_wait` to resume workers.
     pub fn notify_work_available(&self, all: bool) {
+        let sync = self.sync.lock().unwrap();
+
+        // Don't notify workers if we are adding packets when workers are sleeping.
+        // This could happen when we add `ScheduleCollection` or schedule sentinels.
+        if sync.worker_group_state == WorkerGroupState::Sleeping {
+            return;
+        }
+
         if all {
             self.work_available.notify_all();
         } else {
@@ -121,10 +131,15 @@ impl WorkerMonitor {
 
     /// Wake up workers and wait until they transition to `Sleeping` state again.
     /// This is called by the coordinator.
-    pub fn resume_and_wait(&self) {
+    /// If `all` is true, notify all workers; otherwise only notify one worker.
+    pub fn resume_and_wait(&self, all: bool) {
         let mut sync = self.sync.lock().unwrap();
         sync.worker_group_state = WorkerGroupState::Working;
-        self.work_available.notify_all();
+        if all {
+            self.work_available.notify_all();
+        } else {
+            self.work_available.notify_one();
+        }
         let _sync = self
             .all_workers_parked
             .wait_while(sync, |sync| {

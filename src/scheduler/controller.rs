@@ -76,16 +76,6 @@ impl<VM: VMBinding> GCController<VM> {
         false
     }
 
-    /// Handle the "all workers have parked" event.  Return true if GC is finished.
-    fn on_all_workers_parked(&mut self) -> bool {
-        self.scheduler.assert_all_activated_buckets_are_empty();
-
-        let new_work_available = self.find_more_work_for_workers();
-
-        // GC finishes if there is no new work to do.
-        !new_work_available
-    }
-
     /// Coordinate workers to perform GC in response to a GC request.
     pub fn do_gc_until_completion(&mut self) {
         let gc_start = std::time::Instant::now();
@@ -98,13 +88,26 @@ impl<VM: VMBinding> GCController<VM> {
         // Add a ScheduleCollection work packet.  It is the seed of other work packets.
         self.scheduler.work_buckets[WorkBucketStage::Unconstrained].add(ScheduleCollection);
 
-        // Resume the workers and gradually open more buckets when they stop together.
+        // Notify only one worker at this time because there is only one work packet,
+        // namely `ScheduleCollection`.
+        self.scheduler.worker_monitor.resume_and_wait(false);
+
+        // Gradually open more buckets as workers stop each time they drain all open bucket.
         loop {
-            self.scheduler.worker_monitor.resume_and_wait();
-            let finished = self.on_all_workers_parked();
-            if finished {
+            // Workers should only transition to the `Sleeping` state when all open buckets have
+            // been drained.
+            self.scheduler.assert_all_activated_buckets_are_empty();
+
+            let new_work_available = self.find_more_work_for_workers();
+
+            // GC finishes if there is no new work to do.
+            if !new_work_available {
                 break;
             }
+
+            // Notify all workers because there should be many work packets available in the newly
+            // opened bucket(s).
+            self.scheduler.worker_monitor.resume_and_wait(true);
         }
 
         // All GC workers must have parked by now.
