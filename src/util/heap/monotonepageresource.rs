@@ -295,6 +295,33 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
+    /// Iterate through allocated regions, and invoke the given function for each region.
+    pub fn for_allocated_regions<F>(&self, f: F)
+    where
+        F: Fn(Address, usize),
+    {
+        let sync = self.sync.lock().unwrap();
+        match sync.conditional {
+            MonotonePageResourceConditional::Contiguous { start, .. } => {
+                let end = sync.cursor.align_up(BYTES_IN_CHUNK);
+                f(start, end - start);
+            }
+            MonotonePageResourceConditional::Discontiguous => {
+                if !sync.cursor.is_zero() {
+                    f(sync.current_chunk, sync.cursor - sync.current_chunk);
+
+                    let mut chunk = self.vm_map().get_next_contiguous_region(sync.current_chunk);
+                    while !chunk.is_zero() {
+                        let size = self.vm_map().get_contiguous_region_size(chunk);
+                        f(chunk, size);
+
+                        chunk = self.vm_map().get_next_contiguous_region(chunk);
+                    }
+                }
+            }
+        }
+    }
+
     fn release_pages_extent(&self, _first: Address, bytes: usize) {
         let pages = crate::util::conversions::bytes_to_pages(bytes);
         debug_assert!(bytes == crate::util::conversions::pages_to_bytes(pages));
