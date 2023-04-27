@@ -15,11 +15,11 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(not(feature = "global_alloc_bit"))]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+#[cfg(not(feature = "vo_bit"))]
+use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
@@ -180,15 +180,15 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
 impl<VM: VMBinding> MarkCompact<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        // if vo_bit is enabled, VO_BIT_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         let global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        // if global_alloc_bit is NOT enabled,
-        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
-        #[cfg(not(feature = "global_alloc_bit"))]
+        // if vo_bit is NOT enabled,
+        // we need to add VO_BIT_SIDE_METADATA_SPEC to SideMetadataContext here.
+        #[cfg(not(feature = "vo_bit"))]
         let global_side_metadata_specs =
-            SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
+            SideMetadataContext::new_global_specs(&[VO_BIT_SIDE_METADATA_SPEC]);
 
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,

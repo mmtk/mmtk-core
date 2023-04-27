@@ -12,7 +12,6 @@ use super::constants::{
 };
 #[cfg(test)]
 use super::ensure_munmap_metadata;
-use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;
 
 pub(super) fn address_to_chunked_meta_address(

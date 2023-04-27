@@ -96,4 +96,10 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
                 .then(|| self.flush_region_modbuf());
         }
     }
+
+    fn object_probable_write_slow(&mut self, obj: ObjectReference) {
+        // enqueue the object
+        self.modbuf.push(obj);
+        self.modbuf.is_full().then(|| self.flush_modbuf());
+    }
 }

@@ -273,7 +273,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let min_nursery = plan.base().options.get_min_nursery_pages();
         let next_gc_full_heap = available < min_nursery;
         trace!(
-            "next gc will be full heap? {}, availabe pages = {}, min nursery = {}",
+            "next gc will be full heap? {}, available pages = {}, min nursery = {}",
             next_gc_full_heap,
             available,
             min_nursery
@@ -288,7 +288,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     /// Get pages reserved for the collection by a generational plan. A generational plan should
-    /// add their own reservatioin with the value returned by this method.
+    /// add their own reservation with the value returned by this method.
     pub fn get_collection_reserved_pages(&self) -> usize {
         self.nursery.reserved_pages()
     }

@@ -9,9 +9,8 @@ use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Condvar, Mutex};
 
 /// Represents the ID of a GC worker thread.
 pub type ThreadId = usize;
@@ -51,6 +50,85 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     }
 }
 
+/// Used to synchronize mutually exclusive operations between workers and controller,
+/// and also waking up workers when more work packets are available.
+/// NOTE: All fields are public in order to support the complex control structure
+/// in `GCWorkScheduler::poll_slow`.
+pub(crate) struct WorkerMonitor {
+    pub sync: Mutex<WorkerMonitorSync>,
+    pub cond: Condvar,
+}
+
+/// The synchronized part of `WorkerMonitor`.
+pub(crate) struct WorkerMonitorSync {
+    /// The total number of workers.
+    worker_count: usize,
+    /// Number of parked workers.
+    parked_workers: usize,
+    /// This flag is set to true when all workers have parked,
+    /// and cleared if a work packet is added to an open bucket, or a new bucket is opened.
+    /// No workers can unpark while this flag is set.
+    ///
+    /// Note that testing this flag is *not* equivalent to testing `parked_workers == num_workers`.
+    /// This field is used to *receive notification* for the event of more work becoming available.
+    pub group_sleep: bool,
+}
+
+impl WorkerMonitor {
+    pub fn new(worker_count: usize) -> Self {
+        Self {
+            sync: Mutex::new(WorkerMonitorSync {
+                worker_count,
+                parked_workers: 0,
+                group_sleep: false,
+            }),
+            cond: Default::default(),
+        }
+    }
+
+    /// Wake up workers when more work packets are made available for workers.
+    /// This function will get workers out of the "group sleeping" state.
+    pub fn notify_work_available(&self, all: bool) {
+        let mut sync = self.sync.lock().unwrap();
+        sync.group_sleep = false;
+        if all {
+            self.cond.notify_all();
+        } else {
+            self.cond.notify_one();
+        }
+    }
+
+    /// Test if workers are in group sleeping state.  Used for debugging.
+    pub fn debug_is_group_sleeping(&self) -> bool {
+        let sync = self.sync.lock().unwrap();
+        sync.group_sleep
+    }
+}
+
+impl WorkerMonitorSync {
+    /// Increase the packed-workers counter.
+    /// Called before a worker is parked.
+    ///
+    /// Return true if all the workers are parked.
+    pub fn inc_parked_workers(&mut self) -> bool {
+        let old = self.parked_workers;
+        debug_assert!(old < self.worker_count);
+        let new = old + 1;
+        self.parked_workers = new;
+        new == self.worker_count
+    }
+
+    /// Decrease the packed-workers counter.
+    /// Called after a worker is resumed from the parked state.
+    pub fn dec_parked_workers(&mut self) {
+        let old = self.parked_workers;
+        debug_assert!(old <= self.worker_count);
+        debug_assert!(old > 0);
+        let new = old - 1;
+        self.parked_workers = new;
+    }
+}
+
 /// A GC worker.  This part is privately owned by a worker thread.
 /// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
 pub struct GCWorker<VM: VMBinding> {
@@ -64,7 +142,7 @@ pub struct GCWorker<VM: VMBinding> {
     /// The copy context, used to implement copying GC.
     copy: GCWorkerCopyContext<VM>,
     /// The sending end of the channel to send message to the controller thread.
-    pub sender: Sender<CoordinatorMessage<VM>>,
+    pub(crate) sender: controller::channel::Sender<VM>,
     /// The reference to the MMTk instance.
     pub mmtk: &'static MMTK<VM>,
     /// True if this struct is the embedded GCWorker of the controller thread.
@@ -94,12 +172,12 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 }
 
 impl<VM: VMBinding> GCWorker<VM> {
-    pub fn new(
+    pub(crate) fn new(
         mmtk: &'static MMTK<VM>,
         ordinal: ThreadId,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
-        sender: Sender<CoordinatorMessage<VM>>,
+        sender: controller::channel::Sender<VM>,
         shared: Arc<GCWorkerShared<VM>>,
         local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
     ) -> Self {
@@ -194,10 +272,9 @@ impl<VM: VMBinding> GCWorker<VM> {
 }
 
 /// A worker group to manage all the GC workers (except the coordinator worker).
-pub struct WorkerGroup<VM: VMBinding> {
+pub(crate) struct WorkerGroup<VM: VMBinding> {
     /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
-    parked_workers: AtomicUsize,
     unspawned_local_work_queues: Mutex<Vec<deque::Worker<Box<dyn GCWork<VM>>>>>,
 }
 
@@ -218,7 +295,6 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
         Arc::new(Self {
             workers_shared,
-            parked_workers: Default::default(),
             unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
         })
     }
@@ -227,7 +303,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn spawn(
         &self,
         mmtk: &'static MMTK<VM>,
-        sender: Sender<CoordinatorMessage<VM>>,
+        sender: controller::channel::Sender<VM>,
         tls: VMThread,
     ) {
         let mut unspawned_local_work_queues = self.unspawned_local_work_queues.lock().unwrap();
@@ -252,63 +328,10 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         self.workers_shared.len()
     }
 
-    /// Increase the packed-workers counter.
-    /// Called before a worker is parked.
-    ///
-    /// Return true if all the workers are parked.
-    pub fn inc_parked_workers(&self) -> bool {
-        let old = self.parked_workers.fetch_add(1, Ordering::SeqCst);
-        debug_assert!(old < self.worker_count());
-        old + 1 == self.worker_count()
-    }
-
-    /// Decrease the packed-workers counter.
-    /// Called after a worker is resumed from the parked state.
-    pub fn dec_parked_workers(&self) {
-        let old = self.parked_workers.fetch_sub(1, Ordering::SeqCst);
-        debug_assert!(old <= self.worker_count());
-    }
-
-    /// Get the number of parked workers in the group
-    pub fn parked_workers(&self) -> usize {
-        self.parked_workers.load(Ordering::SeqCst)
-    }
-
-    /// Check if all the workers are packed
-    pub fn all_parked(&self) -> bool {
-        self.parked_workers() == self.worker_count()
-    }
-
     /// Return true if there're any pending designated work
     pub fn has_designated_work(&self) -> bool {
         self.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
-    }
-}
-
-/// This ensures the worker always decrements the parked worker count on all control flow paths.
-pub(crate) struct ParkingGuard<'a, VM: VMBinding> {
-    worker_group: &'a WorkerGroup<VM>,
-    all_parked: bool,
-}
-
-impl<'a, VM: VMBinding> ParkingGuard<'a, VM> {
-    pub fn new(worker_group: &'a WorkerGroup<VM>) -> Self {
-        let all_parked = worker_group.inc_parked_workers();
-        ParkingGuard {
-            worker_group,
-            all_parked,
-        }
-    }
-
-    pub fn all_parked(&self) -> bool {
-        self.all_parked
-    }
-}
-
-impl<'a, VM: VMBinding> Drop for ParkingGuard<'a, VM> {
-    fn drop(&mut self) {
-        self.worker_group.dec_parked_workers();
     }
 }
