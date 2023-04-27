@@ -425,38 +425,6 @@
 <span id="425">425</span>
 <span id="426">426</span>
 <span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
@@ -553,16 +521,12 @@
 
     <span class="doccomment">/// Create GC threads, including the controller thread and all workers.
     </span><span class="kw">pub fn </span>spawn_gc_threads(<span class="self">self</span>: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;, tls: VMThread) {
-        <span class="comment">// Create the communication channel.
-        </span><span class="kw">let </span>(sender, receiver) = controller::channel::make_channel();
-
         <span class="comment">// Spawn the controller thread.
         </span><span class="kw">let </span>coordinator_worker = GCWorker::new(
             mmtk,
             usize::MAX,
             <span class="self">self</span>.clone(),
             <span class="bool-val">true</span>,
-            sender.clone(),
             <span class="self">self</span>.coordinator_worker_shared.clone(),
             deque::Worker::new_fifo(),
         );
@@ -570,12 +534,11 @@
             mmtk,
             mmtk.plan.base().gc_requester.clone(),
             <span class="self">self</span>.clone(),
-            receiver,
             coordinator_worker,
         );
         VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::&lt;VM&gt;::Controller(gc_controller));
 
-        <span class="self">self</span>.worker_group.spawn(mmtk, sender, tls)
+        <span class="self">self</span>.worker_group.spawn(mmtk, tls)
     }
 
     <span class="doccomment">/// Resolve the affinity of a thread.
@@ -766,14 +729,22 @@
     }
 
     <span class="doccomment">/// Check if all the work buckets are empty
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>all_activated_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">for </span>bucket <span class="kw">in </span><span class="self">self</span>.work_buckets.values() {
-            <span class="kw">if </span>bucket.is_activated() &amp;&amp; !bucket.is_drained() {
-                <span class="kw">return </span><span class="bool-val">false</span>;
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>assert_all_activated_buckets_are_empty(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>error_example = <span class="prelude-val">None</span>;
+        <span class="kw">for </span>(id, bucket) <span class="kw">in </span><span class="self">self</span>.work_buckets.iter() {
+            <span class="kw">if </span>bucket.is_activated() &amp;&amp; !bucket.is_empty() {
+                <span class="macro">error!</span>(<span class="string">&quot;Work bucket {:?} is active but not empty!&quot;</span>, id);
+                <span class="comment">// This error can be hard to reproduce.
+                // If an error happens in the release build where logs are turned off,
+                // we should show at least one abnormal bucket in the panic message
+                // so that we still have some information for debugging.
+                </span>error_example = <span class="prelude-val">Some</span>(id);
             }
         }
-        <span class="bool-val">true
-    </span>}
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(id) = error_example {
+            <span class="macro">panic!</span>(<span class="string">&quot;Some active buckets (such as {:?}) are not empty.&quot;</span>, id);
+        }
+    }
 
     <span class="doccomment">/// Get a schedulable work packet without retry.
     </span><span class="kw">fn </span>poll_schedulable_work_once(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Steal&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; {
@@ -835,48 +806,13 @@
     }
 
     <span class="kw">fn </span>poll_slow(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
-        <span class="comment">// Note: The lock is released during `wait` in the loop.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.worker_monitor.sync.lock().unwrap();
         <span class="kw">loop </span>{
             <span class="comment">// Retry polling
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.poll_schedulable_work(worker) {
                 <span class="kw">return </span>work;
             }
 
-            <span class="comment">// Park this worker
-            </span><span class="kw">let </span>all_parked = sync.inc_parked_workers();
-
-            <span class="kw">if </span>all_parked {
-                <span class="comment">// If all workers are parked, enter &quot;group sleeping&quot; and notify controller.
-                </span>sync.group_sleep = <span class="bool-val">true</span>;
-                <span class="macro">debug!</span>(<span class="string">&quot;Entered group-sleeping state&quot;</span>);
-                worker.sender.notify_all_workers_parked();
-            } <span class="kw">else </span>{
-                <span class="comment">// Otherwise wait until notified.
-                // Note: The condition for this `cond.wait` is &quot;more work is available&quot;.
-                // If this worker spuriously wakes up, then in the next loop iteration, the
-                // `poll_schedulable_work` invocation above will fail, and the worker will reach
-                // here and wait again.
-                </span>sync = <span class="self">self</span>.worker_monitor.cond.wait(sync).unwrap();
-            }
-
-            <span class="comment">// Keep waiting if we have entered &quot;group sleeping&quot; state.
-            // The coordinator will let the worker leave the &quot;group sleeping&quot; state
-            // once the coordinator finished its work.
-            //
-            // Note: `wait_while` checks `sync.group_sleep` before actually starting to wait.
-            // This is expected because the controller may run so fast that it opened new buckets
-            // and unset `sync.group_sleep` before we even reached here.  If that happens, waiting
-            // blindly will result in all workers sleeping forever.  So we should always check
-            // `sync.group_sleep` before waiting.
-            </span>sync = <span class="self">self
-                </span>.worker_monitor
-                .cond
-                .wait_while(sync, |sync| sync.group_sleep)
-                .unwrap();
-
-            <span class="comment">// Unpark this worker.
-            </span>sync.dec_parked_workers();
+            <span class="self">self</span>.worker_monitor.park_and_wait(worker);
         }
     }
 

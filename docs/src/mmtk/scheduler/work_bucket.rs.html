@@ -279,9 +279,6 @@
 <span id="279">279</span>
 <span id="280">280</span>
 <span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerMonitor;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -494,13 +491,10 @@
             sentinel.take()
         };
         <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = maybe_sentinel {
-            <span class="comment">// We cannot call `self.add` now, because:
-            // 1.  The current function is called only when all workers parked, and we are holding
-            //     the monitor lock.  `self.add` also needs that lock to notify other workers.
-            //     Trying to lock it again will result in deadlock.
-            // 2.  After this function returns, the current worker will check if there is pending
-            //     work immediately, and notify other workers.
-            // So we can just &quot;sneak&quot; the sentinel work packet into the current bucket now.
+            <span class="comment">// We don&#39;t need to call `self.add` because this function is called by the coordinator
+            // when workers are stopped.  We don&#39;t need to notify the workers because the
+            // coordinator will do that later.
+            // We can just &quot;sneak&quot; the sentinel work packet into the current bucket.
             </span><span class="self">self</span>.queue.push(work);
             <span class="bool-val">true
         </span>} <span class="kw">else </span>{

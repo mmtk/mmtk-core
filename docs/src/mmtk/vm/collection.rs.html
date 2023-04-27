@@ -116,11 +116,6 @@
 <span id="116">116</span>
 <span id="117">117</span>
 <span id="118">118</span>
-<span id="119">119</span>
-<span id="120">120</span>
-<span id="121">121</span>
-<span id="122">122</span>
-<span id="123">123</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::MutatorContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -135,13 +130,8 @@
 
 <span class="doccomment">/// VM-specific methods for garbage collection.
 </span><span class="kw">pub trait </span>Collection&lt;VM: VMBinding&gt; {
-    <span class="doccomment">/// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.
-    /// If false, any GC thread can call these methods.
-    ///
-    /// This constant exists because some VMs require the thread that resumes a thread to be the same thread that
-    /// stopped it.  The MMTk Core will use the appropriate thread to stop or start the world according to the value of
-    /// this constant.  If a VM does not have such a requirement, the VM binding shall set this to false to reduce an
-    /// unnecessary context switch.
+    <span class="doccomment">/// This const existed for historical reasons.  It has no effect now.
+    </span><span class="attribute">#[deprecated]
     </span><span class="kw">const </span>COORDINATOR_ONLY_STW: bool = <span class="bool-val">true</span>;
 
     <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.

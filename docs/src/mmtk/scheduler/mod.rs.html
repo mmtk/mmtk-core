@@ -29,7 +29,6 @@
 <span id="29">29</span>
 <span id="30">30</span>
 <span id="31">31</span>
-<span id="32">32</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
 </span><span class="kw">pub mod </span>affinity;
@@ -42,7 +41,6 @@
 <span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">mod </span>work_counter;
 
 <span class="kw">mod </span>work;
-<span class="kw">pub use </span>work::CoordinatorWork;
 <span class="kw">pub use </span>work::GCWork;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>work::GCWorkContext;
 

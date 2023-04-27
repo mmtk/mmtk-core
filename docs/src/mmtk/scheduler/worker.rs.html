@@ -335,6 +335,85 @@
 <span id="335">335</span>
 <span id="336">336</span>
 <span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -389,11 +468,38 @@
 
 <span class="doccomment">/// Used to synchronize mutually exclusive operations between workers and controller,
 /// and also waking up workers when more work packets are available.
-/// NOTE: All fields are public in order to support the complex control structure
-/// in `GCWorkScheduler::poll_slow`.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerMonitor {
-    <span class="kw">pub </span>sync: Mutex&lt;WorkerMonitorSync&gt;,
-    <span class="kw">pub </span>cond: Condvar,
+    <span class="doccomment">/// The synchronized part.
+    </span>sync: Mutex&lt;WorkerMonitorSync&gt;,
+    <span class="doccomment">/// This is notified when new work is made available for the workers.
+    /// Particularly, it is notified when
+    /// -   `sync.worker_group_state` is transitioned to `Working` because
+    ///     -   some workers still have designated work, or
+    ///     -   some sentinel work packets are added to their drained buckets, or
+    ///     -   some work buckets are opened, or
+    /// -   any work packet is added to any open bucket.
+    /// Workers wait on this condvar.
+    </span>work_available: Condvar,
+    <span class="doccomment">/// This is notified when all workers parked.
+    /// The coordinator waits on this condvar.
+    </span>all_workers_parked: Condvar,
+}
+
+<span class="doccomment">/// The state of the worker group.
+///
+/// The worker group alternates between the `Sleeping` and the `Working` state.  Workers are
+/// allowed to execute work packets in the `Working` state.  However, once workers entered the
+/// `Sleeping` state, they will not be allowed to packets from buckets until the coordinator
+/// explicitly transitions the state back to `Working` after it found more work for workers to do.
+</span><span class="attribute">#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+</span><span class="kw">enum </span>WorkerGroupState {
+    <span class="doccomment">/// In this state, the coordinator can open new buckets and close buckets,
+    /// but workers cannot execute any packets or get any work packets from any buckets.
+    /// Workers cannot unpark in this state.
+    </span>Sleeping,
+    <span class="doccomment">/// In this state, workers can get work packets from open buckets,
+    /// but no buckets can be opened or closed.
+    </span>Working,
 }
 
 <span class="doccomment">/// The synchronized part of `WorkerMonitor`.
@@ -402,13 +508,8 @@
     </span>worker_count: usize,
     <span class="doccomment">/// Number of parked workers.
     </span>parked_workers: usize,
-    <span class="doccomment">/// This flag is set to true when all workers have parked,
-    /// and cleared if a work packet is added to an open bucket, or a new bucket is opened.
-    /// No workers can unpark while this flag is set.
-    ///
-    /// Note that testing this flag is *not* equivalent to testing `parked_workers == num_workers`.
-    /// This field is used to *receive notification* for the event of more work becoming available.
-    </span><span class="kw">pub </span>group_sleep: bool,
+    <span class="doccomment">/// The worker group state.
+    </span>worker_group_state: WorkerGroupState,
 }
 
 <span class="kw">impl </span>WorkerMonitor {
@@ -417,28 +518,95 @@
             sync: Mutex::new(WorkerMonitorSync {
                 worker_count,
                 parked_workers: <span class="number">0</span>,
-                group_sleep: <span class="bool-val">false</span>,
+                worker_group_state: WorkerGroupState::Sleeping,
             }),
-            cond: Default::default(),
+            work_available: Default::default(),
+            all_workers_parked: Default::default(),
         }
     }
 
     <span class="doccomment">/// Wake up workers when more work packets are made available for workers.
-    /// This function will get workers out of the &quot;group sleeping&quot; state.
+    /// This function is called when adding work packets to buckets.
+    /// This function doesn&#39;t change the `work_group_state` variable.
+    /// If workers are in the `Sleeping` state, use `resume_and_wait` to resume workers.
     </span><span class="kw">pub fn </span>notify_work_available(<span class="kw-2">&amp;</span><span class="self">self</span>, all: bool) {
-        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        sync.group_sleep = <span class="bool-val">false</span>;
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+
+        <span class="comment">// Don&#39;t notify workers if we are adding packets when workers are sleeping.
+        // This could happen when we add `ScheduleCollection` or schedule sentinels.
+        </span><span class="kw">if </span>sync.worker_group_state == WorkerGroupState::Sleeping {
+            <span class="kw">return</span>;
+        }
+
         <span class="kw">if </span>all {
-            <span class="self">self</span>.cond.notify_all();
+            <span class="self">self</span>.work_available.notify_all();
         } <span class="kw">else </span>{
-            <span class="self">self</span>.cond.notify_one();
+            <span class="self">self</span>.work_available.notify_one();
         }
     }
 
-    <span class="doccomment">/// Test if workers are in group sleeping state.  Used for debugging.
-    </span><span class="kw">pub fn </span>debug_is_group_sleeping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Wake up workers and wait until they transition to `Sleeping` state again.
+    /// This is called by the coordinator.
+    /// If `all` is true, notify all workers; otherwise only notify one worker.
+    </span><span class="kw">pub fn </span>resume_and_wait(<span class="kw-2">&amp;</span><span class="self">self</span>, all: bool) {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        sync.worker_group_state = WorkerGroupState::Working;
+        <span class="kw">if </span>all {
+            <span class="self">self</span>.work_available.notify_all();
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.work_available.notify_one();
+        }
+        <span class="kw">let </span>_sync = <span class="self">self
+            </span>.all_workers_parked
+            .wait_while(sync, |sync| {
+                sync.worker_group_state == WorkerGroupState::Working
+            })
+            .unwrap();
+    }
+
+    <span class="doccomment">/// Test if the worker group is in the `Sleeping` state.
+    </span><span class="kw">pub fn </span>debug_is_sleeping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        sync.group_sleep
+        sync.worker_group_state == WorkerGroupState::Sleeping
+    }
+
+    <span class="doccomment">/// Park until more work is available.
+    /// The argument `worker` indicates this function can only be called by workers.
+    </span><span class="kw">pub fn </span>park_and_wait&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) {
+        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+
+        <span class="comment">// Park this worker
+        </span><span class="kw">let </span>all_parked = sync.inc_parked_workers();
+        <span class="macro">trace!</span>(<span class="string">&quot;Worker {} parked.&quot;</span>, worker.ordinal);
+
+        <span class="kw">if </span>all_parked {
+            <span class="comment">// If all workers are parked, enter &quot;Sleeping&quot; state and notify controller.
+            </span>sync.worker_group_state = WorkerGroupState::Sleeping;
+            <span class="macro">debug!</span>(
+                <span class="string">&quot;Worker {} notifies the coordinator that all workerer parked.&quot;</span>,
+                worker.ordinal
+            );
+            <span class="self">self</span>.all_workers_parked.notify_one();
+        } <span class="kw">else </span>{
+            <span class="comment">// Otherwise wait until notified.
+            // Note: The condition for this `cond.wait` is &quot;more work is available&quot;.
+            // If this worker spuriously wakes up, then in the next loop iteration, the
+            // `poll_schedulable_work` invocation above will fail, and the worker will reach
+            // here and wait again.
+            </span>sync = <span class="self">self</span>.work_available.wait(sync).unwrap();
+        }
+
+        <span class="comment">// If we are in the `Sleeping` state, wait until leaving that state.
+        </span>sync = <span class="self">self
+            </span>.work_available
+            .wait_while(sync, |sync| {
+                sync.worker_group_state == WorkerGroupState::Sleeping
+            })
+            .unwrap();
+
+        <span class="comment">// Unpark this worker.
+        </span>sync.dec_parked_workers();
+        <span class="macro">trace!</span>(<span class="string">&quot;Worker {} unparked.&quot;</span>, worker.ordinal);
     }
 }
 
@@ -447,7 +615,7 @@
     /// Called before a worker is parked.
     ///
     /// Return true if all the workers are parked.
-    </span><span class="kw">pub fn </span>inc_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">fn </span>inc_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>old = <span class="self">self</span>.parked_workers;
         <span class="macro">debug_assert!</span>(old &lt; <span class="self">self</span>.worker_count);
         <span class="kw">let </span>new = old + <span class="number">1</span>;
@@ -457,7 +625,7 @@
 
     <span class="doccomment">/// Decrease the packed-workers counter.
     /// Called after a worker is resumed from the parked state.
-    </span><span class="kw">pub fn </span>dec_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    </span><span class="kw">fn </span>dec_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>old = <span class="self">self</span>.parked_workers;
         <span class="macro">debug_assert!</span>(old &lt;= <span class="self">self</span>.worker_count);
         <span class="macro">debug_assert!</span>(old &gt; <span class="number">0</span>);
@@ -478,8 +646,6 @@
     </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
     <span class="doccomment">/// The copy context, used to implement copying GC.
     </span>copy: GCWorkerCopyContext&lt;VM&gt;,
-    <span class="doccomment">/// The sending end of the channel to send message to the controller thread.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) sender: controller::channel::Sender&lt;VM&gt;,
     <span class="doccomment">/// The reference to the MMTk instance.
     </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
     <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.
@@ -514,7 +680,6 @@
         ordinal: ThreadId,
         scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
         is_coordinator: bool,
-        sender: controller::channel::Sender&lt;VM&gt;,
         shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
         local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
@@ -523,7 +688,6 @@
             ordinal,
             <span class="comment">// We will set this later
             </span>copy: GCWorkerCopyContext::new_non_copy(),
-            sender,
             scheduler,
             mmtk,
             is_coordinator,
@@ -637,12 +801,7 @@
     }
 
     <span class="doccomment">/// Spawn all the worker threads
-    </span><span class="kw">pub fn </span>spawn(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
-        sender: controller::channel::Sender&lt;VM&gt;,
-        tls: VMThread,
-    ) {
+    </span><span class="kw">pub fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;, tls: VMThread) {
         <span class="kw">let </span><span class="kw-2">mut </span>unspawned_local_work_queues = <span class="self">self</span>.unspawned_local_work_queues.lock().unwrap();
         <span class="comment">// Spawn each worker thread.
         </span><span class="kw">for </span>(ordinal, shared) <span class="kw">in </span><span class="self">self</span>.workers_shared.iter().enumerate() {
@@ -651,7 +810,6 @@
                 ordinal,
                 mmtk.scheduler.clone(),
                 <span class="bool-val">false</span>,
-                sender.clone(),
                 shared.clone(),
                 unspawned_local_work_queues.pop().unwrap(),
             ));
