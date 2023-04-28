@@ -130,6 +130,8 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     type EdgeIterator: Iterator<Item = Self::Edge>;
     /// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
     fn iter_edges(&self) -> Self::EdgeIterator;
+    /// The object which this slice belongs to. If we know the object for the slice, we will check the object state (mature or not), rather than the slice address.
+    fn object(&self) -> Option<ObjectReference>;
     /// Start address of the memory slice
     fn start(&self) -> Address;
     /// Size of the memory slice
@@ -167,6 +169,10 @@ impl MemorySlice for Range<Address> {
             cursor: self.start,
             limit: self.end,
         }
+    }
+
+    fn object(&self) -> Option<ObjectReference> {
+        None
     }
 
     fn start(&self) -> Address {
@@ -215,6 +221,10 @@ impl<E: Edge> MemorySlice for UnimplementedMemorySlice<E> {
     type EdgeIterator = UnimplementedMemorySliceEdgeIterator<E>;
 
     fn iter_edges(&self) -> Self::EdgeIterator {
+        unimplemented!()
+    }
+
+    fn object(&self) -> Option<ObjectReference> {
         unimplemented!()
     }
 
