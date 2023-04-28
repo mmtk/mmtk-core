@@ -295,9 +295,9 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
     }
 
     /// Iterate through allocated regions, and invoke the given function for each region.
-    pub fn for_allocated_regions<F>(&self, f: F)
+    pub fn for_allocated_regions<F>(&self, mut f: F)
     where
-        F: Fn(Address, usize),
+        F: FnMut(Address, usize),
     {
         let sync = self.sync.lock().unwrap();
         match sync.conditional {
