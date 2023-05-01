@@ -21,9 +21,11 @@ use crate::vm::{ObjectModel, VMBinding};
 // However, we introduce changes after 43e8a92b507ce9b8f771f31d2dbef7eee93f3cc2, and ImmortalSpace starts to use MarkState.
 // MarkState provides an abstraction of how we flip mark bit, reset mark bit, and check mark bit, depending on the location
 // of the mark bit (on side or in header). In that case, our ImmortalSpace is no longer the same as Java
-// MMTk. As JikesRVM has assumptions in its boot image generation about the space, the new immortal space can no longer be
-// used as vm space for JikesRVM. To temperarily work around the issue, we duplicate ImmortalSpace from commit 43e8a92b507ce9b8f771f31d2dbef7eee93f3cc2
-// into this VMSpace, so the change to ImmortalSpace does not break JikesRVM's vm space.
+// MMTk. JikesRVM has assumptions in its boot image generation about the space. For example, if we change the initial mark state
+// from 0 to 1, JikesRVM will simply hang in the mutator phase. I suspect either JikesRVM hard coded some assumptions in their boot image
+// generation, or our port is incomplete and there are some calls to Java MMTK that did not get forwarded to Rust MMTK properly. Anyway, the new immortal space
+// with the changes can no longer be used as vm space for JikesRVM. To temperarily work around the issue, I duplicate ImmortalSpace
+// from commit 43e8a92b507ce9b8f771f31d2dbef7eee93f3cc2 into this VMSpace, so the change to ImmortalSpace does not break JikesRVM's vm space.
 // TODO: We will provide a new implementation of this VMSpace to accomodate JikesRVM, and other VMs.
 pub struct VMSpace<VM: VMBinding> {
     mark_state: u8,
