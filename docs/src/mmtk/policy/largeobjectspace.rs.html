@@ -307,26 +307,6 @@
 <span id="307">307</span>
 <span id="308">308</span>
 <span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -531,11 +511,11 @@
             <span class="kw">if </span>nursery_object { <span class="string">&quot;is&quot; </span>} <span class="kw">else </span>{ <span class="string">&quot;is not&quot; </span>}
         );
         <span class="kw">if </span>!<span class="self">self</span>.in_nursery_gc || nursery_object {
-            <span class="comment">// Note that test_and_mark() has side effects
+            <span class="comment">// Note that test_and_mark() has side effects of
+            // clearing nursery bit/moving objects out of logical nursery
             </span><span class="kw">if </span><span class="self">self</span>.test_and_mark(object, <span class="self">self</span>.mark_state) {
                 <span class="macro">trace!</span>(<span class="string">&quot;LOS object {} is being marked now&quot;</span>, object);
                 <span class="self">self</span>.treadmill.copy(object, nursery_object);
-                <span class="self">self</span>.clear_nursery(object);
                 <span class="comment">// We just moved the object out of the logical nursery, mark it as unlogged.
                 </span><span class="kw">if </span>nursery_object &amp;&amp; <span class="self">self</span>.common.needs_log_bit {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
@@ -575,7 +555,11 @@
         <span class="self">self</span>.acquire(tls, pages)
     }
 
-    <span class="kw">fn </span>test_and_mark(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, value: u8) -&gt; bool {
+    <span class="doccomment">/// Test if the object&#39;s mark bit is the same as the given value. If it is not the same,
+    /// the method will attemp to mark the object and clear its nursery bit. If the attempt
+    /// succeeds, the method will return true, meaning the object is marked by this invocation.
+    /// Otherwise, it returns false.
+    </span><span class="kw">fn </span>test_and_mark(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, value: u8) -&gt; bool {
         <span class="kw">loop </span>{
             <span class="kw">let </span>mask = <span class="kw">if </span><span class="self">self</span>.in_nursery_gc {
                 LOS_BIT_MASK
@@ -591,7 +575,8 @@
             <span class="kw">if </span>mark_bit == value {
                 <span class="kw">return </span><span class="bool-val">false</span>;
             }
-            <span class="kw">if </span>VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            <span class="comment">// using LOS_BIT_MASK have side effects of clearing nursery bit
+            </span><span class="kw">if </span>VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
                 .compare_exchange_metadata::&lt;VM, u8&gt;(
                     object,
                     old_value,
@@ -625,31 +610,6 @@
             Ordering::Relaxed,
         ) &amp; NURSERY_BIT
             == NURSERY_BIT
-    }
-
-    <span class="doccomment">/// Move a given object out of nursery
-    </span><span class="kw">fn </span>clear_nursery(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
-        <span class="kw">loop </span>{
-            <span class="kw">let </span>old_val = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::&lt;VM, u8&gt;(
-                object,
-                <span class="prelude-val">None</span>,
-                Ordering::Relaxed,
-            );
-            <span class="kw">let </span>new_val = old_val &amp; !NURSERY_BIT;
-            <span class="kw">if </span>VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-                .compare_exchange_metadata::&lt;VM, u8&gt;(
-                    object,
-                    old_val,
-                    new_val,
-                    <span class="prelude-val">None</span>,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                <span class="kw">break</span>;
-            }
-        }
     }
 }
 
