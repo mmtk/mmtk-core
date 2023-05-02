@@ -246,6 +246,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.acquire(tls, pages)
     }
 
+    /// Test if the object's mark bit is the same as the given value. If it is not the same,
+    /// the method will attemp to mark the object and clear its nursery bit. If the attempt
+    /// succeeds, the method will return true, meaning the object is marked by this invocation.
+    /// Otherwise, it returns false.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
         loop {
             let mask = if self.in_nursery_gc {
