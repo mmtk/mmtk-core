@@ -202,11 +202,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if nursery_object { "is" } else { "is not" }
         );
         if !self.in_nursery_gc || nursery_object {
-            // Note that test_and_mark() has side effects
+            // Note that test_and_mark() has side effects of
+            // clearing nursery bit/moving objects out of logical nursery
             if self.test_and_mark(object, self.mark_state) {
                 trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
-                self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
@@ -262,6 +262,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if mark_bit == value {
                 return false;
             }
+            // using LOS_BIT_MASK have side effects of clearing nursery bit
             if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
