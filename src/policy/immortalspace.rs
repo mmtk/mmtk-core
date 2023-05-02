@@ -21,6 +21,8 @@ pub struct ImmortalSpace<VM: VMBinding> {
     mark_state: MarkState,
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
+    /// Is this used as VM space? If this is used as VM space, we never allocate into this space, but we trace objects normally.
+    vm_space: bool,
 }
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
@@ -118,6 +120,15 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSp
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        Self::new_inner(args, false)
+    }
+
+    #[cfg(feature = "vm_space")]
+    pub fn new_vm_space(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        Self::new_inner(args, true)
+    }
+
+    pub fn new_inner(args: crate::policy::space::PlanCreateSpaceArgs<VM>, vm_space: bool) -> Self {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let common = CommonSpace::new(args.into_policy_args(
@@ -133,14 +144,28 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
+            vm_space,
         }
     }
 
     pub fn prepare(&mut self) {
         self.mark_state.on_global_prepare::<VM>();
-        self.pr.for_allocated_regions(|addr, size| {
-            self.mark_state.on_block_reset::<VM>(addr, size);
-        })
+        if self.vm_space {
+            // If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
+            self.mark_state
+                .on_block_reset::<VM>(self.common.start, self.common.extent)
+        } else {
+            // Otherwise, we reset the mark bit for the allocated regions.
+            self.pr.for_allocated_regions(|addr, size| {
+                info!(
+                    "{:?}: reset mark bit from {} to {}",
+                    self.name(),
+                    addr,
+                    addr + size
+                );
+                self.mark_state.on_block_reset::<VM>(addr, size);
+            })
+        }
     }
 
     pub fn release(&mut self) {
