@@ -298,31 +298,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         ) & NURSERY_BIT
             == NURSERY_BIT
     }
-
-    /// Move a given object out of nursery
-    fn clear_nursery(&self, object: ObjectReference) {
-        loop {
-            let old_val = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::Relaxed,
-            );
-            let new_val = old_val & !NURSERY_BIT;
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_val,
-                    new_val,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-    }
 }
 
 fn get_super_page(cell: Address) -> Address {
