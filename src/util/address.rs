@@ -348,6 +348,15 @@ impl fmt::Debug for Address {
     }
 }
 
+impl std::str::FromStr for Address {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let raw: usize = s.parse()?;
+        Ok(Address(raw))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::util::Address;

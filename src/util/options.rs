@@ -5,6 +5,7 @@ use std::default::Default;
 use std::fmt::Debug;
 use std::str::FromStr;
 use strum_macros::EnumString;
+use crate::util::Address;
 
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum NurseryZeroingOptions {
@@ -681,10 +682,10 @@ options! {
     // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
     // factor (e.g. tens of metabytes).
     precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
+    // The start of vmspace.
+    vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
     // The size of vmspace.
-    // FIXME: This value is set for JikesRVM. We need a proper way to set options.
-    //   We need to set these values programmatically in VM specific code.
-    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0x7cc_cccc,
+    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = usize::MAX,
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
