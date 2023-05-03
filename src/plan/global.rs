@@ -429,28 +429,6 @@ pub struct BasePlan<VM: VMBinding> {
     pub vm_space: VMSpace<VM>,
 }
 
-// #[cfg(feature = "vm_space")]
-// pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> ImmortalSpace<VM> {
-//     use crate::util::constants::LOG_BYTES_IN_MBYTE;
-//     let boot_segment_bytes = *args.global_args.options.vm_space_size;
-//     debug_assert!(boot_segment_bytes > 0);
-
-//     use crate::util::conversions::raw_align_up;
-//     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-//     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
-
-//     let space = ImmortalSpace::new_vm_space(args.get_space_args(
-//         "boot",
-//         false,
-//         VMRequest::fixed_size(boot_segment_mb),
-//     ));
-
-//     // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
-//     space.ensure_mapped();
-
-//     space
-// }
-
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
 /// is passed to each plan's constructor.
 pub struct CreateGeneralPlanArgs<VM: VMBinding> {

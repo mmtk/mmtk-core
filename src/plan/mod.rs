@@ -26,6 +26,7 @@ pub use global::AllocationSemantics;
 pub(crate) use global::GcStatus;
 pub use global::Plan;
 pub(crate) use global::PlanTraceObject;
+#[cfg(feature = "vm_space")]    // This is used for creating VM space
 pub(crate) use global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 
 mod mutator_context;
