@@ -5,18 +5,9 @@ use crate::util::Address;
 #[derive(Clone, Copy, Debug)]
 pub enum VMRequest {
     Discontiguous,
-    Fixed {
-        start: Address,
-        extent: usize,
-    },
-    Extent {
-        extent: usize,
-        top: bool,
-    },
-    Fraction {
-        frac: f32,
-        top: bool,
-    },
+    Fixed { start: Address, extent: usize },
+    Extent { extent: usize, top: bool },
+    Fraction { frac: f32, top: bool },
 }
 
 impl VMRequest {

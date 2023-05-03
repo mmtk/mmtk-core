@@ -1,11 +1,11 @@
 use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::Address;
 use std::default::Default;
 use std::fmt::Debug;
 use std::str::FromStr;
 use strum_macros::EnumString;
-use crate::util::Address;
 
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum NurseryZeroingOptions {

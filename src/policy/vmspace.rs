@@ -1,17 +1,17 @@
+use crate::plan::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
+use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::policy::immortalspace::ImmortalSpace;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
-use crate::vm::VMBinding;
-use crate::policy::immortalspace::ImmortalSpace;
-use crate::util::ObjectReference;
-use crate::plan::{ObjectQueue, VectorObjectQueue};
-use crate::policy::sft::GCWorkerMutRef;
-use crate::util::heap::PageResource;
 use crate::util::address::Address;
-use crate::plan::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
+use crate::util::heap::HeapMeta;
+use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::heap::HeapMeta;
+use crate::util::ObjectReference;
+use crate::vm::VMBinding;
 
 pub struct VMSpace<VM: VMBinding> {
     inner: Option<ImmortalSpace<VM>>,
@@ -38,7 +38,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
         self.space().unpin_object(object)
     }
     #[cfg(feature = "object_pinning")]
-    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+    fn is_object_pinned(&self, object: ObjectReference) -> bool {
         self.space().is_object_pinned(object)
     }
     fn is_movable(&self) -> bool {
@@ -91,11 +91,13 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     }
 
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
-        side_metadata_sanity_checker
-            .verify_metadata_context(std::any::type_name::<Self>(), &SideMetadataContext {
+        side_metadata_sanity_checker.verify_metadata_context(
+            std::any::type_name::<Self>(),
+            &SideMetadataContext {
                 global: self.args.global_side_metadata_specs.clone(),
                 local: vec![],
-            })
+            },
+        )
     }
 
     fn address_in_space(&self, start: Address) -> bool {
@@ -140,9 +142,15 @@ impl<VM: VMBinding> VMSpace<VM> {
             global_side_metadata_specs: args.global_side_metadata_specs.clone(),
         };
         if !args.global_args.options.vm_space_start.is_zero() {
-            Self { inner: Some(Self::create_space(args, None)), args: args_clone }
+            Self {
+                inner: Some(Self::create_space(args, None)),
+                args: args_clone,
+            }
         } else {
-            Self { inner: None, args: args_clone }
+            Self {
+                inner: None,
+                args: args_clone,
+            }
         }
     }
 
@@ -153,14 +161,20 @@ impl<VM: VMBinding> VMSpace<VM> {
         self.common().initialize_sft(self.as_sft());
     }
 
-    fn create_space(args: &mut CreateSpecificPlanArgs<VM>, location: Option<(Address, usize)>) -> ImmortalSpace<VM> {
+    fn create_space(
+        args: &mut CreateSpecificPlanArgs<VM>,
+        location: Option<(Address, usize)>,
+    ) -> ImmortalSpace<VM> {
         use crate::util::conversions::raw_align_up;
         use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
         let (boot_segment_start, boot_segment_bytes) = if let Some((start, size)) = location {
             (start, size)
         } else {
-            (*args.global_args.options.vm_space_start, *args.global_args.options.vm_space_size)
+            (
+                *args.global_args.options.vm_space_start,
+                *args.global_args.options.vm_space_size,
+            )
         };
 
         assert!(!boot_segment_start.is_zero());
@@ -180,21 +194,34 @@ impl<VM: VMBinding> VMSpace<VM> {
         //     info!("Index for unaligned {} is {}, Index for aligned {} is {}", boot_segment_start, space_index(boot_segment_start), space_start, space_index(space_start));
         //     (space_start, size_to_end)
         // };
-        let (boot_segment_start_aligned, boot_segment_bytes_aligned) = (boot_segment_start.align_down(BYTES_IN_CHUNK), raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK));
-
+        let (boot_segment_start_aligned, boot_segment_bytes_aligned) = (
+            boot_segment_start.align_down(BYTES_IN_CHUNK),
+            raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK),
+        );
 
         // let space = ImmortalSpace::new(args.get_space_args(
         //     "boot",
         //     false,
         //     VMRequest::fixed_size(boot_segment_mb),
         // ));
-        info!("start {} is aligned to {}, bytes = {}", boot_segment_start, boot_segment_start_aligned, boot_segment_bytes_aligned);
+        info!(
+            "start {} is aligned to {}, bytes = {}",
+            boot_segment_start, boot_segment_start_aligned, boot_segment_bytes_aligned
+        );
         // let space = ImmortalSpace::new_customized(
         //     MonotonePageResource::new_contiguous(boot_segment_start_aligned, boot_segment_bytes_aligned, args.global_args.vm_map),
         //     CommonSpace::new(args.get_space_args("vm_spce", false, VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned)).into_vm_space_args(side_metadata)),
         // );
-        let space_args = args.get_space_args("vm_space", false, VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned));
-        let space = ImmortalSpace::new_vm_space(space_args, boot_segment_start_aligned, boot_segment_bytes_aligned);
+        let space_args = args.get_space_args(
+            "vm_space",
+            false,
+            VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned),
+        );
+        let space = ImmortalSpace::new_vm_space(
+            space_args,
+            boot_segment_start_aligned,
+            boot_segment_bytes_aligned,
+        );
 
         // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
         space.ensure_mapped();

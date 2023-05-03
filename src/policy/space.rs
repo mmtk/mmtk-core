@@ -507,8 +507,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 top: _top,
             } => (_extent, _top),
             VMRequest::Fixed {
-                extent: _extent,
-                ..
+                extent: _extent, ..
             } => (_extent, false),
             _ => unreachable!(),
         };
