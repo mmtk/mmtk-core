@@ -436,7 +436,7 @@ pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> 
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
-    let space = ImmortalSpace::new(args.get_space_args(
+    let space = ImmortalSpace::new_vm_space(args.get_space_args(
         "boot",
         false,
         VMRequest::fixed_size(boot_segment_mb),
