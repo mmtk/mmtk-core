@@ -120,8 +120,13 @@ mod space_map {
                 assert!(old.name() == EMPTY_SFT_NAME || old.name() == space.name());
                 // Make sure the range is in the space
                 let space_start = Self::index_to_space_start(index);
-                assert!(start >= space_start);
-                assert!(start + bytes <= space_start + MAX_SPACE_EXTENT);
+                // FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
+                // but the VM space is an exception. Any address after the last space is considered as the last space,
+                // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
+                if index != Self::TABLE_SIZE - 1 {
+                    assert!(start >= space_start);
+                    assert!(start + bytes <= space_start + MAX_SPACE_EXTENT);
+                }
             }
             *mut_self.sft.get_unchecked_mut(index) = space;
         }
