@@ -414,6 +414,9 @@ pub struct PolicyCreateSpaceArgs<'a, VM: VMBinding> {
     pub movable: bool,
     pub immortal: bool,
     pub local_side_metadata_specs: Vec<SideMetadataSpec>,
+    /// Whether to record this space in our VM map.
+    // TODO: This is a workaround for VM space. See the comments in `CommonSpace::new()` when this field is used.
+    pub vm_map_record: bool,
 }
 
 /// Arguments passed from a plan to create a space.
@@ -444,6 +447,20 @@ impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
             immortal,
             local_side_metadata_specs: policy_metadata_specs,
             plan_args: self,
+            vm_map_record: true,
+        }
+    }
+
+    pub fn into_vm_space_args(
+        self,
+        policy_metadata_specs: Vec<SideMetadataSpec>,
+    ) -> PolicyCreateSpaceArgs<'a, VM> {
+        PolicyCreateSpaceArgs {
+            movable: false,
+            immortal: true,
+            local_side_metadata_specs: policy_metadata_specs,
+            plan_args: self,
+            vm_map_record: false,
         }
     }
 }
@@ -491,9 +508,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
             } => (_extent, _top),
             VMRequest::Fixed {
                 extent: _extent,
-                top: _top,
                 ..
-            } => (_extent, _top),
+            } => (_extent, false),
             _ => unreachable!(),
         };
 
@@ -524,7 +540,15 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // FIXME
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        args.plan_args.vm_map.insert(start, extent, rtn.descriptor);
+
+        // We assume we have a fixed number of spaces, and in 64bits, we pre arrange the virtual address space for them.
+        // Any address after the last space is considered as in the last space, and this obviously causes some issues if we
+        // have an address that is beyond the last space. Normally this is not a problem for us. But when we have a VM space
+        // with a binding-defined address range, we may deal with an arbitrary VM space location. And this becomes a problem.
+        // So for VM space, we do not initialize its VM map to avoid this problem. Ideally, we should fix our VM map implementation.
+        if args.vm_map_record {
+            args.plan_args.vm_map.insert(start, extent, rtn.descriptor);
+        }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
         if rtn

@@ -8,7 +8,6 @@ pub enum VMRequest {
     Fixed {
         start: Address,
         extent: usize,
-        top: bool,
     },
     Extent {
         extent: usize,
@@ -71,5 +70,9 @@ impl VMRequest {
             return Self::common64bit(top);
         }
         VMRequest::Extent { extent, top }
+    }
+
+    pub fn fixed(start: Address, extent: usize) -> Self {
+        VMRequest::Fixed { start, extent }
     }
 }

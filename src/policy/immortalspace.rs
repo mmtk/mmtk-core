@@ -120,15 +120,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSp
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
-        Self::new_inner(args, false)
-    }
-
-    #[cfg(feature = "vm_space")]
-    pub fn new_vm_space(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
-        Self::new_inner(args, true)
-    }
-
-    pub fn new_inner(args: crate::policy::space::PlanCreateSpaceArgs<VM>, vm_space: bool) -> Self {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let common = CommonSpace::new(args.into_policy_args(
@@ -144,7 +135,20 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
-            vm_space,
+            vm_space: false,
+        }
+    }
+
+    #[cfg(feature = "vm_space")]
+    pub fn new_vm_space(args: crate::policy::space::PlanCreateSpaceArgs<VM>, start: Address, size: usize) -> Self {
+        assert!(!args.vmrequest.is_discontiguous());
+        ImmortalSpace {
+            mark_state: MarkState::new(),
+            pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),
+            common: CommonSpace::new(args.into_vm_space_args(
+                metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC])
+            )),
+            vm_space: true,
         }
     }
 

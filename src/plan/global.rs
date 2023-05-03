@@ -30,6 +30,8 @@ use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+#[cfg(feature = "vm_space")]
+use crate::policy::vmspace::VMSpace;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -176,6 +178,7 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn base(&self) -> &BasePlan<Self::VM>;
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
@@ -423,30 +426,30 @@ pub struct BasePlan<VM: VMBinding> {
     ///     the VM space.
     #[cfg(feature = "vm_space")]
     #[trace]
-    pub vm_space: ImmortalSpace<VM>,
+    pub vm_space: VMSpace<VM>,
 }
 
-#[cfg(feature = "vm_space")]
-pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> ImmortalSpace<VM> {
-    use crate::util::constants::LOG_BYTES_IN_MBYTE;
-    let boot_segment_bytes = *args.global_args.options.vm_space_size;
-    debug_assert!(boot_segment_bytes > 0);
+// #[cfg(feature = "vm_space")]
+// pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> ImmortalSpace<VM> {
+//     use crate::util::constants::LOG_BYTES_IN_MBYTE;
+//     let boot_segment_bytes = *args.global_args.options.vm_space_size;
+//     debug_assert!(boot_segment_bytes > 0);
 
-    use crate::util::conversions::raw_align_up;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
+//     use crate::util::conversions::raw_align_up;
+//     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+//     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
-    let space = ImmortalSpace::new_vm_space(args.get_space_args(
-        "boot",
-        false,
-        VMRequest::fixed_size(boot_segment_mb),
-    ));
+//     let space = ImmortalSpace::new_vm_space(args.get_space_args(
+//         "boot",
+//         false,
+//         VMRequest::fixed_size(boot_segment_mb),
+//     ));
 
-    // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
-    space.ensure_mapped();
+//     // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
+//     space.ensure_mapped();
 
-    space
-}
+//     space
+// }
 
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
 /// is passed to each plan's constructor.
@@ -520,7 +523,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: create_vm_space(&mut args),
+            vm_space: VMSpace::new(&mut args),
 
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),

@@ -1,11 +1,11 @@
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 use crate::policy::immortalspace::ImmortalSpace;
-use crate::util::{metadata, ObjectReference};
+use crate::util::ObjectReference;
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
-use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::heap::PageResource;
 use crate::util::address::Address;
 use crate::plan::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::util::heap::VMRequest;
@@ -48,7 +48,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     fn is_sane(&self) -> bool {
         self.space().is_sane()
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         // TODO: Do we expect runtime to initialize object metadata?
         todo!()
     }
@@ -146,8 +146,14 @@ impl<VM: VMBinding> VMSpace<VM> {
         }
     }
 
+    pub fn lazy_initialize(&mut self, start: Address, size: usize) {
+        assert!(self.inner.is_none(), "VM space has been initialized");
+        self.inner = Some(Self::create_space(&mut self.args, Some((start, size))));
+
+        self.common().initialize_sft(self.as_sft());
+    }
+
     fn create_space(args: &mut CreateSpecificPlanArgs<VM>, location: Option<(Address, usize)>) -> ImmortalSpace<VM> {
-        use crate::util::constants::LOG_BYTES_IN_MBYTE;
         use crate::util::conversions::raw_align_up;
         use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
@@ -183,12 +189,12 @@ impl<VM: VMBinding> VMSpace<VM> {
         //     VMRequest::fixed_size(boot_segment_mb),
         // ));
         info!("start {} is aligned to {}, bytes = {}", boot_segment_start, boot_segment_start_aligned, boot_segment_bytes_aligned);
-        // As we create an immortal space, we use the same side metadata as immortal space.
-        let side_metadata = metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
-        let space = ImmortalSpace::new_customized(
-            MonotonePageResource::new_contiguous(boot_segment_start_aligned, boot_segment_bytes_aligned, args.global_args.vm_map),
-            CommonSpace::new(args.get_space_args("vm_spce", false, VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned)).into_vm_space_args(side_metadata)),
-        );
+        // let space = ImmortalSpace::new_customized(
+        //     MonotonePageResource::new_contiguous(boot_segment_start_aligned, boot_segment_bytes_aligned, args.global_args.vm_map),
+        //     CommonSpace::new(args.get_space_args("vm_spce", false, VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned)).into_vm_space_args(side_metadata)),
+        // );
+        let space_args = args.get_space_args("vm_space", false, VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned));
+        let space = ImmortalSpace::new_vm_space(space_args, boot_segment_start_aligned, boot_segment_bytes_aligned);
 
         // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
         space.ensure_mapped();
@@ -204,9 +210,9 @@ impl<VM: VMBinding> VMSpace<VM> {
         self.inner.as_ref().unwrap()
     }
 
-    fn space_mut(&mut self) -> &mut ImmortalSpace<VM> {
-        self.inner.as_mut().unwrap()
-    }
+    // fn space_mut(&mut self) -> &mut ImmortalSpace<VM> {
+    //     self.inner.as_mut().unwrap()
+    // }
 
     pub fn prepare(&mut self) {
         if let Some(ref mut space) = &mut self.inner {

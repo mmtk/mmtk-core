@@ -148,6 +148,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &self.gen.common.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.gen.common.base
+    }
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.gen.common
     }
