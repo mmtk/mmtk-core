@@ -331,6 +331,10 @@
 <span id="331">331</span>
 <span id="332">332</span>
 <span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::header_metadata::HeaderMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -354,6 +358,10 @@
 <span class="kw">impl </span>MetadataSpec {
     <span class="kw">pub const fn </span>is_on_side(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span>MetadataSpec::OnSide(<span class="kw">_</span>))
+    }
+
+    <span class="kw">pub const fn </span>is_in_header(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span>MetadataSpec::InHeader(<span class="kw">_</span>))
     }
 
     <span class="doccomment">/// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.

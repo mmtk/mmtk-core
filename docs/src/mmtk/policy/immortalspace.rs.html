@@ -189,27 +189,13 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
+<span class="kw">use </span><span class="kw">crate</span>::util::metadata::mark_bit::MarkState;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::{metadata, ObjectReference};
 
@@ -223,12 +209,12 @@
 /// &quot;collector&quot; to propagate marks in a liveness trace.  It does not
 /// actually collect.
 </span><span class="kw">pub struct </span>ImmortalSpace&lt;VM: VMBinding&gt; {
-    mark_state: u8,
+    mark_state: MarkState,
     common: CommonSpace&lt;VM&gt;,
     pr: MonotonePageResource&lt;VM&gt;,
+    <span class="doccomment">/// Is this used as VM space? If this is used as VM space, we never allocate into this space, but we trace objects normally.
+    </span>vm_space: bool,
 }
-
-<span class="kw">const </span>GC_MARK_BIT_MASK: u8 = <span class="number">1</span>;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; SFT <span class="kw">for </span>ImmortalSpace&lt;VM&gt; {
     <span class="kw">fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
@@ -238,12 +224,7 @@
         <span class="bool-val">true
     </span>}
     <span class="kw">fn </span>is_reachable(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
-        <span class="kw">let </span>old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
-            object,
-            <span class="prelude-val">None</span>,
-            Ordering::SeqCst,
-        );
-        old_value == <span class="self">self</span>.mark_state
+        <span class="self">self</span>.mark_state.is_marked::&lt;VM&gt;(object)
     }
     <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
     </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
@@ -265,19 +246,8 @@
         <span class="bool-val">true
     </span>}
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
-        <span class="kw">let </span>old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
-            object,
-            <span class="prelude-val">None</span>,
-            Ordering::SeqCst,
-        );
-        <span class="kw">let </span>new_value = (old_value &amp; GC_MARK_BIT_MASK) | <span class="self">self</span>.mark_state;
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::&lt;VM, u8&gt;(
-            object,
-            new_value,
-            <span class="prelude-val">None</span>,
-            Ordering::SeqCst,
-        );
-
+        <span class="self">self</span>.mark_state
+            .on_object_metadata_initialization::&lt;VM&gt;(object);
         <span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::&lt;VM&gt;(object, Ordering::SeqCst);
         }
@@ -341,6 +311,15 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmortalSpace&lt;VM&gt; {
     <span class="kw">pub fn </span>new(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new_inner(args, <span class="bool-val">false</span>)
+    }
+
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+    </span><span class="kw">pub fn </span>new_vm_space(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::new_inner(args, <span class="bool-val">true</span>)
+    }
+
+    <span class="kw">pub fn </span>new_inner(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;, vm_space: bool) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>vm_map = args.vm_map;
         <span class="kw">let </span>is_discontiguous = args.vmrequest.is_discontiguous();
         <span class="kw">let </span>common = CommonSpace::new(args.into_policy_args(
@@ -349,49 +328,40 @@
             metadata::extract_side_metadata(<span class="kw-2">&amp;</span>[<span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
         ));
         ImmortalSpace {
-            mark_state: <span class="number">0</span>,
+            mark_state: MarkState::new(),
             pr: <span class="kw">if </span>is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } <span class="kw">else </span>{
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
+            vm_space,
         }
     }
-
-    <span class="kw">fn </span>test_and_mark(object: ObjectReference, value: u8) -&gt; bool {
-        <span class="kw">loop </span>{
-            <span class="kw">let </span>old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::&lt;VM, u8&gt;(
-                object,
-                <span class="prelude-val">None</span>,
-                Ordering::SeqCst,
-            );
-            <span class="kw">if </span>old_value == value {
-                <span class="kw">return </span><span class="bool-val">false</span>;
-            }
-
-            <span class="kw">if </span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::&lt;VM, u8&gt;(
-                    object,
-                    old_value,
-                    old_value ^ GC_MARK_BIT_MASK,
-                    <span class="prelude-val">None</span>,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                <span class="kw">break</span>;
-            }
-        }
-        <span class="bool-val">true
-    </span>}
 
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.mark_state = GC_MARK_BIT_MASK - <span class="self">self</span>.mark_state;
+        <span class="self">self</span>.mark_state.on_global_prepare::&lt;VM&gt;();
+        <span class="kw">if </span><span class="self">self</span>.vm_space {
+            <span class="comment">// If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
+            </span><span class="self">self</span>.mark_state
+                .on_block_reset::&lt;VM&gt;(<span class="self">self</span>.common.start, <span class="self">self</span>.common.extent)
+        } <span class="kw">else </span>{
+            <span class="comment">// Otherwise, we reset the mark bit for the allocated regions.
+            </span><span class="self">self</span>.pr.for_allocated_regions(|addr, size| {
+                <span class="macro">info!</span>(
+                    <span class="string">&quot;{:?}: reset mark bit from {} to {}&quot;</span>,
+                    <span class="self">self</span>.name(),
+                    addr,
+                    addr + size
+                );
+                <span class="self">self</span>.mark_state.on_block_reset::&lt;VM&gt;(addr, size);
+            })
+        }
     }
 
-    <span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {}
+    <span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.mark_state.on_global_release::&lt;VM&gt;();
+    }
 
     <span class="kw">pub fn </span>trace_object&lt;Q: ObjectQueue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -404,7 +374,7 @@
             <span class="string">&quot;{:x}: VO bit not set&quot;</span>,
             object
         );
-        <span class="kw">if </span>ImmortalSpace::&lt;VM&gt;::test_and_mark(object, <span class="self">self</span>.mark_state) {
+        <span class="kw">if </span><span class="self">self</span>.mark_state.test_and_mark::&lt;VM&gt;(object) {
             queue.enqueue(object);
         }
         object

@@ -317,6 +317,33 @@
 <span id="317">317</span>
 <span id="318">318</span>
 <span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -610,6 +637,33 @@
             guard.sentinel = Address::zero();
             guard.cursor = Address::zero();
             <span class="self">self</span>.common.release_all_chunks();
+        }
+    }
+
+    <span class="doccomment">/// Iterate through allocated regions, and invoke the given function for each region.
+    </span><span class="kw">pub fn </span>for_allocated_regions&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: F)
+    <span class="kw">where
+        </span>F: FnMut(Address, usize),
+    {
+        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        <span class="kw">match </span>sync.conditional {
+            MonotonePageResourceConditional::Contiguous { start, .. } =&gt; {
+                <span class="kw">let </span>end = sync.cursor.align_up(BYTES_IN_CHUNK);
+                f(start, end - start);
+            }
+            MonotonePageResourceConditional::Discontiguous =&gt; {
+                <span class="kw">if </span>!sync.cursor.is_zero() {
+                    f(sync.current_chunk, sync.cursor - sync.current_chunk);
+
+                    <span class="kw">let </span><span class="kw-2">mut </span>chunk = <span class="self">self</span>.vm_map().get_next_contiguous_region(sync.current_chunk);
+                    <span class="kw">while </span>!chunk.is_zero() {
+                        <span class="kw">let </span>size = <span class="self">self</span>.vm_map().get_contiguous_region_size(chunk);
+                        f(chunk, size);
+
+                        chunk = <span class="self">self</span>.vm_map().get_next_contiguous_region(chunk);
+                    }
+                }
+            }
         }
     }
 

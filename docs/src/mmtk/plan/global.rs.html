@@ -1500,7 +1500,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     <span class="kw">let </span>boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) &gt;&gt; LOG_BYTES_IN_MBYTE;
 
-    <span class="kw">let </span>space = ImmortalSpace::new(args.get_space_args(
+    <span class="kw">let </span>space = ImmortalSpace::new_vm_space(args.get_space_args(
         <span class="string">&quot;boot&quot;</span>,
         <span class="bool-val">false</span>,
         VMRequest::fixed_size(boot_segment_mb),

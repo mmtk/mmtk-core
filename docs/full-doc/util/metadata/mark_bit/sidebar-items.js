@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {};
+window.SIDEBAR_ITEMS = {"struct":[["MarkState","This provides an abstraction of the mark bit. It abstracts over the difference between side mark bits and in-header mark bits, and provides efficient implementation for each case."]]};
