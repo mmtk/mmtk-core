@@ -66,7 +66,7 @@ pub fn align_allocation_inner<VM: VMBinding>(
 
     let mask = (alignment - 1) as isize; // fromIntSignExtend
     let neg_off = -offset; // fromIntSignExtend
-    let delta = (neg_off - region_isize) & mask;
+    let delta = neg_off.wrapping_sub(region_isize) & mask; // Use wrapping_sub to avoid overflow
 
     if fillalignmentgap && (VM::ALIGNMENT_VALUE != 0) {
         fill_alignment_gap::<VM>(region, region + delta);
