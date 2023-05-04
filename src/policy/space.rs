@@ -541,7 +541,11 @@ impl<VM: VMBinding> CommonSpace<VM> {
                     layout::vm_layout_constants::AVAILABLE_END
                 };
 
-                args.plan_args.vm_map.insert(start_in_range, end_in_range - start_in_range, rtn.descriptor);
+                args.plan_args.vm_map.insert(
+                    start_in_range,
+                    end_in_range - start_in_range,
+                    rtn.descriptor,
+                );
             }
         }
 

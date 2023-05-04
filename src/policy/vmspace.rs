@@ -182,7 +182,10 @@ impl<VM: VMBinding> VMSpace<VM> {
 
         // For simplicity, VMSpace has to be outside our available heap range.
         // TODO: Allow VMSpace in our available heap range.
-        assert!(!crate::util::heap::layout::range_overlaps_available_range(vm_space_start, vm_space_bytes));
+        assert!(!crate::util::heap::layout::range_overlaps_available_range(
+            vm_space_start,
+            vm_space_bytes
+        ));
 
         let (vm_space_start_aligned, vm_space_bytes_aligned) = (
             vm_space_start.align_down(BYTES_IN_CHUNK),
@@ -198,11 +201,8 @@ impl<VM: VMBinding> VMSpace<VM> {
             false,
             VMRequest::fixed(vm_space_start_aligned, vm_space_bytes_aligned),
         );
-        let space = ImmortalSpace::new_vm_space(
-            space_args,
-            vm_space_start_aligned,
-            vm_space_bytes_aligned,
-        );
+        let space =
+            ImmortalSpace::new_vm_space(space_args, vm_space_start_aligned, vm_space_bytes_aligned);
 
         // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
         space.ensure_mapped();

@@ -54,7 +54,8 @@ pub fn range_overlaps_heap(addr: Address, size: usize) -> bool {
 
 /// Return true if the given range overlaps with our available heap range
 pub fn range_overlaps_available_range(addr: Address, size: usize) -> bool {
-    !(addr >= vm_layout_constants::AVAILABLE_END || addr + size <= vm_layout_constants::AVAILABLE_START)
+    !(addr >= vm_layout_constants::AVAILABLE_END
+        || addr + size <= vm_layout_constants::AVAILABLE_START)
 }
 
 /// Return true if the given range is within our heap range
@@ -64,5 +65,6 @@ pub fn range_in_heap(addr: Address, size: usize) -> bool {
 
 /// Return true if the given range is within our available heap range
 pub fn range_in_available_range(addr: Address, size: usize) -> bool {
-    addr >= vm_layout_constants::AVAILABLE_START && addr + size <= vm_layout_constants::AVAILABLE_END
+    addr >= vm_layout_constants::AVAILABLE_START
+        && addr + size <= vm_layout_constants::AVAILABLE_END
 }
