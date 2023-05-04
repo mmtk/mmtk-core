@@ -130,7 +130,10 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     type EdgeIterator: Iterator<Item = Self::Edge>;
     /// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
     fn iter_edges(&self) -> Self::EdgeIterator;
-    /// The object which this slice belongs to. If we know the object for the slice, we will check the object state (mature or not), rather than the slice address.
+    /// The object which this slice belongs to. If we know the object for the slice, we will check the object state (e.g. mature or not), rather than the slice address.
+    /// Normally checking the object and checking the slice does not make a difference, as the slice is part of the object (in terms of memory range). However,
+    /// if a slice is in a different location from the object, the object state and the slice can be hugely different, and providing a proper implementation
+    /// of this method for the owner object is important.
     fn object(&self) -> Option<ObjectReference>;
     /// Start address of the memory slice
     fn start(&self) -> Address;
