@@ -168,7 +168,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         use crate::util::conversions::raw_align_up;
         use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
-        let (boot_segment_start, boot_segment_bytes) = if let Some((start, size)) = location {
+        let (vm_space_start, vm_space_bytes) = if let Some((start, size)) = location {
             (start, size)
         } else {
             (
@@ -177,50 +177,31 @@ impl<VM: VMBinding> VMSpace<VM> {
             )
         };
 
-        assert!(!boot_segment_start.is_zero());
-        assert!(boot_segment_bytes > 0);
+        assert!(!vm_space_start.is_zero());
+        assert!(vm_space_bytes > 0);
 
-        // #[cfg(target_pointer_width = "32")]
-        // let (boot_segment_start_aligned, boot_segment_bytes_aligned) = (boot_segment_start.align_down(BYTES_IN_CHUNK), raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK));
-        // #[cfg(target_pointer_width = "64")]
-        // let (boot_segment_start_aligned, boot_segment_bytes_aligned) = {
-        //     let space_index = |addr: Address| {
-        //         addr >> crate::util::heap::layout::vm_layout_constants::SPACE_SHIFT_64
-        //     };
-        //     let end = boot_segment_start + boot_segment_bytes;
-        //     let space_start = unsafe { Address::from_usize(boot_segment_start & !((1 << crate::util::heap::layout::vm_layout_constants::SPACE_SHIFT_64) - 1usize)) };
-        //     let size_to_end = raw_align_up(end - space_start, BYTES_IN_CHUNK);
+        // For simplicity, VMSpace has to be outside our available heap range.
+        // TODO: Allow VMSpace in our available heap range.
+        assert!(!crate::util::heap::layout::range_overlaps_available_range(vm_space_start, vm_space_bytes));
 
-        //     info!("Index for unaligned {} is {}, Index for aligned {} is {}", boot_segment_start, space_index(boot_segment_start), space_start, space_index(space_start));
-        //     (space_start, size_to_end)
-        // };
-        let (boot_segment_start_aligned, boot_segment_bytes_aligned) = (
-            boot_segment_start.align_down(BYTES_IN_CHUNK),
-            raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK),
+        let (vm_space_start_aligned, vm_space_bytes_aligned) = (
+            vm_space_start.align_down(BYTES_IN_CHUNK),
+            raw_align_up(vm_space_bytes, BYTES_IN_CHUNK),
         );
-
-        // let space = ImmortalSpace::new(args.get_space_args(
-        //     "boot",
-        //     false,
-        //     VMRequest::fixed_size(boot_segment_mb),
-        // ));
-        info!(
+        debug!(
             "start {} is aligned to {}, bytes = {}",
-            boot_segment_start, boot_segment_start_aligned, boot_segment_bytes_aligned
+            vm_space_start, vm_space_start_aligned, vm_space_bytes_aligned
         );
-        // let space = ImmortalSpace::new_customized(
-        //     MonotonePageResource::new_contiguous(boot_segment_start_aligned, boot_segment_bytes_aligned, args.global_args.vm_map),
-        //     CommonSpace::new(args.get_space_args("vm_spce", false, VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned)).into_vm_space_args(side_metadata)),
-        // );
+
         let space_args = args.get_space_args(
             "vm_space",
             false,
-            VMRequest::fixed(boot_segment_start_aligned, boot_segment_bytes_aligned),
+            VMRequest::fixed(vm_space_start_aligned, vm_space_bytes_aligned),
         );
         let space = ImmortalSpace::new_vm_space(
             space_args,
-            boot_segment_start_aligned,
-            boot_segment_bytes_aligned,
+            vm_space_start_aligned,
+            vm_space_bytes_aligned,
         );
 
         // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.

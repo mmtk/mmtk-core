@@ -53,14 +53,14 @@ pub const MAX_SPACE_EXTENT: usize = 1 << LOG_SPACE_EXTENT;
 // FIXME: HEAP_START, HEAP_END are VM-dependent
 /** Lowest virtual address used by the virtual machine */
 #[cfg(target_pointer_width = "32")]
-pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
+pub const HEAP_START: Address = chunk_align_down(unsafe { Address::from_usize(0x8000_0000) });
 #[cfg(target_pointer_width = "64")]
 pub const HEAP_START: Address =
     chunk_align_down(unsafe { Address::from_usize(0x0000_0200_0000_0000usize) });
 
 /** Highest virtual address used by the virtual machine */
 #[cfg(target_pointer_width = "32")]
-pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
+pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xd000_0000) });
 #[cfg(target_pointer_width = "64")]
 pub const HEAP_END: Address = HEAP_START.add(1 << (LOG_MAX_SPACES + LOG_SPACE_EXTENT));
 
@@ -86,20 +86,23 @@ pub const VM_SPACE_SIZE: usize =
 pub const VM_SPACE_SIZE: usize =
     chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize();
 
+// In Java MMTk, the virtual memory between HEAP_START and AVIALBE_START, and between AVAILABLE_END
+// and HEAP_END, are VM spaces.
+// For us, the address range for VM spaces is set by the runtime, and we do not know them
+// as constants. At this point, our AVAILALBE_START is the same as HEAP_START, and our AVIALABLE_END
+// is the same as HEAP_END.
+// TOOD: We should decide if VM space is considered as part of our heap range, and remove either AVAILABLE_START/END, or HEAP_START/END.
+//       We can do either:
+//       1. Our heap is what we use for MMTk. So VM spaces are not in our heap. Or
+//       2. Our heap includes VM spaces, so its address range depends on the VM space range.
+
 /**
- * Lowest virtual address available for MMTk to manage.  The address space between
- * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
- * and not available to MMTk.
+ * Lowest virtual address available for MMTk to manage.
  */
-#[cfg(feature = "vm_space")]
-pub const AVAILABLE_START: Address = HEAP_START.add(VM_SPACE_SIZE);
-#[cfg(not(feature = "vm_space"))]
 pub const AVAILABLE_START: Address = HEAP_START;
 
 /**
- * Highest virtual address available for MMTk to manage.  The address space between
- * HEAP_END and AVAILABLE_END comprises memory directly managed by the VM,
- * and not available to MMTk.
+ * Highest virtual address available for MMTk to manage.
 */
 pub const AVAILABLE_END: Address = HEAP_END;
 

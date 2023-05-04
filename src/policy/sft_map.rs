@@ -517,8 +517,9 @@ mod sparse_chunk_map {
                 // in which case, we still set SFT map again.
                 debug_assert!(
                     old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
-                    "attempt to overwrite a non-empty chunk {} in SFT map (from {} to {})",
+                    "attempt to overwrite a non-empty chunk {} ({}) in SFT map (from {} to {})",
                     chunk,
+                    crate::util::conversions::chunk_index_to_address(chunk),
                     old,
                     new
                 );

@@ -34,3 +34,35 @@ pub fn create_mmapper() -> Box<dyn Mmapper> {
     // TODO: ByteMapMmapper for 39-bit or less virtual space
     Box::new(fragmented_mapper::FragmentedMapper::new())
 }
+
+use crate::util::Address;
+
+/// Return true if the given address in our heap range
+pub fn address_in_heap(addr: Address) -> bool {
+    addr >= vm_layout_constants::HEAP_START && addr < vm_layout_constants::HEAP_END
+}
+
+/// Return true if the given address in our available heap range (where we manage and allocate)
+pub fn address_in_avialable_range(addr: Address) -> bool {
+    addr >= vm_layout_constants::AVAILABLE_START && addr < vm_layout_constants::AVAILABLE_END
+}
+
+/// Return true if the given range overlaps with our heap range
+pub fn range_overlaps_heap(addr: Address, size: usize) -> bool {
+    !(addr >= vm_layout_constants::HEAP_END || addr + size <= vm_layout_constants::HEAP_START)
+}
+
+/// Return true if the given range overlaps with our available heap range
+pub fn range_overlaps_available_range(addr: Address, size: usize) -> bool {
+    !(addr >= vm_layout_constants::AVAILABLE_END || addr + size <= vm_layout_constants::AVAILABLE_START)
+}
+
+/// Return true if the given range is within our heap range
+pub fn range_in_heap(addr: Address, size: usize) -> bool {
+    addr >= vm_layout_constants::HEAP_START && addr + size <= vm_layout_constants::HEAP_END
+}
+
+/// Return true if the given range is within our available heap range
+pub fn range_in_available_range(addr: Address, size: usize) -> bool {
+    addr >= vm_layout_constants::AVAILABLE_START && addr + size <= vm_layout_constants::AVAILABLE_END
+}

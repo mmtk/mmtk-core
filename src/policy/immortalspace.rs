@@ -149,7 +149,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         ImmortalSpace {
             mark_state: MarkState::new(),
             pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),
-            common: CommonSpace::new(args.into_vm_space_args(metadata::extract_side_metadata(&[
+            common: CommonSpace::new(args.into_policy_args(false, true, metadata::extract_side_metadata(&[
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ]))),
             vm_space: true,

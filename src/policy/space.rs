@@ -414,9 +414,6 @@ pub struct PolicyCreateSpaceArgs<'a, VM: VMBinding> {
     pub movable: bool,
     pub immortal: bool,
     pub local_side_metadata_specs: Vec<SideMetadataSpec>,
-    /// Whether to record this space in our VM map.
-    // TODO: This is a workaround for VM space. See the comments in `CommonSpace::new()` when this field is used.
-    pub vm_map_record: bool,
 }
 
 /// Arguments passed from a plan to create a space.
@@ -447,20 +444,6 @@ impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
             immortal,
             local_side_metadata_specs: policy_metadata_specs,
             plan_args: self,
-            vm_map_record: true,
-        }
-    }
-
-    pub fn into_vm_space_args(
-        self,
-        policy_metadata_specs: Vec<SideMetadataSpec>,
-    ) -> PolicyCreateSpaceArgs<'a, VM> {
-        PolicyCreateSpaceArgs {
-            movable: false,
-            immortal: true,
-            local_side_metadata_specs: policy_metadata_specs,
-            plan_args: self,
-            vm_map_record: false,
         }
     }
 }
@@ -540,13 +523,26 @@ impl<VM: VMBinding> CommonSpace<VM> {
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
 
-        // We assume we have a fixed number of spaces, and in 64bits, we pre arrange the virtual address space for them.
-        // Any address after the last space is considered as in the last space, and this obviously causes some issues if we
-        // have an address that is beyond the last space. Normally this is not a problem for us. But when we have a VM space
-        // with a binding-defined address range, we may deal with an arbitrary VM space location. And this becomes a problem.
-        // So for VM space, we do not initialize its VM map to avoid this problem. Ideally, we should fix our VM map implementation.
-        if args.vm_map_record {
-            args.plan_args.vm_map.insert(start, extent, rtn.descriptor);
+        // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
+        // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
+        // insert into our vm map if the range overlaps with our heap.
+        {
+            use crate::util::heap::layout;
+            if layout::range_overlaps_available_range(start, extent) {
+                // Crop the range to our available heap range. We only need to set VM map for the range that is in our heap
+                let start_in_range = if start > layout::vm_layout_constants::AVAILABLE_START {
+                    start
+                } else {
+                    layout::vm_layout_constants::AVAILABLE_START
+                };
+                let end_in_range = if start + extent < layout::vm_layout_constants::AVAILABLE_END {
+                    start + extent
+                } else {
+                    layout::vm_layout_constants::AVAILABLE_END
+                };
+
+                args.plan_args.vm_map.insert(start_in_range, end_in_range - start_in_range, rtn.descriptor);
+            }
         }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
