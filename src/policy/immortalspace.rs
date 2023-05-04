@@ -165,7 +165,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         } else {
             // Otherwise, we reset the mark bit for the allocated regions.
             self.pr.for_allocated_regions(|addr, size| {
-                info!(
+                debug!(
                     "{:?}: reset mark bit from {} to {}",
                     self.name(),
                     addr,
