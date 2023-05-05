@@ -36,35 +36,18 @@ pub fn create_mmapper() -> Box<dyn Mmapper> {
 }
 
 use crate::util::Address;
+use std::ops::Range;
 
-/// Return true if the given address in our heap range
-pub fn address_in_heap(addr: Address) -> bool {
-    addr >= vm_layout_constants::HEAP_START && addr < vm_layout_constants::HEAP_END
+/// The heap range between HEAP_START and HEAP_END
+/// Heap range include the availble range, but may include some address ranges
+/// that we count as part of the heap but we do not allocate into, such as
+/// VM spaces. However, currently, heap range is the same as available range.
+pub const fn heap_range() -> Range<Address> {
+    vm_layout_constants::HEAP_START..vm_layout_constants::HEAP_END
 }
 
-/// Return true if the given address in our available heap range (where we manage and allocate)
-pub fn address_in_avialable_range(addr: Address) -> bool {
-    addr >= vm_layout_constants::AVAILABLE_START && addr < vm_layout_constants::AVAILABLE_END
-}
-
-/// Return true if the given range overlaps with our heap range
-pub fn range_overlaps_heap(addr: Address, size: usize) -> bool {
-    !(addr >= vm_layout_constants::HEAP_END || addr + size <= vm_layout_constants::HEAP_START)
-}
-
-/// Return true if the given range overlaps with our available heap range
-pub fn range_overlaps_available_range(addr: Address, size: usize) -> bool {
-    !(addr >= vm_layout_constants::AVAILABLE_END
-        || addr + size <= vm_layout_constants::AVAILABLE_START)
-}
-
-/// Return true if the given range is within our heap range
-pub fn range_in_heap(addr: Address, size: usize) -> bool {
-    addr >= vm_layout_constants::HEAP_START && addr + size <= vm_layout_constants::HEAP_END
-}
-
-/// Return true if the given range is within our available heap range
-pub fn range_in_available_range(addr: Address, size: usize) -> bool {
-    addr >= vm_layout_constants::AVAILABLE_START
-        && addr + size <= vm_layout_constants::AVAILABLE_END
+/// The avialable heap range between AVAILABLE_START and AVAILABLE_END.
+/// Available range is what MMTk may allocate into.
+pub const fn available_range() -> Range<Address> {
+    vm_layout_constants::AVAILABLE_START..vm_layout_constants::AVAILABLE_END
 }

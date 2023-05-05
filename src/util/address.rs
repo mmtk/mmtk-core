@@ -318,6 +318,12 @@ impl Address {
             MMAPPER.is_mapped_address(self)
         }
     }
+
+    /// Returns the intersection of the two address ranges. The returned range could
+    /// be empty if there is no intersection between the ranges.
+    pub fn range_intersection(r1: &Range<Address>, r2: &Range<Address>) -> Range<Address> {
+        r1.start.max(r2.start)..r1.end.min(r2.end)
+    }
 }
 
 /// allows print Address as upper-case hex value

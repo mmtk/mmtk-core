@@ -182,10 +182,11 @@ impl<VM: VMBinding> VMSpace<VM> {
 
         // For simplicity, VMSpace has to be outside our available heap range.
         // TODO: Allow VMSpace in our available heap range.
-        assert!(!crate::util::heap::layout::range_overlaps_available_range(
-            vm_space_start,
-            vm_space_bytes
-        ));
+        assert!(Address::range_intersection(
+            &(vm_space_start..vm_space_start + vm_space_bytes),
+            &crate::util::heap::layout::available_range()
+        )
+        .is_empty());
 
         let (vm_space_start_aligned, vm_space_bytes_aligned) = (
             vm_space_start.align_down(BYTES_IN_CHUNK),

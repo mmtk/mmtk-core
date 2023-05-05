@@ -528,22 +528,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // insert into our vm map if the range overlaps with our heap.
         {
             use crate::util::heap::layout;
-            if layout::range_overlaps_available_range(start, extent) {
-                // Crop the range to our available heap range. We only need to set VM map for the range that is in our heap
-                let start_in_range = if start > layout::vm_layout_constants::AVAILABLE_START {
-                    start
-                } else {
-                    layout::vm_layout_constants::AVAILABLE_START
-                };
-                let end_in_range = if start + extent < layout::vm_layout_constants::AVAILABLE_END {
-                    start + extent
-                } else {
-                    layout::vm_layout_constants::AVAILABLE_END
-                };
-
+            let overlap =
+                Address::range_intersection(&(start..start + extent), &layout::available_range());
+            if !overlap.is_empty() {
                 args.plan_args.vm_map.insert(
-                    start_in_range,
-                    end_in_range - start_in_range,
+                    overlap.start,
+                    overlap.end - overlap.start,
                     rtn.descriptor,
                 );
             }
