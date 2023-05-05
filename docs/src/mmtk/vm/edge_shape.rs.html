@@ -255,6 +255,19 @@
 <span id="255">255</span>
 <span id="256">256</span>
 <span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::{fmt::Debug, ops::Range};
@@ -387,6 +400,11 @@
     <span class="kw">type </span>EdgeIterator: Iterator&lt;Item = <span class="self">Self</span>::Edge&gt;;
     <span class="doccomment">/// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
     </span><span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator;
+    <span class="doccomment">/// The object which this slice belongs to. If we know the object for the slice, we will check the object state (e.g. mature or not), rather than the slice address.
+    /// Normally checking the object and checking the slice does not make a difference, as the slice is part of the object (in terms of memory range). However,
+    /// if a slice is in a different location from the object, the object state and the slice can be hugely different, and providing a proper implementation
+    /// of this method for the owner object is important.
+    </span><span class="kw">fn </span>object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;;
     <span class="doccomment">/// Start address of the memory slice
     </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address;
     <span class="doccomment">/// Size of the memory slice
@@ -425,6 +443,10 @@
             limit: <span class="self">self</span>.end,
         }
     }
+
+    <span class="kw">fn </span>object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="prelude-val">None
+    </span>}
 
     <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="self">self</span>.start
@@ -472,6 +494,10 @@
     <span class="kw">type </span>EdgeIterator = UnimplementedMemorySliceEdgeIterator&lt;E&gt;;
 
     <span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
+        <span class="macro">unimplemented!</span>()
+    }
+
+    <span class="kw">fn </span>object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="macro">unimplemented!</span>()
     }
 

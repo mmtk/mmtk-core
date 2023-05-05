@@ -103,6 +103,11 @@
 <span id="103">103</span>
 <span id="104">104</span>
 <span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Generational read/write barrier implementations.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSemantics;
@@ -187,8 +192,13 @@
     }
 
     <span class="kw">fn </span>memory_region_copy_slow(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
+        <span class="comment">// Check if the destination object/slice is in nursery space.
+        </span><span class="kw">let </span>dst_in_nursery = <span class="kw">match </span>dst.object() {
+            <span class="prelude-val">Some</span>(obj) =&gt; <span class="self">self</span>.plan.is_object_in_nursery(obj),
+            <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.plan.is_address_in_nursery(dst.start()),
+        };
         <span class="comment">// Only enqueue array slices in mature spaces
-        </span><span class="kw">if </span>!<span class="self">self</span>.plan.is_address_in_nursery(dst.start()) {
+        </span><span class="kw">if </span>!dst_in_nursery {
             <span class="comment">// enqueue
             </span><span class="macro">debug_assert_eq!</span>(
                 dst.bytes() &amp; (BYTES_IN_ADDRESS - <span class="number">1</span>),
