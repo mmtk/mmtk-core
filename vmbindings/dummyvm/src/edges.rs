@@ -55,6 +55,10 @@ impl MemorySlice for DummyVMMemorySlice {
         }
     }
 
+    fn object(&self) -> Option<ObjectReference> {
+        None
+    }
+
     fn start(&self) -> Address {
         Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
     }
