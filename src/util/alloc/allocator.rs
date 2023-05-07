@@ -63,9 +63,9 @@ pub fn align_allocation_inner<VM: VMBinding>(
 
     // May require an alignment
     let region_isize = region.as_usize() as isize;
-
     let mask = (alignment - 1) as isize; // fromIntSignExtend
     let neg_off = -offset; // fromIntSignExtend
+
     // TODO: Consider using neg_off.wrapping_sub_unsigned(region.as_usize()), and we can remove region_isize.
     // This requires Rust 1.66.0+.
     let delta = neg_off.wrapping_sub(region_isize) & mask; // Use wrapping_sub to avoid overflow
