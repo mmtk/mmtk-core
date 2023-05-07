@@ -13,6 +13,8 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
+use delegate::delegate;
+
 pub struct VMSpace<VM: VMBinding> {
     inner: Option<ImmortalSpace<VM>>,
     // Save it
@@ -20,49 +22,31 @@ pub struct VMSpace<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> SFT for VMSpace<VM> {
-    fn name(&self) -> &str {
-        self.space().name()
-    }
-    fn is_live(&self, object: ObjectReference) -> bool {
-        self.space().is_live(object)
-    }
-    fn is_reachable(&self, object: ObjectReference) -> bool {
-        self.space().is_reachable(object)
-    }
-    #[cfg(feature = "object_pinning")]
-    fn pin_object(&self, object: ObjectReference) -> bool {
-        self.space().pin_object(object)
-    }
-    #[cfg(feature = "object_pinning")]
-    fn unpin_object(&self, object: ObjectReference) -> bool {
-        self.space().unpin_object(object)
-    }
-    #[cfg(feature = "object_pinning")]
-    fn is_object_pinned(&self, object: ObjectReference) -> bool {
-        self.space().is_object_pinned(object)
-    }
-    fn is_movable(&self) -> bool {
-        self.space().is_movable()
-    }
-    #[cfg(feature = "sanity")]
-    fn is_sane(&self) -> bool {
-        self.space().is_sane()
-    }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        // TODO: Do we expect runtime to initialize object metadata?
-        todo!()
-    }
-    #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        self.space().is_mmtk_object(addr)
-    }
-    fn sft_trace_object(
-        &self,
-        queue: &mut VectorObjectQueue,
-        object: ObjectReference,
-        worker: GCWorkerMutRef,
-    ) -> ObjectReference {
-        self.space().sft_trace_object(queue, object, worker)
+    delegate! {
+        // Delegate every call to the inner space. Given that we have acquired SFT, we can assume there are objects in the space and the space is initialized.
+        to self.space() {
+            fn name(&self) -> &str;
+            fn is_live(&self, object: ObjectReference) -> bool;
+            fn is_reachable(&self, object: ObjectReference) -> bool;
+            #[cfg(feature = "object_pinning")]
+            fn pin_object(&self, object: ObjectReference) -> bool;
+            #[cfg(feature = "object_pinning")]
+            fn unpin_object(&self, object: ObjectReference) -> bool;
+            #[cfg(feature = "object_pinning")]
+            fn is_object_pinned(&self, object: ObjectReference) -> bool;
+            fn is_movable(&self) -> bool;
+            #[cfg(feature = "sanity")]
+            fn is_sane(&self) -> bool;
+            fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
+            #[cfg(feature = "is_mmtk_object")]
+            fn is_mmtk_object(&self, addr: Address) -> bool;
+            fn sft_trace_object(
+                &self,
+                queue: &mut VectorObjectQueue,
+                object: ObjectReference,
+                worker: GCWorkerMutRef,
+            ) -> ObjectReference;
+        }
     }
 }
 
