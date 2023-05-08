@@ -374,36 +374,36 @@
         args: <span class="kw-2">&amp;mut </span>CreateSpecificPlanArgs&lt;VM&gt;,
         location: <span class="prelude-ty">Option</span>&lt;(Address, usize)&gt;,
     ) -&gt; ImmortalSpace&lt;VM&gt; {
-        <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
         <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
-        <span class="kw">let </span>(vm_space_start, vm_space_bytes) = <span class="kw">if let </span><span class="prelude-val">Some</span>((start, size)) = location {
-            (start, size)
-        } <span class="kw">else </span>{
-            (
-                <span class="kw-2">*</span>args.global_args.options.vm_space_start,
-                <span class="kw-2">*</span>args.global_args.options.vm_space_size,
-            )
-        };
-
-        <span class="macro">assert!</span>(!vm_space_start.is_zero());
+        <span class="comment">// If the location of the VM space is not supplied, find them in the options.
+        </span><span class="kw">let </span>(vm_space_start, vm_space_bytes) = location.unwrap_or((
+            <span class="kw-2">*</span>args.global_args.options.vm_space_start,
+            <span class="kw-2">*</span>args.global_args.options.vm_space_size,
+        ));
+        <span class="comment">// Verify the start and the size is valid
+        </span><span class="macro">assert!</span>(!vm_space_start.is_zero());
         <span class="macro">assert!</span>(vm_space_bytes &gt; <span class="number">0</span>);
+
+        <span class="comment">// We only map on chunk granularity. Align them.
+        </span><span class="kw">let </span>vm_space_start_aligned = vm_space_start.align_down(BYTES_IN_CHUNK);
+        <span class="kw">let </span>vm_space_end_aligned = (vm_space_start + vm_space_bytes).align_up(BYTES_IN_CHUNK);
+        <span class="kw">let </span>vm_space_bytes_aligned = vm_space_end_aligned - vm_space_start_aligned;
 
         <span class="comment">// For simplicity, VMSpace has to be outside our available heap range.
         // TODO: Allow VMSpace in our available heap range.
         </span><span class="macro">assert!</span>(Address::range_intersection(
-            <span class="kw-2">&amp;</span>(vm_space_start..vm_space_start + vm_space_bytes),
+            <span class="kw-2">&amp;</span>(vm_space_start_aligned..vm_space_end_aligned),
             <span class="kw-2">&amp;</span><span class="kw">crate</span>::util::heap::layout::available_range()
         )
         .is_empty());
 
-        <span class="kw">let </span>(vm_space_start_aligned, vm_space_bytes_aligned) = (
-            vm_space_start.align_down(BYTES_IN_CHUNK),
-            raw_align_up(vm_space_bytes, BYTES_IN_CHUNK),
-        );
         <span class="macro">debug!</span>(
-            <span class="string">&quot;start {} is aligned to {}, bytes = {}&quot;</span>,
-            vm_space_start, vm_space_start_aligned, vm_space_bytes_aligned
+            <span class="string">&quot;Align VM space ({}, {}) to chunk ({}, {})&quot;</span>,
+            vm_space_start,
+            vm_space_start + vm_space_bytes,
+            vm_space_start_aligned,
+            vm_space_end_aligned
         );
 
         <span class="kw">let </span>space_args = args.get_space_args(
