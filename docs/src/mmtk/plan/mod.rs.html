@@ -65,6 +65,8 @@
 <span id="65">65</span>
 <span id="66">66</span>
 <span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
 </pre><pre class="rust"><code><span class="doccomment">//! GC algorithms from the MMTk suite.
 //!
 //! This module provides various GC plans, each of which implements a GC algorithm.
@@ -93,6 +95,8 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::GcStatus;
 <span class="kw">pub use </span>global::Plan;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::PlanTraceObject;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)] </span><span class="comment">// This is used for creating VM space
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 
 <span class="kw">mod </span>mutator_context;
 <span class="kw">pub use </span>mutator_context::Mutator;

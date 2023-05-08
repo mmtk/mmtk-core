@@ -522,6 +522,12 @@
 <span id="522">522</span>
 <span id="523">523</span>
 <span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -644,8 +650,13 @@
                 <span class="macro">assert!</span>(old.name() == EMPTY_SFT_NAME || old.name() == space.name());
                 <span class="comment">// Make sure the range is in the space
                 </span><span class="kw">let </span>space_start = <span class="self">Self</span>::index_to_space_start(index);
-                <span class="macro">assert!</span>(start &gt;= space_start);
-                <span class="macro">assert!</span>(start + bytes &lt;= space_start + MAX_SPACE_EXTENT);
+                <span class="comment">// FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
+                // but the VM space is an exception. Any address after the last space is considered as the last space,
+                // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
+                </span><span class="kw">if </span>index != <span class="self">Self</span>::TABLE_SIZE - <span class="number">1 </span>{
+                    <span class="macro">assert!</span>(start &gt;= space_start);
+                    <span class="macro">assert!</span>(start + bytes &lt;= space_start + MAX_SPACE_EXTENT);
+                }
             }
             <span class="kw-2">*</span>mut_self.sft.get_unchecked_mut(index) = space;
         }
@@ -1036,8 +1047,9 @@
                 // in which case, we still set SFT map again.
                 </span><span class="macro">debug_assert!</span>(
                     old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
-                    <span class="string">&quot;attempt to overwrite a non-empty chunk {} in SFT map (from {} to {})&quot;</span>,
+                    <span class="string">&quot;attempt to overwrite a non-empty chunk {} ({}) in SFT map (from {} to {})&quot;</span>,
                     chunk,
+                    <span class="kw">crate</span>::util::conversions::chunk_index_to_address(chunk),
                     old,
                     new
                 );

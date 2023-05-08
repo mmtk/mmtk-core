@@ -1083,9 +1083,11 @@
 <span id="1083">1083</span>
 <span id="1084">1084</span>
 <span id="1085">1085</span>
+<span id="1086">1086</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
 <span class="kw">use </span>std::fmt::Debug;
 <span class="kw">use </span>std::str::FromStr;
@@ -1766,10 +1768,10 @@
     // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
     // factor (e.g. tens of metabytes).
     </span>precise_stress:        bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">true</span>,
+    <span class="comment">// The start of vmspace.
+    </span>vm_space_start:        Address              [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = Address::ZERO,
     <span class="comment">// The size of vmspace.
-    // FIXME: This value is set for JikesRVM. We need a proper way to set options.
-    //   We need to set these values programmatically in VM specific code.
-    </span>vm_space_size:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = <span class="number">0x7cc_cccc</span>,
+    </span>vm_space_size:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = usize::MAX,
     <span class="comment">// Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).

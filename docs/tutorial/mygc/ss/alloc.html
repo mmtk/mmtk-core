@@ -355,6 +355,10 @@ base plan <em>through</em> the common plan.</p>
 </span>    fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
         &amp;self.common.base
     }
+
+    fn base_mut(&amp;mut self) -&gt; &amp;mut BasePlan&lt;Self::VM&gt; {
+        &amp;mut self.common.base
+    }
 <span class="boring">}</span></code></pre></pre>
 <p>The trait <code>Plan</code> requires <code>collection_required()</code> method to know when
 we should trigger a collection. We can just use the implementation

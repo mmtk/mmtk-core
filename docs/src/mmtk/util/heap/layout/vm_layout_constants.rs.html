@@ -162,6 +162,9 @@
 <span id="162">162</span>
 <span id="163">163</span>
 <span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::heap_parameters::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -217,14 +220,14 @@
 <span class="comment">// FIXME: HEAP_START, HEAP_END are VM-dependent
 </span><span class="doccomment">/** Lowest virtual address used by the virtual machine */
 </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub const </span>HEAP_START: Address = chunk_align_down(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x6000_0000</span>) });
+</span><span class="kw">pub const </span>HEAP_START: Address = chunk_align_down(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x8000_0000</span>) });
 <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
 </span><span class="kw">pub const </span>HEAP_START: Address =
     chunk_align_down(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x0000_0200_0000_0000usize</span>) });
 
 <span class="doccomment">/** Highest virtual address used by the virtual machine */
 </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub const </span>HEAP_END: Address = chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0xb000_0000</span>) });
+</span><span class="kw">pub const </span>HEAP_END: Address = chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0xd000_0000</span>) });
 <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
 </span><span class="kw">pub const </span>HEAP_END: Address = HEAP_START.add(<span class="number">1 </span>&lt;&lt; (LOG_MAX_SPACES + LOG_SPACE_EXTENT));
 
@@ -250,20 +253,23 @@
 </span><span class="kw">pub const </span>VM_SPACE_SIZE: usize =
     chunk_align_up(<span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0xdc0_0000</span>) }).as_usize();
 
-<span class="doccomment">/**
- * Lowest virtual address available for MMTk to manage.  The address space between
- * HEAP_START and AVAILABLE_START comprises memory directly managed by the VM,
- * and not available to MMTk.
+<span class="comment">// In Java MMTk, the virtual memory between HEAP_START and AVIALBE_START, and between AVAILABLE_END
+// and HEAP_END, are VM spaces.
+// For us, the address range for VM spaces is set by the runtime, and we do not know them
+// as constants. At this point, our AVAILALBE_START is the same as HEAP_START, and our AVIALABLE_END
+// is the same as HEAP_END.
+// TOOD: We should decide if VM space is considered as part of our heap range, and remove either AVAILABLE_START/END, or HEAP_START/END.
+//       We can do either:
+//       1. Our heap is what we use for MMTk. So VM spaces are not in our heap. Or
+//       2. Our heap includes VM spaces, so its address range depends on the VM space range.
+
+</span><span class="doccomment">/**
+ * Lowest virtual address available for MMTk to manage.
  */
-</span><span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-</span><span class="kw">pub const </span>AVAILABLE_START: Address = HEAP_START.add(VM_SPACE_SIZE);
-<span class="attribute">#[cfg(not(feature = <span class="string">&quot;vm_space&quot;</span>))]
 </span><span class="kw">pub const </span>AVAILABLE_START: Address = HEAP_START;
 
 <span class="doccomment">/**
- * Highest virtual address available for MMTk to manage.  The address space between
- * HEAP_END and AVAILABLE_END comprises memory directly managed by the VM,
- * and not available to MMTk.
+ * Highest virtual address available for MMTk to manage.
 */
 </span><span class="kw">pub const </span>AVAILABLE_END: Address = HEAP_END;
 

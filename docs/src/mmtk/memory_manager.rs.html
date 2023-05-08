@@ -893,6 +893,11 @@
 <span id="893">893</span>
 <span id="894">894</span>
 <span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -978,6 +983,11 @@
     <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
     </span><span class="macro">warn!</span>(<span class="string">&quot;The feature &#39;extreme_assertions&#39; is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.&quot;</span>);
     Box::new(mmtk)
+}
+
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+</span><span class="kw">pub fn </span>lazy_init_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
+    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
 }
 
 <span class="doccomment">/// Request MMTk to create a mutator for the given thread. The ownership

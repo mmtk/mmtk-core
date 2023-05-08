@@ -34,6 +34,23 @@
 <span id="34">34</span>
 <span id="35">35</span>
 <span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
 </pre><pre class="rust"><code><span class="kw">pub mod </span>heap_parameters;
 <span class="kw">pub mod </span>vm_layout_constants;
 
@@ -69,6 +86,23 @@
 </span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper&gt; {
     <span class="comment">// TODO: ByteMapMmapper for 39-bit or less virtual space
     </span>Box::new(fragmented_mapper::FragmentedMapper::new())
+}
+
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span>std::ops::Range;
+
+<span class="doccomment">/// The heap range between HEAP_START and HEAP_END
+/// Heap range include the availble range, but may include some address ranges
+/// that we count as part of the heap but we do not allocate into, such as
+/// VM spaces. However, currently, heap range is the same as available range.
+</span><span class="kw">pub const fn </span>heap_range() -&gt; Range&lt;Address&gt; {
+    vm_layout_constants::HEAP_START..vm_layout_constants::HEAP_END
+}
+
+<span class="doccomment">/// The avialable heap range between AVAILABLE_START and AVAILABLE_END.
+/// Available range is what MMTk may allocate into.
+</span><span class="kw">pub const fn </span>available_range() -&gt; Range&lt;Address&gt; {
+    vm_layout_constants::AVAILABLE_START..vm_layout_constants::AVAILABLE_END
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

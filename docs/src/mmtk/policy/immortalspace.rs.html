@@ -189,6 +189,16 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
@@ -311,15 +321,6 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmortalSpace&lt;VM&gt; {
     <span class="kw">pub fn </span>new(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-        <span class="self">Self</span>::new_inner(args, <span class="bool-val">false</span>)
-    }
-
-    <span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-    </span><span class="kw">pub fn </span>new_vm_space(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
-        <span class="self">Self</span>::new_inner(args, <span class="bool-val">true</span>)
-    }
-
-    <span class="kw">pub fn </span>new_inner(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;, vm_space: bool) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>vm_map = args.vm_map;
         <span class="kw">let </span>is_discontiguous = args.vmrequest.is_discontiguous();
         <span class="kw">let </span>common = CommonSpace::new(args.into_policy_args(
@@ -335,7 +336,26 @@
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
-            vm_space,
+            vm_space: <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+    </span><span class="kw">pub fn </span>new_vm_space(
+        args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;,
+        start: Address,
+        size: usize,
+    ) -&gt; <span class="self">Self </span>{
+        <span class="macro">assert!</span>(!args.vmrequest.is_discontiguous());
+        ImmortalSpace {
+            mark_state: MarkState::new(),
+            pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),
+            common: CommonSpace::new(args.into_policy_args(
+                <span class="bool-val">false</span>,
+                <span class="bool-val">true</span>,
+                metadata::extract_side_metadata(<span class="kw-2">&amp;</span>[<span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+            )),
+            vm_space: <span class="bool-val">true</span>,
         }
     }
 

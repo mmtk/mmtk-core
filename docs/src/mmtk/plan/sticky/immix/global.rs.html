@@ -355,6 +355,10 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -422,6 +426,10 @@
 
     <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">crate</span>::plan::global::BasePlan&lt;<span class="self">Self</span>::VM&gt; {
         <span class="self">self</span>.immix.base()
+    }
+
+    <span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">crate</span>::plan::global::BasePlan&lt;<span class="self">Self</span>::VM&gt; {
+        <span class="self">self</span>.immix.base_mut()
     }
 
     <span class="kw">fn </span>generational(

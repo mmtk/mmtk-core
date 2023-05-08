@@ -1043,25 +1043,6 @@
 <span id="1043">1043</span>
 <span id="1044">1044</span>
 <span id="1045">1045</span>
-<span id="1046">1046</span>
-<span id="1047">1047</span>
-<span id="1048">1048</span>
-<span id="1049">1049</span>
-<span id="1050">1050</span>
-<span id="1051">1051</span>
-<span id="1052">1052</span>
-<span id="1053">1053</span>
-<span id="1054">1054</span>
-<span id="1055">1055</span>
-<span id="1056">1056</span>
-<span id="1057">1057</span>
-<span id="1058">1058</span>
-<span id="1059">1059</span>
-<span id="1060">1060</span>
-<span id="1061">1061</span>
-<span id="1062">1062</span>
-<span id="1063">1063</span>
-<span id="1064">1064</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1072,6 +1053,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::immortalspace::ImmortalSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{PlanCreateSpaceArgs, Space};
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::policy::vmspace::VMSpace;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="attribute">#[cfg(feature = <span class="string">&quot;analysis&quot;</span>)]
@@ -1240,6 +1223,7 @@
     }
 
     <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
+    <span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, _scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;);
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;<span class="self">Self</span>::VM&gt; {
         <span class="macro">panic!</span>(<span class="string">&quot;Common Plan not handled!&quot;</span>)
@@ -1487,29 +1471,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     ///     the VM space.
     </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
     #[trace]
-    </span><span class="kw">pub </span>vm_space: ImmortalSpace&lt;VM&gt;,
-}
-
-<span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-</span><span class="kw">pub fn </span>create_vm_space&lt;VM: VMBinding&gt;(args: <span class="kw-2">&amp;mut </span>CreateSpecificPlanArgs&lt;VM&gt;) -&gt; ImmortalSpace&lt;VM&gt; {
-    <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
-    <span class="kw">let </span>boot_segment_bytes = <span class="kw-2">*</span>args.global_args.options.vm_space_size;
-    <span class="macro">debug_assert!</span>(boot_segment_bytes &gt; <span class="number">0</span>);
-
-    <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    <span class="kw">let </span>boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) &gt;&gt; LOG_BYTES_IN_MBYTE;
-
-    <span class="kw">let </span>space = ImmortalSpace::new_vm_space(args.get_space_args(
-        <span class="string">&quot;boot&quot;</span>,
-        <span class="bool-val">false</span>,
-        VMRequest::fixed_size(boot_segment_mb),
-    ));
-
-    <span class="comment">// The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
-    </span>space.ensure_mapped();
-
-    space
+    </span><span class="kw">pub </span>vm_space: VMSpace&lt;VM&gt;,
 }
 
 <span class="doccomment">/// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
@@ -1584,7 +1546,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
                 VMRequest::discontiguous(),
             )),
             <span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-            </span>vm_space: create_vm_space(<span class="kw-2">&amp;mut </span>args),
+            </span>vm_space: VMSpace::new(<span class="kw-2">&amp;mut </span>args),
 
             initialized: AtomicBool::new(<span class="bool-val">false</span>),
             trigger_gc_when_heap_is_full: AtomicBool::new(<span class="bool-val">true</span>),

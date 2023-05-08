@@ -27,6 +27,8 @@
 <span id="27">27</span>
 <span id="28">28</span>
 <span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Memory policies that can be used for spaces.
 
 /// This class defines and manages spaces.  Each policy is an instance
@@ -56,5 +58,7 @@
 <span class="kw">pub mod </span>lockfreeimmortalspace;
 <span class="kw">pub mod </span>markcompactspace;
 <span class="kw">pub mod </span>marksweepspace;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+</span><span class="kw">pub mod </span>vmspace;
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

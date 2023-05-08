@@ -368,6 +368,8 @@
 <span id="368">368</span>
 <span id="369">369</span>
 <span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
@@ -433,12 +435,14 @@
 
     <span class="comment">// May require an alignment
     </span><span class="kw">let </span>region_isize = region.as_usize() <span class="kw">as </span>isize;
-
     <span class="kw">let </span>mask = (alignment - <span class="number">1</span>) <span class="kw">as </span>isize; <span class="comment">// fromIntSignExtend
     </span><span class="kw">let </span>neg_off = -offset; <span class="comment">// fromIntSignExtend
-    </span><span class="kw">let </span>delta = (neg_off - region_isize) &amp; mask;
 
-    <span class="kw">if </span>fillalignmentgap &amp;&amp; (VM::ALIGNMENT_VALUE != <span class="number">0</span>) {
+    // TODO: Consider using neg_off.wrapping_sub_unsigned(region.as_usize()), and we can remove region_isize.
+    // This requires Rust 1.66.0+.
+    </span><span class="kw">let </span>delta = neg_off.wrapping_sub(region_isize) &amp; mask; <span class="comment">// Use wrapping_sub to avoid overflow
+
+    </span><span class="kw">if </span>fillalignmentgap &amp;&amp; (VM::ALIGNMENT_VALUE != <span class="number">0</span>) {
         fill_alignment_gap::&lt;VM&gt;(region, region + delta);
     }
 

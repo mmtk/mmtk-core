@@ -67,12 +67,6 @@
 <span id="67">67</span>
 <span id="68">68</span>
 <span id="69">69</span>
-<span id="70">70</span>
-<span id="71">71</span>
-<span id="72">72</span>
-<span id="73">73</span>
-<span id="74">74</span>
-<span id="75">75</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -80,19 +74,9 @@
 <span class="attribute">#[derive(Clone, Copy, Debug)]
 </span><span class="kw">pub enum </span>VMRequest {
     Discontiguous,
-    Fixed {
-        start: Address,
-        extent: usize,
-        top: bool,
-    },
-    Extent {
-        extent: usize,
-        top: bool,
-    },
-    Fraction {
-        frac: f32,
-        top: bool,
-    },
+    Fixed { start: Address, extent: usize },
+    Extent { extent: usize, top: bool },
+    Fraction { frac: f32, top: bool },
 }
 
 <span class="kw">impl </span>VMRequest {
@@ -146,6 +130,10 @@
             <span class="kw">return </span><span class="self">Self</span>::common64bit(top);
         }
         VMRequest::Extent { extent, top }
+    }
+
+    <span class="kw">pub fn </span>fixed(start: Address, extent: usize) -&gt; <span class="self">Self </span>{
+        VMRequest::Fixed { start, extent }
     }
 }
 </code></pre></div>
