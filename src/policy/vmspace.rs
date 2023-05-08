@@ -125,16 +125,12 @@ impl<VM: VMBinding> VMSpace<VM> {
             constraints: args.constraints,
             global_side_metadata_specs: args.global_side_metadata_specs.clone(),
         };
-        if !args.global_args.options.vm_space_start.is_zero() {
-            Self {
-                inner: Some(Self::create_space(args, None)),
-                args: args_clone,
-            }
-        } else {
-            Self {
-                inner: None,
-                args: args_clone,
-            }
+        // Create the space if the VM space start/size is set. Otherwise, use None.
+        let inner = (!args.global_args.options.vm_space_start.is_zero())
+            .then(|| Self::create_space(args, None));
+        Self {
+            inner,
+            args: args_clone,
         }
     }
 
