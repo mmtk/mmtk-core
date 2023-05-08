@@ -13,8 +13,12 @@ pub fn result_is_mapped(result: Result<()>) -> bool {
 }
 
 pub fn zero(start: Address, len: usize) {
+    set(start, 0, len);
+}
+
+pub fn set(start: Address, val: u8, len: usize) {
     let ptr = start.to_mut_ptr();
-    wrap_libc_call(&|| unsafe { libc::memset(ptr, 0, len) }, ptr).unwrap()
+    wrap_libc_call(&|| unsafe { libc::memset(ptr, val as i32, len) }, ptr).unwrap()
 }
 
 /// Demand-zero mmap:
