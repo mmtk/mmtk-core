@@ -148,33 +148,36 @@ impl<VM: VMBinding> VMSpace<VM> {
         use crate::util::conversions::raw_align_up;
         use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
-        let (vm_space_start, vm_space_bytes) = if let Some((start, size)) = location {
-            (start, size)
-        } else {
+        // If the location of the VM space is not supplied, find them in the options.
+        let (vm_space_start, vm_space_bytes) = location.unwrap_or_else(|| {
             (
                 *args.global_args.options.vm_space_start,
                 *args.global_args.options.vm_space_size,
             )
-        };
-
+        });
+        // Verify the start and the size is valid
         assert!(!vm_space_start.is_zero());
         assert!(vm_space_bytes > 0);
+
+        // We only map on chunk granularity. Align them.
+        let vm_space_start_aligned = vm_space_start.align_down(BYTES_IN_CHUNK);
+        let vm_space_end_aligned = (vm_space_start + vm_space_bytes).align_up(BYTES_IN_CHUNK);
+        let vm_space_bytes_aligned = vm_space_end_aligned - vm_space_start_aligned;
 
         // For simplicity, VMSpace has to be outside our available heap range.
         // TODO: Allow VMSpace in our available heap range.
         assert!(Address::range_intersection(
-            &(vm_space_start..vm_space_start + vm_space_bytes),
+            &(vm_space_start_aligned..vm_space_end_aligned),
             &crate::util::heap::layout::available_range()
         )
         .is_empty());
 
-        let (vm_space_start_aligned, vm_space_bytes_aligned) = (
-            vm_space_start.align_down(BYTES_IN_CHUNK),
-            raw_align_up(vm_space_bytes, BYTES_IN_CHUNK),
-        );
         debug!(
-            "start {} is aligned to {}, bytes = {}",
-            vm_space_start, vm_space_start_aligned, vm_space_bytes_aligned
+            "Align VM space ({}, {}) to chunk ({}, {})",
+            vm_space_start,
+            vm_space_start + vm_space_bytes,
+            vm_space_start_aligned,
+            vm_space_end_aligned
         );
 
         let space_args = args.get_space_args(
