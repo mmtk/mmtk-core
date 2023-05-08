@@ -72,7 +72,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         // Keep the finalizable objects alive.
         self.forward_finalizable(e, nursery);
 
-        // Set nursery_inex to the end of the candidates (the candidates before the index are scanned)
+        // Set nursery_index to the end of the candidates (the candidates before the index are scanned)
         self.nursery_index = self.candidates.len();
 
         <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
