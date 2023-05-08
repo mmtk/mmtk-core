@@ -141,15 +141,17 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    /// This method is used for bulk zeroing side metadata for a data address range. As we cannot guarantee
+    /// This method is used for bulk updating side metadata for a data address range. As we cannot guarantee
     /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
-    /// we need to mask and zero certain bits in a metadata byte.
-    /// The end address and the end bit are exclusive.
-    pub(super) fn zero_meta_bits(
+    /// we need to mask and zero certain bits in a metadata byte. The end address and the end bit are exclusive.
+    /// The end bit for update_bits could be 8, so overflowing needs to be taken care of.
+    pub(super) fn update_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
         meta_end_bit: u8,
+        update_bytes: &impl Fn(Address, Address),
+        update_bits: &impl Fn(Address, u8, u8),
     ) {
         // Start/end is the same, we don't need to do anything.
         if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
@@ -158,69 +160,97 @@ impl SideMetadataSpec {
 
         // zeroing bytes
         if meta_start_bit == 0 && meta_end_bit == 0 {
-            memory::zero(meta_start_addr, meta_end_addr - meta_start_addr);
+            update_bytes(meta_start_addr, meta_end_addr);
             return;
         }
 
         if meta_start_addr == meta_end_addr {
-            // we are zeroing selected bits in one byte
-            let mask: u8 = (u8::MAX << meta_end_bit) | !(u8::MAX << meta_start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
-
-            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+            // Update bits in the same byte between start and end bit
+            update_bits(meta_start_addr, meta_start_bit, meta_end_bit);
         } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
-            // we are zeroing the rest bits in one byte
-            let mask = !(u8::MAX << meta_start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
-
-            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+            // Update bits in the same byte after the start bit (between start bit and 8)
+            update_bits(meta_start_addr, meta_start_bit, 8);
         } else {
-            // zero bits in the first byte
-            Self::zero_meta_bits(meta_start_addr, meta_start_bit, meta_start_addr + 1usize, 0);
-            // zero bytes in the middle
-            Self::zero_meta_bits(meta_start_addr + 1usize, 0, meta_end_addr, 0);
-            // zero bits in the last byte
-            Self::zero_meta_bits(meta_end_addr, 0, meta_end_addr, meta_end_bit);
+            // update bits in the first byte
+            Self::update_meta_bits(
+                meta_start_addr,
+                meta_start_bit,
+                meta_start_addr + 1usize,
+                0,
+                update_bytes,
+                update_bits,
+            );
+            // update bytes in the middle
+            Self::update_meta_bits(
+                meta_start_addr + 1usize,
+                0,
+                meta_end_addr,
+                0,
+                update_bytes,
+                update_bits,
+            );
+            // update bits in the last byte
+            Self::update_meta_bits(
+                meta_end_addr,
+                0,
+                meta_end_addr,
+                meta_end_bit,
+                update_bytes,
+                update_bits,
+            );
         }
     }
 
-    /// This method is used for bulk setting side metadata for a data address range. As we cannot guarantee
-    /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
-    /// we need to mask and set certain bits in a metadata byte.
-    /// The end address and the end bit are exclusive.
+    /// This method is used for bulk zeroing side metadata for a data address range.
+    pub(super) fn zero_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        let zero_bytes = |start: Address, end: Address| {
+            memory::zero(start, end - start);
+        };
+        let zero_bits = |addr: Address, start_bit: u8, end_bit: u8| {
+            // we are zeroing selected bits in one byte
+            let mask: u8 =
+                u8::MAX.checked_shl(end_bit.into()).unwrap_or(0) | !(u8::MAX << start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
+            unsafe { addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+        };
+        Self::update_meta_bits(
+            meta_start_addr,
+            meta_start_bit,
+            meta_end_addr,
+            meta_end_bit,
+            &zero_bytes,
+            &zero_bits,
+        );
+    }
+
+    /// This method is used for bulk setting side metadata for a data address range.
     pub(super) fn set_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        // Start/end is the same, we don't need to do anything.
-        if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
-            return;
-        }
-
-        // Setting bytes
-        if meta_start_bit == 0 && meta_end_bit == 0 {
-            memory::set(meta_start_addr, 0xff, meta_end_addr - meta_start_addr);
-            return;
-        }
-
-        if meta_start_addr == meta_end_addr {
+        let set_bytes = |start: Address, end: Address| {
+            memory::set(start, 0xff, end - start);
+        };
+        let set_bits = |addr: Address, start_bit: u8, end_bit: u8| {
             // we are setting selected bits in one byte
-            let mask: u8 = !(u8::MAX << meta_end_bit) & (u8::MAX << meta_start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
-
-            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
-        } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
-            // we are setting the rest bits in one byte
-            let mask = u8::MAX << meta_start_bit; // Get a mask that the bits we need to set are 1, and the other bits are 0.
-
-            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
-        } else {
-            // Set bits in the first byte
-            Self::set_meta_bits(meta_start_addr, meta_start_bit, meta_start_addr + 1usize, 0);
-            // Set bytes in the middle
-            Self::set_meta_bits(meta_start_addr + 1usize, 0, meta_end_addr, 0);
-            // Set bits in the last byte
-            Self::set_meta_bits(meta_end_addr, 0, meta_end_addr, meta_end_bit);
-        }
+            let mask: u8 =
+                !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
+            unsafe { addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
+        };
+        Self::update_meta_bits(
+            meta_start_addr,
+            meta_start_bit,
+            meta_end_addr,
+            meta_end_bit,
+            &set_bytes,
+            &set_bits,
+        );
     }
 
     /// This method does bulk update for the given data range. It calculates the metadata bits for the given data range,
@@ -1595,6 +1625,9 @@ mod tests {
 
         SideMetadataSpec::zero_meta_bits(addr, 0, addr + 1usize, 0);
         assert_eq!(unsafe { addr.load::<u64>() }, 0b0);
+
+        SideMetadataSpec::set_meta_bits(addr, 2, addr + 1usize, 2);
+        assert_eq!(unsafe { addr.load::<u64>() }, 0b11_1111_1100);
 
         SideMetadataSpec::set_meta_bits(addr, 0, addr + 1usize, 2);
         assert_eq!(unsafe { addr.load::<u64>() }, 0b11_1111_1111);

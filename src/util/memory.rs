@@ -17,8 +17,9 @@ pub fn zero(start: Address, len: usize) {
 }
 
 pub fn set(start: Address, val: u8, len: usize) {
-    let ptr = start.to_mut_ptr();
-    wrap_libc_call(&|| unsafe { libc::memset(ptr, val as i32, len) }, ptr).unwrap()
+    unsafe {
+        std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
+    }
 }
 
 /// Demand-zero mmap:
