@@ -175,6 +175,14 @@
 <span id="175">175</span>
 <span id="176">176</span>
 <span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::is_nursery_gc;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker};
@@ -249,7 +257,8 @@
         <span class="comment">// Keep the finalizable objects alive.
         </span><span class="self">self</span>.forward_finalizable(e, nursery);
 
-        <span class="self">self</span>.nursery_index = <span class="self">self</span>.candidates.len();
+        <span class="comment">// Set nursery_index to the end of the candidates (the candidates before the index are scanned)
+        </span><span class="self">self</span>.nursery_index = <span class="self">self</span>.candidates.len();
 
         &lt;&lt;E <span class="kw">as </span>ProcessEdgesWork&gt;::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::schedule_finalization(tls);
     }
@@ -275,8 +284,11 @@
     <span class="kw">pub fn </span>get_all_finalizers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Vec&lt;F&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>ret = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.candidates);
         <span class="kw">let </span>ready_objects = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.ready_for_finalize);
-
         ret.extend(ready_objects);
+
+        <span class="comment">// We removed objects from candidates. Reset nursery_index
+        </span><span class="self">self</span>.nursery_index = <span class="number">0</span>;
+
         ret
     }
 
@@ -300,6 +312,10 @@
         };
         <span class="kw">let </span><span class="kw-2">mut </span>ret: Vec&lt;F&gt; = drain_filter(<span class="kw-2">&amp;mut </span><span class="self">self</span>.candidates);
         ret.extend(drain_filter(<span class="kw-2">&amp;mut </span><span class="self">self</span>.ready_for_finalize));
+
+        <span class="comment">// We removed objects from candidates. Reset nursery_index
+        </span><span class="self">self</span>.nursery_index = <span class="number">0</span>;
+
         ret
     }
 }
