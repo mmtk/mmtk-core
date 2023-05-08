@@ -53,6 +53,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.base
+    }
+
     fn prepare(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }

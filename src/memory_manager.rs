@@ -85,6 +85,11 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     Box::new(mmtk)
 }
 
+#[cfg(feature = "vm_space")]
+pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
+    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
+}
+
 /// Request MMTk to create a mutator for the given thread. The ownership
 /// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its
 /// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage

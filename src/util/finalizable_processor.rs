@@ -72,6 +72,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         // Keep the finalizable objects alive.
         self.forward_finalizable(e, nursery);
 
+        // Set nursery_index to the end of the candidates (the candidates before the index are scanned)
         self.nursery_index = self.candidates.len();
 
         <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
@@ -98,8 +99,11 @@ impl<F: Finalizable> FinalizableProcessor<F> {
     pub fn get_all_finalizers(&mut self) -> Vec<F> {
         let mut ret = std::mem::take(&mut self.candidates);
         let ready_objects = std::mem::take(&mut self.ready_for_finalize);
-
         ret.extend(ready_objects);
+
+        // We removed objects from candidates. Reset nursery_index
+        self.nursery_index = 0;
+
         ret
     }
 
@@ -123,6 +127,10 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         };
         let mut ret: Vec<F> = drain_filter(&mut self.candidates);
         ret.extend(drain_filter(&mut self.ready_for_finalize));
+
+        // We removed objects from candidates. Reset nursery_index
+        self.nursery_index = 0;
+
         ret
     }
 }
