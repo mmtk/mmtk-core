@@ -145,16 +145,13 @@ impl<VM: VMBinding> VMSpace<VM> {
         args: &mut CreateSpecificPlanArgs<VM>,
         location: Option<(Address, usize)>,
     ) -> ImmortalSpace<VM> {
-        use crate::util::conversions::raw_align_up;
         use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 
         // If the location of the VM space is not supplied, find them in the options.
-        let (vm_space_start, vm_space_bytes) = location.unwrap_or_else(|| {
-            (
-                *args.global_args.options.vm_space_start,
-                *args.global_args.options.vm_space_size,
-            )
-        });
+        let (vm_space_start, vm_space_bytes) = location.unwrap_or((
+            *args.global_args.options.vm_space_start,
+            *args.global_args.options.vm_space_size,
+        ));
         // Verify the start and the size is valid
         assert!(!vm_space_start.is_zero());
         assert!(vm_space_bytes > 0);
