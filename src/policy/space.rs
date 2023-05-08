@@ -490,10 +490,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 top: _top,
             } => (_extent, _top),
             VMRequest::Fixed {
-                extent: _extent,
-                top: _top,
-                ..
-            } => (_extent, _top),
+                extent: _extent, ..
+            } => (_extent, false),
             _ => unreachable!(),
         };
 
@@ -524,7 +522,22 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // FIXME
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        args.plan_args.vm_map.insert(start, extent, rtn.descriptor);
+
+        // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
+        // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
+        // insert into our vm map if the range overlaps with our heap.
+        {
+            use crate::util::heap::layout;
+            let overlap =
+                Address::range_intersection(&(start..start + extent), &layout::available_range());
+            if !overlap.is_empty() {
+                args.plan_args.vm_map.insert(
+                    overlap.start,
+                    overlap.end - overlap.start,
+                    rtn.descriptor,
+                );
+            }
+        }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
         if rtn
