@@ -1675,7 +1675,7 @@
             <span class="self">self</span>.flush();
         }
         <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
-        </span><span class="kw">if </span><span class="self">self</span>.roots {
+        </span><span class="kw">if </span><span class="self">self</span>.roots &amp;&amp; !_mmtk.plan.is_in_sanity() {
             <span class="self">self</span>.cache_roots_for_sanity_gc();
         }
         <span class="macro">trace!</span>(<span class="string">&quot;ProcessEdgesWork End&quot;</span>);
@@ -1795,7 +1795,7 @@
 
         <span class="attribute">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
         </span>{
-            <span class="kw">if </span><span class="self">self</span>.roots() {
+            <span class="kw">if </span><span class="self">self</span>.roots() &amp;&amp; !mmtk.plan.is_in_sanity() {
                 mmtk.sanity_checker
                     .lock()
                     .unwrap()

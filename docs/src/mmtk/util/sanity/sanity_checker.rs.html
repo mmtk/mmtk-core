@@ -231,6 +231,8 @@
 <span id="231">231</span>
 <span id="232">232</span>
 <span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -300,6 +302,10 @@
 
         scheduler.reset_state();
 
+        <span class="comment">// We are going to do sanity GC which will traverse the object graph again. Reset edge logger to clear recorded edges.
+        </span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span>mmtk.edge_logger.reset();
+
         plan.base().inside_sanity.store(<span class="bool-val">true</span>, Ordering::SeqCst);
         <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)
 
@@ -329,8 +335,6 @@
                 </span>));
             }
         }
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(ScanVMSpecificRoots::&lt;SanityGCProcessEdges&lt;P::VM&gt;&gt;::new());
         <span class="comment">// Prepare global/collectors/mutators
         </span>worker.scheduler().work_buckets[WorkBucketStage::Prepare]
             .add(SanityPrepare::&lt;P&gt;::new(plan.downcast_ref::&lt;P&gt;().unwrap()));
