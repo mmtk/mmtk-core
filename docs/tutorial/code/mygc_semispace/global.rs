@@ -154,6 +154,10 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
+
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.common.base
+    }
     // ANCHOR_END: plan_base
 
     // Add
