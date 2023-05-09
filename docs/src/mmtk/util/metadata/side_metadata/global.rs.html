@@ -1512,6 +1512,127 @@
 <span id="1512">1512</span>
 <span id="1513">1513</span>
 <span id="1514">1514</span>
+<span id="1515">1515</span>
+<span id="1516">1516</span>
+<span id="1517">1517</span>
+<span id="1518">1518</span>
+<span id="1519">1519</span>
+<span id="1520">1520</span>
+<span id="1521">1521</span>
+<span id="1522">1522</span>
+<span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
+<span id="1528">1528</span>
+<span id="1529">1529</span>
+<span id="1530">1530</span>
+<span id="1531">1531</span>
+<span id="1532">1532</span>
+<span id="1533">1533</span>
+<span id="1534">1534</span>
+<span id="1535">1535</span>
+<span id="1536">1536</span>
+<span id="1537">1537</span>
+<span id="1538">1538</span>
+<span id="1539">1539</span>
+<span id="1540">1540</span>
+<span id="1541">1541</span>
+<span id="1542">1542</span>
+<span id="1543">1543</span>
+<span id="1544">1544</span>
+<span id="1545">1545</span>
+<span id="1546">1546</span>
+<span id="1547">1547</span>
+<span id="1548">1548</span>
+<span id="1549">1549</span>
+<span id="1550">1550</span>
+<span id="1551">1551</span>
+<span id="1552">1552</span>
+<span id="1553">1553</span>
+<span id="1554">1554</span>
+<span id="1555">1555</span>
+<span id="1556">1556</span>
+<span id="1557">1557</span>
+<span id="1558">1558</span>
+<span id="1559">1559</span>
+<span id="1560">1560</span>
+<span id="1561">1561</span>
+<span id="1562">1562</span>
+<span id="1563">1563</span>
+<span id="1564">1564</span>
+<span id="1565">1565</span>
+<span id="1566">1566</span>
+<span id="1567">1567</span>
+<span id="1568">1568</span>
+<span id="1569">1569</span>
+<span id="1570">1570</span>
+<span id="1571">1571</span>
+<span id="1572">1572</span>
+<span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
+<span id="1578">1578</span>
+<span id="1579">1579</span>
+<span id="1580">1580</span>
+<span id="1581">1581</span>
+<span id="1582">1582</span>
+<span id="1583">1583</span>
+<span id="1584">1584</span>
+<span id="1585">1585</span>
+<span id="1586">1586</span>
+<span id="1587">1587</span>
+<span id="1588">1588</span>
+<span id="1589">1589</span>
+<span id="1590">1590</span>
+<span id="1591">1591</span>
+<span id="1592">1592</span>
+<span id="1593">1593</span>
+<span id="1594">1594</span>
+<span id="1595">1595</span>
+<span id="1596">1596</span>
+<span id="1597">1597</span>
+<span id="1598">1598</span>
+<span id="1599">1599</span>
+<span id="1600">1600</span>
+<span id="1601">1601</span>
+<span id="1602">1602</span>
+<span id="1603">1603</span>
+<span id="1604">1604</span>
+<span id="1605">1605</span>
+<span id="1606">1606</span>
+<span id="1607">1607</span>
+<span id="1608">1608</span>
+<span id="1609">1609</span>
+<span id="1610">1610</span>
+<span id="1611">1611</span>
+<span id="1612">1612</span>
+<span id="1613">1613</span>
+<span id="1614">1614</span>
+<span id="1615">1615</span>
+<span id="1616">1616</span>
+<span id="1617">1617</span>
+<span id="1618">1618</span>
+<span id="1619">1619</span>
+<span id="1620">1620</span>
+<span id="1621">1621</span>
+<span id="1622">1622</span>
+<span id="1623">1623</span>
+<span id="1624">1624</span>
+<span id="1625">1625</span>
+<span id="1626">1626</span>
+<span id="1627">1627</span>
+<span id="1628">1628</span>
+<span id="1629">1629</span>
+<span id="1630">1630</span>
+<span id="1631">1631</span>
+<span id="1632">1632</span>
+<span id="1633">1633</span>
+<span id="1634">1634</span>
+<span id="1635">1635</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -1655,15 +1776,17 @@
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    <span class="doccomment">/// This method is used for bulk zeroing side metadata for a data address range. As we cannot guarantee
+    <span class="doccomment">/// This method is used for bulk updating side metadata for a data address range. As we cannot guarantee
     /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
-    /// we need to mask and zero certain bits in a metadata byte.
-    /// The end address and the end bit are exclusive.
-    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>zero_meta_bits(
+    /// we need to mask and zero certain bits in a metadata byte. The end address and the end bit are exclusive.
+    /// The end bit for update_bits could be 8, so overflowing needs to be taken care of.
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>update_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
         meta_end_bit: u8,
+        update_bytes: <span class="kw-2">&amp;</span><span class="kw">impl </span>Fn(Address, Address),
+        update_bits: <span class="kw-2">&amp;</span><span class="kw">impl </span>Fn(Address, u8, u8),
     ) {
         <span class="comment">// Start/end is the same, we don&#39;t need to do anything.
         </span><span class="kw">if </span>meta_start_addr == meta_end_addr &amp;&amp; meta_start_bit == meta_end_bit {
@@ -1672,50 +1795,110 @@
 
         <span class="comment">// zeroing bytes
         </span><span class="kw">if </span>meta_start_bit == <span class="number">0 </span>&amp;&amp; meta_end_bit == <span class="number">0 </span>{
-            memory::zero(meta_start_addr, meta_end_addr - meta_start_addr);
+            update_bytes(meta_start_addr, meta_end_addr);
             <span class="kw">return</span>;
         }
 
         <span class="kw">if </span>meta_start_addr == meta_end_addr {
-            <span class="comment">// we are zeroing selected bits in one byte
-            </span><span class="kw">let </span>mask: u8 = (u8::MAX &lt;&lt; meta_end_bit) | !(u8::MAX &lt;&lt; meta_start_bit); <span class="comment">// Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
-
-            </span><span class="kw">unsafe </span>{ meta_start_addr.as_ref::&lt;AtomicU8&gt;() }.fetch_and(mask, Ordering::SeqCst);
+            <span class="comment">// Update bits in the same byte between start and end bit
+            </span>update_bits(meta_start_addr, meta_start_bit, meta_end_bit);
         } <span class="kw">else if </span>meta_start_addr + <span class="number">1usize </span>== meta_end_addr &amp;&amp; meta_end_bit == <span class="number">0 </span>{
-            <span class="comment">// we are zeroing the rest bits in one byte
-            </span><span class="kw">let </span>mask = !(u8::MAX &lt;&lt; meta_start_bit); <span class="comment">// Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
-
-            </span><span class="kw">unsafe </span>{ meta_start_addr.as_ref::&lt;AtomicU8&gt;() }.fetch_and(mask, Ordering::SeqCst);
+            <span class="comment">// Update bits in the same byte after the start bit (between start bit and 8)
+            </span>update_bits(meta_start_addr, meta_start_bit, <span class="number">8</span>);
         } <span class="kw">else </span>{
-            <span class="comment">// zero bits in the first byte
-            </span><span class="self">Self</span>::zero_meta_bits(meta_start_addr, meta_start_bit, meta_start_addr + <span class="number">1usize</span>, <span class="number">0</span>);
-            <span class="comment">// zero bytes in the middle
-            </span><span class="self">Self</span>::zero_meta_bits(meta_start_addr + <span class="number">1usize</span>, <span class="number">0</span>, meta_end_addr, <span class="number">0</span>);
-            <span class="comment">// zero bits in the last byte
-            </span><span class="self">Self</span>::zero_meta_bits(meta_end_addr, <span class="number">0</span>, meta_end_addr, meta_end_bit);
+            <span class="comment">// update bits in the first byte
+            </span><span class="self">Self</span>::update_meta_bits(
+                meta_start_addr,
+                meta_start_bit,
+                meta_start_addr + <span class="number">1usize</span>,
+                <span class="number">0</span>,
+                update_bytes,
+                update_bits,
+            );
+            <span class="comment">// update bytes in the middle
+            </span><span class="self">Self</span>::update_meta_bits(
+                meta_start_addr + <span class="number">1usize</span>,
+                <span class="number">0</span>,
+                meta_end_addr,
+                <span class="number">0</span>,
+                update_bytes,
+                update_bits,
+            );
+            <span class="comment">// update bits in the last byte
+            </span><span class="self">Self</span>::update_meta_bits(
+                meta_end_addr,
+                <span class="number">0</span>,
+                meta_end_addr,
+                meta_end_bit,
+                update_bytes,
+                update_bits,
+            );
         }
     }
 
-    <span class="doccomment">/// Bulk-zero a specific metadata for a chunk. Note that this method is more sophisiticated than a simple memset, especially in the following
-    /// cases:
-    /// * the metadata for the range includes partial bytes (a few bits in the same byte).
-    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk zero for each chunk&#39;s side metadata.
-    ///
-    /// # Arguments
-    ///
-    /// * `start`: The starting address of a memory region. The side metadata starting from this data address will be zeroed.
-    /// * `size`: The size of the memory region.
-    ///
-    </span><span class="kw">pub fn </span>bzero_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
-        </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
+    <span class="doccomment">/// This method is used for bulk zeroing side metadata for a data address range.
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>zero_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        <span class="kw">let </span>zero_bytes = |start: Address, end: Address| {
+            memory::zero(start, end - start);
+        };
+        <span class="kw">let </span>zero_bits = |addr: Address, start_bit: u8, end_bit: u8| {
+            <span class="comment">// we are zeroing selected bits in one byte
+            </span><span class="kw">let </span>mask: u8 =
+                u8::MAX.checked_shl(end_bit.into()).unwrap_or(<span class="number">0</span>) | !(u8::MAX &lt;&lt; start_bit); <span class="comment">// Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
+            </span><span class="kw">unsafe </span>{ addr.as_ref::&lt;AtomicU8&gt;() }.fetch_and(mask, Ordering::SeqCst);
+        };
+        <span class="self">Self</span>::update_meta_bits(
+            meta_start_addr,
+            meta_start_bit,
+            meta_end_addr,
+            meta_end_bit,
+            <span class="kw-2">&amp;</span>zero_bytes,
+            <span class="kw-2">&amp;</span>zero_bits,
+        );
+    }
 
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
-        </span>sanity::verify_bzero(<span class="self">self</span>, start, size);
+    <span class="doccomment">/// This method is used for bulk setting side metadata for a data address range.
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>set_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        <span class="kw">let </span>set_bytes = |start: Address, end: Address| {
+            memory::set(start, <span class="number">0xff</span>, end - start);
+        };
+        <span class="kw">let </span>set_bits = |addr: Address, start_bit: u8, end_bit: u8| {
+            <span class="comment">// we are setting selected bits in one byte
+            </span><span class="kw">let </span>mask: u8 =
+                !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(<span class="number">0</span>)) &amp; (u8::MAX &lt;&lt; start_bit); <span class="comment">// Get a mask that the bits we need to set are 1, and the other bits are 0.
+            </span><span class="kw">unsafe </span>{ addr.as_ref::&lt;AtomicU8&gt;() }.fetch_or(mask, Ordering::SeqCst);
+        };
+        <span class="self">Self</span>::update_meta_bits(
+            meta_start_addr,
+            meta_start_bit,
+            meta_end_addr,
+            meta_end_bit,
+            <span class="kw-2">&amp;</span>set_bytes,
+            <span class="kw-2">&amp;</span>set_bits,
+        );
+    }
 
-        <span class="comment">// Zero for a contiguous side metadata spec. We can simply calculate the data end address, and
+    <span class="doccomment">/// This method does bulk update for the given data range. It calculates the metadata bits for the given data range,
+    /// and invoke the given method to update the metadata bits.
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>bulk_update_metadata(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        start: Address,
+        size: usize,
+        update_meta_bits: <span class="kw-2">&amp;</span><span class="kw">impl </span>Fn(Address, u8, Address, u8),
+    ) {
+        <span class="comment">// Update bits for a contiguous side metadata spec. We can simply calculate the data end address, and
         // calculate the metadata address for the data end.
-        </span><span class="kw">let </span>zero_contiguous = |data_start: Address, data_bytes: usize| {
+        </span><span class="kw">let </span>update_contiguous = |data_start: Address, data_bytes: usize| {
             <span class="kw">if </span>data_bytes == <span class="number">0 </span>{
                 <span class="kw">return</span>;
             }
@@ -1723,37 +1906,33 @@
             <span class="kw">let </span>meta_start_shift = meta_byte_lshift(<span class="self">self</span>, data_start);
             <span class="kw">let </span>meta_end = address_to_meta_address(<span class="self">self</span>, data_start + data_bytes);
             <span class="kw">let </span>meta_end_shift = meta_byte_lshift(<span class="self">self</span>, data_start + data_bytes);
-            <span class="self">Self</span>::zero_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
+            update_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
         };
 
-        <span class="comment">// Zero for a discontiguous side metadata spec (chunked metadata). The side metadata for different
+        <span class="comment">// Update bits for a discontiguous side metadata spec (chunked metadata). The side metadata for different
         // chunks are stored in discontiguous memory. For example, Chunk #2 follows Chunk #1, but the side metadata
-        // for Chunk #2 does not immediately follow the side metadata for Chunk #1. So when we bulk zero metadata for Chunk #1,
-        // we cannot zero up to the metadata address for the Chunk #2 start. Otherwise it may zero unrelated metadata
+        // for Chunk #2 does not immediately follow the side metadata for Chunk #1. So when we bulk update metadata for Chunk #1,
+        // we cannot update up to the metadata address for the Chunk #2 start. Otherwise it may modify unrelated metadata
         // between the two chunks&#39; metadata.
-        // Instead, we compute how many bytes/bits we need to zero.
-        // The data for which the metadata will be zeroed has to be in the same chunk.
+        // Instead, we compute how many bytes/bits we need to update.
+        // The data for which the metadata will be updates has to be in the same chunk.
         </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-        </span><span class="kw">let </span>zero_discontiguous = |data_start: Address, data_bytes: usize| {
+        </span><span class="kw">let </span>update_discontiguous = |data_start: Address, data_bytes: usize| {
             <span class="kw">use </span><span class="kw">crate</span>::util::constants::BITS_IN_BYTE;
             <span class="kw">if </span>data_bytes == <span class="number">0 </span>{
                 <span class="kw">return</span>;
             }
-
             <span class="macro">debug_assert_eq!</span>(
                 data_start.align_down(BYTES_IN_CHUNK),
                 (data_start + data_bytes - <span class="number">1</span>).align_down(BYTES_IN_CHUNK),
                 <span class="string">&quot;The data to be zeroed in discontiguous specs needs to be in the same chunk&quot;
             </span>);
-
             <span class="kw">let </span>meta_start = address_to_meta_address(<span class="self">self</span>, data_start);
             <span class="kw">let </span>meta_start_shift = meta_byte_lshift(<span class="self">self</span>, data_start);
-
             <span class="comment">// How many bits we need to zero for data_bytes
             </span><span class="kw">let </span>meta_total_bits = (data_bytes &gt;&gt; <span class="self">self</span>.log_bytes_in_region) &lt;&lt; <span class="self">self</span>.log_num_of_bits;
             <span class="kw">let </span>meta_delta_bytes = meta_total_bits &gt;&gt; LOG_BITS_IN_BYTE;
             <span class="kw">let </span>meta_delta_bits: u8 = (meta_total_bits % BITS_IN_BYTE) <span class="kw">as </span>u8;
-
             <span class="comment">// Calculate the end byte/addr and end bit
             </span><span class="kw">let </span>(meta_end, meta_end_shift) = {
                 <span class="kw">let </span><span class="kw-2">mut </span>end_addr = meta_start + meta_delta_bytes;
@@ -1765,11 +1944,11 @@
                 (end_addr, end_bit)
             };
 
-            <span class="self">Self</span>::zero_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
+            update_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
         };
 
         <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) || <span class="self">self</span>.is_global {
-            zero_contiguous(start, size);
+            update_contiguous(start, size);
         }
         <span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
         </span><span class="kw">if </span>!<span class="self">self</span>.is_global {
@@ -1778,24 +1957,62 @@
                 - start.align_down(BYTES_IN_CHUNK))
                 / BYTES_IN_CHUNK;
             <span class="kw">if </span>chunk_num == <span class="number">0 </span>{
-                zero_discontiguous(start, size);
+                update_discontiguous(start, size);
             } <span class="kw">else </span>{
                 <span class="kw">let </span>second_data_chunk = start.align_up(BYTES_IN_CHUNK);
                 <span class="comment">// bzero the first sub-chunk
-                </span>zero_discontiguous(start, second_data_chunk - start);
+                </span>update_discontiguous(start, second_data_chunk - start);
 
                 <span class="kw">let </span>last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
                 <span class="comment">// bzero the last sub-chunk
-                </span>zero_discontiguous(last_data_chunk, start + size - last_data_chunk);
+                </span>update_discontiguous(last_data_chunk, start + size - last_data_chunk);
                 <span class="kw">let </span><span class="kw-2">mut </span>next_data_chunk = second_data_chunk;
 
                 <span class="comment">// bzero all chunks in the middle
                 </span><span class="kw">while </span>next_data_chunk != last_data_chunk {
-                    zero_discontiguous(next_data_chunk, BYTES_IN_CHUNK);
+                    update_discontiguous(next_data_chunk, BYTES_IN_CHUNK);
                     next_data_chunk += BYTES_IN_CHUNK;
                 }
             }
         }
+    }
+
+    <span class="doccomment">/// Bulk-zero a specific metadata for a memory region. Note that this method is more sophisiticated than a simple memset, especially in the following
+    /// cases:
+    /// * the metadata for the range includes partial bytes (a few bits in the same byte).
+    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk zero for each chunk&#39;s side metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `start`: The starting address of a memory region. The side metadata starting from this data address will be zeroed.
+    /// * `size`: The size of the memory region.
+    </span><span class="kw">pub fn </span>bzero_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) {
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span>sanity::verify_bzero(<span class="self">self</span>, start, size);
+
+        <span class="self">self</span>.bulk_update_metadata(start, size, <span class="kw-2">&amp;</span><span class="self">Self</span>::zero_meta_bits)
+    }
+
+    <span class="doccomment">/// Bulk set a specific metadata for a memory region. Note that this method is more sophisiticated than a simple memset, especially in the following
+    /// cases:
+    /// * the metadata for the range includes partial bytes (a few bits in the same byte).
+    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk set for each chunk&#39;s side metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `start`: The starting address of a memory region. The side metadata starting from this data address will be set to all 1s in the bits.
+    /// * `size`: The size of the memory region.
+    </span><span class="kw">pub fn </span>bset_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) {
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span>sanity::verify_bset(<span class="self">self</span>, start, size);
+
+        <span class="self">self</span>.bulk_update_metadata(start, size, <span class="kw-2">&amp;</span><span class="self">Self</span>::set_meta_bits)
     }
 
     <span class="doccomment">/// This is a wrapper method for implementing side metadata access. It does nothing other than
@@ -3025,6 +3242,31 @@
             <span class="macro">unreachable!</span>()
         }
     );
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_bulk_update_meta_bits() {
+        <span class="kw">let </span>raw_mem =
+            <span class="kw">unsafe </span>{ std::alloc::alloc_zeroed(std::alloc::Layout::from_size_align(<span class="number">8</span>, <span class="number">8</span>).unwrap()) };
+        <span class="kw">let </span>addr = Address::from_mut_ptr(raw_mem);
+
+        SideMetadataSpec::set_meta_bits(addr, <span class="number">0</span>, addr, <span class="number">4</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ addr.load::&lt;u64&gt;() }, <span class="number">0b1111</span>);
+
+        SideMetadataSpec::zero_meta_bits(addr, <span class="number">1</span>, addr, <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ addr.load::&lt;u64&gt;() }, <span class="number">0b1001</span>);
+
+        SideMetadataSpec::set_meta_bits(addr, <span class="number">2</span>, addr, <span class="number">6</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ addr.load::&lt;u64&gt;() }, <span class="number">0b0011_1101</span>);
+
+        SideMetadataSpec::zero_meta_bits(addr, <span class="number">0</span>, addr + <span class="number">1usize</span>, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ addr.load::&lt;u64&gt;() }, <span class="number">0b0</span>);
+
+        SideMetadataSpec::set_meta_bits(addr, <span class="number">2</span>, addr + <span class="number">1usize</span>, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ addr.load::&lt;u64&gt;() }, <span class="number">0b11_1111_1100</span>);
+
+        SideMetadataSpec::set_meta_bits(addr, <span class="number">0</span>, addr + <span class="number">1usize</span>, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ addr.load::&lt;u64&gt;() }, <span class="number">0b11_1111_1111</span>);
+    }
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

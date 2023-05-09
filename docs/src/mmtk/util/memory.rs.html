@@ -363,6 +363,11 @@
 <span id="363">363</span>
 <span id="364">364</span>
 <span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -378,8 +383,13 @@
 }
 
 <span class="kw">pub fn </span>zero(start: Address, len: usize) {
-    <span class="kw">let </span>ptr = start.to_mut_ptr();
-    wrap_libc_call(<span class="kw-2">&amp;</span>|| <span class="kw">unsafe </span>{ libc::memset(ptr, <span class="number">0</span>, len) }, ptr).unwrap()
+    set(start, <span class="number">0</span>, len);
+}
+
+<span class="kw">pub fn </span>set(start: Address, val: u8, len: usize) {
+    <span class="kw">unsafe </span>{
+        std::ptr::write_bytes::&lt;u8&gt;(start.to_mut_ptr(), val, len);
+    }
 }
 
 <span class="doccomment">/// Demand-zero mmap:

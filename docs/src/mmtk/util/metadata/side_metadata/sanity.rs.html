@@ -765,6 +765,34 @@
 <span id="765">765</span>
 <span id="766">766</span>
 <span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::io::{Error, ErrorKind, <span class="prelude-ty">Result</span>};
@@ -1192,6 +1220,34 @@
                 </span><span class="kw">if </span><span class="kw-2">*</span>k &gt;= start &amp;&amp; <span class="kw-2">*</span>k &lt; end {
                     <span class="kw-2">*</span>v = <span class="number">0</span>;
                 }
+            }
+        }
+        <span class="prelude-val">None </span>=&gt; {
+            <span class="macro">panic!</span>(<span class="string">&quot;Invalid Metadata Spec!&quot;</span>);
+        }
+    }
+}
+
+<span class="doccomment">/// Commits a side metadata bulk set operation (set the related bits to all 1s).
+/// Panics if the metadata spec is not valid.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to perform the bulk set on
+/// * `start`: the starting address of the source data
+/// * `size`: size of the source data
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+</span><span class="kw">pub fn </span>verify_bset(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, start: Address, size: usize) {
+    <span class="kw">let </span>sanity_map = <span class="kw-2">&amp;mut </span>CONTENT_SANITY_MAP.write().unwrap();
+    <span class="kw">let </span>start = align_to_region_start(metadata_spec, start);
+    <span class="kw">let </span>end = align_to_region_start(metadata_spec, start + size);
+    <span class="kw">let </span>max_value = (<span class="number">1 </span>&lt;&lt; (<span class="number">1 </span>&lt;&lt; metadata_spec.log_num_of_bits)) - <span class="number">1</span>;
+    <span class="kw">match </span>sanity_map.get_mut(metadata_spec) {
+        <span class="prelude-val">Some</span>(spec_sanity_map) =&gt; {
+            <span class="kw">let </span><span class="kw-2">mut </span>cursor = start;
+            <span class="kw">let </span>step: usize = <span class="number">1 </span>&lt;&lt; metadata_spec.log_bytes_in_region;
+            <span class="kw">while </span>cursor &lt; end {
+                spec_sanity_map.insert(cursor, max_value);
+                cursor += step;
             }
         }
         <span class="prelude-val">None </span>=&gt; {
