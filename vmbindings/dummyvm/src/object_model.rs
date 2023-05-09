@@ -50,10 +50,6 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn get_type_descriptor(_reference: ObjectReference) -> &'static [i8] {
-        unimplemented!()
-    }
-
     fn ref_to_object_start(object: ObjectReference) -> Address {
         object.to_raw_address().sub(OBJECT_REF_OFFSET)
     }

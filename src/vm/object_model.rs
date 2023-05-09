@@ -353,14 +353,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: The object to be queried.
     fn get_align_offset_when_copied(object: ObjectReference) -> isize;
 
-    /// Get the type descriptor for an object.
-    ///
-    /// FIXME: Do we need this? If so, determine lifetime, return byte[]
-    ///
-    /// Arguments:
-    /// * `reference`: The object to be queried.
-    fn get_type_descriptor(reference: ObjectReference) -> &'static [i8];
-
     /// This is the worst case expansion that can occur due to object size increasing while
     /// copying. This constant is used to calculate whether a nursery has grown larger than the
     /// mature space for generational plans.
