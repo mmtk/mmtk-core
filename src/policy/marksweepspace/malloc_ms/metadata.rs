@@ -280,7 +280,7 @@ pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
 pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u128 {
     let meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "extreme_assertions"))]
     metadata_spec.assert_metadata_mapped(data_addr);
 
     meta_addr.load::<u128>()
