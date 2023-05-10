@@ -567,7 +567,7 @@
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>load128(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u128 {
     <span class="kw">let </span>meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
 
-    <span class="attribute">#[cfg(debug_assertions)]
+    <span class="attribute">#[cfg(all(debug_assertions, feature = <span class="string">&quot;extreme_assertions&quot;</span>))]
     </span>metadata_spec.assert_metadata_mapped(data_addr);
 
     meta_addr.load::&lt;u128&gt;()

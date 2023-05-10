@@ -1633,6 +1633,7 @@
 <span id="1633">1633</span>
 <span id="1634">1634</span>
 <span id="1635">1635</span>
+<span id="1636">1636</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -2041,7 +2042,8 @@
         </span><span class="attribute">#[cfg(debug_assertions)]
         </span>{
             <span class="self">self</span>.assert_value_type::&lt;T&gt;(input);
-            <span class="self">self</span>.assert_metadata_mapped(data_addr);
+            <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+            </span><span class="self">self</span>.assert_metadata_mapped(data_addr);
         }
 
         <span class="comment">// Actual access to the side metadata
