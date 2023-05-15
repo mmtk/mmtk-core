@@ -112,10 +112,6 @@
 <span id="112">112</span>
 <span id="113">113</span>
 <span id="114">114</span>
-<span id="115">115</span>
-<span id="116">116</span>
-<span id="117">117</span>
-<span id="118">118</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::MutatorContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -130,10 +126,6 @@
 
 <span class="doccomment">/// VM-specific methods for garbage collection.
 </span><span class="kw">pub trait </span>Collection&lt;VM: VMBinding&gt; {
-    <span class="doccomment">/// This const existed for historical reasons.  It has no effect now.
-    </span><span class="attribute">#[deprecated]
-    </span><span class="kw">const </span>COORDINATOR_ONLY_STW: bool = <span class="bool-val">true</span>;
-
     <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
     /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
