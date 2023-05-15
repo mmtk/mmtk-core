@@ -287,10 +287,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 .trace_object::<Q>(queue, object);
         }
 
-        warn!(
-            "Object {} is not in nursery or in LOS, it is not traced!",
-            object
-        );
         object
     }
 }
