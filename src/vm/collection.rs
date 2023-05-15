@@ -12,10 +12,6 @@ pub enum GCThreadContext<VM: VMBinding> {
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
-    /// This const existed for historical reasons.  It has no effect now.
-    #[deprecated]
-    const COORDINATOR_ONLY_STW: bool = true;
-
     /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
     /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
