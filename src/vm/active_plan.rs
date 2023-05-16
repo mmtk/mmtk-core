@@ -32,7 +32,7 @@ pub trait ActivePlan<VM: VMBinding> {
     /// The caller needs to make sure that the thread is a mutator thread.
     fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
 
-    /// A utility method to provide a thread-safe mutator iterator from `reset_mutator_iterator()` and `get_next_mutator()`.
+    /// Return an iterator that includes all the mutators at the point of invocation.
     fn mutators<'a>() -> Box<dyn Iterator<Item = &'a mut Mutator<VM>> + 'a>;
 
     /// Return the total count of mutators.
