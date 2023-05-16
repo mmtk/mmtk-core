@@ -355,10 +355,6 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -648,10 +644,6 @@
                 .trace_object::&lt;Q&gt;(queue, object);
         }
 
-        <span class="macro">warn!</span>(
-            <span class="string">&quot;Object {} is not in nursery or in LOS, it is not traced!&quot;</span>,
-            object
-        );
         object
     }
 }
