@@ -10,6 +10,8 @@
 // to me - considering it will break our API and all the efforts for all the developers to make the change, it may
 // not worth it.
 #![allow(clippy::upper_case_acronyms)]
+#![feature(return_position_impl_trait_in_trait)]
+#![allow(incomplete_features)]
 
 //! Memory Management ToolKit (MMTk) is a portable and high performance memory manager
 //! that includes various garbage collection algorithms and provides clean and efficient
