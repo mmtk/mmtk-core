@@ -47,6 +47,9 @@ regex = "1.7.0"
 static_assertions = "1.1.0"
 delegate = "0.9.0"
 
+humansize = { version = "2.1.3", optional = true }
+procfs = { version = "0.15.1", optional = true }
+
 [dev-dependencies]
 rand = "0.8.5"
 paste = "1.0.8"
@@ -126,6 +129,10 @@ work_packet_stats = []
 
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
+
+# Log rss at the end of each GC. This can be used to debug our page accounting.
+# Rss is printed through normal logging. Make sure logging is turned (info-levle) when this is used.
+log_rss = ["humansize", "procfs"]
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

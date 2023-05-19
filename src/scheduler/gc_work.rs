@@ -226,6 +226,25 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.plan.get_total_pages(),
             self.elapsed.as_millis()
         );
+        #[cfg(feature = "log_rss")]
+        {
+            use humansize::{format_size, BINARY};
+            let mmtk_reported: u64 = (mmtk.plan.get_reserved_pages()
+                << crate::util::constants::LOG_BYTES_IN_PAGE)
+                as u64;
+            let process_rss: u64 = procfs::process::Process::myself()
+                .unwrap()
+                .status()
+                .unwrap()
+                .vmrss
+                .unwrap()
+                << 10; // Turn KB into bytes
+            info!(
+                "RSS Check: MMTk reported = {}, process RSS = {}",
+                format_size(mmtk_reported, BINARY),
+                format_size(process_rss, BINARY),
+            );
+        }
 
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
