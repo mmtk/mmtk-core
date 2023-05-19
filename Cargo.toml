@@ -19,37 +19,36 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
+atomic = "0.5.1"
+atomic_refcell = "0.1.7"
+atomic-traits = "0.3.0"
+cfg-if = "1.0"
+crossbeam = "0.8.1"
+delegate = "0.9.0"
+downcast-rs = "1.1.1"
+enum-map = "2.4.2"
+env_logger = "0.10.0"
+itertools = "0.10.5"
+jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
+lazy_static = "1.1"
+libc = "0.2"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
+mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros
 mmtk-macros = { version = "0.18.0", path = "macros/" }
-
-libc = "0.2"
-jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
-mimalloc-sys = { version = "0.1.6", optional = true }
-lazy_static = "1.1"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
-crossbeam = "0.8.1"
 num_cpus = "1.8"
-enum-map = "2.4.2"
-downcast-rs = "1.1.1"
-atomic-traits = "0.3.0"
-atomic = "0.5.1"
 num-traits = "0.2"
-spin = "0.9.5"
-env_logger = "0.10.0"
 pfm = { version = "0.1.0-beta.1", optional = true }
-atomic_refcell = "0.1.7"
+regex = "1.7.0"
+spin = "0.9.5"
+static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-cfg-if = "1.0"
-itertools = "0.10.5"
 sys-info = "0.9"
-regex = "1.7.0"
-static_assertions = "1.1.0"
-delegate = "0.9.0"
 
 [dev-dependencies]
-rand = "0.8.5"
 paste = "1.0.8"
+rand = "0.8.5"
 
 [build-dependencies]
 built = { version = "0.6.0", features = ["git2"] }
