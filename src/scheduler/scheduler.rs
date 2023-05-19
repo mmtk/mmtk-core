@@ -94,16 +94,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Create GC threads, including the controller thread and all workers.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        // Create the communication channel.
-        let (sender, receiver) = controller::channel::make_channel();
-
         // Spawn the controller thread.
         let coordinator_worker = GCWorker::new(
             mmtk,
             usize::MAX,
             self.clone(),
             true,
-            sender.clone(),
             self.coordinator_worker_shared.clone(),
             deque::Worker::new_fifo(),
         );
@@ -111,12 +107,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             mmtk,
             mmtk.plan.base().gc_requester.clone(),
             self.clone(),
-            receiver,
             coordinator_worker,
         );
         VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
 
-        self.worker_group.spawn(mmtk, sender, tls)
+        self.worker_group.spawn(mmtk, tls)
     }
 
     /// Resolve the affinity of a thread.
@@ -307,13 +302,21 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    pub(crate) fn all_activated_buckets_are_empty(&self) -> bool {
-        for bucket in self.work_buckets.values() {
-            if bucket.is_activated() && !bucket.is_drained() {
-                return false;
+    pub(crate) fn assert_all_activated_buckets_are_empty(&self) {
+        let mut error_example = None;
+        for (id, bucket) in self.work_buckets.iter() {
+            if bucket.is_activated() && !bucket.is_empty() {
+                error!("Work bucket {:?} is active but not empty!", id);
+                // This error can be hard to reproduce.
+                // If an error happens in the release build where logs are turned off,
+                // we should show at least one abnormal bucket in the panic message
+                // so that we still have some information for debugging.
+                error_example = Some(id);
             }
         }
-        true
+        if let Some(id) = error_example {
+            panic!("Some active buckets (such as {:?}) are not empty.", id);
+        }
     }
 
     /// Get a schedulable work packet without retry.
@@ -376,48 +379,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
-        // Note: The lock is released during `wait` in the loop.
-        let mut sync = self.worker_monitor.sync.lock().unwrap();
         loop {
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
             }
 
-            // Park this worker
-            let all_parked = sync.inc_parked_workers();
-
-            if all_parked {
-                // If all workers are parked, enter "group sleeping" and notify controller.
-                sync.group_sleep = true;
-                debug!("Entered group-sleeping state");
-                worker.sender.notify_all_workers_parked();
-            } else {
-                // Otherwise wait until notified.
-                // Note: The condition for this `cond.wait` is "more work is available".
-                // If this worker spuriously wakes up, then in the next loop iteration, the
-                // `poll_schedulable_work` invocation above will fail, and the worker will reach
-                // here and wait again.
-                sync = self.worker_monitor.cond.wait(sync).unwrap();
-            }
-
-            // Keep waiting if we have entered "group sleeping" state.
-            // The coordinator will let the worker leave the "group sleeping" state
-            // once the coordinator finished its work.
-            //
-            // Note: `wait_while` checks `sync.group_sleep` before actually starting to wait.
-            // This is expected because the controller may run so fast that it opened new buckets
-            // and unset `sync.group_sleep` before we even reached here.  If that happens, waiting
-            // blindly will result in all workers sleeping forever.  So we should always check
-            // `sync.group_sleep` before waiting.
-            sync = self
-                .worker_monitor
-                .cond
-                .wait_while(sync, |sync| sync.group_sleep)
-                .unwrap();
-
-            // Unpark this worker.
-            sync.dec_parked_workers();
+            self.worker_monitor.park_and_wait(worker);
         }
     }
 

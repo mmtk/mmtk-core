@@ -210,13 +210,10 @@ impl<VM: VMBinding> WorkBucket<VM> {
             sentinel.take()
         };
         if let Some(work) = maybe_sentinel {
-            // We cannot call `self.add` now, because:
-            // 1.  The current function is called only when all workers parked, and we are holding
-            //     the monitor lock.  `self.add` also needs that lock to notify other workers.
-            //     Trying to lock it again will result in deadlock.
-            // 2.  After this function returns, the current worker will check if there is pending
-            //     work immediately, and notify other workers.
-            // So we can just "sneak" the sentinel work packet into the current bucket now.
+            // We don't need to call `self.add` because this function is called by the coordinator
+            // when workers are stopped.  We don't need to notify the workers because the
+            // coordinator will do that later.
+            // We can just "sneak" the sentinel work packet into the current bucket.
             self.queue.push(work);
             true
         } else {

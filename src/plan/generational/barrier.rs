@@ -82,8 +82,13 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
     }
 
     fn memory_region_copy_slow(&mut self, _src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
+        // Check if the destination object/slice is in nursery space.
+        let dst_in_nursery = match dst.object() {
+            Some(obj) => self.plan.is_object_in_nursery(obj),
+            None => self.plan.is_address_in_nursery(dst.start()),
+        };
         // Only enqueue array slices in mature spaces
-        if !self.plan.is_address_in_nursery(dst.start()) {
+        if !dst_in_nursery {
             // enqueue
             debug_assert_eq!(
                 dst.bytes() & (BYTES_IN_ADDRESS - 1),

@@ -79,10 +79,18 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     }
     let mmtk = builder.build();
 
-    info!("Initialized MMTk with {:?}", *mmtk.options.plan);
+    info!(
+        "Initialized MMTk with {:?} ({:?})",
+        *mmtk.options.plan, *mmtk.options.gc_trigger
+    );
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
     Box::new(mmtk)
+}
+
+#[cfg(feature = "vm_space")]
+pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
+    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
 }
 
 /// Request MMTk to create a mutator for the given thread. The ownership

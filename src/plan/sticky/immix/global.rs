@@ -67,6 +67,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.base()
     }
 
+    fn base_mut(&mut self) -> &mut crate::plan::global::BasePlan<Self::VM> {
+        self.immix.base_mut()
+    }
+
     fn generational(
         &self,
     ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
@@ -283,10 +287,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 .trace_object::<Q>(queue, object);
         }
 
-        warn!(
-            "Object {} is not in nursery or in LOS, it is not traced!",
-            object
-        );
         object
     }
 }

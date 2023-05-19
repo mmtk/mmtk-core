@@ -23,6 +23,10 @@ impl MetadataSpec {
         matches!(self, &MetadataSpec::OnSide(_))
     }
 
+    pub const fn is_in_header(&self) -> bool {
+        matches!(self, &MetadataSpec::InHeader(_))
+    }
+
     /// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.
     pub const fn extract_side_spec(&self) -> &SideMetadataSpec {
         match self {
