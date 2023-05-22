@@ -193,13 +193,13 @@ pub fn get_process_memory_maps() -> String {
 }
 
 /// Returns the total physical memory for the system in bytes.
-pub(crate) fn get_system_total_memory() -> usize {
+pub(crate) fn get_system_total_memory() -> u64 {
     // TODO: Note that if we want to get system info somewhere else in the future, we should
     // refactor this instance into some global struct. sysinfo recommends sharing one instance of
     // `System` instead of making multiple instances.
     // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
     let sys = System::new_all();
-    sys.total_memory().try_into().unwrap()
+    sys.total_memory()
 }
 
 #[cfg(test)]
