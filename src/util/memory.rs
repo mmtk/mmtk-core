@@ -4,6 +4,7 @@ use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
+use sysinfo::{System, SystemExt};
 
 pub fn result_is_mapped(result: Result<()>) -> bool {
     match result {
@@ -193,16 +194,12 @@ pub fn get_process_memory_maps() -> String {
 
 /// Returns the total physical memory for the system in bytes.
 pub(crate) fn get_system_total_memory() -> usize {
-    match sys_info::mem_info() {
-        Ok(mem_info) => mem_info.total as usize,
-        Err(e) => {
-            warn!(
-                "Failed to get sys_info::mem_info: {:?}. Return 1G in get_system_total_memory()",
-                e
-            );
-            1024 * 1024 * 1024
-        }
-    }
+    // TODO: Note that if we want to get system info somewhere else in the future, we should
+    // refactor this instance into some global struct. sysinfo recommends sharing one instance of
+    // `System` instead of making multiple instances.
+    // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
+    let sys = System::new_all();
+    sys.total_memory().try_into().unwrap()
 }
 
 #[cfg(test)]
