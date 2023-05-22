@@ -365,15 +365,13 @@
 <span id="365">365</span>
 <span id="366">366</span>
 <span id="367">367</span>
-<span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{Collection, VMBinding};
 <span class="kw">use </span>libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 <span class="kw">use </span>std::io::{Error, <span class="prelude-ty">Result</span>};
+<span class="kw">use </span>sysinfo::{System, SystemExt};
 
 <span class="kw">pub fn </span>result_is_mapped(result: <span class="prelude-ty">Result</span>&lt;()&gt;) -&gt; bool {
     <span class="kw">match </span>result {
@@ -562,17 +560,13 @@
 }
 
 <span class="doccomment">/// Returns the total physical memory for the system in bytes.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_system_total_memory() -&gt; usize {
-    <span class="kw">match </span>sys_info::mem_info() {
-        <span class="prelude-val">Ok</span>(mem_info) =&gt; mem_info.total <span class="kw">as </span>usize,
-        <span class="prelude-val">Err</span>(e) =&gt; {
-            <span class="macro">warn!</span>(
-                <span class="string">&quot;Failed to get sys_info::mem_info: {:?}. Return 1G in get_system_total_memory()&quot;</span>,
-                e
-            );
-            <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024
-        </span>}
-    }
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_system_total_memory() -&gt; u64 {
+    <span class="comment">// TODO: Note that if we want to get system info somewhere else in the future, we should
+    // refactor this instance into some global struct. sysinfo recommends sharing one instance of
+    // `System` instead of making multiple instances.
+    // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
+    </span><span class="kw">let </span>sys = System::new_all();
+    sys.total_memory()
 }
 
 <span class="attribute">#[cfg(test)]
