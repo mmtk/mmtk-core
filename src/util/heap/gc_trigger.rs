@@ -359,10 +359,10 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 if stats.generational_mem_stats_on_gc_end(plan) {
                     self.compute_new_heap_limit(
                         mmtk.plan.get_reserved_pages(),
-                        // We reserve an extra of 2x max nursery: when MMTk triggers a GC, it needs to ensure there is enough room in the mature space
-                        // to accomodate the copiyng from nursery, thus it counts the nursery size twice to make sure that objects can all be copied.
+                        // We reserve an extra of min nursery. This ensures that we will not trigger
+                        // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
                         mmtk.plan.get_collection_reserved_pages()
-                            + mmtk.options.get_max_nursery_pages() * 2,
+                            + mmtk.options.get_min_nursery_pages(),
                         stats,
                     );
                 }
