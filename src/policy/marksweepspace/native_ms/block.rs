@@ -165,8 +165,7 @@ impl Block {
     }
 
     pub fn store_block_list(&self, block_list: &BlockList) {
-        let block_list_usize: usize =
-            unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
+        let block_list_usize: usize = block_list as *const BlockList as usize;
         unsafe {
             Block::BLOCK_LIST_TABLE.store::<usize>(self.start(), block_list_usize);
         }
@@ -187,8 +186,8 @@ impl Block {
     }
 
     pub fn store_tls(&self, tls: VMThread) {
-        let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls.0) };
-        unsafe { Block::TLS_TABLE.store(self.start(), tls) }
+        let tls_usize: usize = tls.0.to_address().as_usize();
+        unsafe { Block::TLS_TABLE.store(self.start(), tls_usize) }
     }
 
     pub fn load_tls(&self) -> VMThread {

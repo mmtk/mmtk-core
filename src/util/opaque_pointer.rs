@@ -26,6 +26,10 @@ impl OpaquePointer {
         OpaquePointer(addr.to_mut_ptr::<c_void>())
     }
 
+    pub fn to_address(self) -> Address {
+        Address::from_mut_ptr(self.0)
+    }
+
     pub fn is_null(self) -> bool {
         self.0.is_null()
     }
