@@ -427,7 +427,6 @@
 <span id="427">427</span>
 <span id="428">428</span>
 <span id="429">429</span>
-<span id="430">430</span>
 </pre><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -595,8 +594,7 @@
     }
 
     <span class="kw">pub fn </span>store_block_list(<span class="kw-2">&amp;</span><span class="self">self</span>, block_list: <span class="kw-2">&amp;</span>BlockList) {
-        <span class="kw">let </span>block_list_usize: usize =
-            <span class="kw">unsafe </span>{ std::mem::transmute::&lt;<span class="kw-2">&amp;</span>BlockList, usize&gt;(block_list) };
+        <span class="kw">let </span>block_list_usize: usize = block_list <span class="kw">as </span><span class="kw-2">*const </span>BlockList <span class="kw">as </span>usize;
         <span class="kw">unsafe </span>{
             Block::BLOCK_LIST_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), block_list_usize);
         }
@@ -617,8 +615,8 @@
     }
 
     <span class="kw">pub fn </span>store_tls(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread) {
-        <span class="kw">let </span>tls = <span class="kw">unsafe </span>{ std::mem::transmute::&lt;OpaquePointer, usize&gt;(tls.<span class="number">0</span>) };
-        <span class="kw">unsafe </span>{ Block::TLS_TABLE.store(<span class="self">self</span>.start(), tls) }
+        <span class="kw">let </span>tls_usize: usize = tls.<span class="number">0</span>.to_address().as_usize();
+        <span class="kw">unsafe </span>{ Block::TLS_TABLE.store(<span class="self">self</span>.start(), tls_usize) }
     }
 
     <span class="kw">pub fn </span>load_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMThread {
