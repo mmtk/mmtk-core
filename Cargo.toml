@@ -44,7 +44,7 @@ spin = "0.9.5"
 static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-sys-info = "0.9"
+sysinfo = "0.29"
 
 [dev-dependencies]
 paste = "1.0.8"
