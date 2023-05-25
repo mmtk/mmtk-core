@@ -458,27 +458,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // sweep all blocks and push consumed onto available list
         let mut bin = 0;
         while bin < MAX_BIN + 1 {
-            let sweep = |first_block: Option<Block>, used_blocks: bool| {
-                let mut cursor = first_block;
-                while let Some(block) = cursor {
-                    if used_blocks {
-                        block.sweep::<VM>();
-                        cursor = block.load_next_block();
-                    } else {
-                        let next = block.load_next_block();
-                        if !block.attempt_release(self.space) {
-                            block.sweep::<VM>();
-                        }
-                        cursor = next;
-                    }
-                }
-            };
-
-            sweep(self.available_blocks[bin].first, true);
-            sweep(self.available_blocks_stress[bin].first, true);
+            // Sweep available blocks
+            self.available_blocks[bin].sweep_blocks(self.space);
+            self.available_blocks_stress[bin].sweep_blocks(self.space);
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
-            sweep(self.consumed_blocks[bin].first, false);
+            self.consumed_blocks[bin].sweep_blocks(self.space);
             if self.plan.base().is_precise_stress() && self.plan.base().is_stress_test_gc_enabled()
             {
                 debug_assert!(self.plan.base().is_precise_stress());
@@ -487,11 +472,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 self.available_blocks[bin].append(&mut self.consumed_blocks[bin]);
             }
 
-            bin += 1;
+            // For eager sweeping, we should not have unswept blocks
+            assert!(self.unswept_blocks[bin].is_empty());
 
-            if Self::ABANDON_BLOCKS_IN_RESET {
-                self.abandon_blocks();
-            }
+            bin += 1;
         }
 
         if Self::ABANDON_BLOCKS_IN_RESET {

@@ -6,13 +6,18 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
 /// List of blocks owned by the allocator
-#[derive(Debug)]
 #[repr(C)]
 pub struct BlockList {
     pub first: Option<Block>,
     pub last: Option<Block>,
     pub size: usize,
     pub lock: AtomicBool,
+}
+
+impl std::fmt::Debug for BlockList {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "BlockList {:?}", self.iter().collect::<Vec<Block>>())
+    }
 }
 
 impl BlockList {
@@ -152,6 +157,38 @@ impl BlockList {
     /// Unlock list. See the comments on the lock method.
     pub fn unlock(&mut self) {
         self.lock.store(false, Ordering::SeqCst);
+    }
+
+    /// Get an iterator for the block list.
+    pub fn iter(&self) -> BlockListIterator {
+        BlockListIterator {
+            cursor: self.first,
+        }
+    }
+
+    /// Sweep all the blocks in the block list.
+    pub fn sweep_blocks<VM: VMBinding>(&self, space: &super::MarkSweepSpace<VM>) {
+        for block in self.iter() {
+            if !block.attempt_release(space) {
+                block.sweep::<VM>();
+            }
+        }
+    }
+}
+
+pub struct BlockListIterator {
+    cursor: Option<Block>,
+}
+
+impl Iterator for BlockListIterator {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.cursor;
+        if let Some(cur) = self.cursor {
+            self.cursor = cur.load_next_block();
+        }
+        ret
     }
 }
 
