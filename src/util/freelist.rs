@@ -14,16 +14,116 @@ const MULTI_MASK: i32 = 1 << (TOTAL_BITS - 1);
 const COALESC_MASK: i32 = 1 << (TOTAL_BITS - 2);
 const SIZE_MASK: i32 = (1 << UNIT_BITS) - 1;
 
+/// This is a very simple, generic malloc-free allocator.  It works abstractly, in "units", which
+/// the user may associate with some other allocatable resource (e.g. heap blocks).  The user
+/// issues requests for N units and the allocator returns the index of the first of a contiguous
+/// set of N units or fails, returning -1.  The user frees the block of N units by calling `free()`
+/// with the index of the first unit as the argument.
+///
+/// Properties/Constraints:
+///
+/// -   The allocator consumes one word per allocatable unit (plus a fixed overhead of about 128
+///     words).
+/// -   The allocator can only deal with `MAX_UNITS` units (see below for the value).
+///
+/// The basic data structure used by the algorithm is a large table, with one word per allocatable
+/// unit.  Each word is used in a number of different ways, some combination of "undefined" (32),
+/// "free/used" (1), "multi/single" (1), "prev" (15), "next" (15) and "size" (15) where field sizes
+/// in bits are in parenthesis.
+///
+/// ```
+///                       +-+-+-----------+-----------+
+///                       |f|m|    prev   | next/size |
+///                       +-+-+-----------+-----------+
+/// ```
+///
+/// -   single free unit: "free", "single", "prev", "next"
+/// -   single used unit: "used", "single"
+/// -   contiguous free units
+///     *   first unit: "free", "multi", "prev", "next"
+///     *   second unit: "free", "multi", "size"
+///     *   last unit: "free", "multi", "size"
+/// -   contiguous used units
+///     *   first unit: "used", "multi", "prev", "next"
+///     *   second unit: "used", "multi", "size"
+///     *   last unit: "used", "multi", "size"
+/// -   any other unit: undefined
+///
+/// ```
+///                       +-+-+-----------+-----------+
+///   top sentinel        |0|0|    tail   |   head    |  [-1]
+///                       +-+-+-----------+-----------+
+///                                     ....
+///            /--------  +-+-+-----------+-----------+
+///            |          |1|1|   prev    |   next    |  [j]
+///            |          +-+-+-----------+-----------+
+///            |          |1|1|           |   size    |  [j+1]
+///         free multi    +-+-+-----------+-----------+
+///         unit block    |              ...          |  ...
+///            |          +-+-+-----------+-----------+
+///            |          |1|1|           |   size    |
+///            >--------  +-+-+-----------+-----------+
+///   single free unit    |1|0|   prev    |   next    |
+///            >--------  +-+-+-----------+-----------+
+///   single used unit    |0|0|                       |
+///            >--------  +-+-+-----------------------+
+///            |          |0|1|                       |
+///            |          +-+-+-----------+-----------+
+///            |          |0|1|           |   size    |
+///         used multi    +-+-+-----------+-----------+
+///         unit block    |              ...          |
+///            |          +-+-+-----------+-----------+
+///            |          |0|1|           |   size    |
+///            \--------  +-+-+-----------+-----------+
+///                                     ....
+///                       +-+-+-----------------------+
+///   bottom sentinel     |0|0|                       |  [N]
+///                       +-+-+-----------------------+
+/// ```
+///
+/// The sentinels serve as guards against out of range coalescing because they both appear as
+/// "used" blocks and so will never coalesce.  The top sentinel also serves as the head and tail of
+/// the doubly linked list of free blocks.
 pub trait FreeList: Sync + Downcast {
     fn head(&self) -> i32;
     // fn head_mut(&mut self) -> &mut i32;
+
+    /// The number of free lists which will share this instance
     fn heads(&self) -> i32;
+
     // fn heads_mut(&mut self) -> &mut i32;
     // fn resize_freelist(&mut self);
     // fn resize_freelist(&mut self, units: i32, heads: i32);
+
+    /// Fetch the value at the given index into the table.
+    ///
+    /// # Parameters
+    ///
+    /// -   `index`: Index of the value to fetch.  Note this is a table index, not a unit number.
+    ///
+    /// # Returns
+    ///
+    /// Contents of the given index.
     fn get_entry(&self, index: i32) -> i32;
+
+    /// Store the given value at an index into the table
+    ///
+    /// # Parameters
+    ///
+    /// -   `index`: Index of the entry to fetch.  Note this is a table index, not a unit number.
+    /// -   `value`: The value to store.
     fn set_entry(&mut self, index: i32, value: i32);
 
+    /// Allocate `size` units. Return the unit ID
+    ///
+    /// # Parameters
+    ///
+    /// -   `size`: The number of units to be allocated
+    ///
+    /// # Returns
+    ///
+    /// The index of the first of the `size` contiguous units, or -1 if the request can't be
+    /// satisfied.
     fn alloc(&mut self, size: i32) -> i32 {
         let mut unit = self.head();
         let mut s = 0;
@@ -63,6 +163,17 @@ pub trait FreeList: Sync + Downcast {
     }
 
     /// Free a previously allocated contiguous lump of units
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit.
+    /// -   `return_coalesced_size`: If true, return the coalesced size.
+    ///
+    /// # Returns
+    ///
+    /// Return the size of the unit which was freed. If `return_coalesced_size` is false, return
+    /// the size of the unit which was freed.  Otherwise return the size of the unit now available
+    /// (the coalesced size).
     fn free(&mut self, unit: i32, return_coalesced_size: bool) -> i32 {
         debug_assert!(!self.get_free(unit));
         let mut freed = self.get_size(unit);
@@ -90,10 +201,25 @@ pub trait FreeList: Sync + Downcast {
         freed
     }
 
+    /// Return the size of the specified lump of units.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the lump.
+    ///
+    /// # Returns
+    ///
+    /// The size of the lump, in units.
     fn size(&self, unit: i32) -> i32 {
         self.get_size(unit)
     }
 
+    /// Initialize a new heap.  Fabricate a free list entry containing everything.
+    ///
+    /// # Parameters
+    ///
+    /// -   `units`: The number of units in the heap.
+    /// -   `grain`: TODO needs documentation
     fn initialize_heap(&mut self, units: i32, grain: i32) {
         // Initialize the sentinels
         // Set top sentinels per heads
@@ -118,6 +244,11 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Add a lump of units to the free list
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The first unit in the lump of units to be added.
     fn add_to_free(&mut self, unit: i32) {
         self.set_free(unit, true);
         let next = self.get_next(self.head());
@@ -129,15 +260,45 @@ pub trait FreeList: Sync + Downcast {
         self.set_prev(next, unit);
     }
 
+    /// Get the lump to the "right" of the current lump (i.e. "below" it).
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the lump in question.
+    ///
+    /// # Returns
+    ///
+    /// The index of the first unit in the lump to the "right"/"below" the lump in question.
+    ///
+    /// # Known issues
+    ///
+    /// People using right-to-left or top-to-bottom languages (including those modern Chinese and
+    /// Japanese who still prefer writing vertically) may be confused about the notion of "right";
+    /// and system programmers who are familiar with "low address" may be confused about the notion
+    /// of "below".  Consider renaming to `next_adjacent_lump`.
     fn get_right(&self, unit: i32) -> i32 {
         unit + self.get_size(unit)
     }
 
+    /// Initialize a unit as a sentinel.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The unit to be initialized
     fn set_sentinel(&mut self, unit: i32) {
         self.set_lo_entry(unit, NEXT_MASK & unit);
         self.set_hi_entry(unit, PREV_MASK & unit);
     }
 
+    /// Get the size of a lump of units
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The first unit in the lump of units
+    ///
+    /// # Returns
+    ///
+    /// The size of the lump of units
     fn get_size(&self, unit: i32) -> i32 {
         if (self.get_hi_entry(unit) & MULTI_MASK) == MULTI_MASK {
             self.get_hi_entry(unit + 1) & SIZE_MASK
@@ -146,6 +307,12 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Set the size of lump of units.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The first unit in the lump of units.
+    /// -   `size`: The size of the lump of units.
     fn set_size(&mut self, unit: i32, size: i32) {
         let hi = self.get_hi_entry(unit);
         if size > 1 {
@@ -157,10 +324,25 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Establish whether a lump of units is free.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The first or last unit in the lump.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the lump is free.
     fn get_free(&self, unit: i32) -> bool {
         (self.get_lo_entry(unit) & FREE_MASK) == FREE_MASK
     }
 
+    /// Set the "free" flag for a lump of units (both the first and last units in the lump are set.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The first unit in the lump.
+    /// -   `is_free`: `true` if the lump is to be marked as free.
     fn set_free(&mut self, unit: i32, is_free: bool) {
         let size;
         let lo = self.get_lo_entry(unit);
@@ -181,6 +363,15 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Get the next lump in the doubly linked free list.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the current lump.
+    ///
+    /// # Returns
+    ///
+    /// The index of the first unit of the next lump of units in the list.
     fn get_next(&self, unit: i32) -> i32 {
         let next = self.get_hi_entry(unit) & NEXT_MASK;
         if next <= MAX_UNITS {
@@ -190,6 +381,12 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Set the next lump in the doubly linked free list.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the lump to be set.
+    /// -   `next`: The value to be set.
     fn set_next(&mut self, unit: i32, next: i32) {
         debug_assert!((next >= -self.heads()) && (next <= MAX_UNITS));
         let old_value = self.get_hi_entry(unit);
@@ -197,7 +394,16 @@ pub trait FreeList: Sync + Downcast {
         self.set_hi_entry(unit, new_value);
     }
 
-    // Return the previous link. If no previous link, return head
+    /// Get the previous lump in the doubly linked free list.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the current lump.
+    ///
+    /// # Returns
+    ///
+    /// The index of the first unit of the previous lump of units in the list.  If there is no
+    /// previous link, return the head.
     fn get_prev(&self, unit: i32) -> i32 {
         let prev = self.get_lo_entry(unit) & PREV_MASK;
         if prev <= MAX_UNITS {
@@ -207,6 +413,12 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Set the previous lump in the doubly linked free list.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the lump to be set.
+    /// -   `prev`: The value to be set.
     fn set_prev(&mut self, unit: i32, prev: i32) {
         debug_assert!((prev >= -self.heads()) && (prev <= MAX_UNITS));
         let old_value = self.get_lo_entry(unit);
@@ -214,7 +426,19 @@ pub trait FreeList: Sync + Downcast {
         self.set_lo_entry(unit, new_value);
     }
 
-    // Return the left unit. If it is a multi unit, return the start of the unit.
+    /// Get the lump to the "left" of the current lump (i.e. "above" it)
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit in the lump in question
+    ///
+    /// # Returns
+    ///
+    /// The index of the first unit in the lump to the "left"/"above" the lump in question.
+    ///
+    /// # Known Issues
+    ///
+    /// Similar to `get_right`, we should rename it to `previous_adjacent_lump`.
     fn get_left(&self, unit: i32) -> i32 {
         if (self.get_hi_entry(unit - 1) & MULTI_MASK) == MULTI_MASK {
             unit - (self.get_hi_entry(unit - 1) & SIZE_MASK)
@@ -223,15 +447,39 @@ pub trait FreeList: Sync + Downcast {
         }
     }
 
+    /// Return true if this unit may be coalesced with the unit below it.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The unit in question
+    ///
+    /// # Returns
+    ///
+    /// `true` if this unit may be coalesced with the unit below it.
+    ///
+    /// # Known issue
+    ///
+    /// Similar to `get_right` we should avoid the notion of "left", "right", "above" or "below".
+    /// The "next adjacent unit" should be fine to explain this function.
     fn is_coalescable(&self, unit: i32) -> bool {
         (self.get_lo_entry(unit) & COALESC_MASK) == 0
     }
 
+    /// Clear the Uncoalescable flag associated with a unit.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The unit in question
     fn clear_uncoalescable(&mut self, unit: i32) {
         let lo = self.get_lo_entry(unit);
         self.set_lo_entry(unit, lo & !COALESC_MASK);
     }
 
+    /// Mark a unit as uncoalescable
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The unit in question
     fn set_uncoalescable(&mut self, unit: i32) {
         let lo = self.get_lo_entry(unit);
         self.set_lo_entry(unit, lo | COALESC_MASK);
@@ -247,19 +495,49 @@ pub trait FreeList: Sync + Downcast {
         (lo & FREE_MASK) == FREE_MASK
     }
 
+    /// Get the (low) contents of an entry.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the unit.
+    ///
+    /// # Returns
+    ///
+    /// The (low) contents of the unit.
     fn get_lo_entry(&self, unit: i32) -> i32 {
         self.get_entry((unit + self.heads()) << 1)
     }
 
+    /// Get the (high) contents of an entry
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the unit.
+    ///
+    /// # Returns
+    ///
+    /// The (high) contents of the unit.
     fn get_hi_entry(&self, unit: i32) -> i32 {
         self.get_entry(((unit + self.heads()) << 1) + 1)
     }
 
+    /// Set the (low) contents of an entry
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the unit
+    /// -   `value`: The (low) contents of the unit
     fn set_lo_entry(&mut self, unit: i32, value: i32) {
         let heads = self.heads();
         self.set_entry((unit + heads) << 1, value);
     }
 
+    /// Set the (hi) contents of an entry
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the unit
+    /// -   `value`: The (hi) contents of the unit
     fn set_hi_entry(&mut self, unit: i32, value: i32) {
         let heads = self.heads();
         self.set_entry(((unit + heads) << 1) + 1, value);
@@ -267,6 +545,18 @@ pub trait FreeList: Sync + Downcast {
 
     // Private methods
 
+    /// Allocate `size` units. Return the unit ID
+    ///
+    /// # Parameters
+    ///
+    /// -   `size`: The number of units to be allocated
+    /// -   `unit`: First unit to consider
+    /// -   `unit_size`: The size of the lump of units starting at `unit`
+    ///
+    /// # Returns
+    ///
+    /// The index of the first of the `size` contiguous units, or -1 if the request can't be
+    /// satisfied
     fn __alloc(&mut self, size: i32, unit: i32, unit_size: i32) -> i32 {
         if unit_size >= size {
             if unit_size > size {
@@ -278,6 +568,12 @@ pub trait FreeList: Sync + Downcast {
         unit
     }
 
+    /// Reduce a lump of units to size, freeing any excess.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit`: The index of the first unit.
+    /// -   `size`: The size of the first part.
     fn __split(&mut self, unit: i32, size: i32) {
         let basesize = self.get_size(unit);
         debug_assert!(basesize > size);
@@ -286,6 +582,13 @@ pub trait FreeList: Sync + Downcast {
         self.add_to_free(unit + size);
     }
 
+    /// Coalesce two or three contiguous lumps of units, removing start and end lumps from the free
+    /// list as necessary.
+    ///
+    /// # Parameters
+    ///
+    /// -   `start`: The index of the start of the first lump
+    /// -   `end`: The index of the start of the last lump
     fn __coalesce(&mut self, start: i32, end: i32) {
         if self.get_free(end) {
             self.__remove_from_free(end);
@@ -297,6 +600,11 @@ pub trait FreeList: Sync + Downcast {
         self.set_size(start, end - start + size);
     }
 
+    /// Remove a lump of units from the free list.
+    ///
+    /// # Parameters
+    ///
+    /// -   `unit` The first unit in the lump of units to be removed
     fn __remove_from_free(&mut self, unit: i32) {
         let next = self.get_next(unit);
         let prev = self.get_prev(unit);

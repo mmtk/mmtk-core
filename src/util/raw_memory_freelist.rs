@@ -12,16 +12,34 @@ const LOG_BYTES_IN_ENTRY: usize = LOG_ENTRY_BITS - (LOG_BITS_IN_BYTE as usize);
 /** log2 of the number of bytes used by a free list unit */
 const LOG_BYTES_IN_UNIT: usize = LOG_BYTES_IN_ENTRY + 1;
 
+/// Implementation of `FreeList` backed by raw memory, allocated on demand direct from the OS (via
+/// mmap).
+///
+/// The method `grow_freelist` must be called to grow the list.  Where the list has a grain smaller
+/// than the maximum size of the list, it can only grow in increments of whole grains.
+///
+/// Unlike its sibling `IntArrayFreeList`, it is not possible for a `RawMemoryFreeList` to have
+/// multiple sub-lists threaded through the same list.
 #[derive(Debug)]
 pub struct RawMemoryFreeList {
     pub head: i32,
+    /// The number of free lists which will share this instance
     pub heads: i32,
+    /// Lowest address occupied by this list
     base: Address,
+    /// Highest address this list is allowed to occupy. Attempts to grow the list beyond this will
+    /// fail.
     limit: Address,
+    /// Memory addresses between base (inclusive) and highWater (exclusive) are already allocated
+    /// to the map.
     high_water: Address,
+    /// Maximum configured size of list in units
     max_units: i32,
+    /// Units are allocated such that they will never cross this granularity boundary
     grain: i32,
+    /// Current formatted size of list in units
     current_units: i32,
+    /// The free list allocates VM in blocks of this many pages
     pages_per_block: i32,
 }
 
@@ -71,20 +89,45 @@ impl FreeList for RawMemoryFreeList {
 }
 
 impl RawMemoryFreeList {
+    /// Return the number of units held in a block (excluding list heads and sentinels)
     fn units_per_block(&self) -> i32 {
         (conversions::pages_to_bytes(self.pages_per_block as _) >> LOG_BYTES_IN_UNIT) as _
     }
+
+    /// Return the number of units held in the first block (including list heads and sentinels)
     fn units_in_first_block(&self) -> i32 {
         self.units_per_block() - self.heads - 1
     }
+
     pub fn default_block_size(units: i32, heads: i32) -> i32 {
         usize::min(Self::size_in_pages(units, heads) as _, 16) as _
     }
+
+    /// Calculate the size (in pages) of a map for a given number of units and heads
+    ///
+    /// # Parameters
+    ///
+    /// -   `units`: Number of units in the map
+    /// -   `heads`: Number of independent heads
+    ///
+    /// # Returns
+    ///
+    /// The size in pages of the map
     pub fn size_in_pages(units: i32, heads: i32) -> i32 {
         let map_size = ((units + heads + 1) as usize) << LOG_BYTES_IN_UNIT;
         conversions::bytes_to_pages_up(map_size as _) as _
     }
 
+    /// Constructor
+    ///
+    /// # Parameters
+    ///
+    /// -   `base`: lowest address occupied by the list
+    /// -   `limit`: highest address that the list could occupy
+    /// -   `units`: The number of allocatable units for this free list
+    /// -   `pages_per_block`: number of pages in a block
+    /// -   `grain`: Units are allocated such that they will never cross this granularity boundary
+    /// -   `heads`: The number of free lists which will share this instance
     pub fn new(
         base: Address,
         limit: Address,
@@ -110,12 +153,24 @@ impl RawMemoryFreeList {
         }
     }
 
+    /// Return the current capacity (units) of the allocated blocks, allowing one unit for the
+    /// bottom sentinel.
     fn current_capacity(&self) -> i32 {
         let list_blocks =
             conversions::bytes_to_pages(self.high_water - self.base) as i32 / self.pages_per_block;
         self.units_in_first_block() + (list_blocks - 1) * self.units_per_block()
     }
 
+    /// Grows the free list by a specified number of units.
+    ///
+    /// # Parameters
+    ///
+    /// -   `units`: the number of units to add
+    ///
+    /// # Returns
+    ///
+    /// `true` if the list was grown, `false` if it was not (e.g. because the maximum would have
+    /// been surpasssed)
     pub fn grow_freelist(&mut self, units: i32) -> bool {
         let required_units = units + self.current_units;
         if required_units > self.max_units {
@@ -130,6 +185,13 @@ impl RawMemoryFreeList {
         self.grow_list_by_blocks(blocks, required_units);
         true
     }
+
+    /// Grow the list and initialize the new portion.
+    ///
+    /// # Parameters
+    ///
+    /// -   `blocks`: Number of map blocks to add to the map (may be zero)
+    /// -   `new_max`: The new capacity of the list in units
     fn grow_list_by_blocks(&mut self, blocks: i32, new_max: i32) {
         debug_assert!(
             (new_max <= self.grain) || (((new_max / self.grain) * self.grain) == new_max)
@@ -180,6 +242,11 @@ impl RawMemoryFreeList {
         }
     }
 
+    /// Raise the high water mark by requesting more pages from the OS
+    ///
+    /// # Parameter
+    ///
+    /// -   `blocks`: block count to raise by
     fn raise_high_water(&mut self, blocks: i32) {
         let mut grow_extent = conversions::pages_to_bytes((self.pages_per_block * blocks) as _);
         assert_ne!(
@@ -197,6 +264,8 @@ impl RawMemoryFreeList {
         let res = super::memory::dzmmap_noreplace(start, bytes);
         assert!(res.is_ok(), "Can't get more space with mmap()");
     }
+
+    /// Return the highest virtual address that can be occupied by this list.
     pub fn get_limit(&self) -> Address {
         self.limit
     }

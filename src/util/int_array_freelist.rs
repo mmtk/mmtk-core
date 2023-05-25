@@ -1,6 +1,8 @@
 use super::freelist::*;
 use std::mem;
 
+/// TODO: The comment in JikesRVM is identical to the comment of `GenericFreeList`.
+/// We should write our own doc comment here.
 #[derive(Debug)]
 pub struct IntArrayFreeList {
     pub head: i32,
@@ -13,18 +15,28 @@ impl FreeList for IntArrayFreeList {
     fn head(&self) -> i32 {
         self.head
     }
+
     fn heads(&self) -> i32 {
         self.heads
     }
+
     fn get_entry(&self, index: i32) -> i32 {
         self.table()[index as usize]
     }
+
     fn set_entry(&mut self, index: i32, value: i32) {
         self.table_mut()[index as usize] = value;
     }
 }
 
 impl IntArrayFreeList {
+    /// Constructor
+    ///
+    /// # Parameters
+    ///
+    /// -   `units`: The number of allocatable units for this free list
+    /// -   `grain`: Units are allocated such that they will never cross this granularity boundary
+    /// -   `heads`: The number of free lists which will share this instance
     pub fn new(units: usize, grain: i32, heads: usize) -> Self {
         debug_assert!(units <= MAX_UNITS as usize && heads <= MAX_HEADS as usize);
         // allocate the data structure, including space for top & bottom sentinels
@@ -38,6 +50,7 @@ impl IntArrayFreeList {
         iafl.initialize_heap(units as _, grain);
         iafl
     }
+
     pub fn from_parent(parent: &IntArrayFreeList, ordinal: i32) -> Self {
         let iafl = IntArrayFreeList {
             head: -(1 + ordinal),
@@ -48,9 +61,11 @@ impl IntArrayFreeList {
         debug_assert!(-iafl.head <= iafl.heads);
         iafl
     }
+
     pub(crate) fn get_ordinal(&self) -> i32 {
         -self.head - 1
     }
+
     fn table(&self) -> &Vec<i32> {
         match self.parent {
             Some(p) => p.table(),
@@ -70,6 +85,11 @@ impl IntArrayFreeList {
             None => self.table.as_mut().unwrap(),
         }
     }
+
+    /// Resize the free list for a parent free list.
+    ///
+    /// -   `units`: The number of allocatable units for this free list
+    /// -   `grain`: Units are allocated such that they will never cross this granularity boundary
     pub fn resize_freelist(&mut self, units: usize, grain: i32) {
         // debug_assert!(self.parent.is_none() && !selected_plan::PLAN.is_initialized());
         *self.table_mut() = vec![0; (units + 1 + self.heads as usize) << 1];
