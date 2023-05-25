@@ -161,9 +161,7 @@ impl BlockList {
 
     /// Get an iterator for the block list.
     pub fn iter(&self) -> BlockListIterator {
-        BlockListIterator {
-            cursor: self.first,
-        }
+        BlockListIterator { cursor: self.first }
     }
 
     /// Sweep all the blocks in the block list.
