@@ -23,3 +23,4 @@ mod conservatism;
 mod is_in_mmtk_spaces;
 mod fixtures;
 mod edges_test;
+mod barrier_slow_path_assertion;

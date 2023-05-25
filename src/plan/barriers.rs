@@ -3,7 +3,7 @@
 use crate::vm::edge_shape::{Edge, MemorySlice};
 use crate::vm::ObjectModel;
 use crate::{
-    util::{metadata::MetadataSpec, *},
+    util::{metadata::MetadataSpec, metadata::vo_bit::is_vo_bit_set,*},
     vm::VMBinding,
 };
 use atomic::Ordering;
@@ -177,6 +177,8 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     /// Attepmt to atomically log an object.
     /// Returns true if the object is not logged previously.
     fn log_object(&self, object: ObjectReference) -> bool {
+        #[cfg(all(feature = "vo_bit", feature = "extreme_assertions"))]
+        debug_assert!(is_vo_bit_set::<S::VM>(object), "object bit is unset");
         loop {
             let old_value =
                 S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst);
