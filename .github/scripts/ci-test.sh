@@ -1,6 +1,8 @@
 . $(dirname "$0")/ci-common.sh
 
 export RUST_BACKTRACE=1
+# Run all tests with 1G heap
+export MMTK_GC_TRIGGER=FixedHeapSize:1000000000
 
 for_all_features "cargo test"
 
