@@ -365,13 +365,20 @@
 <span id="365">365</span>
 <span id="366">366</span>
 <span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{Collection, VMBinding};
 <span class="kw">use </span>libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 <span class="kw">use </span>std::io::{Error, <span class="prelude-ty">Result</span>};
-<span class="kw">use </span>sysinfo::{System, SystemExt};
+<span class="kw">use </span>sysinfo::{RefreshKind, System, SystemExt};
 
 <span class="kw">pub fn </span>result_is_mapped(result: <span class="prelude-ty">Result</span>&lt;()&gt;) -&gt; bool {
     <span class="kw">match </span>result {
@@ -565,7 +572,14 @@
     // refactor this instance into some global struct. sysinfo recommends sharing one instance of
     // `System` instead of making multiple instances.
     // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
-    </span><span class="kw">let </span>sys = System::new_all();
+    //
+    // If we refactor the `System` instance to use it for other purposes, please make sure start-up
+    // time is not affected.  It takes a long time to load all components in sysinfo (e.g. by using
+    // `System::new_all()`).  Some applications, especially short-running scripts, are sensitive to
+    // start-up time.  During start-up, MMTk core only needs the total memory to initialize the
+    // `Options`.  If we only load memory-related components on start-up, it should only take &lt;1ms
+    // to initialize the `System` instance.
+    </span><span class="kw">let </span>sys = System::new_with_specifics(RefreshKind::new().with_memory());
     sys.total_memory()
 }
 
