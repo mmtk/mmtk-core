@@ -4,7 +4,7 @@ use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
-use sysinfo::{System, SystemExt};
+use sysinfo::{RefreshKind, System, SystemExt};
 
 pub fn result_is_mapped(result: Result<()>) -> bool {
     match result {
@@ -198,7 +198,14 @@ pub(crate) fn get_system_total_memory() -> u64 {
     // refactor this instance into some global struct. sysinfo recommends sharing one instance of
     // `System` instead of making multiple instances.
     // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
-    let sys = System::new_all();
+    //
+    // If we refactor the `System` instance to use it for other purposes, please make sure start-up
+    // time is not affected.  It takes a long time to load all components in sysinfo (e.g. by using
+    // `System::new_all()`).  Some applications, especially short-running scripts, are sensitive to
+    // start-up time.  During start-up, MMTk core only needs the total memory to initialize the
+    // `Options`.  If we only load memory-related components on start-up, it should only take <1ms
+    // to initialize the `System` instance.
+    let sys = System::new_with_specifics(RefreshKind::new().with_memory());
     sys.total_memory()
 }
 
