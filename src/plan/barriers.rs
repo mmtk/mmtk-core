@@ -177,6 +177,11 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     /// Attepmt to atomically log an object.
     /// Returns true if the object is not logged previously.
     fn log_object(&self, object: ObjectReference) -> bool {
+        #[cfg(all(feature = "vo_bit", feature = "extreme_assertions"))]
+        debug_assert!(
+            crate::util::metadata::vo_bit::is_vo_bit_set::<S::VM>(object),
+            "object bit is unset"
+        );
         loop {
             let old_value =
                 S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst);

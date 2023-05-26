@@ -47,7 +47,6 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
     }
 
     fn get_available_physical_pages(&self) -> usize {
-        debug_assert!(self.common().contiguous);
         let _sync = self.sync.lock().unwrap();
         self.flpr.get_available_physical_pages()
     }
