@@ -25,11 +25,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         unimplemented!()
     }
 
-    fn reset_mutator_iterator() {
-        unimplemented!()
-    }
-
-    fn get_next_mutator() -> Option<&'static mut Mutator<DummyVM>> {
+    fn mutators<'a>() -> Box<dyn Iterator<Item = &'a mut Mutator<DummyVM>> + 'a> {
         unimplemented!()
     }
 }
