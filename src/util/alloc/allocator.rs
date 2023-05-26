@@ -23,7 +23,7 @@ pub enum AllocationError {
 pub fn align_allocation_no_fill<VM: VMBinding>(
     region: Address,
     alignment: usize,
-    offset: isize,
+    offset: usize,
 ) -> Address {
     align_allocation_inner::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, false)
 }
@@ -31,7 +31,7 @@ pub fn align_allocation_no_fill<VM: VMBinding>(
 pub fn align_allocation<VM: VMBinding>(
     region: Address,
     alignment: usize,
-    offset: isize,
+    offset: usize,
 ) -> Address {
     align_allocation_inner::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, true)
 }
@@ -39,7 +39,7 @@ pub fn align_allocation<VM: VMBinding>(
 pub fn align_allocation_inner<VM: VMBinding>(
     region: Address,
     alignment: usize,
-    offset: isize,
+    offset: usize,
     known_alignment: usize,
     fillalignmentgap: bool,
 ) -> Address {
@@ -51,10 +51,9 @@ pub fn align_allocation_inner<VM: VMBinding>(
     }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
     debug_assert!(alignment <= VM::MAX_ALIGNMENT);
-    debug_assert!(offset >= 0);
     debug_assert!(region.is_aligned_to(VM::ALLOC_END_ALIGNMENT));
     debug_assert!((alignment & (VM::MIN_ALIGNMENT - 1)) == 0);
-    debug_assert!((offset & (VM::MIN_ALIGNMENT - 1) as isize) == 0);
+    debug_assert!((offset & (VM::MIN_ALIGNMENT - 1) as usize) == 0);
 
     // No alignment ever required.
     if alignment <= known_alignment || VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT {
@@ -64,7 +63,7 @@ pub fn align_allocation_inner<VM: VMBinding>(
     // May require an alignment
     let region_isize = region.as_usize() as isize;
     let mask = (alignment - 1) as isize; // fromIntSignExtend
-    let neg_off = -offset; // fromIntSignExtend
+    let neg_off: isize = -(offset as isize); // fromIntSignExtend
 
     // TODO: Consider using neg_off.wrapping_sub_unsigned(region.as_usize()), and we can remove region_isize.
     // This requires Rust 1.66.0+.
@@ -164,7 +163,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address;
 
     /// Slowpath allocation attempt. This function is explicitly not inlined for performance
     /// considerations.
@@ -174,7 +173,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
     #[inline(never)]
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow(&mut self, size: usize, align: usize, offset: usize) -> Address {
         self.alloc_slow_inline(size, align, offset)
     }
 
@@ -194,7 +193,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: usize) -> Address {
         let tls = self.get_tls();
         let plan = self.get_plan().base();
         let is_mutator = VM::VMActivePlan::is_mutator(tls);
@@ -317,7 +316,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address;
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address;
 
     /// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to
     /// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for
@@ -351,7 +350,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         // If an allocator does thread local allocation but does not override this method to

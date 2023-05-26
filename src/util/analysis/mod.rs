@@ -23,7 +23,7 @@ use self::obj_size::PerSizeClassObjectCounter;
 /// invoke it in its respective place.
 ///
 pub trait RtAnalysis<VM: VMBinding> {
-    fn alloc_hook(&mut self, _size: usize, _align: usize, _offset: isize) {}
+    fn alloc_hook(&mut self, _size: usize, _align: usize, _offset: usize) {}
     fn gc_hook(&mut self, _mmtk: &'static MMTK<VM>) {}
     fn set_running(&mut self, running: bool);
 }
@@ -72,7 +72,7 @@ impl<VM: VMBinding> AnalysisManager<VM> {
         routines.push(routine.clone());
     }
 
-    pub fn alloc_hook(&self, size: usize, align: usize, offset: isize) {
+    pub fn alloc_hook(&self, size: usize, align: usize, offset: usize) {
         let routines = self.routines.lock().unwrap();
         for r in &*routines {
             r.lock().unwrap().alloc_hook(size, align, offset);

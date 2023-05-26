@@ -46,7 +46,7 @@ impl PerSizeClassObjectCounter {
 }
 
 impl<VM: VMBinding> RtAnalysis<VM> for PerSizeClassObjectCounter {
-    fn alloc_hook(&mut self, size: usize, _align: usize, _offset: isize) {
+    fn alloc_hook(&mut self, size: usize, _align: usize, _offset: usize) {
         if !self.running {
             return;
         }
