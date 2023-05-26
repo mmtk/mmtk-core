@@ -396,7 +396,6 @@
 <span id="396">396</span>
 <span id="397">397</span>
 <span id="398">398</span>
-<span id="399">399</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use super</span>::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -446,7 +445,6 @@
     }
 
     <span class="kw">fn </span>get_available_physical_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.common().contiguous);
         <span class="kw">let </span>_sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="self">self</span>.flpr.get_available_physical_pages()
     }

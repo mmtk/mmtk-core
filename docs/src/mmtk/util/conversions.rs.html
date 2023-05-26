@@ -217,7 +217,7 @@
 
 <span class="doccomment">/// Convert size in bytes to the number of pages (aligned up)
 </span><span class="kw">pub fn </span>bytes_to_pages_up(bytes: usize) -&gt; usize {
-    (bytes + BYTES_IN_PAGE - <span class="number">1</span>) &gt;&gt; LOG_BYTES_IN_PAGE
+    raw_align_up(bytes, BYTES_IN_PAGE) &gt;&gt; LOG_BYTES_IN_PAGE
 }
 
 <span class="kw">pub fn </span>bytes_to_pages(bytes: usize) -&gt; usize {
