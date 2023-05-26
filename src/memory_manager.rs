@@ -79,7 +79,10 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     }
     let mmtk = builder.build();
 
-    info!("Initialized MMTk with {:?}", *mmtk.options.plan);
+    info!(
+        "Initialized MMTk with {:?} ({:?})",
+        *mmtk.options.plan, *mmtk.options.gc_trigger
+    );
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
     Box::new(mmtk)
