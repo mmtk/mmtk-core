@@ -38,7 +38,7 @@ mimalloc-sys = { version = "0.1.6", optional = true }
 mmtk-macros = { version = "0.18.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
-pfm = { version = "0.1.0-beta.1", optional = true }
+pfm = { version = "0.1.0-beta.3", optional = true }
 regex = "1.7.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
