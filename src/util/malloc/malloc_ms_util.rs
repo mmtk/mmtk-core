@@ -26,7 +26,7 @@ pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: usiz
     if address.is_zero() {
         return address;
     }
-    let mod_offset = offset % (align as usize);
+    let mod_offset = offset % align;
     let mut result =
         crate::util::alloc::allocator::align_allocation_no_fill::<VM>(address, align, mod_offset);
     if result - BYTES_IN_ADDRESS < address {

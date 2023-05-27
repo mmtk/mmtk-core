@@ -53,7 +53,7 @@ pub fn align_allocation_inner<VM: VMBinding>(
     debug_assert!(alignment <= VM::MAX_ALIGNMENT);
     debug_assert!(region.is_aligned_to(VM::ALLOC_END_ALIGNMENT));
     debug_assert!((alignment & (VM::MIN_ALIGNMENT - 1)) == 0);
-    debug_assert!((offset & (VM::MIN_ALIGNMENT - 1) as usize) == 0);
+    debug_assert!((offset & (VM::MIN_ALIGNMENT - 1)) == 0);
 
     // No alignment ever required.
     if alignment <= known_alignment || VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT {
