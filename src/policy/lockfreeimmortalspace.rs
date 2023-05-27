@@ -1,7 +1,9 @@
+use atomic::Atomic;
+
 use crate::mmtk::SFT_MAP;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
-use crate::util::address::Address;
+use crate::util::address::{Address, ByteSize};
 use crate::util::heap::PageResource;
 use crate::util::ObjectReference;
 
@@ -13,7 +15,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -25,10 +27,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
     name: &'static str,
     /// Heap range start
-    ///
-    /// We use `AtomicUsize` instead of `Address` here to atomically bumping this cursor.
-    /// TODO: Better address type here (Atomic<Address>?)
-    cursor: AtomicUsize,
+    cursor: Atomic<Address>,
     /// Heap range end
     limit: Address,
     /// start of this space
@@ -108,7 +107,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        let cursor = unsafe { Address::from_usize(self.cursor.load(Ordering::Relaxed)) };
+        let cursor = self.cursor.load(Ordering::Relaxed);
         let data_pages = conversions::bytes_to_pages_up(self.limit - cursor);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
@@ -116,7 +115,15 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
-        let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
+        let start = self
+            .cursor
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |addr| {
+                Some(addr.add(ByteSize::from(bytes)))
+            });
+        let start = match start {
+            Ok(addr) => addr,
+            Err(_) => panic!("Update cursor failed"),
+        };
         if start + bytes > self.limit {
             panic!("OutOfMemory")
         }
@@ -182,7 +189,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // https://github.com/mmtk/mmtk-core/issues/314
         let space = Self {
             name: args.name,
-            cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
+            cursor: Atomic::new(AVAILABLE_START),
             limit: AVAILABLE_START + total_bytes,
             start: AVAILABLE_START,
             extent: total_bytes,
