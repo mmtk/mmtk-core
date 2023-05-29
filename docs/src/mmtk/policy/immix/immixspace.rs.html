@@ -1886,7 +1886,7 @@
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -&gt; Address {
         <span class="self">self</span>.allocator.alloc(bytes, align, offset)
     }
@@ -1935,7 +1935,7 @@
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -&gt; Address {
         <span class="kw">if </span><span class="self">self</span>.get_space().in_defrag() {
             <span class="self">self</span>.defrag_allocator.alloc(bytes, align, offset)

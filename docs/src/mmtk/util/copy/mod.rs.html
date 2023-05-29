@@ -343,7 +343,7 @@
         original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         semantics: CopySemantics,
     ) -&gt; Address {
         <span class="attribute">#[cfg(debug_assertions)]

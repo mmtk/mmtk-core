@@ -118,7 +118,7 @@
 
 <span class="comment">// Beside returning the allocation result,
 // this will store the malloc result at (result - BYTES_IN_ADDRESS)
-</span><span class="kw">pub fn </span>align_offset_alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: isize) -&gt; Address {
+</span><span class="kw">pub fn </span>align_offset_alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: usize) -&gt; Address {
     <span class="comment">// we allocate extra `align` bytes here, so we are able to handle offset
     </span><span class="kw">let </span>actual_size = size + align + BYTES_IN_ADDRESS;
     <span class="kw">let </span>raw = <span class="kw">unsafe </span>{ calloc(<span class="number">1</span>, actual_size) };
@@ -126,7 +126,7 @@
     <span class="kw">if </span>address.is_zero() {
         <span class="kw">return </span>address;
     }
-    <span class="kw">let </span>mod_offset = offset % (align <span class="kw">as </span>isize);
+    <span class="kw">let </span>mod_offset = offset % align;
     <span class="kw">let </span><span class="kw-2">mut </span>result =
         <span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill::&lt;VM&gt;(address, align, mod_offset);
     <span class="kw">if </span>result - BYTES_IN_ADDRESS &lt; address {
@@ -164,7 +164,7 @@
 
 <span class="doccomment">/// allocate `size` bytes, which is aligned to `align` at `offset`
 /// return the address, and whether it is an offset allocation
-</span><span class="kw">pub fn </span>alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: isize) -&gt; (Address, bool) {
+</span><span class="kw">pub fn </span>alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: usize) -&gt; (Address, bool) {
     <span class="kw">let </span>address: Address;
     <span class="kw">let </span><span class="kw-2">mut </span>is_offset_malloc = <span class="bool-val">false</span>;
     <span class="comment">// malloc returns 16 bytes aligned address.

@@ -1145,7 +1145,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>alloc(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, size: usize, align: usize, offset: isize) -&gt; Address {
+    <span class="kw">pub fn </span>alloc(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="comment">// TODO: Should refactor this and Space.acquire()
         </span><span class="kw">if </span><span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>)) {
             <span class="macro">assert!</span>(VM::VMActivePlan::is_mutator(tls), <span class="string">&quot;Polling in GC worker&quot;</span>);

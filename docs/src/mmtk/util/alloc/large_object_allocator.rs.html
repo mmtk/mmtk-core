@@ -102,7 +102,7 @@
         <span class="bool-val">false
     </span>}
 
-    <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="kw">let </span>cell: Address = <span class="self">self</span>.alloc_slow(size, align, offset);
         <span class="comment">// We may get a null ptr from alloc due to the VM being OOM
         </span><span class="kw">if </span>!cell.is_zero() {
@@ -112,7 +112,7 @@
         }
     }
 
-    <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, _offset: isize) -&gt; Address {
+    <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, _offset: usize) -&gt; Address {
         <span class="kw">let </span>header = <span class="number">0</span>; <span class="comment">// HashSet is used instead of DoublyLinkedList
         </span><span class="kw">let </span>maxbytes = allocator::get_maximum_aligned_size::&lt;VM&gt;(size + header, align);
         <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(maxbytes);

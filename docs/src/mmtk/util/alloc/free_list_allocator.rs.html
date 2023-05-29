@@ -571,7 +571,7 @@
     }
 
     <span class="comment">// Find a block with free space and allocate to it
-    </span><span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    </span><span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">debug_assert!</span>(
             size &lt;= MAX_BIN_SIZE,
             <span class="string">&quot;Alloc request for {} bytes is too big.&quot;</span>,
@@ -607,7 +607,7 @@
         <span class="self">self</span>.alloc_slow(size, align, offset)
     }
 
-    <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="comment">// Try get a block from the space
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(block) = <span class="self">self</span>.acquire_global_block(size, align, <span class="bool-val">false</span>) {
             <span class="kw">let </span>addr = <span class="self">self</span>.block_alloc(block);
@@ -629,7 +629,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;allow slow precise stress s={}&quot;</span>, size);

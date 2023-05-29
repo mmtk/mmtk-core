@@ -463,7 +463,7 @@
         <span class="kw">crate</span>::policy::immix::block::Block::BYTES
     }
 
-    <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">debug_assert!</span>(
             size &lt;= <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE,
             <span class="string">&quot;Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}&quot;</span>,
@@ -502,7 +502,7 @@
     }
 
     <span class="doccomment">/// Acquire a clean block from ImmixSpace for allocation.
-    </span><span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    </span><span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once&quot;</span>, <span class="self">self</span>.tls);
         <span class="self">self</span>.acquire_clean_block(size, align, offset)
     }
@@ -515,7 +515,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_precise_stress&quot;</span>, <span class="self">self</span>.tls);
@@ -593,7 +593,7 @@
     }
 
     <span class="doccomment">/// Large-object (larger than a line) bump allocation.
-    </span><span class="kw">fn </span>overflow_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    </span><span class="kw">fn </span>overflow_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: overflow_alloc&quot;</span>, <span class="self">self</span>.tls);
         <span class="kw">let </span>start = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_cursor, align, offset);
         <span class="kw">let </span>end = start + size;
@@ -610,7 +610,7 @@
     }
 
     <span class="doccomment">/// Bump allocate small objects into recyclable lines (i.e. holes).
-    </span><span class="kw">fn </span>alloc_slow_hot(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    </span><span class="kw">fn </span>alloc_slow_hot(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_hot&quot;</span>, <span class="self">self</span>.tls);
         <span class="kw">if </span><span class="self">self</span>.acquire_recyclable_lines(size, align, offset) {
             <span class="comment">// If stress test is active, then we need to go to the slow path instead of directly
@@ -636,7 +636,7 @@
     }
 
     <span class="doccomment">/// Search for recyclable lines.
-    </span><span class="kw">fn </span>acquire_recyclable_lines(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; bool {
+    </span><span class="kw">fn </span>acquire_recyclable_lines(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; bool {
         <span class="kw">while </span><span class="self">self</span>.line.is_some() || <span class="self">self</span>.acquire_recyclable_block() {
             <span class="kw">let </span>line = <span class="self">self</span>.line.unwrap();
             <span class="kw">if let </span><span class="prelude-val">Some</span>((start_line, end_line)) = <span class="self">self</span>.immix_space().get_next_available_lines(line)
@@ -687,7 +687,7 @@
     }
 
     <span class="comment">// Get a clean block from ImmixSpace.
-    </span><span class="kw">fn </span>acquire_clean_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; Address {
+    </span><span class="kw">fn </span>acquire_clean_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="kw">match </span><span class="self">self</span>.immix_space().get_clean_block(<span class="self">self</span>.tls, <span class="self">self</span>.copy) {
             <span class="prelude-val">None </span>=&gt; Address::ZERO,
             <span class="prelude-val">Some</span>(block) =&gt; {
@@ -712,7 +712,7 @@
     <span class="doccomment">/// Return whether the TLAB has been exhausted and we need to acquire a new block. Assumes that
     /// the buffer limits have been restored using [`ImmixAllocator::restore_limit_for_stress`].
     /// Note that this function may implicitly change the limits of the allocator.
-    </span><span class="kw">fn </span>require_new_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: isize) -&gt; bool {
+    </span><span class="kw">fn </span>require_new_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; bool {
         <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.cursor, align, offset);
         <span class="kw">let </span>new_cursor = result + size;
         <span class="kw">let </span>insufficient_space = new_cursor &gt; <span class="self">self</span>.limit;

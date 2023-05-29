@@ -445,7 +445,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         allocator: AllocationSemantics,
     ) -&gt; Address {
         <span class="kw">unsafe </span>{
@@ -520,7 +520,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         allocator: AllocationSemantics,
     ) -&gt; Address;
     <span class="kw">fn </span>post_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, refer: ObjectReference, bytes: usize, allocator: AllocationSemantics);

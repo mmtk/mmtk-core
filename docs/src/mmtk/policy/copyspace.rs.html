@@ -638,7 +638,7 @@
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -&gt; Address {
         <span class="self">self</span>.copy_allocator.alloc(bytes, align, offset)
     }

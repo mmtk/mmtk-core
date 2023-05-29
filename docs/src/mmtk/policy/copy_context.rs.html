@@ -46,7 +46,7 @@
         original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -&gt; Address;
     <span class="kw">fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _obj: ObjectReference, _bytes: usize) {}
 }

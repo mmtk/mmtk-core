@@ -1049,7 +1049,7 @@
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     size: usize,
     align: usize,
-    offset: isize,
+    offset: usize,
     semantics: AllocationSemantics,
 ) -&gt; Address {
     <span class="comment">// MMTk has assumptions about minimal object size.
