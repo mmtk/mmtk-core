@@ -18,7 +18,7 @@ pub fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
 
 // Beside returning the allocation result,
 // this will store the malloc result at (result - BYTES_IN_ADDRESS)
-pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: isize) -> Address {
+pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> Address {
     // we allocate extra `align` bytes here, so we are able to handle offset
     let actual_size = size + align + BYTES_IN_ADDRESS;
     let raw = unsafe { calloc(1, actual_size) };
@@ -26,7 +26,7 @@ pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: isiz
     if address.is_zero() {
         return address;
     }
-    let mod_offset = offset % (align as isize);
+    let mod_offset = offset % align;
     let mut result =
         crate::util::alloc::allocator::align_allocation_no_fill::<VM>(address, align, mod_offset);
     if result - BYTES_IN_ADDRESS < address {
@@ -64,7 +64,7 @@ pub fn get_malloc_usable_size(address: Address, is_offset_malloc: bool) -> usize
 
 /// allocate `size` bytes, which is aligned to `align` at `offset`
 /// return the address, and whether it is an offset allocation
-pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: isize) -> (Address, bool) {
+pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Address, bool) {
     let address: Address;
     let mut is_offset_malloc = false;
     // malloc returns 16 bytes aligned address.

@@ -900,7 +900,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         self.allocator.alloc(bytes, align, offset)
     }
@@ -949,7 +949,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixHybridCopyContext<VM> {
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         if self.get_space().in_defrag() {
             self.defrag_allocator.alloc(bytes, align, offset)

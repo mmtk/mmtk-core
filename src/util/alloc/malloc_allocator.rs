@@ -25,7 +25,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         self.plan
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         self.alloc_slow(size, align, offset)
     }
 
@@ -37,9 +37,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         false
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        assert!(offset >= 0);
-
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         self.space.alloc(self.tls, size, align, offset)
     }
 }
