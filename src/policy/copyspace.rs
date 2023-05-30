@@ -306,7 +306,7 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
     }

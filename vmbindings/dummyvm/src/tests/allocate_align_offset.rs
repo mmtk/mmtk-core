@@ -30,7 +30,7 @@ pub fn allocate_alignment() {
 #[test]
 pub fn allocate_offset() {
     MUTATOR.with_fixture(|fixture| {
-        const OFFSET: isize = 4;
+        const OFFSET: usize = 4;
         let min = DummyVM::MIN_ALIGNMENT;
         let max = DummyVM::MAX_ALIGNMENT;
         info!("Allowed alignment between {} and {}", min, max);
