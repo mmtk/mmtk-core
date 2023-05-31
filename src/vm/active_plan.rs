@@ -5,26 +5,6 @@ use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::ObjectQueue;
-use std::marker::PhantomData;
-use std::sync::MutexGuard;
-
-pub struct SynchronizedMutatorIterator<'a, VM: VMBinding> {
-    _guard: MutexGuard<'a, ()>,
-    start: bool,
-    phantom: PhantomData<VM>,
-}
-
-impl<'a, VM: VMBinding> Iterator for SynchronizedMutatorIterator<'a, VM> {
-    type Item = &'static mut Mutator<VM>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.start {
-            self.start = false;
-            VM::VMActivePlan::reset_mutator_iterator();
-        }
-        VM::VMActivePlan::get_next_mutator()
-    }
-}
 
 /// VM-specific methods for the current plan.
 pub trait ActivePlan<VM: VMBinding> {
@@ -52,22 +32,8 @@ pub trait ActivePlan<VM: VMBinding> {
     /// The caller needs to make sure that the thread is a mutator thread.
     fn mutator(tls: VMMutatorThread) -> &'static mut Mutator<VM>;
 
-    /// Reset the mutator iterator so that `get_next_mutator()` returns the first mutator.
-    fn reset_mutator_iterator();
-
-    /// Return the next mutator if there is any. This method assumes that the VM implements stateful type
-    /// to remember which mutator is returned and guarantees to return the next when called again. This does
-    /// not need to be thread safe.
-    fn get_next_mutator() -> Option<&'static mut Mutator<VM>>;
-
-    /// A utility method to provide a thread-safe mutator iterator from `reset_mutator_iterator()` and `get_next_mutator()`.
-    fn mutators<'a>() -> SynchronizedMutatorIterator<'a, VM> {
-        SynchronizedMutatorIterator {
-            _guard: Self::global().base().mutator_iterator_lock.lock().unwrap(),
-            start: true,
-            phantom: PhantomData,
-        }
-    }
+    /// Return an iterator that includes all the mutators at the point of invocation.
+    fn mutators<'a>() -> Box<dyn Iterator<Item = &'a mut Mutator<VM>> + 'a>;
 
     /// Return the total count of mutators.
     fn number_of_mutators() -> usize;

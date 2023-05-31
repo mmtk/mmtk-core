@@ -31,7 +31,7 @@ extern MMTk_Mutator bind_mutator(void *tls) {
     return NULL;
 }
 
-extern void* align_allocation(void* region, size_t align, ssize_t offset) {
+extern void* align_allocation(void* region, size_t align, size_t offset) {
     ssize_t region_signed = (ssize_t) region;
 
     ssize_t mask = (ssize_t) (align - 1);
@@ -42,7 +42,7 @@ extern void* align_allocation(void* region, size_t align, ssize_t offset) {
 }
 
 extern void* alloc(MMTk_Mutator mutator, size_t size,
-                   size_t align, ssize_t offset, int allocator) {
+                   size_t align, size_t offset, int allocator) {
 
     void* result = align_allocation(IMMORTAL_SPACE.heap_cursor, align, offset);
     void* new_cursor = (void*)((size_t) result + size);
@@ -54,7 +54,7 @@ extern void* alloc(MMTk_Mutator mutator, size_t size,
 }
 
 extern void* alloc_slow(MMTk_Mutator mutator, size_t size,
-                        size_t align, ssize_t offset, int allocator) {
+                        size_t align, size_t offset, int allocator) {
 
     perror("Not implemented\n");
     exit(1);

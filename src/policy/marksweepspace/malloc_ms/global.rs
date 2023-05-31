@@ -93,7 +93,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         true
     }
 
-    // For malloc space, we need to further check the alloc bit.
+    // For malloc space, we need to further check the VO bit.
     fn is_in_space(&self, object: ObjectReference) -> bool {
         is_alloced_by_malloc::<VM>(object)
     }
@@ -109,7 +109,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        set_alloc_bit::<VM>(object);
+        set_vo_bit::<VM>(object);
     }
 
     fn sft_trace_object(
@@ -161,7 +161,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             let addr = object.to_object_start::<VM>();
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
-                // The alloc bit tells that the object is in space.
+                // The VO bit tells that the object is in space.
                 debug_assert!(
                     *active_mem.get(&addr).unwrap() != 0,
                     "active mem check failed for {} (object {}) - was freed",
@@ -169,7 +169,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                     object
                 );
             } else {
-                // The alloc bit tells that the object is not in space. It could never be allocated, or have been freed.
+                // The VO bit tells that the object is not in space. It could never be allocated, or have been freed.
                 debug_assert!(
                     (!active_mem.contains_key(&addr))
                         || (active_mem.contains_key(&addr) && *active_mem.get(&addr).unwrap() == 0),
@@ -238,10 +238,10 @@ pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
 
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
-        // MallocSpace needs to use alloc bit. If the feature is turned on, the alloc bit spec is in the global specs.
+        // MallocSpace needs to use VO bit. If the feature is turned on, the VO bit spec is in the global specs.
         // Otherwise, we manually add it.
-        if !cfg!(feature = "global_alloc_bit") {
-            specs.push(crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC);
+        if !cfg!(feature = "vo_bit") {
+            specs.push(crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC);
         }
         // MallocSpace also need a global chunk metadata.
         // TODO: I don't know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
@@ -325,7 +325,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
+    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: usize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if self.get_gc_trigger().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
@@ -538,7 +538,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
             trace!("free object {}", object);
-            unsafe { unset_alloc_bit_unsafe::<VM>(object) };
+            unsafe { unset_vo_bit_unsafe::<VM>(object) };
 
             true
         } else {
@@ -615,30 +615,35 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let chunk_end = chunk_start + BYTES_IN_CHUNK;
 
             debug_assert!(
-                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
                     == mark_bit_spec.log_bytes_in_region,
-                "Alloc-bit and mark-bit metadata have different minimum object sizes!"
+                "VO-bit and mark-bit metadata have different minimum object sizes!"
             );
 
             // For bulk xor'ing 128-bit vectors on architectures with vector instructions
             // Each bit represents an object of LOG_MIN_OBJ_SIZE size
-            let bulk_load_size: usize =
-                128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
+            let bulk_load_size: usize = 128
+                * (1 << crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC
+                    .log_bytes_in_region);
 
             // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
             let mut empty_page_start = Address::ZERO;
 
             // Scan the chunk by every 'bulk_load_size' region.
             while address < chunk_end {
-                let alloc_128: u128 =
-                    unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
+                let alloc_128: u128 = unsafe {
+                    load128(
+                        &crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC,
+                        address,
+                    )
+                };
                 let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
                 // Check if there are dead objects in the bulk loaded region
                 if alloc_128 ^ mark_128 != 0 {
                     let end = address + bulk_load_size;
 
-                    // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
+                    // We will do non atomic load on the VO bit, as this is the only thread that access the VO bit for a chunk.
                     // Linear scan through the bulk load region.
                     let bulk_load_scan = crate::util::linear_scan::ObjectIterator::<
                         VM,
@@ -676,7 +681,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     if ASSERT_ALLOCATION {
                         debug_assert!(
                             self.active_mem.lock().unwrap().contains_key(&obj_start),
-                            "Address {} with alloc bit is not in active_mem",
+                            "Address {} with VO bit is not in active_mem",
                             obj_start
                         );
                         debug_assert_eq!(
@@ -742,7 +747,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
                 debug_assert!(
                     self.active_mem.lock().unwrap().contains_key(&obj_start),
-                    "Address {} with alloc bit is not in active_mem",
+                    "Address {} with VO bit is not in active_mem",
                     obj_start
                 );
                 debug_assert_eq!(

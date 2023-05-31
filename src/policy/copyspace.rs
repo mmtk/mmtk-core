@@ -5,7 +5,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
-#[cfg(feature = "global_alloc_bit")]
+#[cfg(feature = "vo_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
@@ -56,8 +56,8 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
@@ -74,7 +74,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(
@@ -172,21 +172,21 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
-            #[cfg(feature = "global_alloc_bit")]
-            self.reset_alloc_bit();
+            #[cfg(feature = "vo_bit")]
+            self.reset_vo_bit();
             self.pr.reset();
         }
         self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
     }
 
-    #[cfg(feature = "global_alloc_bit")]
-    unsafe fn reset_alloc_bit(&self) {
+    #[cfg(feature = "vo_bit")]
+    unsafe fn reset_vo_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            // If we have allocated something into this space, we need to clear its alloc bit.
+            // If we have allocated something into this space, we need to clear its VO bit.
             if current_chunk != self.common.start {
-                crate::util::alloc_bit::bzero_alloc_bit(
+                crate::util::metadata::vo_bit::bzero_vo_bit(
                     self.common.start,
                     current_chunk + BYTES_IN_CHUNK - self.common.start,
                 );
@@ -218,10 +218,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         // This object is in from space, we will copy. Make sure we have a valid copy semantic.
         debug_assert!(semantics.is_some());
 
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
 
@@ -306,7 +306,7 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
     }

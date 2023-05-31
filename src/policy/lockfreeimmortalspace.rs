@@ -68,12 +68,12 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         unimplemented!()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,

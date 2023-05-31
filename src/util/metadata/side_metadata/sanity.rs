@@ -433,6 +433,34 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
     }
 }
 
+/// Commits a side metadata bulk set operation (set the related bits to all 1s).
+/// Panics if the metadata spec is not valid.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to perform the bulk set on
+/// * `start`: the starting address of the source data
+/// * `size`: size of the source data
+#[cfg(feature = "extreme_assertions")]
+pub fn verify_bset(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
+    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+    let start = align_to_region_start(metadata_spec, start);
+    let end = align_to_region_start(metadata_spec, start + size);
+    let max_value = (1 << (1 << metadata_spec.log_num_of_bits)) - 1;
+    match sanity_map.get_mut(metadata_spec) {
+        Some(spec_sanity_map) => {
+            let mut cursor = start;
+            let step: usize = 1 << metadata_spec.log_bytes_in_region;
+            while cursor < end {
+                spec_sanity_map.insert(cursor, max_value);
+                cursor += step;
+            }
+        }
+        None => {
+            panic!("Invalid Metadata Spec!");
+        }
+    }
+}
+
 #[cfg(feature = "extreme_assertions")]
 use crate::util::metadata::metadata_val_traits::*;
 

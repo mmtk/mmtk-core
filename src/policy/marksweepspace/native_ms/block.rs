@@ -165,8 +165,7 @@ impl Block {
     }
 
     pub fn store_block_list(&self, block_list: &BlockList) {
-        let block_list_usize: usize =
-            unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
+        let block_list_usize: usize = block_list as *const BlockList as usize;
         unsafe {
             Block::BLOCK_LIST_TABLE.store::<usize>(self.start(), block_list_usize);
         }
@@ -187,8 +186,8 @@ impl Block {
     }
 
     pub fn store_tls(&self, tls: VMThread) {
-        let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls.0) };
-        unsafe { Block::TLS_TABLE.store(self.start(), tls) }
+        let tls_usize: usize = tls.0.to_address().as_usize();
+        unsafe { Block::TLS_TABLE.store(self.start(), tls_usize) }
     }
 
     pub fn load_tls(&self) -> VMThread {
@@ -287,10 +286,10 @@ impl Block {
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)
             {
-                // clear alloc bit if it is ever set. It is possible that the alloc bit is never set for this cell (i.e. there was no object in this cell before this GC),
+                // clear VO bit if it is ever set. It is possible that the VO bit is never set for this cell (i.e. there was no object in this cell before this GC),
                 // we unset the bit anyway.
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_alloc_bit_nocheck::<VM>(potential_object);
+                #[cfg(feature = "vo_bit")]
+                crate::util::metadata::vo_bit::unset_vo_bit_nocheck::<VM>(potential_object);
                 unsafe {
                     cell.store::<Address>(last);
                 }
@@ -353,9 +352,9 @@ impl Block {
                         self, cell, last
                     );
 
-                    // Clear alloc bit: we don't know where the object reference actually is, so we bulk zero the cell.
-                    #[cfg(feature = "global_alloc_bit")]
-                    crate::util::alloc_bit::bzero_alloc_bit(cell, cell_size);
+                    // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
+                    #[cfg(feature = "vo_bit")]
+                    crate::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
 
                     // store the previous cell to make the free list
                     debug_assert!(last.is_zero() || (last >= self.start() && last < self.end()));

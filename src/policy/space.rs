@@ -23,11 +23,9 @@ use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::map::Map;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
@@ -265,7 +263,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             panic!("failed to mmap meta memory");
         }
 
-        use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
             .mark_as_mapped(self.common().start, self.common().extent);
@@ -394,8 +391,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
     pub head_discontiguous_region: Address,
 
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
+    pub vm_map: &'static dyn VMMap,
+    pub mmapper: &'static dyn Mmapper,
 
     pub metadata: SideMetadataContext,
 
@@ -425,8 +422,8 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub zeroed: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
+    pub vm_map: &'static dyn VMMap,
+    pub mmapper: &'static dyn Mmapper,
     pub heap: &'a mut HeapMeta,
     pub constraints: &'a PlanConstraints,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -493,10 +490,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 top: _top,
             } => (_extent, _top),
             VMRequest::Fixed {
-                extent: _extent,
-                top: _top,
-                ..
-            } => (_extent, _top),
+                extent: _extent, ..
+            } => (_extent, false),
             _ => unreachable!(),
         };
 
@@ -527,7 +522,22 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // FIXME
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        args.plan_args.vm_map.insert(start, extent, rtn.descriptor);
+
+        // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
+        // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
+        // insert into our vm map if the range overlaps with our heap.
+        {
+            use crate::util::heap::layout;
+            let overlap =
+                Address::range_intersection(&(start..start + extent), &layout::available_range());
+            if !overlap.is_empty() {
+                args.plan_args.vm_map.insert(
+                    overlap.start,
+                    overlap.end - overlap.start,
+                    rtn.descriptor,
+                );
+            }
+        }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
         if rtn
@@ -563,7 +573,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
     }
 
-    pub fn vm_map(&self) -> &'static VMMap {
+    pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
     }
 }

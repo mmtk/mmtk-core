@@ -79,10 +79,18 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     }
     let mmtk = builder.build();
 
-    info!("Initialized MMTk with {:?}", *mmtk.options.plan);
+    info!(
+        "Initialized MMTk with {:?} ({:?})",
+        *mmtk.options.plan, *mmtk.options.gc_trigger
+    );
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
     Box::new(mmtk)
+}
+
+#[cfg(feature = "vm_space")]
+pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
+    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
 }
 
 /// Request MMTk to create a mutator for the given thread. The ownership
@@ -138,7 +146,7 @@ pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
-    offset: isize,
+    offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
     // MMTk has assumptions about minimal object size.
@@ -598,20 +606,20 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// 2.  Also return true if there exists an `objref: ObjectReference` such that
 ///     -   `objref` is a valid object reference to an object in any space in MMTk, and
 ///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(ALLOC_BIT_REGION_SIZE)` and
-///         -   `hi = lo + ALLOC_BIT_REGION_SIZE` and
-///         -   `ALLOC_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
-///             It is the byte granularity of the alloc bit.
+///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
+///         -   `hi = lo + VO_BIT_REGION_SIZE` and
+///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
+///             It is the byte granularity of the valid object (VO) bit.
 /// 3.  Return false otherwise.  This function never panics.
 ///
 /// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the "alloc bits" side metadata, i.e. a bitmap.
+/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
 /// For space efficiency, each bit of the bitmap governs a small region of memory.
 /// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
 /// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
 /// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
 /// The alignment of a region is also the region size.
-/// If an alloc bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
+/// If a VO bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
 /// is the valid object reference.
 /// Therefore, if the input `addr` is not properly aligned, but is close to a valid object
 /// reference, this function may still return true.
@@ -619,7 +627,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
 /// function.  For most VMs, valid object references are always aligned to the word size, so
 /// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
-/// always check against [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
+/// always check against [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses

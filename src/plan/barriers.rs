@@ -94,6 +94,23 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
 
     /// Full post-barrier for array copy
     fn memory_region_copy_post(&mut self, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
+
+    /// A pre-barrier indicating that some fields of the object will probably be modified soon.
+    /// Specifically, the caller should ensure that:
+    ///     * The barrier must called before any field modification.
+    ///     * Some fields (unknown at the time of calling this barrier) might be modified soon, without a write barrier.
+    ///     * There are no safepoints between the barrier call and the field writes.
+    ///
+    /// **Example use case for mmtk-openjdk:**
+    ///
+    /// The OpenJDK C2 slowpath allocation code
+    /// can do deoptimization after the allocation and before returning to C2 compiled code.
+    /// The deoptimization itself contains a safepoint. For generational plans, if a GC
+    /// happens at this safepoint, the allocated object will be promoted, and all the
+    /// subsequent field initialization should be recorded.
+    ///
+    // TODO: Review any potential use cases for other VM bindings.
+    fn object_probable_write(&mut self, _obj: ObjectReference) {}
 }
 
 impl_downcast!(Barrier<VM> where VM: VMBinding);
@@ -136,6 +153,9 @@ pub trait BarrierSemantics: 'static + Send {
         src: <Self::VM as VMBinding>::VMMemorySlice,
         dst: <Self::VM as VMBinding>::VMMemorySlice,
     );
+
+    /// Object will probably be modified
+    fn object_probable_write_slow(&mut self, _obj: ObjectReference) {}
 }
 
 /// Generic object barrier with a type argument defining it's slow-path behaviour.
@@ -157,6 +177,11 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     /// Attepmt to atomically log an object.
     /// Returns true if the object is not logged previously.
     fn log_object(&self, object: ObjectReference) -> bool {
+        #[cfg(all(feature = "vo_bit", feature = "extreme_assertions"))]
+        debug_assert!(
+            crate::util::metadata::vo_bit::is_vo_bit_set::<S::VM>(object),
+            "object bit is unset"
+        );
         loop {
             let old_value =
                 S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst);
@@ -214,5 +239,11 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         dst: <S::VM as VMBinding>::VMMemorySlice,
     ) {
         self.semantics.memory_region_copy_slow(src, dst);
+    }
+
+    fn object_probable_write(&mut self, obj: ObjectReference) {
+        if self.object_is_unlogged(obj) {
+            self.semantics.object_probable_write_slow(obj);
+        }
     }
 }

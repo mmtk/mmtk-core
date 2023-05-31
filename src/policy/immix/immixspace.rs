@@ -117,12 +117,12 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -246,7 +246,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        #[cfg(feature = "immix_no_defrag")]
+        #[cfg(feature = "immix_non_moving")]
         info!(
             "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
             args.name,
@@ -485,10 +485,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
         if self.attempt_mark(object, self.mark_state) {
@@ -520,10 +520,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
@@ -769,18 +769,11 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-        }
-        // NOTE: We don't need to reset the forwarding pointer metadata because it is meaningless
-        // until the forwarding bits are also set, at which time we also write the forwarding
-        // pointer.
     }
 }
 
 impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        let defrag_threshold = self.defrag_threshold.unwrap_or(0);
         // Clear object mark table for this chunk
         self.reset_object_mark();
         // Iterate over all blocks in this chunk
@@ -791,15 +784,36 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 continue;
             }
             // Check if this block needs to be defragmented.
-            if super::DEFRAG && defrag_threshold != 0 && block.get_holes() > defrag_threshold {
-                block.set_as_defrag_source(true);
+            let is_defrag_source = if !super::DEFRAG {
+                // Do not set any block as defrag source if defrag is disabled.
+                false
+            } else if super::DEFRAG_EVERY_BLOCK {
+                // Set every block as defrag source if so desired.
+                true
+            } else if let Some(defrag_threshold) = self.defrag_threshold {
+                // This GC is a defrag GC.
+                block.get_holes() > defrag_threshold
             } else {
-                block.set_as_defrag_source(false);
-            }
+                // Not a defrag GC.
+                false
+            };
+            block.set_as_defrag_source(is_defrag_source);
             // Clear block mark data.
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
+            // Clear forwarding bits if necessary.
+            if is_defrag_source {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+                    // Clear on-the-side forwarding bits.
+                    // NOTE: In theory, we only need to clear the forwarding bits of occupied lines of
+                    // blocks that are defrag sources.
+                    side.bzero_metadata(block.start(), Block::BYTES);
+                }
+            }
+            // NOTE: We don't need to reset the forwarding pointer metadata because it is meaningless
+            // until the forwarding bits are also set, at which time we also write the forwarding
+            // pointer.
         }
     }
 }
@@ -886,7 +900,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         self.allocator.alloc(bytes, align, offset)
     }
@@ -935,7 +949,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixHybridCopyContext<VM> {
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         if self.get_space().in_defrag() {
             self.defrag_allocator.alloc(bytes, align, offset)

@@ -5,7 +5,6 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
-use crate::util::heap::layout::mmapper::Mmapper;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -319,6 +318,12 @@ impl Address {
             MMAPPER.is_mapped_address(self)
         }
     }
+
+    /// Returns the intersection of the two address ranges. The returned range could
+    /// be empty if there is no intersection between the ranges.
+    pub fn range_intersection(r1: &Range<Address>, r2: &Range<Address>) -> Range<Address> {
+        r1.start.max(r2.start)..r1.end.min(r2.end)
+    }
 }
 
 /// allows print Address as upper-case hex value
@@ -346,6 +351,15 @@ impl fmt::Display for Address {
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:#x}", self.0)
+    }
+}
+
+impl std::str::FromStr for Address {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let raw: usize = s.parse()?;
+        Ok(Address(raw))
     }
 }
 

@@ -42,14 +42,14 @@ extern void mmtk_disable_collection();
 extern void* mmtk_alloc(MMTk_Mutator mutator,
                         size_t size,
                         size_t align,
-                        ssize_t offset,
+                        size_t offset,
                         int allocator);
 
 // Slowpath allocation for an object
 extern void* mmtk_alloc_slow(MMTk_Mutator mutator,
                              size_t size,
                              size_t align,
-                             ssize_t offset,
+                             size_t offset,
                              int allocator);
 
 // Perform post-allocation hooks or actions such as initializing object metadata

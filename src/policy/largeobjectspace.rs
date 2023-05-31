@@ -78,13 +78,13 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
         self.treadmill.add_to_treadmill(object, alloc);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -189,10 +189,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
         let nursery_object = self.is_in_nursery(object);
@@ -202,11 +202,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if nursery_object { "is" } else { "is not" }
         );
         if !self.in_nursery_gc || nursery_object {
-            // Note that test_and_mark() has side effects
+            // Note that test_and_mark() has side effects of
+            // clearing nursery bit/moving objects out of logical nursery
             if self.test_and_mark(object, self.mark_state) {
                 trace!("LOS object {} is being marked now", object);
                 self.treadmill.copy(object, nursery_object);
-                self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
@@ -225,8 +225,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
-            #[cfg(feature = "global_alloc_bit")]
-            crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::unset_vo_bit::<VM>(object);
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
         };
@@ -246,6 +246,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.acquire(tls, pages)
     }
 
+    /// Test if the object's mark bit is the same as the given value. If it is not the same,
+    /// the method will attemp to mark the object and clear its nursery bit. If the attempt
+    /// succeeds, the method will return true, meaning the object is marked by this invocation.
+    /// Otherwise, it returns false.
     fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
         loop {
             let mask = if self.in_nursery_gc {
@@ -262,6 +266,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if mark_bit == value {
                 return false;
             }
+            // using LOS_BIT_MASK have side effects of clearing nursery bit
             if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
@@ -296,31 +301,6 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
-    }
-
-    /// Move a given object out of nursery
-    fn clear_nursery(&self, object: ObjectReference) {
-        loop {
-            let old_val = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::Relaxed,
-            );
-            let new_val = old_val & !NURSERY_BIT;
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_val,
-                    new_val,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
     }
 }
 

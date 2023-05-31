@@ -1,3 +1,34 @@
+0.18.0 (2023-04-03)
+===
+
+Plan
+---
+* Add a new plan, `StickyImmix`. This is an variant of immix using a sticky mark bit. This plan allows generational behaviors without using a compulsory copying nursery.
+* Side log bits in generational plans are now set using relaxed store for the entire byte as an optimization.
+
+Policy
+---
+* Add constants `STRESS_DEFRAG` and `DEFRAG_EVERY_BLOCK` to allow immix to stress defrag copying for debugging.
+
+API
+---
+* Add a new write barrier method `object_probable_write`. The method can be called before the fields of an object may get updated without a normal write barrier.
+* Add a feature `immix_non_moving` to replace the current `immix_no_defrag` feature. This is only intended for debugging uses to rule out issues from copying.
+
+Misc
+---
+* Refactor `Mmapper` and `VMMap`. Their implementation is now chosen dynamically, rather than statically based on the pointer size of the architecture. This allows
+  us to use a more appropriate implementation to support compressed pointers.
+* Revert changes in d341506 about forwarding bits, and bulk zero side forward bits for defrag source blocks.
+* Fix a bug in the scheduler where a worker may spuriously wake up and attempt to open new buckets while the coordinator is executing a coordinator work packet, 
+  which would result in an assertion failure.
+* Fix a bug in the mem balancer where subtraction may silently overflow and cause unexpected statistics to be used for computing new heap sizes.
+* Fix a bug where `ScanObjectsWork` does not properly set the worker when it internally uses `ProcessEdgesWork`.
+* Fix a bug where nodes pushed during root scanning were not cached for sanity GC.
+* Fix a bug where `harness_begin` does not force a full heap GC for generational plans.
+* Add info-level logging for each GC to show the memory usage before and after the GC, and elapsed time for the GC.
+
+
 0.17.0 (2023-02-17)
 ===
 

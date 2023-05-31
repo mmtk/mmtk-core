@@ -67,6 +67,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.base()
     }
 
+    fn base_mut(&mut self) -> &mut crate::plan::global::BasePlan<Self::VM> {
+        self.immix.base_mut()
+    }
+
     fn generational(
         &self,
     ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
@@ -147,7 +151,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     ) -> bool {
         let nursery_full =
             self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
-        if space_full && space.is_some() && space.unwrap().name() == self.immix.immix_space.name() {
+        if space_full && space.is_some() && space.unwrap().name() != self.immix.immix_space.name() {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
         self.immix.collection_required(space_full, space) || nursery_full
@@ -158,7 +162,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
-        self.immix.get_collection_reserved_pages() + self.immix.immix_space.defrag_headroom_pages()
+        self.immix.get_collection_reserved_pages()
     }
 
     fn get_used_pages(&self) -> usize {
@@ -283,10 +287,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 .trace_object::<Q>(queue, object);
         }
 
-        warn!(
-            "Object {} is not in nursery or in LOS, it is not traced!",
-            object
-        );
         object
     }
 }

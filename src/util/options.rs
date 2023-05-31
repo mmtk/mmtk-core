@@ -1,6 +1,7 @@
 use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::Address;
 use std::default::Default;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -636,7 +637,7 @@ mod gc_trigger_tests {
 // At some point, we may disallow this and all the options can only be set by command line.
 options! {
     // The plan to use.
-    plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::NoGC,
+    plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::GenImmix,
     // Number of GC worker threads. (There is always one GC controller thread.)
     // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
@@ -681,10 +682,10 @@ options! {
     // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
     // factor (e.g. tens of metabytes).
     precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
+    // The start of vmspace.
+    vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
     // The size of vmspace.
-    // FIXME: This value is set for JikesRVM. We need a proper way to set options.
-    //   We need to set these values programmatically in VM specific code.
-    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0x7cc_cccc,
+    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = usize::MAX,
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).

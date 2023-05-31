@@ -18,7 +18,7 @@ impl ObjectCounter {
 }
 
 impl<VM: VMBinding> RtAnalysis<VM> for ObjectCounter {
-    fn alloc_hook(&mut self, _size: usize, _align: usize, _offset: isize) {
+    fn alloc_hook(&mut self, _size: usize, _align: usize, _offset: usize) {
         if self.running {
             // The analysis routine simply updates the counter when the allocation hook is called
             self.counter.lock().unwrap().inc();

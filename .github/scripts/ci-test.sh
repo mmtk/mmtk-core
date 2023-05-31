@@ -1,6 +1,8 @@
 . $(dirname "$0")/ci-common.sh
 
 export RUST_BACKTRACE=1
+# Run all tests with 1G heap
+export MMTK_GC_TRIGGER=FixedHeapSize:1000000000
 
 for_all_features "cargo test"
 
@@ -25,7 +27,7 @@ for fn in $(ls src/tests/*.rs); do
     # Get the required plans.
     # Some tests need to be run with multiple plans because
     # some bugs can only be reproduced in some plans but not others.
-    PLANS=$(sed -n 's;^//\s*GITHUB-CI:\s*MMTK_PLAN=\(\w\+\)\s*$;\1;p' $fn)
+    PLANS=$(sed -n 's/^\/\/ *GITHUB-CI: *MMTK_PLAN=//p' $fn)
     if [[ $PLANS == 'all' ]]; then
         PLANS=$ALL_PLANS
     elif [[ -z $PLANS ]]; then
@@ -33,7 +35,7 @@ for fn in $(ls src/tests/*.rs); do
     fi
 
     # Some tests need some features enabled.
-    FEATURES=$(sed -n 's;^//\s*GITHUB-CI:\s*FEATURES=\([a-zA-Z0-9_,]\+\)\s*$;\1;p' $fn)
+    FEATURES=$(sed -n 's/^\/\/ *GITHUB-CI: *FEATURES=//p' $fn)
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do

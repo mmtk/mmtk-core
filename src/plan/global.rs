@@ -8,14 +8,16 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
+#[cfg(feature = "vm_space")]
+use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -66,8 +68,8 @@ pub fn create_mutator<VM: VMBinding>(
 
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
-    vm_map: &'static VMMap,
-    mmapper: &'static Mmapper,
+    vm_map: &'static dyn VMMap,
+    mmapper: &'static dyn Mmapper,
     options: Arc<Options>,
     scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
@@ -176,6 +178,7 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn base(&self) -> &BasePlan<Self::VM>;
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
@@ -184,9 +187,6 @@ pub trait Plan: 'static + Sync + Downcast {
         &self,
     ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
         None
-    }
-    fn mmapper(&self) -> &'static Mmapper {
-        self.base().mmapper
     }
     fn options(&self) -> &Options {
         &self.base().options
@@ -381,8 +381,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub cur_collection_attempts: AtomicUsize,
     pub gc_requester: Arc<GCRequester<VM>>,
     pub stats: Stats,
-    mmapper: &'static Mmapper,
-    pub vm_map: &'static VMMap,
+    // pub vm_map: &'static dyn Map,
     pub options: Arc<Options>,
     pub heap: HeapMeta,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -422,7 +421,7 @@ pub struct BasePlan<VM: VMBinding> {
     /// If VM space is present, it has some special interaction with the
     /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
     ///
-    /// -   The `is_mmtk_object` funciton requires the alloc_bit side metadata to identify objects,
+    /// -   The `is_mmtk_object` funciton requires the valid object (VO) bit side metadata to identify objects,
     ///     but currently we do not require the boot image to provide it, so it will not work if the
     ///     address argument is in the VM space.
     ///
@@ -430,36 +429,14 @@ pub struct BasePlan<VM: VMBinding> {
     ///     the VM space.
     #[cfg(feature = "vm_space")]
     #[trace]
-    pub vm_space: ImmortalSpace<VM>,
-}
-
-#[cfg(feature = "vm_space")]
-pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> ImmortalSpace<VM> {
-    use crate::util::constants::LOG_BYTES_IN_MBYTE;
-    let boot_segment_bytes = *args.global_args.options.vm_space_size;
-    debug_assert!(boot_segment_bytes > 0);
-
-    use crate::util::conversions::raw_align_up;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
-
-    let space = ImmortalSpace::new(args.get_space_args(
-        "boot",
-        false,
-        VMRequest::fixed_size(boot_segment_mb),
-    ));
-
-    // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
-    space.ensure_mapped();
-
-    space
+    pub vm_space: VMSpace<VM>,
 }
 
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
 /// is passed to each plan's constructor.
 pub struct CreateGeneralPlanArgs<VM: VMBinding> {
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
+    pub vm_map: &'static dyn VMMap,
+    pub mmapper: &'static dyn Mmapper,
     pub heap: HeapMeta,
     pub options: Arc<Options>,
     pub gc_trigger: Arc<crate::util::heap::gc_trigger::GCTrigger<VM>>,
@@ -527,7 +504,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: create_vm_space(&mut args),
+            vm_space: VMSpace::new(&mut args),
 
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),
@@ -543,11 +520,9 @@ impl<VM: VMBinding> BasePlan<VM> {
             cur_collection_attempts: AtomicUsize::new(0),
             gc_requester: Arc::new(GCRequester::new()),
             stats,
-            mmapper: args.global_args.mmapper,
             heap: args.global_args.heap,
             gc_trigger: args.global_args.gc_trigger,
-            vm_map: args.global_args.vm_map,
-            options: args.global_args.options.clone(),
+            options: args.global_args.options,
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),

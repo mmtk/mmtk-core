@@ -2,8 +2,8 @@ use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::{FreeListPageResource, PageResource};
 use crate::util::address::Address;
 use crate::util::constants::*;
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::linear_scan::Region;
@@ -47,7 +47,6 @@ impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
     }
 
     fn get_available_physical_pages(&self) -> usize {
-        debug_assert!(self.common().contiguous);
         let _sync = self.sync.lock().unwrap();
         self.flpr.get_available_physical_pages()
     }
@@ -61,7 +60,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         log_pages: usize,
         start: Address,
         bytes: usize,
-        vm_map: &'static VMMap,
+        vm_map: &'static dyn VMMap,
         num_workers: usize,
     ) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
@@ -72,7 +71,11 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         }
     }
 
-    pub fn new_discontiguous(log_pages: usize, vm_map: &'static VMMap, num_workers: usize) -> Self {
+    pub fn new_discontiguous(
+        log_pages: usize,
+        vm_map: &'static dyn VMMap,
+        num_workers: usize,
+    ) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
             flpr: FreeListPageResource::new_discontiguous(vm_map),

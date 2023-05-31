@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.17.0"
+version = "0.18.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -19,36 +19,36 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
-# MMTk macros
-mmtk-macros = { version = "0.17.0", path = "macros/" }
-
-libc = "0.2"
-jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
-mimalloc-sys = { version = "0.1.6", optional = true }
-lazy_static = "1.1"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
-crossbeam = "0.8.1"
-num_cpus = "1.8"
-enum-map = "2.4.2"
-downcast-rs = "1.1.1"
-atomic-traits = "0.3.0"
 atomic = "0.5.1"
-num-traits = "0.2"
-spin = "0.9.5"
-env_logger = "0.10.0"
-pfm = { version = "0.1.0-beta.1", optional = true }
 atomic_refcell = "0.1.7"
+atomic-traits = "0.3.0"
+cfg-if = "1.0"
+crossbeam = "0.8.1"
+delegate = "0.9.0"
+downcast-rs = "1.1.1"
+enum-map = "2.4.2"
+env_logger = "0.10.0"
+itertools = "0.10.5"
+jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
+lazy_static = "1.1"
+libc = "0.2"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
+mimalloc-sys = { version = "0.1.6", optional = true }
+# MMTk macros
+mmtk-macros = { version = "0.18.0", path = "macros/" }
+num_cpus = "1.8"
+num-traits = "0.2"
+pfm = { version = "0.1.0-beta.3", optional = true }
+regex = "1.7.0"
+spin = "0.9.5"
+static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-cfg-if = "1.0"
-itertools = "0.10.5"
-sys-info = "0.9"
-regex = "1.7.0"
-static_assertions = "1.1.0"
+sysinfo = "0.29"
 
 [dev-dependencies]
-rand = "0.8.5"
 paste = "1.0.8"
+rand = "0.8.5"
 
 [build-dependencies]
 built = { version = "0.6.0", features = ["git2"] }
@@ -81,21 +81,22 @@ ro_space = []
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
-# metadata
-global_alloc_bit = []
+# Global valid object (VO) bit metadata.
+# The VO bit is set when an object is allocated, and cleared when it is reclaimed.
+# See `src/util/metadata/vo_bit.rs`
+vo_bit = []
 
 # conservative garbage collection support
-is_mmtk_object = ["global_alloc_bit"]
+is_mmtk_object = ["vo_bit"]
 
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []
 
 # The following two features are useful for using Immix for VMs that do not support moving GC.
 
-# Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
-immix_no_defrag = []
-# Disable nursery copy for ImmixSpace. This along with immix_no_defrag makes StickyImmix a non-moving plan.
-immix_no_nursery_copy = []
+# Disable any object copying in Immix. This makes Immix a non-moving policy.
+immix_non_moving = []
+
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
