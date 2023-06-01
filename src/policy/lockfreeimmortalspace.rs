@@ -1,21 +1,22 @@
 use atomic::Atomic;
 
+use std::marker::PhantomData;
+use std::sync::atomic::Ordering;
+
 use crate::mmtk::SFT_MAP;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
-use crate::util::address::{Address, ByteSize};
-use crate::util::heap::PageResource;
-use crate::util::ObjectReference;
+use crate::util::address::Address;
 
-use crate::policy::sft::GCWorkerMutRef;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
+use crate::util::heap::PageResource;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::opaque_pointer::*;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use std::marker::PhantomData;
-use std::sync::atomic::Ordering;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -118,12 +119,9 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         let start = self
             .cursor
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |addr| {
-                Some(addr.add(ByteSize::from(bytes)))
-            });
-        let start = match start {
-            Ok(addr) => addr,
-            Err(_) => panic!("Update cursor failed"),
-        };
+                Some(addr.add(bytes))
+            })
+            .expect("update cursor failed");
         if start + bytes > self.limit {
             panic!("OutOfMemory")
         }
