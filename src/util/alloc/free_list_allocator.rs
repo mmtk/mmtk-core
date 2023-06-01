@@ -43,7 +43,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     // Find a block with free space and allocate to it
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         debug_assert!(
             size <= MAX_BIN_SIZE,
             "Alloc request for {} bytes is too big.",
@@ -79,7 +79,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.alloc_slow(size, align, offset)
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         // Try get a block from the space
         if let Some(block) = self.acquire_global_block(size, align, false) {
             let addr = self.block_alloc(block);
@@ -101,7 +101,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         trace!("allow slow precise stress s={}", size);

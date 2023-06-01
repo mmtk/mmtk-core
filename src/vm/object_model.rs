@@ -351,7 +351,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `object`: The object to be queried.
-    fn get_align_offset_when_copied(object: ObjectReference) -> isize;
+    fn get_align_offset_when_copied(object: ObjectReference) -> usize;
 
     /// Get the type descriptor for an object.
     ///
