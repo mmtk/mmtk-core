@@ -984,6 +984,24 @@
 <span id="984">984</span>
 <span id="985">985</span>
 <span id="986">986</span>
+<span id="987">987</span>
+<span id="988">988</span>
+<span id="989">989</span>
+<span id="990">990</span>
+<span id="991">991</span>
+<span id="992">992</span>
+<span id="993">993</span>
+<span id="994">994</span>
+<span id="995">995</span>
+<span id="996">996</span>
+<span id="997">997</span>
+<span id="998">998</span>
+<span id="999">999</span>
+<span id="1000">1000</span>
+<span id="1001">1001</span>
+<span id="1002">1002</span>
+<span id="1003">1003</span>
+<span id="1004">1004</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1075,12 +1093,29 @@
     }
 
     <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
-        <span class="kw">if </span><span class="kw">super</span>::NEVER_MOVE_OBJECTS {
-            <span class="comment">// We won&#39;t forward objects.
-            </span><span class="self">self</span>.is_marked(object)
-        } <span class="kw">else </span>{
-            <span class="self">self</span>.is_marked(object) || ForwardingWord::is_forwarded::&lt;VM&gt;(object)
+        <span class="comment">// If the mark bit is set, it is live.
+        </span><span class="kw">if </span><span class="self">self</span>.is_marked(object) {
+            <span class="kw">return </span><span class="bool-val">true</span>;
         }
+
+        <span class="comment">// If we never move objects, look no further.
+        </span><span class="kw">if </span><span class="kw">super</span>::NEVER_MOVE_OBJECTS {
+            <span class="kw">return </span><span class="bool-val">false</span>;
+        }
+
+        <span class="comment">// If the forwarding bits are on the side,
+        </span><span class="kw">if </span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
+            <span class="comment">// we need to ensure `object` is in a defrag source
+            // because `PrepareBlockState` does not clear forwarding bits
+            // for non-defrag-source blocks.
+            </span><span class="kw">if </span>!Block::containing::&lt;VM&gt;(object).is_defrag_source() {
+                <span class="comment">// Objects not in defrag sources cannot be forwarded.
+                </span><span class="kw">return </span><span class="bool-val">false</span>;
+            }
+        }
+
+        <span class="comment">// If the object is forwarded, it is live, too.
+        </span>ForwardingWord::is_forwarded::&lt;VM&gt;(object)
     }
     <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
     </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
@@ -1790,10 +1825,11 @@
             <span class="macro">debug_assert_ne!</span>(block.get_state(), BlockState::Marked);
             <span class="comment">// Clear forwarding bits if necessary.
             </span><span class="kw">if </span>is_defrag_source {
-                <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+                <span class="comment">// Note that `ImmixSpace::is_live` depends on the fact that we only clear side
+                // forwarding bits for defrag sources.  If we change the code here, we need to
+                // make sure `ImmixSpace::is_live` is fixed, too.
+                </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
                     <span class="comment">// Clear on-the-side forwarding bits.
-                    // NOTE: In theory, we only need to clear the forwarding bits of occupied lines of
-                    // blocks that are defrag sources.
                     </span>side.bzero_metadata(block.start(), Block::BYTES);
                 }
             }
