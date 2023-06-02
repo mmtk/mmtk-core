@@ -1,3 +1,5 @@
+use atomic::Atomic;
+
 use super::metadata::*;
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
@@ -39,8 +41,8 @@ pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
     active_pages: AtomicUsize,
-    pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
-    pub chunk_addr_max: AtomicUsize,
+    pub chunk_addr_min: Atomic<Address>,
+    pub chunk_addr_max: Atomic<Address>,
     metadata: SideMetadataContext,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
@@ -251,12 +253,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let all_f_addr = unsafe { Address::max() };
+        let zero_addr = Address::ZERO;
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
             active_pages: AtomicUsize::new(0),
-            chunk_addr_min: AtomicUsize::new(usize::max_value()), // XXX: have to use AtomicUsize to represent an Address
-            chunk_addr_max: AtomicUsize::new(0),
+            chunk_addr_min: Atomic::new(all_f_addr),
+            chunk_addr_max: Atomic::new(zero_addr),
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
@@ -428,12 +432,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // Update chunk_addr_min, basing on the start of the allocation: addr.
         {
             let min_chunk_start = conversions::chunk_align_down(addr);
-            let min_chunk_usize = min_chunk_start.as_usize();
             let mut min = self.chunk_addr_min.load(Ordering::Relaxed);
-            while min_chunk_usize < min {
+            while min_chunk_start < min {
                 match self.chunk_addr_min.compare_exchange_weak(
                     min,
-                    min_chunk_usize,
+                    min_chunk_start,
                     Ordering::AcqRel,
                     Ordering::Relaxed,
                 ) {
@@ -446,12 +449,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // Update chunk_addr_max, basing on the end of the allocation: addr + size.
         {
             let max_chunk_start = conversions::chunk_align_down(addr + size);
-            let max_chunk_usize = max_chunk_start.as_usize();
             let mut max = self.chunk_addr_max.load(Ordering::Relaxed);
-            while max_chunk_usize > max {
+            while max_chunk_start > max {
                 match self.chunk_addr_max.compare_exchange_weak(
                     max,
-                    max_chunk_usize,
+                    max_chunk_start,
                     Ordering::AcqRel,
                     Ordering::Relaxed,
                 ) {
@@ -467,9 +469,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
     pub fn release(&mut self) {
         use crate::scheduler::WorkBucketStage;
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
-        let mut chunk = unsafe { Address::from_usize(self.chunk_addr_min.load(Ordering::Relaxed)) }; // XXX: have to use AtomicUsize to represent an Address
-        let end = unsafe { Address::from_usize(self.chunk_addr_max.load(Ordering::Relaxed)) }
-            + BYTES_IN_CHUNK;
+        let mut chunk = self.chunk_addr_min.load(Ordering::Relaxed);
+        let end = self.chunk_addr_max.load(Ordering::Relaxed) + BYTES_IN_CHUNK;
 
         // Since only a single thread generates the sweep work packets as well as it is a Stop-the-World collector,
         // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
