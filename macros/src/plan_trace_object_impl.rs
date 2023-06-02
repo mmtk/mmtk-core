@@ -1,6 +1,6 @@
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{Field, TypeGenerics};
-use proc_macro2::TokenStream as TokenStream2;
 
 use crate::util;
 

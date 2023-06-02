@@ -1,4 +1,5 @@
 use atomic_traits::Atomic;
+use atomic_traits::NumOps;
 use std::fmt;
 use std::mem;
 use std::ops::*;
@@ -256,6 +257,25 @@ impl Address {
     ) -> Result<T::Type, T::Type> {
         let loc = &*(self.0 as *const T);
         loc.compare_exchange(old, new, success, failure)
+    }
+
+    pub unsafe fn fetch_update<T: NumOps + Atomic>(
+        self,
+        expected_old: <T as Atomic>::Type,
+        expected_new: <T as Atomic>::Type,
+        fetch_order: Ordering,
+        set_order: Ordering,
+    ) -> Result<<T as Atomic>::Type, <T as Atomic>::Type>
+    where
+        <T as Atomic>::Type: Copy + PartialEq,
+    {
+        let loc = &mut *(self.0 as *mut T);
+        loc.fetch_update(fetch_order, set_order, |old| {
+            if old == expected_old {
+                return Some(expected_new);
+            }
+            None
+        })
     }
 
     /// is this address zero?
