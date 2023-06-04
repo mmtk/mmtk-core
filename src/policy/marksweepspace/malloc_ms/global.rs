@@ -253,14 +253,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
-        let all_f_addr = unsafe { Address::max() };
-        let zero_addr = Address::ZERO;
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
             active_pages: AtomicUsize::new(0),
-            chunk_addr_min: Atomic::new(all_f_addr),
-            chunk_addr_max: Atomic::new(zero_addr),
+            chunk_addr_min: Atomic::new(Address::MAX),
+            chunk_addr_max: Atomic::new(Address::ZERO),
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
