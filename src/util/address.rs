@@ -1,4 +1,5 @@
 use atomic_traits::Atomic;
+
 use std::fmt;
 use std::mem;
 use std::ops::*;
