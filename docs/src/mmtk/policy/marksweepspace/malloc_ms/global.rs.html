@@ -817,8 +817,9 @@
 <span id="817">817</span>
 <span id="818">818</span>
 <span id="819">819</span>
-<span id="820">820</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
+
+<span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -859,8 +860,8 @@
     phantom: PhantomData&lt;VM&gt;,
     active_bytes: AtomicUsize,
     active_pages: AtomicUsize,
-    <span class="kw">pub </span>chunk_addr_min: AtomicUsize, <span class="comment">// XXX: have to use AtomicUsize to represent an Address
-    </span><span class="kw">pub </span>chunk_addr_max: AtomicUsize,
+    <span class="kw">pub </span>chunk_addr_min: Atomic&lt;Address&gt;,
+    <span class="kw">pub </span>chunk_addr_max: Atomic&lt;Address&gt;,
     metadata: SideMetadataContext,
     <span class="doccomment">/// Work packet scheduler
     </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
@@ -1075,8 +1076,8 @@
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(<span class="number">0</span>),
             active_pages: AtomicUsize::new(<span class="number">0</span>),
-            chunk_addr_min: AtomicUsize::new(usize::max_value()), <span class="comment">// XXX: have to use AtomicUsize to represent an Address
-            </span>chunk_addr_max: AtomicUsize::new(<span class="number">0</span>),
+            chunk_addr_min: Atomic::new(Address::MAX),
+            chunk_addr_max: Atomic::new(Address::ZERO),
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(<span class="kw-2">&amp;</span>[
@@ -1248,12 +1249,11 @@
         // Update chunk_addr_min, basing on the start of the allocation: addr.
         </span>{
             <span class="kw">let </span>min_chunk_start = conversions::chunk_align_down(addr);
-            <span class="kw">let </span>min_chunk_usize = min_chunk_start.as_usize();
             <span class="kw">let </span><span class="kw-2">mut </span>min = <span class="self">self</span>.chunk_addr_min.load(Ordering::Relaxed);
-            <span class="kw">while </span>min_chunk_usize &lt; min {
+            <span class="kw">while </span>min_chunk_start &lt; min {
                 <span class="kw">match </span><span class="self">self</span>.chunk_addr_min.compare_exchange_weak(
                     min,
-                    min_chunk_usize,
+                    min_chunk_start,
                     Ordering::AcqRel,
                     Ordering::Relaxed,
                 ) {
@@ -1266,12 +1266,11 @@
         <span class="comment">// Update chunk_addr_max, basing on the end of the allocation: addr + size.
         </span>{
             <span class="kw">let </span>max_chunk_start = conversions::chunk_align_down(addr + size);
-            <span class="kw">let </span>max_chunk_usize = max_chunk_start.as_usize();
             <span class="kw">let </span><span class="kw-2">mut </span>max = <span class="self">self</span>.chunk_addr_max.load(Ordering::Relaxed);
-            <span class="kw">while </span>max_chunk_usize &gt; max {
+            <span class="kw">while </span>max_chunk_start &gt; max {
                 <span class="kw">match </span><span class="self">self</span>.chunk_addr_max.compare_exchange_weak(
                     max,
-                    max_chunk_usize,
+                    max_chunk_start,
                     Ordering::AcqRel,
                     Ordering::Relaxed,
                 ) {
@@ -1287,9 +1286,8 @@
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
         <span class="kw">let </span><span class="kw-2">mut </span>work_packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt; = <span class="macro">vec!</span>[];
-        <span class="kw">let </span><span class="kw-2">mut </span>chunk = <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.chunk_addr_min.load(Ordering::Relaxed)) }; <span class="comment">// XXX: have to use AtomicUsize to represent an Address
-        </span><span class="kw">let </span>end = <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.chunk_addr_max.load(Ordering::Relaxed)) }
-            + BYTES_IN_CHUNK;
+        <span class="kw">let </span><span class="kw-2">mut </span>chunk = <span class="self">self</span>.chunk_addr_min.load(Ordering::Relaxed);
+        <span class="kw">let </span>end = <span class="self">self</span>.chunk_addr_max.load(Ordering::Relaxed) + BYTES_IN_CHUNK;
 
         <span class="comment">// Since only a single thread generates the sweep work packets as well as it is a Stop-the-World collector,
         // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
