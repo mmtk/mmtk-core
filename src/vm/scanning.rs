@@ -200,7 +200,10 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `factory`: The VM uses it to create work packets for scanning roots.
-    fn scan_roots_in_all_mutator_threads(tls: VMWorkerThread, factory: impl RootsWorkFactory<VM::VMEdge>);
+    fn scan_roots_in_all_mutator_threads(
+        tls: VMWorkerThread,
+        factory: impl RootsWorkFactory<VM::VMEdge>,
+    );
 
     /// Scan one mutator for roots.
     ///
