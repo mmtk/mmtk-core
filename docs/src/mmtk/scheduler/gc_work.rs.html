@@ -1474,7 +1474,7 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;ScanStackRoots&quot;</span>);
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;E&gt;::new(mmtk);
-        &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_thread_roots(worker.tls, factory);
+        &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_all_mutator_threads(worker.tls, factory);
         &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(<span class="bool-val">false</span>, worker.tls);
         <span class="kw">for </span>mutator <span class="kw">in </span>&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators() {
             mutator.flush();
@@ -1491,7 +1491,7 @@
         <span class="kw">let </span>base = <span class="kw-2">&amp;</span>mmtk.plan.base();
         <span class="kw">let </span>mutators = &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;E&gt;::new(mmtk);
-        &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_thread_root(
+        &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
             factory,

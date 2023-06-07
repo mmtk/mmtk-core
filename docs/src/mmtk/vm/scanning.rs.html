@@ -293,6 +293,9 @@
 <span id="293">293</span>
 <span id="294">294</span>
 <span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -495,7 +498,10 @@
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `factory`: The VM uses it to create work packets for scanning roots.
-    </span><span class="kw">fn </span>scan_thread_roots(tls: VMWorkerThread, factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;);
+    </span><span class="kw">fn </span>scan_roots_in_all_mutator_threads(
+        tls: VMWorkerThread,
+        factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;,
+    );
 
     <span class="doccomment">/// Scan one mutator for roots.
     ///
@@ -503,7 +509,7 @@
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `mutator`: The reference to the mutator whose roots will be scanned.
     /// * `factory`: The VM uses it to create work packets for scanning roots.
-    </span><span class="kw">fn </span>scan_thread_root(
+    </span><span class="kw">fn </span>scan_roots_in_mutator_thread(
         tls: VMWorkerThread,
         mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
         factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;,
