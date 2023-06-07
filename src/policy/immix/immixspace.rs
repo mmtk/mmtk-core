@@ -15,6 +15,8 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
+#[cfg(feature = "vo_bit")]
+use crate::vm::object_model::ImmixVOBitUpdateStrategy;
 use crate::vm::*;
 use crate::{
     plan::ObjectQueue,
@@ -386,6 +388,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             });
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
+            #[cfg(feature = "vo_bit")]
+            if matches!(
+                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
+                ImmixVOBitUpdateStrategy::ReconstructByTracing
+            ) {
+                // In this strategy, we clear all VO bits after stacks are scanned.
+                let work_packets = self
+                    .chunk_map
+                    .generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk }));
+                self.scheduler().work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
+            }
+
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
                 if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
@@ -504,7 +518,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            !VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY.vo_bit_available_during_tracing()
+                || crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );
@@ -517,6 +532,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
             }
+
+            #[cfg(feature = "vo_bit")]
+            if matches!(
+                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
+                ImmixVOBitUpdateStrategy::ReconstructByTracing
+            ) {
+                // In this strategy, we set the VO bit when an object is marked.
+                crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
+            }
+
             // Visit node
             queue.enqueue(object);
             self.unlog_object_if_needed(object);
@@ -539,7 +564,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            !VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY.vo_bit_available_during_tracing()
+                || crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );
@@ -599,6 +625,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(new_object).get_state(),
                 BlockState::Marked
             );
+
+            #[cfg(feature = "vo_bit")]
+            if matches!(
+                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
+                ImmixVOBitUpdateStrategy::ReconstructByTracing
+            ) {
+                // In this strategy, we set the VO bit when an object is marked or forwarded.
+                crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
+            }
+
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
             self.unlog_object_if_needed(new_object);
@@ -833,6 +869,19 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             // until the forwarding bits are also set, at which time we also write the forwarding
             // pointer.
         }
+    }
+}
+
+/// A work packet to clear VO bit metadata after Prepare.
+#[cfg(feature = "vo_bit")]
+pub struct ClearVOBitsAfterPrepare {
+    pub chunk: Chunk,
+}
+
+#[cfg(feature = "vo_bit")]
+impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        crate::util::metadata::vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
     }
 }
 
