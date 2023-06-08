@@ -15,8 +15,6 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
-#[cfg(feature = "vo_bit")]
-use crate::vm::object_model::ImmixVOBitUpdateStrategy;
 use crate::vm::*;
 use crate::{
     plan::ObjectQueue,
@@ -389,16 +387,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
             #[cfg(feature = "vo_bit")]
-            if matches!(
-                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
-                ImmixVOBitUpdateStrategy::ReconstructByTracing
-            ) {
-                // In this strategy, we clear all VO bits after stacks are scanned.
-                let work_packets = self
-                    .chunk_map
-                    .generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk }));
-                self.scheduler().work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
-            }
+            super::vo_bit::prepare_extra_packets(&self.chunk_map, self.scheduler());
 
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -517,12 +506,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
-        debug_assert!(
-            !VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY.vo_bit_available_during_tracing()
-                || crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: VO bit not set",
-            object
-        );
+        super::vo_bit::on_trace_object::<VM>(object);
+
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -534,13 +519,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
 
             #[cfg(feature = "vo_bit")]
-            if matches!(
-                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
-                ImmixVOBitUpdateStrategy::ReconstructByTracing
-            ) {
-                // In this strategy, we set the VO bit when an object is marked.
-                crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
-            }
+            super::vo_bit::on_object_marked::<VM>(object);
 
             // Visit node
             queue.enqueue(object);
@@ -562,13 +541,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
+
         #[cfg(feature = "vo_bit")]
-        debug_assert!(
-            !VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY.vo_bit_available_during_tracing()
-                || crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: VO bit not set",
-            object
-        );
+        super::vo_bit::on_trace_object::<VM>(object);
+
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             // We lost the forwarding race as some other thread has set the forwarding word; wait
@@ -615,6 +591,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
+
+                #[cfg(feature = "vo_bit")]
+                super::vo_bit::on_object_marked::<VM>(object);
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
@@ -623,27 +603,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
 
                 #[cfg(feature = "vo_bit")]
-                if matches!(
-                    VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
-                    ImmixVOBitUpdateStrategy::CopyFromMarkBits
-                ) {
-                    // In this strategy, we will copy mark bits to VO bits.
-                    // We need to set mark bits for to-space objects, too.
-                    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
-                        new_object,
-                        1,
-                        None,
-                        Ordering::SeqCst,
-                    );
-
-                    // In theory, we don't need to set the VO bit for to-space objects because we
-                    // will copy the VO bits from mark bits during Release.  However, Some VMs
-                    // allow the same edge to be traced twice, and MMTk will see the edge pointing
-                    // to a to-space object when visiting the edge the second time.  Considering
-                    // that we may want to use the VO bits to validate if the edge is valid, we set
-                    // the VO bit for the to-space object, too.
-                    crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
-                }
+                super::vo_bit::on_object_forwarded::<VM>(new_object);
 
                 new_object
             };
@@ -651,15 +611,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(new_object).get_state(),
                 BlockState::Marked
             );
-
-            #[cfg(feature = "vo_bit")]
-            if matches!(
-                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
-                ImmixVOBitUpdateStrategy::ReconstructByTracing
-            ) {
-                // In this strategy, we set the VO bit when an object is marked or forwarded.
-                crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
-            }
 
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
@@ -895,19 +846,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             // until the forwarding bits are also set, at which time we also write the forwarding
             // pointer.
         }
-    }
-}
-
-/// A work packet to clear VO bit metadata after Prepare.
-#[cfg(feature = "vo_bit")]
-pub struct ClearVOBitsAfterPrepare {
-    pub chunk: Chunk,
-}
-
-#[cfg(feature = "vo_bit")]
-impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        crate::util::metadata::vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
     }
 }
 

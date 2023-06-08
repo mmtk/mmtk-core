@@ -2,7 +2,8 @@ pub mod block;
 pub mod defrag;
 pub mod immixspace;
 pub mod line;
-mod vo_bit_update;
+#[cfg(feature = "vo_bit")]
+mod vo_bit;
 
 pub use immixspace::*;
 
