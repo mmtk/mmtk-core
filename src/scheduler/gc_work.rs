@@ -444,7 +444,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots(worker.tls, factory);
+        <E::VM as VMBinding>::VMScanning::scan_roots_in_all_mutator_threads(worker.tls, factory);
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
             mutator.flush();
@@ -461,7 +461,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_root(
+        <E::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
             factory,
