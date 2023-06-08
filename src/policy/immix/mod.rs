@@ -2,6 +2,7 @@ pub mod block;
 pub mod defrag;
 pub mod immixspace;
 pub mod line;
+mod vo_bit_update;
 
 pub use immixspace::*;
 

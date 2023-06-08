@@ -12,6 +12,7 @@ use atomic::Ordering;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
 
 /// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
@@ -103,7 +104,13 @@ pub fn bzero_vo_bit(start: Address, size: usize) {
     VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }
 
-/// Bulk copy VO bits from mark bits.
-pub fn bcopy_vo_bit_from_mark_bits(start: Address, size: usize) {
-    VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
+/// Bulk copy VO bits from side mark bits.
+pub fn bcopy_vo_bit_from_mark_bits<VM: VMBinding>(start: Address, size: usize) {
+    let mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
+    debug_assert!(
+        mark_bit_spec.is_on_side(),
+        "bcopy_vo_bit_from_mark_bits can only be used with on-the-side mark bits."
+    );
+    let side_mark_bit_spec = mark_bit_spec.extract_side_spec();
+    VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
 }

@@ -421,7 +421,7 @@ impl SideMetadataSpec {
                 !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
             let old_src = unsafe { src.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
             let old_dst = unsafe { dst.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
-            let new = old_src & mask | old_dst & !mask;
+            let new = (old_src & mask) | (old_dst & !mask);
             unsafe { dst.as_ref::<AtomicU8>() }.store(new, Ordering::Relaxed);
         };
 

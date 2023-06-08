@@ -619,7 +619,33 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
                 // mark the block. So we do not need to explicitly mark it here.
-                ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
+                let new_object =
+                    ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
+
+                #[cfg(feature = "vo_bit")]
+                if matches!(
+                    VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
+                    ImmixVOBitUpdateStrategy::CopyFromMarkBits
+                ) {
+                    // In this strategy, we will copy mark bits to VO bits.
+                    // We need to set mark bits for to-space objects, too.
+                    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
+                        new_object,
+                        1,
+                        None,
+                        Ordering::SeqCst,
+                    );
+
+                    // In theory, we don't need to set the VO bit for to-space objects because we
+                    // will copy the VO bits from mark bits during Release.  However, Some VMs
+                    // allow the same edge to be traced twice, and MMTk will see the edge pointing
+                    // to a to-space object when visiting the edge the second time.  Considering
+                    // that we may want to use the VO bits to validate if the edge is valid, we set
+                    // the VO bit for the to-space object, too.
+                    crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
+                }
+
+                new_object
             };
             debug_assert_eq!(
                 Block::containing::<VM>(new_object).get_state(),

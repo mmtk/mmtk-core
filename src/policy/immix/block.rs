@@ -201,7 +201,7 @@ impl Block {
                 // In this strategy, we need to update the VO bits state after marking.
                 if is_occupied {
                     // If the block has live objects, copy the VO bits from mark bits.
-                    crate::util::metadata::vo_bit::bcopy_vo_bit_from_mark_bits(
+                    crate::util::metadata::vo_bit::bcopy_vo_bit_from_mark_bits::<VM>(
                         self.start(),
                         Block::BYTES,
                     );
