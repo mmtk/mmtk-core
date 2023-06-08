@@ -102,3 +102,8 @@ pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<Ob
 pub fn bzero_vo_bit(start: Address, size: usize) {
     VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }
+
+/// Bulk copy VO bits from mark bits.
+pub fn bcopy_vo_bit_from_mark_bits(start: Address, size: usize) {
+    VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
+}

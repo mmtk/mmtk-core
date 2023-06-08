@@ -192,15 +192,41 @@ impl Block {
         mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
     ) -> bool {
+        #[cfg(feature = "vo_bit")]
+        let update_vo_bits = |is_occupied: bool| {
+            if matches!(
+                VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY,
+                object_model::ImmixVOBitUpdateStrategy::CopyFromMarkBits
+            ) {
+                // In this strategy, we need to update the VO bits state after marking.
+                if is_occupied {
+                    // If the block has live objects, copy the VO bits from mark bits.
+                    crate::util::metadata::vo_bit::bcopy_vo_bit_from_mark_bits(
+                        self.start(),
+                        Block::BYTES,
+                    );
+                } else {
+                    // If the block has no live objects, simply clear the VO bits.
+                    crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Block::BYTES);
+                }
+            }
+        };
+
         if super::BLOCK_ONLY {
             match self.get_state() {
                 BlockState::Unallocated => false,
                 BlockState::Unmarked => {
+                    #[cfg(feature = "vo_bit")]
+                    update_vo_bits(false);
+
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
                     true
                 }
                 BlockState::Marked => {
+                    #[cfg(feature = "vo_bit")]
+                    update_vo_bits(true);
+
                     // The block is live.
                     false
                 }
@@ -230,6 +256,9 @@ impl Block {
             }
 
             if marked_lines == 0 {
+                #[cfg(feature = "vo_bit")]
+                update_vo_bits(false);
+
                 // Release the block if non of its lines are marked.
                 space.release_block(*self);
                 true
@@ -249,6 +278,10 @@ impl Block {
                 mark_histogram[holes] += marked_lines;
                 // Record number of holes in block side metadata.
                 self.set_holes(holes);
+
+                #[cfg(feature = "vo_bit")]
+                update_vo_bits(true);
+
                 false
             }
         }
