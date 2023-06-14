@@ -15,7 +15,7 @@ use crate::vm::VMBinding;
 /// the mark bits metadata.  VM bindings should choose the appropriate strategy according to its
 /// specific needs.
 ///
-/// See also: [`util::metadata::vo_bit`]
+/// See also: [`crate::util::metadata::vo_bit`]
 #[cfg(feature = "vo_bit")]
 #[derive(Debug)]
 pub enum ImmixVOBitUpdateStrategy {
@@ -26,11 +26,11 @@ pub enum ImmixVOBitUpdateStrategy {
     ///
     /// The main limitation is that the VO bits metadata is not available during tracing, because
     /// it is cleared after stack scanning.  If the VM needs to use the
-    /// [`memory_manager::is_mmtk_object`] function during tracing (for example, some *fields* are
-    /// conservative), it cannot use this strategy.
+    /// [`crate::memory_manager::is_mmtk_object`] function during tracing (for example, if some
+    /// *fields* are conservative), it cannot use this strategy.
     ///
     /// This strategy is described in the paper *Fast Conservative Garbage Collection* published
-    /// in OOPSLA'14.  See: https://dl.acm.org/doi/10.1145/2660193.2660198
+    /// in OOPSLA'14.  See: <https://dl.acm.org/doi/10.1145/2660193.2660198>
     ClearAndReconstruct,
     /// Copy the mark bits metadata over to the VO bits metadata after tracing.
     ///
