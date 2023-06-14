@@ -1,4 +1,6 @@
 use super::line::*;
+#[cfg(feature = "vo_bit")]
+use super::vo_bit_helper;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
@@ -278,7 +280,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
 
         super::validate_features();
-        super::vo_bit::validate_config::<VM>();
+        #[cfg(feature = "vo_bit")]
+        vo_bit_helper::validate_config::<VM>();
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let common =
@@ -388,7 +391,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
             #[cfg(feature = "vo_bit")]
-            super::vo_bit::prepare_extra_packets(&self.chunk_map, self.scheduler());
+            vo_bit_helper::prepare_extra_packets(&self.chunk_map, self.scheduler());
 
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -507,7 +510,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
-        super::vo_bit::on_trace_object::<VM>(object);
+        vo_bit_helper::on_trace_object::<VM>(object);
 
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
@@ -520,7 +523,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
 
             #[cfg(feature = "vo_bit")]
-            super::vo_bit::on_object_marked::<VM>(object);
+            vo_bit_helper::on_object_marked::<VM>(object);
 
             // Visit node
             queue.enqueue(object);
@@ -544,7 +547,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
 
         #[cfg(feature = "vo_bit")]
-        super::vo_bit::on_trace_object::<VM>(object);
+        vo_bit_helper::on_trace_object::<VM>(object);
 
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
@@ -594,7 +597,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
 
                 #[cfg(feature = "vo_bit")]
-                super::vo_bit::on_object_marked::<VM>(object);
+                vo_bit_helper::on_object_marked::<VM>(object);
 
                 object
             } else {
@@ -604,7 +607,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
 
                 #[cfg(feature = "vo_bit")]
-                super::vo_bit::on_object_forwarded::<VM>(new_object);
+                vo_bit_helper::on_object_forwarded::<VM>(new_object);
 
                 new_object
             };

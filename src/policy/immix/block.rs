@@ -1,6 +1,6 @@
 use super::defrag::Histogram;
 use super::line::Line;
-use super::ImmixSpace;
+use super::{ImmixSpace};
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
@@ -9,6 +9,8 @@ use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpe
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
+#[cfg(feature = "vo_bit")]
+use super::vo_bit_helper;
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -197,7 +199,7 @@ impl Block {
                 BlockState::Unallocated => false,
                 BlockState::Unmarked => {
                     #[cfg(feature = "vo_bit")]
-                    super::vo_bit::on_block_swept::<VM>(self, false);
+                    vo_bit_helper::on_block_swept::<VM>(self, false);
 
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
@@ -205,7 +207,7 @@ impl Block {
                 }
                 BlockState::Marked => {
                     #[cfg(feature = "vo_bit")]
-                    super::vo_bit::on_block_swept::<VM>(self, true);
+                    vo_bit_helper::on_block_swept::<VM>(self, true);
 
                     // The block is live.
                     false
@@ -237,7 +239,7 @@ impl Block {
 
             if marked_lines == 0 {
                 #[cfg(feature = "vo_bit")]
-                super::vo_bit::on_block_swept::<VM>(self, false);
+                vo_bit_helper::on_block_swept::<VM>(self, false);
 
                 // Release the block if non of its lines are marked.
                 space.release_block(*self);
@@ -260,7 +262,7 @@ impl Block {
                 self.set_holes(holes);
 
                 #[cfg(feature = "vo_bit")]
-                super::vo_bit::on_block_swept::<VM>(self, true);
+                vo_bit_helper::on_block_swept::<VM>(self, true);
 
                 false
             }

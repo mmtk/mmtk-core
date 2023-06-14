@@ -110,7 +110,7 @@ pub fn bzero_vo_bit(start: Address, size: usize) {
 /// As an alternative, this function copies the mark bits metadata to VO bits.
 /// The caller needs to ensure the mark bits are set exactly wherever VO bits need to be set before
 /// calling this function.
-pub fn bcopy_vo_bit_from_mark_bits<VM: VMBinding>(start: Address, size: usize) {
+pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
     let mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
     debug_assert!(
         mark_bit_spec.is_on_side(),

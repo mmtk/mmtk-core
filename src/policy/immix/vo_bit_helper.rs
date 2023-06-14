@@ -10,7 +10,8 @@ use crate::{
     util::{
         heap::chunk_map::{Chunk, ChunkMap},
         linear_scan::Region,
-        metadata, ObjectReference,
+        metadata::vo_bit,
+        ObjectReference,
     },
     vm::{ImmixVOBitUpdateStrategy, ObjectModel, VMBinding},
     MMTK,
@@ -36,7 +37,7 @@ pub(crate) fn validate_config<VM: VMBinding>() {
             );
 
             let mark_bit_meta = mark_bit_spec.extract_side_spec();
-            let vo_bit_meta = crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
+            let vo_bit_meta = vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 
             assert_eq!(
                 mark_bit_meta.log_bytes_in_region,
@@ -71,7 +72,7 @@ pub(crate) fn on_trace_object<VM: VMBinding>(object: ObjectReference) {
         // If the VO bits are available during tracing,
         // we validate the objects we trace using the VO bits.
         debug_assert!(
-            metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
             object
         );
@@ -82,7 +83,7 @@ pub(crate) fn on_object_marked<VM: VMBinding>(object: ObjectReference) {
     match strategy::<VM>() {
         ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
             // In this strategy, we set the VO bit when an object is marked.
-            metadata::vo_bit::set_vo_bit::<VM>(object);
+            vo_bit::set_vo_bit::<VM>(object);
         }
         ImmixVOBitUpdateStrategy::CopyFromMarkBits => {
             // VO bit was not cleared before tracing in this strategy.  Do nothing.
@@ -94,7 +95,7 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
     match strategy::<VM>() {
         ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
             // In this strategy, we set the VO bit of the to-space object when forwarded.
-            metadata::vo_bit::set_vo_bit::<VM>(new_object);
+            vo_bit::set_vo_bit::<VM>(new_object);
         }
         ImmixVOBitUpdateStrategy::CopyFromMarkBits => {
             // In this strategy, we will copy mark bits to VO bits.
@@ -112,7 +113,7 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
             // to a to-space object when visiting the edge the second time.  Considering
             // that we may want to use the VO bits to validate if the edge is valid, we set
             // the VO bit for the to-space object, too.
-            metadata::vo_bit::set_vo_bit::<VM>(new_object);
+            vo_bit::set_vo_bit::<VM>(new_object);
         }
     }
 }
@@ -126,10 +127,10 @@ pub(crate) fn on_block_swept<VM: VMBinding>(block: &Block, is_occupied: bool) {
             // In this strategy, we need to update the VO bits state after marking.
             if is_occupied {
                 // If the block has live objects, copy the VO bits from mark bits.
-                metadata::vo_bit::bcopy_vo_bit_from_mark_bits::<VM>(block.start(), Block::BYTES);
+                vo_bit::bcopy_vo_bit_from_mark_bit::<VM>(block.start(), Block::BYTES);
             } else {
                 // If the block has no live objects, simply clear the VO bits.
-                metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
+                vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
             }
         }
     }
@@ -142,6 +143,6 @@ pub struct ClearVOBitsAfterPrepare {
 
 impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        crate::util::metadata::vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
+        vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
     }
 }
