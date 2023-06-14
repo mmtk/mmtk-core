@@ -609,6 +609,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 #[cfg(feature = "vo_bit")]
                 vo_bit_helper::on_object_forwarded::<VM>(new_object);
 
+                // Clippy complains if the "vo_bit" feature is not enabled.
+                #[allow(clippy::let_and_return)]
                 new_object
             };
             debug_assert_eq!(

@@ -1,6 +1,8 @@
 use super::defrag::Histogram;
 use super::line::Line;
-use super::{ImmixSpace};
+#[cfg(feature = "vo_bit")]
+use super::vo_bit_helper;
+use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
@@ -9,8 +11,6 @@ use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpe
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
-#[cfg(feature = "vo_bit")]
-use super::vo_bit_helper;
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
