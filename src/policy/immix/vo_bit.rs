@@ -22,12 +22,39 @@ const fn strategy<VM: VMBinding>() -> ImmixVOBitUpdateStrategy {
     VM::VMObjectModel::IMMIX_VO_BIT_UPDATE_STRATEGY
 }
 
+pub(crate) fn validate_config<VM: VMBinding>() {
+    let s = strategy::<VM>();
+    match s {
+        ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
+            // Always valid
+        }
+        ImmixVOBitUpdateStrategy::CopyFromMarkBits => {
+            let mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
+            assert!(
+                mark_bit_spec.is_on_side(),
+                "The {s:?} strategy requires the mark bits to be on the side."
+            );
+
+            let mark_bit_meta = mark_bit_spec.extract_side_spec();
+            let vo_bit_meta = crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
+
+            assert_eq!(
+                mark_bit_meta.log_bytes_in_region,
+                vo_bit_meta.log_bytes_in_region,
+                "The {s:?} strategy requires the mark bits to have the same granularity as the VO bits."
+            );
+            assert_eq!(mark_bit_meta.log_num_of_bits, vo_bit_meta.log_num_of_bits,
+                "The {s:?} strategy requires the mark bits to have the same number of bits per object as the VO bits.");
+        }
+    }
+}
+
 pub(crate) fn prepare_extra_packets<VM: VMBinding>(
     chunk_map: &ChunkMap,
     scheduler: &GCWorkScheduler<VM>,
 ) {
     match strategy::<VM>() {
-        ImmixVOBitUpdateStrategy::ReconstructByTracing => {
+        ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
             // In this strategy, we clear all VO bits after stacks are scanned.
             let work_packets =
                 chunk_map.generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk }));
@@ -41,6 +68,8 @@ pub(crate) fn prepare_extra_packets<VM: VMBinding>(
 
 pub(crate) fn on_trace_object<VM: VMBinding>(object: ObjectReference) {
     if strategy::<VM>().vo_bit_available_during_tracing() {
+        // If the VO bits are available during tracing,
+        // we validate the objects we trace using the VO bits.
         debug_assert!(
             metadata::vo_bit::is_vo_bit_set::<VM>(object),
             "{:x}: VO bit not set",
@@ -51,7 +80,7 @@ pub(crate) fn on_trace_object<VM: VMBinding>(object: ObjectReference) {
 
 pub(crate) fn on_object_marked<VM: VMBinding>(object: ObjectReference) {
     match strategy::<VM>() {
-        ImmixVOBitUpdateStrategy::ReconstructByTracing => {
+        ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
             // In this strategy, we set the VO bit when an object is marked.
             metadata::vo_bit::set_vo_bit::<VM>(object);
         }
@@ -63,7 +92,7 @@ pub(crate) fn on_object_marked<VM: VMBinding>(object: ObjectReference) {
 
 pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
     match strategy::<VM>() {
-        ImmixVOBitUpdateStrategy::ReconstructByTracing => {
+        ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
             // In this strategy, we set the VO bit of the to-space object when forwarded.
             metadata::vo_bit::set_vo_bit::<VM>(new_object);
         }
@@ -90,7 +119,7 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
 
 pub(crate) fn on_block_swept<VM: VMBinding>(block: &Block, is_occupied: bool) {
     match strategy::<VM>() {
-        ImmixVOBitUpdateStrategy::ReconstructByTracing => {
+        ImmixVOBitUpdateStrategy::ClearAndReconstruct => {
             // Do nothing.  The VO bit metadata is already reconstructed.
         }
         ImmixVOBitUpdateStrategy::CopyFromMarkBits => {

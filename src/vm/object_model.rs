@@ -31,7 +31,7 @@ pub enum ImmixVOBitUpdateStrategy {
     ///
     /// This strategy is described in the paper *Fast Conservative Garbage Collection* published
     /// in OOPSLA'14.  See: https://dl.acm.org/doi/10.1145/2660193.2660198
-    ReconstructByTracing,
+    ClearAndReconstruct,
     /// Copy the mark bits metadata over to the VO bits metadata after tracing.
     ///
     /// This strategy will keep the VO bits metadata available during tracing.  However, it
@@ -45,7 +45,7 @@ impl ImmixVOBitUpdateStrategy {
     /// Return `true` if the VO bit metadata is available during tracing.
     pub fn vo_bit_available_during_tracing(&self) -> bool {
         match *self {
-            ImmixVOBitUpdateStrategy::ReconstructByTracing => false,
+            ImmixVOBitUpdateStrategy::ClearAndReconstruct => false,
             ImmixVOBitUpdateStrategy::CopyFromMarkBits => true,
         }
     }
@@ -129,7 +129,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// See: [`ImmixVOBitUpdateStrategy`].
     #[cfg(feature = "vo_bit")]
     const IMMIX_VO_BIT_UPDATE_STRATEGY: ImmixVOBitUpdateStrategy =
-        ImmixVOBitUpdateStrategy::ReconstructByTracing;
+        ImmixVOBitUpdateStrategy::ClearAndReconstruct;
 
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.

@@ -278,6 +278,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
 
         super::validate_features();
+        super::vo_bit::validate_config::<VM>();
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let common =
