@@ -170,12 +170,9 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
                 Ordering::SeqCst,
             );
 
-            // In theory, we don't need to set the VO bit for to-space objects because we
-            // will copy the VO bits from mark bits during Release.  However, Some VMs
-            // allow the same edge to be traced twice, and MMTk will see the edge pointing
-            // to a to-space object when visiting the edge the second time.  Considering
-            // that we may want to use the VO bits to validate if the edge is valid, we set
-            // the VO bit for the to-space object, too.
+            // We set the VO bit for the to-space object eagerly.  If an edge is visited twice, we
+            // will see it alread forwarded and pointing to the to-space object, and such an edge
+            // is still valid.
             vo_bit::set_vo_bit::<VM>(new_object);
         }
     }

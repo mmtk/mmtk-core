@@ -12,9 +12,9 @@ use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::{self, MetadataSpec};
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -391,7 +391,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
             #[cfg(feature = "vo_bit")]
-            vo_bit::helper::schedule_clear_vo_bits_packets_if_needed(&self.chunk_map, self.scheduler());
+            vo_bit::helper::schedule_clear_vo_bits_packets_if_needed(
+                &self.chunk_map,
+                self.scheduler(),
+            );
 
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
