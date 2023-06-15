@@ -5,6 +5,7 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
+use crate::util::rust_util::array_from_fn;
 use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
@@ -36,18 +37,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
-        let mut work_buckets = {
-            // TODO: switch to `std::array::from_fn` after we bump MSRV to at least 1.63.
-            let mut stage_nums_array = [0; WorkBucketStage::LENGTH];
-            for (stage_num, item) in stage_nums_array.iter_mut().enumerate() {
-                *item = stage_num;
-            }
-            EnumMap::from_array(stage_nums_array.map(|stage_num| {
-                let stage = WorkBucketStage::from_usize(stage_num);
-                let active = stage == WorkBucketStage::Unconstrained;
-                WorkBucket::new(active, worker_monitor.clone())
-            }))
-        };
+        // TODO: Replace `array_from_fn` with `std::array::from_fn` after bumping MSRV.
+        let mut work_buckets = EnumMap::from_array(array_from_fn(|stage_num| {
+            let stage = WorkBucketStage::from_usize(stage_num);
+            let active = stage == WorkBucketStage::Unconstrained;
+            WorkBucket::new(active, worker_monitor.clone())
+        }));
 
         // Set the open condition of each bucket.
         {
