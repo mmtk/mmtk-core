@@ -2,10 +2,43 @@
 //!
 //! The valid object bit, or "VO bit" for short", is a global per-address metadata.  It is set at
 //! the address of the `ObjectReference` of an object when the object is allocated, and cleared
-//! when the object is reclaimed by the GC.
+//! when the object is determined to be dead by the GC.
 //!
-//! The main purpose of VO bit is supporting conservative GC.  It is the canonical source of
-//! information about whether there is an object in the MMTk heap at any given address.
+//! The VO bit metadata serves multiple purposes, including but not limited to:
+//!
+//! | purpose                                     | happens when                                  |
+//! |---------------------------------------------|-----------------------------------------------|
+//! | conservative stack scanning                 | stack scanning                                |
+//! | conservative object scanning                | tracing                                       |
+//! | supporting interior pointers                | tracing                                       |
+//! | heap dumping (by tracing)                   | tracing                                       |
+//! | heap dumping (by iteration)                 | before or after tracing                       |
+//! | heap iteration (for GC algorithm)           | depending on algorithm                        |
+//! | heap iteration (for VM API, e.g. JVM-TI)    | during mutator time                           |
+//! | sanity checking                             | any time in GC                                |
+//!
+//! Among the listed purposes, conservative stack scanning and conservative objects scanning are
+//! visible to the VM binding.  By default, if the "vo_bit" cargo feature is enabled, the VO bits
+//! metadata will be available to the VM binding during stack scanning time.  The VM binding can
+//! further require the VO bits to be available during tracing (for object scanning) by setting
+//! [`crate::vm::ObjectModel::NEED_VO_BITS_DURING_TRACING`] to `true`.  mmtk-core does not
+//! guarantee the VO bits are available to the VM binding during other time.
+//!
+//! Internally, mmtk-core will also make the VO bits available when necessary if mmtk-core needs to
+//! implement features that needs VO bits.
+//!
+//! When the VO bits are available during tracing, if a plan uses evacuation to reclaim space, then
+//! both the from-space copy and the to-space copy of an object will have the VO-bit set.
+//!
+//! *(Note: There are several reasons behind this semantics.  One reason is that an edge may be
+//! visited multiple times during GC.  If an edge is visited twice, we will see it pointing to the
+//! from-space copy during the first visit, but pointing to the to-space copy during the second
+//! visit.  We consider the edge valid if it points to either the from-space or the to-space copy.
+//! If each edge is visited only once, and we see an edge happen to hold a pointer into the
+//! to-space during its only visit, that must a dangling pointer, and error should be reported.
+//! However, it is hard to guarantee each edge is only visited once during tracing because both the
+//! VM and the GC algorithm may break this guarantee.  See:
+//! [`crate::plan::PlanConstraints::may_trace_duplicate_edges`])*
 
 // FIXME: The entire vo_bit module should only be available if the "vo_bit" feature is enabled.
 // However, the malloc-based MarkSweepSpace and MarkCompactSpace depends on the VO bits regardless

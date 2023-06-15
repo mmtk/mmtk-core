@@ -1,11 +1,14 @@
 //! This module updates of VO bits during GC.  It is used for spaces that do not clear the metadata
-//! of some dead objects during GC.  Currently, only ImmixSpace is impacted.
+//! of some dead objects during GC.  Currently, only ImmixSpace is affected.
 //!
 //! | Policy            | When are VO bits of dead objects cleared                      |
 //! |-------------------|---------------------------------------------------------------|
-//! | MarkSweepSpace    | When sweeping cells of dead objects                           |
-//! | MarkCompactSpace  | When compacting                                               |
-//! | CopySpace         | When releasing the space                                      |
+//! | MarkSweepSpace    | when sweeping cells of dead objects                           |
+//! | MarkCompactSpace  | when compacting                                               |
+//! | CopySpace         | when releasing the space                                      |
+//!
+//! The policies listed above trivially clear the VO bits for dead objects (individually or in
+//! bulk), and make the VO bits available during tracing.
 //!
 //! For ImmixSpace, if a line contains both live and dead objects, live objects will be traced,
 //! but dead objects will not be visited.  Therefore we cannot clear the VO bits of individual
@@ -14,12 +17,7 @@
 //! if Immix is configured to be block-only).
 //!
 //! We implement several strategies depending on whether mmtk-core or the VM binding also requires
-//! the VO bits to also be available during tracing, for the purpose of
-//!
-//! -   conservative stack scanning
-//! -   supporting interior pointers
-//! -   heap dumping and object graph validation
-//! -   sanity check
+//! the VO bits to also be available during tracing.
 //!
 //! The handling is very sensitive to `VOBitUpdateStrategy`, and may be a bit verbose.
 //! We abstract VO-bit-related code out of the main GC algorithms (such as Immix) to make it more
@@ -39,31 +37,31 @@ use crate::{
     MMTK,
 };
 
-/// The strategy to update the valid object (VO) bits metadata for some spaces.
+/// The strategy to update the valid object (VO) bits.
 ///
-/// Note that some strategies have implications on the availability of VO bits and the layout of
-/// the mark bits metadata.  VM bindings should choose the appropriate strategy according to its
-/// specific needs.
+/// Each stategy has its strength and limitation.  We should choose a strategy according to the
+/// configuration of the VM binding.  See [`strategy`].
 #[derive(Debug)]
-pub enum VOBitUpdateStrategy {
+enum VOBitUpdateStrategy {
     /// Clear all VO bits after stacks are scanned, and reconstruct the VO bits during tracing.
     ///
-    /// This strategy is the default because it has minimum overhead.  If the VM does not have any
-    /// special requirements other than conservative stack scanning, it should use this strategy.
+    /// Pros:
+    /// -   Minimum overhead.
     ///
-    /// The main limitation is that the VO bits metadata is not available during tracing, because
-    /// it is cleared after stack scanning.  If the VM needs to use the
-    /// [`crate::memory_manager::is_mmtk_object`] function during tracing (for example, if some
-    /// *fields* are conservative), it cannot use this strategy.
+    /// Cons:
+    /// -   VO bits are not available during tracing.
     ///
     /// This strategy is described in the paper *Fast Conservative Garbage Collection* published
     /// in OOPSLA'14.  See: <https://dl.acm.org/doi/10.1145/2660193.2660198>
     ClearAndReconstruct,
     /// Copy the mark bits metadata over to the VO bits metadata after tracing.
     ///
-    /// This strategy will keep the VO bits metadata available during tracing.  However, it
-    /// requires the mark bits to be on the side.  The VM cannot use this strategy if it uses
-    /// in-header mark bits.
+    /// Pros:
+    /// -   VO bits are available during tracing.
+    ///
+    /// Cons:
+    /// -   Requires marking bits to be on the side.
+    /// -   Has extra time overhead.
     CopyFromMarkBits,
 }
 
@@ -77,6 +75,8 @@ impl VOBitUpdateStrategy {
     }
 }
 
+/// Select a strategy for the VM.  It is a `const` function so it always returns the same strategy
+/// for a given VM.
 const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
     // TODO: Select strategy wisely if we add features for heap dumping or interior reference.
     if VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING {
@@ -170,9 +170,7 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
                 Ordering::SeqCst,
             );
 
-            // We set the VO bit for the to-space object eagerly.  If an edge is visited twice, we
-            // will see it alread forwarded and pointing to the to-space object, and such an edge
-            // is still valid.
+            // We set the VO bit for the to-space object eagerly.
             vo_bit::set_vo_bit::<VM>(new_object);
         }
     }
