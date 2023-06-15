@@ -36,11 +36,18 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
-        let mut work_buckets = EnumMap::from_array(std::array::from_fn(|stage_num| {
-            let stage = WorkBucketStage::from_usize(stage_num);
-            let active = stage == WorkBucketStage::Unconstrained;
-            WorkBucket::new(active, worker_monitor.clone())
-        }));
+        let mut work_buckets = {
+            // TODO: switch to `std::array::from_fn` after we bump MSRV to at least 1.63.
+            let mut stage_nums_array = [0; WorkBucketStage::LENGTH];
+            for (stage_num, item) in stage_nums_array.iter_mut().enumerate() {
+                *item = stage_num;
+            }
+            EnumMap::from_array(stage_nums_array.map(|stage_num| {
+                let stage = WorkBucketStage::from_usize(stage_num);
+                let active = stage == WorkBucketStage::Unconstrained;
+                WorkBucket::new(active, worker_monitor.clone())
+            }))
+        };
 
         // Set the open condition of each bucket.
         {
