@@ -7,50 +7,6 @@ use crate::util::metadata::MetadataValue;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
-/// The strategy to update the valid object (VO) bits metadata for ImmixSpace.
-///
-/// It only affects plans that use ImmixSpace, including Immix, GenImmix and StickyImmix.
-///
-/// Note that some strategies have implications on the availability of VO bits and the layout of
-/// the mark bits metadata.  VM bindings should choose the appropriate strategy according to its
-/// specific needs.
-///
-/// See also: [`crate::util::metadata::vo_bit`]
-#[cfg(feature = "vo_bit")]
-#[derive(Debug)]
-pub enum ImmixVOBitUpdateStrategy {
-    /// Clear all VO bits after stacks are scanned, and reconstruct the VO bits during tracing.
-    ///
-    /// This strategy is the default because it has minimum overhead.  If the VM does not have any
-    /// special requirements other than conservative stack scanning, it should use this strategy.
-    ///
-    /// The main limitation is that the VO bits metadata is not available during tracing, because
-    /// it is cleared after stack scanning.  If the VM needs to use the
-    /// [`crate::memory_manager::is_mmtk_object`] function during tracing (for example, if some
-    /// *fields* are conservative), it cannot use this strategy.
-    ///
-    /// This strategy is described in the paper *Fast Conservative Garbage Collection* published
-    /// in OOPSLA'14.  See: <https://dl.acm.org/doi/10.1145/2660193.2660198>
-    ClearAndReconstruct,
-    /// Copy the mark bits metadata over to the VO bits metadata after tracing.
-    ///
-    /// This strategy will keep the VO bits metadata available during tracing.  However, it
-    /// requires the mark bits to be on the side.  The VM cannot use this strategy if it uses
-    /// in-header mark bits.
-    CopyFromMarkBits,
-}
-
-#[cfg(feature = "vo_bit")]
-impl ImmixVOBitUpdateStrategy {
-    /// Return `true` if the VO bit metadata is available during tracing.
-    pub fn vo_bit_available_during_tracing(&self) -> bool {
-        match *self {
-            ImmixVOBitUpdateStrategy::ClearAndReconstruct => false,
-            ImmixVOBitUpdateStrategy::CopyFromMarkBits => true,
-        }
-    }
-}
-
 /// VM-specific methods for object model.
 ///
 /// This trait includes 3 parts:
@@ -125,11 +81,13 @@ pub trait ObjectModel<VM: VMBinding> {
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
-    /// Strategy to update VO bits metadata for ImmixSpace.
-    /// See: [`ImmixVOBitUpdateStrategy`].
+    /// Set this to true if the VM binding requires the valid object (VO) bits to be available
+    /// during tracing.
+    ///
+    /// Note that the VO bits is always available during root scanning even this flag is false.
+    /// See the comments of individual methods in the `Scanning` trait.
     #[cfg(feature = "vo_bit")]
-    const IMMIX_VO_BIT_UPDATE_STRATEGY: ImmixVOBitUpdateStrategy =
-        ImmixVOBitUpdateStrategy::ClearAndReconstruct;
+    const NEED_VO_BITS_DURING_TRACING: bool = false;
 
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.

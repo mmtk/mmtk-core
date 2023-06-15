@@ -7,6 +7,12 @@
 //! The main purpose of VO bit is supporting conservative GC.  It is the canonical source of
 //! information about whether there is an object in the MMTk heap at any given address.
 
+// FIXME: The entire vo_bit module should only be available if the "vo_bit" feature is enabled.
+// However, the malloc-based MarkSweepSpace and MarkCompactSpace depends on the VO bits regardless
+// of the "vo_bit" feature.
+#[cfg(feature = "vo_bit")]
+pub(crate) mod helper;
+
 use atomic::Ordering;
 
 use crate::util::metadata::side_metadata::SideMetadataSpec;

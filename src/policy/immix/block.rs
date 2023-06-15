@@ -1,13 +1,13 @@
 use super::defrag::Histogram;
 use super::line::Line;
-#[cfg(feature = "vo_bit")]
-use super::vo_bit_helper;
 use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
@@ -199,7 +199,7 @@ impl Block {
                 BlockState::Unallocated => false,
                 BlockState::Unmarked => {
                     #[cfg(feature = "vo_bit")]
-                    vo_bit_helper::on_block_swept::<VM>(self, false);
+                    vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
@@ -207,7 +207,7 @@ impl Block {
                 }
                 BlockState::Marked => {
                     #[cfg(feature = "vo_bit")]
-                    vo_bit_helper::on_block_swept::<VM>(self, true);
+                    vo_bit::helper::on_region_swept::<VM, _>(self, true);
 
                     // The block is live.
                     false
@@ -239,7 +239,7 @@ impl Block {
 
             if marked_lines == 0 {
                 #[cfg(feature = "vo_bit")]
-                vo_bit_helper::on_block_swept::<VM>(self, false);
+                vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
                 // Release the block if non of its lines are marked.
                 space.release_block(*self);
@@ -262,7 +262,7 @@ impl Block {
                 self.set_holes(holes);
 
                 #[cfg(feature = "vo_bit")]
-                vo_bit_helper::on_block_swept::<VM>(self, true);
+                vo_bit::helper::on_region_swept::<VM, _>(self, true);
 
                 false
             }

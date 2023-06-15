@@ -2,8 +2,6 @@ pub mod block;
 pub mod defrag;
 pub mod immixspace;
 pub mod line;
-#[cfg(feature = "vo_bit")]
-mod vo_bit_helper;
 
 pub use immixspace::*;
 

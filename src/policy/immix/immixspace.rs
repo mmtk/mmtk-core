@@ -1,6 +1,4 @@
 use super::line::*;
-#[cfg(feature = "vo_bit")]
-use super::vo_bit_helper;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
@@ -15,6 +13,8 @@ use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::{self, MetadataSpec};
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::vo_bit;
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -281,7 +281,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         super::validate_features();
         #[cfg(feature = "vo_bit")]
-        vo_bit_helper::validate_config::<VM>();
+        vo_bit::helper::validate_config::<VM>();
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let common =
@@ -391,7 +391,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
             #[cfg(feature = "vo_bit")]
-            vo_bit_helper::prepare_extra_packets(&self.chunk_map, self.scheduler());
+            vo_bit::helper::schedule_clear_vo_bits_packets_if_needed(&self.chunk_map, self.scheduler());
 
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -510,7 +510,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
-        vo_bit_helper::on_trace_object::<VM>(object);
+        vo_bit::helper::on_trace_object::<VM>(object);
 
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
@@ -523,7 +523,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
 
             #[cfg(feature = "vo_bit")]
-            vo_bit_helper::on_object_marked::<VM>(object);
+            vo_bit::helper::on_object_marked::<VM>(object);
 
             // Visit node
             queue.enqueue(object);
@@ -547,7 +547,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
 
         #[cfg(feature = "vo_bit")]
-        vo_bit_helper::on_trace_object::<VM>(object);
+        vo_bit::helper::on_trace_object::<VM>(object);
 
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
@@ -597,7 +597,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
 
                 #[cfg(feature = "vo_bit")]
-                vo_bit_helper::on_object_marked::<VM>(object);
+                vo_bit::helper::on_object_marked::<VM>(object);
 
                 object
             } else {
@@ -607,7 +607,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
 
                 #[cfg(feature = "vo_bit")]
-                vo_bit_helper::on_object_forwarded::<VM>(new_object);
+                vo_bit::helper::on_object_forwarded::<VM>(new_object);
 
                 // Clippy complains if the "vo_bit" feature is not enabled.
                 #[allow(clippy::let_and_return)]
