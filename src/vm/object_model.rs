@@ -82,10 +82,16 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
     /// Set this to true if the VM binding requires the valid object (VO) bits to be available
-    /// during tracing.
+    /// during tracing. If this constant is set to `false`, it is undefined behavior if the binding
+    /// attempts to access VO bits during tracing.
     ///
-    /// Note that the VO bits is always available during root scanning even this flag is false.
-    /// See the comments of individual methods in the `Scanning` trait.
+    /// Note that the VO bits is always available during root scanning even if this flag is false,
+    /// which is suitable for using VO bits (and the `is_mmtk_object()` method) for conservative
+    /// stack scanning. However, if a binding is also conservative in finding references during
+    /// object scanning, they need to set this constant to `true`. See the comments of individual
+    /// methods in the `Scanning` trait.
+    ///
+    /// Setting this to true may incur some overhead for certain plans, such as immix-related plans.
     #[cfg(feature = "vo_bit")]
     const NEED_VO_BITS_DURING_TRACING: bool = false;
 
