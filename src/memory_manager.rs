@@ -97,7 +97,8 @@ pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Add
 /// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its
 /// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage
 /// that can be accessed efficiently. A VM may also copy and embed the mutator stucture to a thread-local data
-/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied).
+/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied --
+/// Note that `Mutator` may contain pointers so a binding may drop the box only if they perform a deep copy).
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.

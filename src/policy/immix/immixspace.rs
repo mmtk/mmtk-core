@@ -89,12 +89,29 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        if super::NEVER_MOVE_OBJECTS {
-            // We won't forward objects.
-            self.is_marked(object)
-        } else {
-            self.is_marked(object) || ForwardingWord::is_forwarded::<VM>(object)
+        // If the mark bit is set, it is live.
+        if self.is_marked(object) {
+            return true;
         }
+
+        // If we never move objects, look no further.
+        if super::NEVER_MOVE_OBJECTS {
+            return false;
+        }
+
+        // If the forwarding bits are on the side,
+        if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
+            // we need to ensure `object` is in a defrag source
+            // because `PrepareBlockState` does not clear forwarding bits
+            // for non-defrag-source blocks.
+            if !Block::containing::<VM>(object).is_defrag_source() {
+                // Objects not in defrag sources cannot be forwarded.
+                return false;
+            }
+        }
+
+        // If the object is forwarded, it is live, too.
+        ForwardingWord::is_forwarded::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
@@ -804,10 +821,11 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             debug_assert_ne!(block.get_state(), BlockState::Marked);
             // Clear forwarding bits if necessary.
             if is_defrag_source {
+                // Note that `ImmixSpace::is_live` depends on the fact that we only clear side
+                // forwarding bits for defrag sources.  If we change the code here, we need to
+                // make sure `ImmixSpace::is_live` is fixed, too.
                 if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
                     // Clear on-the-side forwarding bits.
-                    // NOTE: In theory, we only need to clear the forwarding bits of occupied lines of
-                    // blocks that are defrag sources.
                     side.bzero_metadata(block.start(), Block::BYTES);
                 }
             }
