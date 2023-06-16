@@ -606,14 +606,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
                 // mark the block. So we do not need to explicitly mark it here.
+
+                // Clippy complains if the "vo_bit" feature is not enabled.
+                #[allow(clippy::let_and_return)]
                 let new_object =
                     ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
 
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_forwarded::<VM>(new_object);
 
-                // Clippy complains if the "vo_bit" feature is not enabled.
-                #[allow(clippy::let_and_return)]
                 new_object
             };
             debug_assert_eq!(
