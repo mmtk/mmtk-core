@@ -318,6 +318,8 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // In full heap GC, mature objects may die, and their unlogged bit needs to be reset.
                 // Along with the option above, we unlog them again during tracing.
                 reset_log_bit_in_major_gc: true,
+                // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
+                mixed_age: true,
             },
         );
         let full_heap_gc_count = immix.base().stats.new_event_counter("majorGC", true, true);

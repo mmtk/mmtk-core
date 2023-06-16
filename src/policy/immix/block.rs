@@ -268,6 +268,34 @@ impl Block {
             }
         }
     }
+
+    /// Clear VO bits metadata for regions that contain young objects.
+    #[cfg(feature = "vo_bit")]
+    pub fn clear_vo_bits_for_young_regions(&self, line_mark_state: Option<u8>) {
+        match line_mark_state {
+            None => {
+                match self.get_state() {
+                    BlockState::Unmarked => {
+                        // It may contain young objects.  Clear it.
+                        vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+                    }
+                    BlockState::Marked => {
+                        // It contains old objects.  Skip it.
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            Some(state) => {
+                // With lines.
+                for line in self.lines() {
+                    if !line.is_marked(state) {
+                        // It may contain young objects.  Clear it.
+                        vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// A non-block single-linked list to store blocks.

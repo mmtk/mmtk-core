@@ -69,6 +69,12 @@ pub struct ImmixSpaceArgs {
     /// bit to differentiate them. So we reset all the log bits in major GCs,
     /// and unlogged the objects when they are traced (alive).
     pub reset_log_bit_in_major_gc: bool,
+    /// Whether this ImmixSpace instance contains both young and old objects.
+    /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
+    /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
+    /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
+    /// nursery and its VO bits can be cleared in bulk.
+    pub mixed_age: bool,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -390,18 +396,48 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             });
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
 
-            #[cfg(feature = "vo_bit")]
-            vo_bit::helper::schedule_clear_vo_bits_packets_if_needed(
-                &self.chunk_map,
-                self.scheduler(),
-            );
-
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
                 if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
                     self.line_mark_state
                         .store(Line::RESET_MARK_STATE, Ordering::Release);
                 }
+            }
+        }
+
+        #[cfg(feature = "vo_bit")]
+        if vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
+            let maybe_scope = if major_gc {
+                // If it is major GC, we always clear all VO bits because we are doing full-heap
+                // tracing.
+                Some(VOBitsClearingScope::FullGC)
+            } else if self.space_args.mixed_age {
+                // StickyImmix nursery GC.
+                // Some lines (or blocks) contain only young objects,
+                // while other lines (or blocks) contain only old objects.
+                if super::BLOCK_ONLY {
+                    // Block only.  Young objects are only allocated into fully empty blocks.
+                    // Only clear unmarked blocks.
+                    Some(VOBitsClearingScope::BlockOnly)
+                } else {
+                    // Young objects are allocated into empty lines.
+                    // Only clear unmarked lines.
+                    let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
+                    Some(VOBitsClearingScope::Line {
+                        state: line_mark_state,
+                    })
+                }
+            } else {
+                // GenImmix nursery GC.  We do nothing to the ImmixSpace because the nursery is a
+                // separate CopySpace.  It'll clear its own VO bits.
+                None
+            };
+
+            if let Some(scope) = maybe_scope {
+                let work_packets = self
+                    .chunk_map
+                    .generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk, scope }));
+                self.scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
             }
         }
     }
@@ -1023,5 +1059,53 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
         );
         // Just get the space from either allocator
         self.defrag_allocator.immix_space()
+    }
+}
+
+#[cfg(feature = "vo_bit")]
+#[derive(Clone, Copy)]
+enum VOBitsClearingScope {
+    /// Clear all VO bits in all blocks.
+    FullGC,
+    /// Clear unmarked blocks, only.
+    BlockOnly,
+    /// Clear unmarked lines, only.  (i.e. lines with line mark state **not** equal to `state`).
+    Line { state: u8 },
+}
+
+/// A work packet to clear VO bit metadata after Prepare.
+#[cfg(feature = "vo_bit")]
+struct ClearVOBitsAfterPrepare {
+    chunk: Chunk,
+    scope: VOBitsClearingScope,
+}
+
+#[cfg(feature = "vo_bit")]
+impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        match self.scope {
+            VOBitsClearingScope::FullGC => {
+                vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
+            }
+            VOBitsClearingScope::BlockOnly => {
+                self.clear_blocks(None);
+            }
+            VOBitsClearingScope::Line { state } => {
+                self.clear_blocks(Some(state));
+            }
+        }
+    }
+}
+
+#[cfg(feature = "vo_bit")]
+impl ClearVOBitsAfterPrepare {
+    fn clear_blocks(&mut self, line_mark_state: Option<u8>) {
+        for block in self
+            .chunk
+            .iter_region::<Block>()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            block.clear_vo_bits_for_young_regions(line_mark_state);
+        }
     }
 }

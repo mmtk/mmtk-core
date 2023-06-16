@@ -26,15 +26,8 @@
 use atomic::Ordering;
 
 use crate::{
-    scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
-    util::{
-        heap::chunk_map::{Chunk, ChunkMap},
-        linear_scan::Region,
-        metadata::vo_bit,
-        ObjectReference,
-    },
+    util::{linear_scan::Region, metadata::vo_bit, ObjectReference},
     vm::{ObjectModel, VMBinding},
-    MMTK,
 };
 
 /// The strategy to update the valid object (VO) bits.
@@ -113,20 +106,10 @@ pub(crate) fn validate_config<VM: VMBinding>() {
     }
 }
 
-pub(crate) fn schedule_clear_vo_bits_packets_if_needed<VM: VMBinding>(
-    chunk_map: &ChunkMap,
-    scheduler: &GCWorkScheduler<VM>,
-) {
+pub(crate) fn need_to_clear_vo_bits_before_tracing<VM: VMBinding>() -> bool {
     match strategy::<VM>() {
-        VOBitUpdateStrategy::ClearAndReconstruct => {
-            // In this strategy, we clear all VO bits after stacks are scanned.
-            let work_packets =
-                chunk_map.generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk }));
-            scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
-        }
-        VOBitUpdateStrategy::CopyFromMarkBits => {
-            // Do nothing.
-        }
+        VOBitUpdateStrategy::ClearAndReconstruct => true,
+        VOBitUpdateStrategy::CopyFromMarkBits => false,
     }
 }
 
@@ -191,16 +174,5 @@ pub(crate) fn on_region_swept<VM: VMBinding, R: Region>(region: &R, is_occupied:
                 vo_bit::bzero_vo_bit(region.start(), R::BYTES);
             }
         }
-    }
-}
-
-/// A work packet to clear VO bit metadata after Prepare.
-pub struct ClearVOBitsAfterPrepare {
-    pub chunk: Chunk,
-}
-
-impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
     }
 }
