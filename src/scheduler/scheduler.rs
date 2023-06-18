@@ -8,14 +8,14 @@ use crate::util::options::AffinityKind;
 use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
-use enum_map::Enum;
-use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
-    /// Work buckets
-    pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
+    /// The configuration of the stages. This is created based on the plan.
+    pub stage_config: WorkBucketStageConfig,
+    /// Work buckets. This is created based on the config above.
+    pub work_buckets: HashMap<WorkBucketStage, WorkBucket<VM>>,
     /// Workers
     pub(crate) worker_group: Arc<WorkerGroup<VM>>,
     /// The shared part of the GC worker object of the controller thread
@@ -32,47 +32,41 @@ pub struct GCWorkScheduler<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
-    pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
+    pub fn new(
+        num_workers: usize,
+        affinity: AffinityKind,
+        stage_config: WorkBucketStageConfig,
+    ) -> Arc<Self> {
         let worker_monitor: Arc<WorkerMonitor> = Arc::new(WorkerMonitor::new(num_workers));
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
-        let mut work_buckets = enum_map! {
-            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
-            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::VMRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::VMRefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
-        };
+        let mut work_buckets: HashMap<WorkBucketStage, WorkBucket<VM>> = stage_config
+            .stages
+            .iter()
+            .map(|stage| {
+                let activated = stage == &WorkBucketStage::Unconstrained;
+                (*stage, WorkBucket::new(activated, worker_monitor.clone()))
+            })
+            .collect();
 
         // Set the open condition of each bucket.
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
             // This vec will grow for each stage we call with open_next()
-            let first_stw_stage = WorkBucketStage::first_stw_stage();
-            let mut open_stages: Vec<WorkBucketStage> = vec![first_stw_stage];
+            let mut open_stages: Vec<WorkBucketStage> = vec![stage_config.first_stw_stage];
             // The rest will open after the previous stage is done.
-            let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
-            for stage in stages {
-                if stage != WorkBucketStage::Unconstrained && stage != first_stw_stage {
+            for stage in stage_config.stages.iter() {
+                if stage != &WorkBucketStage::Unconstrained
+                    && stage != &stage_config.first_stw_stage
+                {
                     let cur_stages = open_stages.clone();
-                    work_buckets[stage].set_open_condition(
+                    work_buckets.get_mut(stage).unwrap().set_open_condition(
                         move |scheduler: &GCWorkScheduler<VM>| {
                             scheduler.are_buckets_drained(&cur_stages)
                         },
                     );
-                    open_stages.push(stage);
+                    open_stages.push(*stage);
                 }
             }
         }
@@ -85,6 +79,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             coordinator_worker_shared,
             worker_monitor,
             affinity,
+            stage_config,
         })
     }
 
@@ -127,27 +122,27 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         use crate::plan::Plan;
         use crate::scheduler::gc_work::*;
         // Stop & scan mutators (mutator scanning can happen before STW)
-        self.work_buckets[WorkBucketStage::Unconstrained]
+        self.work_buckets[&WorkBucketStage::Unconstrained]
             .add(StopMutators::<C::ProcessEdgesWorkType>::new());
 
         // Prepare global/collectors/mutators
-        self.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));
+        self.work_buckets[&WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));
 
         // Release global/collectors/mutators
-        self.work_buckets[WorkBucketStage::Release].add(Release::<C>::new(plan));
+        self.work_buckets[&WorkBucketStage::Release].add(Release::<C>::new(plan));
 
         // Analysis GC work
         #[cfg(feature = "analysis")]
         {
             use crate::util::analysis::GcHookWork;
-            self.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+            self.work_buckets[&WorkBucketStage::Unconstrained].add(GcHookWork);
         }
 
         // Sanity
         #[cfg(feature = "sanity")]
         {
             use crate::util::sanity::sanity_checker::ScheduleSanityGC;
-            self.work_buckets[WorkBucketStage::Final]
+            self.work_buckets[&WorkBucketStage::Final]
                 .add(ScheduleSanityGC::<C::PlanType>::new(plan));
         }
 
@@ -156,32 +151,32 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             use crate::util::reference_processor::{
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
-            self.work_buckets[WorkBucketStage::SoftRefClosure]
+            self.work_buckets[&WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::<C::ProcessEdgesWorkType>::new());
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
+            self.work_buckets[&WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<C::ProcessEdgesWorkType>::new());
-            self.work_buckets[WorkBucketStage::PhantomRefClosure]
+            self.work_buckets[&WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
-                self.work_buckets[WorkBucketStage::RefForwarding]
+                self.work_buckets[&WorkBucketStage::RefForwarding]
                     .add(RefForwarding::<C::ProcessEdgesWorkType>::new());
             }
 
             use crate::util::reference_processor::RefEnqueue;
-            self.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
+            self.work_buckets[&WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
         }
 
         // Finalization
         if !*plan.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
-            self.work_buckets[WorkBucketStage::FinalRefClosure]
+            self.work_buckets[&WorkBucketStage::FinalRefClosure]
                 .add(Finalization::<C::ProcessEdgesWorkType>::new());
             // forward refs
             if plan.constraints().needs_forward_after_liveness {
-                self.work_buckets[WorkBucketStage::FinalizableForwarding]
+                self.work_buckets[&WorkBucketStage::FinalizableForwarding]
                     .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
             }
         }
@@ -207,20 +202,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // `VMProcessWeakRefs` packet can be an ordinary packet (doesn't have to be a sentinel)
         // because there are no other packets in the bucket.  We set it as sentinel for
         // consistency.
-        self.work_buckets[WorkBucketStage::VMRefClosure]
+        self.work_buckets[&WorkBucketStage::VMRefClosure]
             .set_sentinel(Box::new(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
-            self.work_buckets[WorkBucketStage::VMRefForwarding]
+            self.work_buckets[&WorkBucketStage::VMRefForwarding]
                 .add(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new());
         }
 
-        self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
+        self.work_buckets[&WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
-        buckets.iter().all(|&b| self.work_buckets[b].is_drained())
+        buckets.iter().all(|b| self.work_buckets[b].is_drained())
     }
 
     pub fn all_buckets_empty(&self) -> bool {
@@ -248,25 +243,24 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub(crate) fn update_buckets(&self) -> bool {
         let mut buckets_updated = false;
         let mut new_packets = false;
-        for i in 0..WorkBucketStage::LENGTH {
-            let id = WorkBucketStage::from_usize(i);
-            if id == WorkBucketStage::Unconstrained {
+        for stage in self.stage_config.stages.iter() {
+            if stage == &WorkBucketStage::Unconstrained {
                 continue;
             }
-            let bucket = &self.work_buckets[id];
+            let bucket = &self.work_buckets[stage];
             let bucket_opened = bucket.update(self);
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
                 new_packets = new_packets || !bucket.is_drained();
                 if new_packets {
                     // Quit the loop. There are already new packets in the newly opened buckets.
-                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    trace!("Found new packets at stage {:?}.  Break.", stage);
                     break;
                 }
                 new_packets = new_packets || bucket.maybe_schedule_sentinel();
                 if new_packets {
                     // Quit the loop. A sentinel packet is added to the newly opened buckets.
-                    trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
+                    trace!("Sentinel is scheduled at stage {:?}.  Break.", stage);
                     break;
                 }
             }
@@ -276,16 +270,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn deactivate_all(&self) {
         self.work_buckets.iter().for_each(|(id, bkt)| {
-            if id != WorkBucketStage::Unconstrained {
+            if id != &WorkBucketStage::Unconstrained {
                 bkt.deactivate();
             }
         });
     }
 
     pub fn reset_state(&self) {
-        let first_stw_stage = WorkBucketStage::first_stw_stage();
         self.work_buckets.iter().for_each(|(id, bkt)| {
-            if id != WorkBucketStage::Unconstrained && id != first_stw_stage {
+            if id != &WorkBucketStage::Unconstrained && id != &self.stage_config.first_stw_stage {
                 bkt.deactivate();
             }
         });
@@ -294,7 +287,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn debug_assert_all_buckets_deactivated(&self) {
         if cfg!(debug_assertions) {
             self.work_buckets.iter().for_each(|(id, bkt)| {
-                if id != WorkBucketStage::Unconstrained {
+                if id != &WorkBucketStage::Unconstrained {
                     assert!(!bkt.is_activated());
                 }
             });
@@ -411,7 +404,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().gc_requester.clear_request();
-        let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
+        let first_stw_bucket = &self.work_buckets[&self.stage_config.first_stw_stage];
         debug_assert!(!first_stw_bucket.is_activated());
         // Note: This is the only place where a non-coordinator thread opens a bucket.
         // If the `StopMutators` is executed by the coordinator thread, it will open

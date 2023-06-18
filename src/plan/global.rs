@@ -132,6 +132,18 @@ pub fn create_plan<VM: VMBinding>(
     plan
 }
 
+pub fn create_work_bucket_stage_config<VM: VMBinding>(
+    plan_selector: PlanSelector,
+) -> WorkBucketStageConfig {
+    // For any plan that needs extra work buckets, they should create their own stage config.
+    match plan_selector {
+        PlanSelector::MarkCompact => {
+            crate::plan::markcompact::MarkCompact::<VM>::work_bucket_stage_config()
+        }
+        _ => WorkBucketStageConfig::default(),
+    }
+}
+
 /// Create thread local GC worker.
 pub fn create_gc_worker_context<VM: VMBinding>(
     tls: VMWorkerThread,

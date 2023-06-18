@@ -2,7 +2,6 @@ use super::worker::WorkerMonitor;
 use super::*;
 use crate::vm::VMBinding;
 use crossbeam::deque::{Injector, Steal, Worker};
-use enum_map::Enum;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -222,7 +221,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 }
 
-#[derive(Debug, Enum, Copy, Clone, Eq, PartialEq)]
+use variant_count::VariantCount;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, VariantCount)]
 pub enum WorkBucketStage {
     /// This bucket is always open.
     Unconstrained,
@@ -265,17 +266,45 @@ pub enum WorkBucketStage {
     ///
     /// NOTE: This stage is intended to replace Java-specific forwarding phases above.
     VMRefForwarding,
-    /// Compact objects (mark-compact-only).
-    Compact,
     /// Work packets that should be done just before GC shall go here.  This includes releasing
     /// resources and setting states in plans, spaces, GC workers, mutators, etc.
     Release,
     /// Resume mutators and end GC.
     Final,
+
+    /// A plan can create their custom stage with a unique ID (per plan).
+    Custom(usize),
 }
 
-impl WorkBucketStage {
-    pub fn first_stw_stage() -> Self {
-        WorkBucketStage::from_usize(1)
+pub struct WorkBucketStageConfig {
+    pub stages: Vec<WorkBucketStage>,
+    pub first_stw_stage: WorkBucketStage,
+}
+
+impl std::default::Default for WorkBucketStageConfig {
+    fn default() -> Self {
+        let stages = vec![
+            WorkBucketStage::Unconstrained,
+            WorkBucketStage::Prepare,
+            WorkBucketStage::Closure,
+            WorkBucketStage::SoftRefClosure,
+            WorkBucketStage::WeakRefClosure,
+            WorkBucketStage::FinalRefClosure,
+            WorkBucketStage::PhantomRefClosure,
+            WorkBucketStage::VMRefClosure,
+            WorkBucketStage::CalculateForwarding,
+            WorkBucketStage::SecondRoots,
+            WorkBucketStage::RefForwarding,
+            WorkBucketStage::FinalizableForwarding,
+            WorkBucketStage::VMRefForwarding,
+            WorkBucketStage::Release,
+            WorkBucketStage::Final,
+        ];
+        // Except the custom stage in WorkBucketStage, every stage should appear in the default stages.
+        assert_eq!(stages.len(), WorkBucketStage::VARIANT_COUNT - 1);
+        Self {
+            stages,
+            first_stw_stage: WorkBucketStage::Prepare,
+        }
     }
 }

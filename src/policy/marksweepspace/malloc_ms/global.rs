@@ -491,7 +491,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             self.work_live_bytes.store(0, Ordering::SeqCst);
         }
 
-        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        self.scheduler.work_buckets[&WorkBucketStage::Release].bulk_add(work_packets);
     }
 
     pub fn sweep_chunk(&self, chunk_start: Address) {

@@ -44,6 +44,9 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..PlanConstraints::default()
 };
 
+/// A custom stage for doing compaction for mark compact. It happens after all the tracing stages, and before Release
+pub const COMPACT_STAGE: WorkBucketStage = WorkBucketStage::Custom(0);
+
 impl<VM: VMBinding> Plan for MarkCompact<VM> {
     type VM = VM;
 
@@ -96,21 +99,21 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         //     );
 
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
+        scheduler.work_buckets[&WorkBucketStage::Unconstrained]
             .add(StopMutators::<MarkingProcessEdges<VM>>::new());
 
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
+        scheduler.work_buckets[&WorkBucketStage::Prepare]
             .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
+        scheduler.work_buckets[&WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
-        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
+        scheduler.work_buckets[&WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
+        scheduler.work_buckets[&COMPACT_STAGE].add(Compact::<VM>::new(&self.mc_space));
 
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
+        scheduler.work_buckets[&WorkBucketStage::Release]
             .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
 
         // Reference processing
@@ -118,19 +121,19 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             use crate::util::reference_processor::{
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
-            scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
+            scheduler.work_buckets[&WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
+            scheduler.work_buckets[&WorkBucketStage::WeakRefClosure]
                 .add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
-            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
+            scheduler.work_buckets[&WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
 
             use crate::util::reference_processor::RefForwarding;
-            scheduler.work_buckets[WorkBucketStage::RefForwarding]
+            scheduler.work_buckets[&WorkBucketStage::RefForwarding]
                 .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
 
             use crate::util::reference_processor::RefEnqueue;
-            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
+            scheduler.work_buckets[&WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
         }
 
         // Finalization
@@ -139,33 +142,33 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             // finalization
             // treat finalizable objects as roots and perform a closure (marking)
             // must be done before calculating forwarding pointers
-            scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
+            scheduler.work_buckets[&WorkBucketStage::FinalRefClosure]
                 .add(Finalization::<MarkingProcessEdges<VM>>::new());
             // update finalizable object references
             // must be done before compacting
-            scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
+            scheduler.work_buckets[&WorkBucketStage::FinalizableForwarding]
                 .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }
 
         // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::VMRefClosure]
+        scheduler.work_buckets[&WorkBucketStage::VMRefClosure]
             .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new()));
 
         // VM-specific weak ref forwarding
-        scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
+        scheduler.work_buckets[&WorkBucketStage::VMRefForwarding]
             .add(VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new());
 
         // VM-specific work after forwarding, possible to implement ref enququing.
-        scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
+        scheduler.work_buckets[&WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
 
         // Analysis GC work
         #[cfg(feature = "analysis")]
         {
             use crate::util::analysis::GcHookWork;
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+            scheduler.work_buckets[&WorkBucketStage::Unconstrained].add(GcHookWork);
         }
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
+        scheduler.work_buckets[&WorkBucketStage::Final]
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
     }
 
@@ -217,6 +220,17 @@ impl<VM: VMBinding> MarkCompact<VM> {
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
 
         res
+    }
+
+    pub fn work_bucket_stage_config() -> WorkBucketStageConfig {
+        let mut default = WorkBucketStageConfig::default();
+        // Add compact stage before release
+        crate::util::rust_util::vec_insert_before(
+            &mut default.stages,
+            COMPACT_STAGE,
+            &WorkBucketStage::Release,
+        );
+        default
     }
 }
 

@@ -88,12 +88,12 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         {
             let sanity_checker = mmtk.sanity_checker.lock().unwrap();
             for roots in &sanity_checker.root_edges {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(
+                scheduler.work_buckets[&WorkBucketStage::Closure].add(
                     SanityGCProcessEdges::<P::VM>::new(roots.clone(), true, mmtk),
                 );
             }
             for roots in &sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(ScanObjects::<
+                scheduler.work_buckets[&WorkBucketStage::Closure].add(ScanObjects::<
                     SanityGCProcessEdges<P::VM>,
                 >::new(
                     roots.clone(), false, true
@@ -101,10 +101,10 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
             }
         }
         // Prepare global/collectors/mutators
-        worker.scheduler().work_buckets[WorkBucketStage::Prepare]
+        worker.scheduler().work_buckets[&WorkBucketStage::Prepare]
             .add(SanityPrepare::<P>::new(plan.downcast_ref::<P>().unwrap()));
         // Release global/collectors/mutators
-        worker.scheduler().work_buckets[WorkBucketStage::Release]
+        worker.scheduler().work_buckets[&WorkBucketStage::Release]
             .add(SanityRelease::<P>::new(plan.downcast_ref::<P>().unwrap()));
     }
 }
@@ -128,7 +128,7 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
             sanity_checker.refs.clear();
         }
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+            mmtk.scheduler.work_buckets[&WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group.workers_shared {
@@ -154,7 +154,7 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
         mmtk.plan.leave_sanity();
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
+            mmtk.scheduler.work_buckets[&WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group.workers_shared {

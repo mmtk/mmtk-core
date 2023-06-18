@@ -125,3 +125,13 @@ mod initialize_once_tests {
         assert_eq!(INITIALIZE_COUNT.load(Ordering::SeqCst), 1);
     }
 }
+
+/// Insert a value before the given value. Returns true if we find the given value in the vector, and perform the insertion.
+pub fn vec_insert_before<T: PartialEq>(vec: &mut Vec<T>, insert: T, before: &T) -> bool {
+    if let Some(pos) = vec.iter().position(|x| x == before) {
+        vec.insert(pos, insert);
+        true
+    } else {
+        false
+    }
+}

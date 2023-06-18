@@ -15,6 +15,7 @@ pub(crate) use work::GCWorkContext;
 
 mod work_bucket;
 pub use work_bucket::WorkBucketStage;
+pub use work_bucket::WorkBucketStageConfig;
 
 mod worker;
 pub(crate) use worker::current_worker_ordinal;

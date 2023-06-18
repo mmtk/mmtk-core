@@ -885,7 +885,7 @@ pub fn add_work_packet<VM: VMBinding, W: GCWork<VM>>(
     bucket: WorkBucketStage,
     packet: W,
 ) {
-    mmtk.scheduler.work_buckets[bucket].add(packet)
+    mmtk.scheduler.work_buckets[&bucket].add(packet)
 }
 
 /// Bulk add a number of work packets to the given work bucket. Note that this simply adds the work packets
@@ -900,5 +900,5 @@ pub fn add_work_packets<VM: VMBinding>(
     bucket: WorkBucketStage,
     packets: Vec<Box<dyn GCWork<VM>>>,
 ) {
-    mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
+    mmtk.scheduler.work_buckets[&bucket].bulk_add(packets)
 }

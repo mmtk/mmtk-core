@@ -384,7 +384,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     },
                 })
             });
-            self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
+            self.scheduler().work_buckets[&WorkBucketStage::Prepare].bulk_add(work_packets);
 
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
@@ -415,7 +415,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
         // Sweep chunks and blocks
         let work_packets = self.generate_sweep_tasks();
-        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        self.scheduler().work_buckets[&WorkBucketStage::Release].bulk_add(work_packets);
         if super::DEFRAG {
             self.defrag.release(self);
         }

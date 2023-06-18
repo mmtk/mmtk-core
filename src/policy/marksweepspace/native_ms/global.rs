@@ -265,7 +265,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         // do that when we release mutators (eager sweeping), or do that at allocation time (lazy sweeping).
         use crate::scheduler::WorkBucketStage;
         let work_packets = self.generate_sweep_tasks();
-        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        self.scheduler.work_buckets[&WorkBucketStage::Release].bulk_add(work_packets);
 
         let mut abandoned = self.abandoned.lock().unwrap();
         abandoned.move_consumed_to_unswept();

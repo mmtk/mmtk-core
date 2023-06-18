@@ -86,7 +86,7 @@ impl<VM: VMBinding> GCController<VM> {
         );
 
         // Add a ScheduleCollection work packet.  It is the seed of other work packets.
-        self.scheduler.work_buckets[WorkBucketStage::Unconstrained].add(ScheduleCollection);
+        self.scheduler.work_buckets[&WorkBucketStage::Unconstrained].add(ScheduleCollection);
 
         // Notify only one worker at this time because there is only one work packet,
         // namely `ScheduleCollection`.

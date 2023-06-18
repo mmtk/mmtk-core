@@ -44,7 +44,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
     fn flush_modbuf(&mut self) {
         let buf = self.modbuf.take();
         if !buf.is_empty() {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
+            self.mmtk.scheduler.work_buckets[&WorkBucketStage::Closure]
                 .add(ProcessModBuf::<GenNurseryProcessEdges<VM, P>>::new(buf));
         }
     }
@@ -53,7 +53,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
         let buf = self.region_modbuf.take();
         if !buf.is_empty() {
             debug_assert!(!buf.is_empty());
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRegionModBuf::<
+            self.mmtk.scheduler.work_buckets[&WorkBucketStage::Closure].add(ProcessRegionModBuf::<
                 GenNurseryProcessEdges<VM, P>,
             >::new(buf));
         }
