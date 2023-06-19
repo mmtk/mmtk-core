@@ -387,12 +387,14 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
 ///
 /// NOTE: This will replace `RefForwarding` and `ForwardFinalization` in the future.
 pub struct VMForwardWeakRefs<E: ProcessEdgesWork> {
+    stage: WorkBucketStage,
     phantom_data: PhantomData<E>,
 }
 
 impl<E: ProcessEdgesWork> VMForwardWeakRefs<E> {
-    pub fn new() -> Self {
+    pub fn new(stage: WorkBucketStage) -> Self {
         Self {
+            stage,
             phantom_data: PhantomData,
         }
     }
@@ -402,10 +404,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMForwardWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("VMForwardWeakRefs");
 
-        let stage = WorkBucketStage::VMRefForwarding;
-
         let tracer_factory = ProcessEdgesWorkTracerContext::<E> {
-            stage,
+            stage: self.stage,
             phantom_data: PhantomData,
         };
         <E::VM as VMBinding>::VMScanning::forward_weak_refs(worker, tracer_factory)

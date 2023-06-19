@@ -158,27 +158,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[&WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
-            use crate::util::reference_processor::RefForwarding;
-            if plan.constraints().needs_forward_after_liveness {
-                self.work_buckets[&WorkBucketStage::RefForwarding]
-                    .add(RefForwarding::<C::ProcessEdgesWorkType>::new());
-            }
-
             use crate::util::reference_processor::RefEnqueue;
             self.work_buckets[&WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
         }
 
         // Finalization
         if !*plan.base().options.no_finalizer {
-            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            use crate::util::finalizable_processor::Finalization;
             // finalization
             self.work_buckets[&WorkBucketStage::FinalRefClosure]
                 .add(Finalization::<C::ProcessEdgesWorkType>::new());
-            // forward refs
-            if plan.constraints().needs_forward_after_liveness {
-                self.work_buckets[&WorkBucketStage::FinalizableForwarding]
-                    .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
-            }
         }
 
         // We add the VM-specific weak ref processing work regardless of MMTK-side options,
@@ -204,12 +193,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // consistency.
         self.work_buckets[&WorkBucketStage::VMRefClosure]
             .set_sentinel(Box::new(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new()));
-
-        if plan.constraints().needs_forward_after_liveness {
-            // VM-specific weak ref forwarding
-            self.work_buckets[&WorkBucketStage::VMRefForwarding]
-                .add(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new());
-        }
 
         self.work_buckets[&WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
     }

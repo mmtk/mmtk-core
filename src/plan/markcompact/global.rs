@@ -44,8 +44,24 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..PlanConstraints::default()
 };
 
-/// A custom stage for doing compaction for mark compact. It happens after all the tracing stages, and before Release
-pub const COMPACT_STAGE: WorkBucketStage = WorkBucketStage::Custom(0);
+/// A stage to compute forwarding addresses of objects. When we finish the marking transitive closure (`TRACE_KIND_MARK`),
+/// we calculate the forwarding addresses for marked objects.
+pub const CALCULATE_FORWARDING_STAGE: WorkBucketStage = WorkBucketStage::Custom(0);
+
+/// A stage to initiate the second transitive closure (`TRACE_KIND_FORWARD`). This happens after we calculate forwarding addresses.
+pub const SECOND_ROOTS_STAGE: WorkBucketStage = WorkBucketStage::Custom(1);
+
+/// A stage to forward weak references. This happens after the second transitive closure.
+pub const REF_FORWARDING_STAGE: WorkBucketStage = WorkBucketStage::Custom(2);
+
+/// A stage to forward finalizable objects. This happens after the second transitive closure.
+pub const FINALIZABLE_FORWARDING_STAGE: WorkBucketStage = WorkBucketStage::Custom(3);
+
+/// A stage to allow VM bindings to do ref forwarding. This happens after other ref forwarding work.
+pub const VM_REF_FORARDING_STAGE: WorkBucketStage = WorkBucketStage::Custom(4);
+
+/// A custom stage to do compaction. It happens after all the tracing stages, and before Release
+pub const COMPACT_STAGE: WorkBucketStage = WorkBucketStage::Custom(5);
 
 impl<VM: VMBinding> Plan for MarkCompact<VM> {
     type VM = VM;
@@ -106,10 +122,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[&WorkBucketStage::Prepare]
             .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
 
-        scheduler.work_buckets[&WorkBucketStage::CalculateForwarding]
+        scheduler.work_buckets[&CALCULATE_FORWARDING_STAGE]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
-        scheduler.work_buckets[&WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
+        scheduler.work_buckets[&SECOND_ROOTS_STAGE].add(UpdateReferences::<VM>::new());
         scheduler.work_buckets[&COMPACT_STAGE].add(Compact::<VM>::new(&self.mc_space));
 
         // Release global/collectors/mutators
@@ -129,7 +145,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
                 .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
 
             use crate::util::reference_processor::RefForwarding;
-            scheduler.work_buckets[&WorkBucketStage::RefForwarding]
+            scheduler.work_buckets[&REF_FORWARDING_STAGE]
                 .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
 
             use crate::util::reference_processor::RefEnqueue;
@@ -146,7 +162,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
                 .add(Finalization::<MarkingProcessEdges<VM>>::new());
             // update finalizable object references
             // must be done before compacting
-            scheduler.work_buckets[&WorkBucketStage::FinalizableForwarding]
+            scheduler.work_buckets[&FINALIZABLE_FORWARDING_STAGE]
                 .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }
 
@@ -155,8 +171,9 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new()));
 
         // VM-specific weak ref forwarding
-        scheduler.work_buckets[&WorkBucketStage::VMRefForwarding]
-            .add(VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new());
+        scheduler.work_buckets[&VM_REF_FORARDING_STAGE].add(VMForwardWeakRefs::<
+            ForwardingProcessEdges<VM>,
+        >::new(VM_REF_FORARDING_STAGE));
 
         // VM-specific work after forwarding, possible to implement ref enququing.
         scheduler.work_buckets[&WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
@@ -223,14 +240,24 @@ impl<VM: VMBinding> MarkCompact<VM> {
     }
 
     pub fn work_bucket_stage_config() -> WorkBucketStageConfig {
-        let mut default = WorkBucketStageConfig::default();
-        // Add compact stage before release
-        crate::util::rust_util::vec_insert_before(
-            &mut default.stages,
-            COMPACT_STAGE,
-            &WorkBucketStage::Release,
+        let mut config = WorkBucketStageConfig::default();
+        // Add cusotm stages before release
+        config.bulk_insert_before(
+            vec![
+                // Calculate forwarding addresses for live objects
+                CALCULATE_FORWARDING_STAGE,
+                // Second round transitive closure
+                SECOND_ROOTS_STAGE,
+                // Forwarding weak/final references
+                REF_FORWARDING_STAGE,
+                FINALIZABLE_FORWARDING_STAGE,
+                VM_REF_FORARDING_STAGE,
+                // Compaction
+                COMPACT_STAGE,
+            ],
+            WorkBucketStage::Release,
         );
-        default
+        config
     }
 }
 

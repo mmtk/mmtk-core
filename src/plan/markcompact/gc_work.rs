@@ -1,11 +1,10 @@
-use super::global::MarkCompact;
+use super::global::*;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
-use crate::scheduler::WorkBucketStage;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
@@ -47,11 +46,11 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
         //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
         for mutator in VM::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[&WorkBucketStage::SecondRoots]
+            mmtk.scheduler.work_buckets[&SECOND_ROOTS_STAGE]
                 .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
         }
 
-        mmtk.scheduler.work_buckets[&WorkBucketStage::SecondRoots]
+        mmtk.scheduler.work_buckets[&SECOND_ROOTS_STAGE]
             .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
     }
 }

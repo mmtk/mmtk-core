@@ -247,25 +247,6 @@ pub enum WorkBucketStage {
     /// NOTE: This stage is intended to replace the Java-specific weak reference handling stages
     /// above.
     VMRefClosure,
-    /// Compute the forwarding addresses of objects (mark-compact-only).
-    CalculateForwarding,
-    /// Scan roots again to initiate another transitive closure to update roots and reference
-    /// after computing the forwarding addresses (mark-compact-only).
-    SecondRoots,
-    /// Update Java-style weak references after computing forwarding addresses (mark-compact-only).
-    ///
-    /// NOTE: This stage should be updated to adapt to the VM-side reference handling.  It shall
-    /// be kept after removing `{Soft,Weak,Final,Phantom}RefClosure`.
-    RefForwarding,
-    /// Update the list of Java-style finalization cadidates and finalizable objects after
-    /// computing forwarding addresses (mark-compact-only).
-    FinalizableForwarding,
-    /// Let the VM handle the forwarding of reference fields in any VM-specific weak data
-    /// structures, including weak references, weak collections, table of finalizable objects,
-    /// ephemerons, etc., after computing forwarding addresses (mark-compact-only).
-    ///
-    /// NOTE: This stage is intended to replace Java-specific forwarding phases above.
-    VMRefForwarding,
     /// Work packets that should be done just before GC shall go here.  This includes releasing
     /// resources and setting states in plans, spaces, GC workers, mutators, etc.
     Release,
@@ -281,6 +262,17 @@ pub struct WorkBucketStageConfig {
     pub first_stw_stage: WorkBucketStage,
 }
 
+impl WorkBucketStageConfig {
+    /// Insert a few stages before the given stage. If the given stage is not found, this method will panic.
+    pub fn bulk_insert_before(&mut self, insert: Vec<WorkBucketStage>, before: WorkBucketStage) {
+        if let Some(index) = self.stages.iter().position(|x| *x == before) {
+            self.stages.splice(index..index, insert);
+        } else {
+            panic!("Cannot find {:?} in the stages", before)
+        }
+    }
+}
+
 impl std::default::Default for WorkBucketStageConfig {
     fn default() -> Self {
         let stages = vec![
@@ -292,11 +284,6 @@ impl std::default::Default for WorkBucketStageConfig {
             WorkBucketStage::FinalRefClosure,
             WorkBucketStage::PhantomRefClosure,
             WorkBucketStage::VMRefClosure,
-            WorkBucketStage::CalculateForwarding,
-            WorkBucketStage::SecondRoots,
-            WorkBucketStage::RefForwarding,
-            WorkBucketStage::FinalizableForwarding,
-            WorkBucketStage::VMRefForwarding,
             WorkBucketStage::Release,
             WorkBucketStage::Final,
         ];
@@ -306,5 +293,47 @@ impl std::default::Default for WorkBucketStageConfig {
             stages,
             first_stw_stage: WorkBucketStage::Prepare,
         }
+    }
+}
+
+#[cfg(test)]
+mod work_bucke_stage_tests {
+    use super::*;
+
+    const STAGE1: WorkBucketStage = WorkBucketStage::Custom(1);
+    const STAGE2: WorkBucketStage = WorkBucketStage::Custom(2);
+    const STAGE3: WorkBucketStage = WorkBucketStage::Custom(3);
+    fn test_config() -> WorkBucketStageConfig {
+        WorkBucketStageConfig {
+            stages: vec![STAGE1, STAGE2, STAGE3],
+            first_stw_stage: STAGE1,
+        }
+    }
+
+    #[test]
+    fn test_bulk_insert_before() {
+        const STAGE10: WorkBucketStage = WorkBucketStage::Custom(10);
+        const STAGE11: WorkBucketStage = WorkBucketStage::Custom(11);
+
+        let mut config = test_config();
+        config.bulk_insert_before(vec![STAGE10, STAGE11], STAGE1);
+        assert_eq!(
+            config.stages,
+            vec![STAGE10, STAGE11, STAGE1, STAGE2, STAGE3]
+        );
+
+        let mut config = test_config();
+        config.bulk_insert_before(vec![STAGE10, STAGE11], STAGE2);
+        assert_eq!(
+            config.stages,
+            vec![STAGE1, STAGE10, STAGE11, STAGE2, STAGE3]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot find Custom(99) in the stages")]
+    fn test_bulk_insert_not_found() {
+        let mut config = test_config();
+        config.bulk_insert_before(vec![], WorkBucketStage::Custom(99));
     }
 }

@@ -32,6 +32,7 @@ pub struct PlanConstraints {
     pub generate_gc_trace: bool,
     /// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.
     /// For plans that use those policies, they should set this as true.
+    /// TODO: This is unused now. Mark compact will schedule their own work packet.
     pub needs_forward_after_liveness: bool,
 }
 
