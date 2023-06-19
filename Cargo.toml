@@ -84,11 +84,10 @@ code_space  = []
 # Global valid object (VO) bit metadata.
 # The VO bit is set when an object is allocated, and cleared when the GC determines it is dead.
 # See `src/util/metadata/vo_bit/mod.rs`
-vo_bit = [
-    # VO bits for dead objects must have been cleared by the end of each GC.
-    # Native MarkSweep only ensures this in eager sweeping mode.
-    "eager_sweeping"
-]
+#
+# eager_sweeping: VO bits for dead objects must have been cleared by the end of each GC.
+# Native MarkSweep only ensures this in eager sweeping mode.
+vo_bit = ["eager_sweeping"]
 
 # conservative garbage collection support
 is_mmtk_object = ["vo_bit"]
