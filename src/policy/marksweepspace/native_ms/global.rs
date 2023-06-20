@@ -73,8 +73,7 @@ impl AbandonedBlockLists {
     }
 
     fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
-        let mut i = 0;
-        while i < MI_BIN_FULL {
+        for i in 0..MI_BIN_FULL {
             self.available[i].sweep_blocks(space);
             self.consumed[i].sweep_blocks(space);
             self.unswept[i].sweep_blocks(space);
@@ -87,8 +86,6 @@ impl AbandonedBlockLists {
                     self.consumed[i].push(block);
                 }
             }
-
-            i += 1;
         }
     }
 }
