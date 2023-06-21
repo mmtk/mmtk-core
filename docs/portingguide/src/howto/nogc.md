@@ -17,7 +17,7 @@ You want to set up the binding repository/directory structure. For the sake of t
   - `/rt` (rename this to your runtime name) - Runtime-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the runtime and the MMTk side of the binding. This is implemented in the runtime's implementation language. Often this will be one of C or C++.
   - You can place your runtime repository at any path. For the sake of this guide, we assume you will place the runtime repo as a sibling of the binding repo. You can also clone `mmtk-core` to a local path. Using
     a local repo of `mmtk-core` can be beneficial to your development in case you need to make certain changes to the core (though this is unlikely).
-    
+
 Your working directory may look like this (assuming your runtime is named as `X`):
  ```
  Your working directory/
@@ -38,7 +38,7 @@ In case the build system is too complex and you want get to hacking, a quick and
   1. `cd mmtk-X/mmtk`
   2. `cargo build` to build in debug mode or add `--release` for release mode
   3. Copy the shared or static[^2] library from `target/debug` or `target/release` to your desired location
-  
+
 [^2]: You would have to change the `crate-type` in `mmtk-X/mmtk/Cargo.toml` from `cdylib` to `staticlib` to build a static library.
 
 Later, you can edit the runtime build process to build MMTk at the same time automatically.
@@ -62,7 +62,7 @@ The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other tr
   6. [`Edge`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.Edge.html): This trait implements what an edge in the object graph looks like in the runtime. This is useful as it can abstract over compressed or tagged pointers. If an edge in your runtime is indistinguishable from an arbitrary address, you may set it to the [`Address`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.Address.html) type.
   7. [`MemorySlice`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.MemorySlice.html): This trait implements functions related to memory slices such as arrays. This is mainly used by generational collectors.
 
-For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`. Note that you should change the type that implements `VMBinding` from `DummyVM` to an appropriately named type for your runtime. For example, the OpenJDK binding defines the zero-struct [`OpenJDK`](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L139-L162) which implements the `VMBinding` trait. 
+For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`. Note that you should change the type that implements `VMBinding` from `DummyVM` to an appropriately named type for your runtime. For example, the OpenJDK binding defines the zero-struct [`OpenJDK`](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L139-L162) which implements the `VMBinding` trait.
 
 ### Object model
 
@@ -99,7 +99,7 @@ You might be interested in reading the *Demystifying Magic: High-level Low-level
 
 **Note:** Currently the `ObjectReference` is not fully opaque to MMTk, so there is some abstraction leakage, but [work is underway](https://github.com/mmtk/mmtk-core/issues/686) to make `ObjectReference` fully opaque to MMTk.
 
-You must understand the difference between an `ObjectReference` and an `Address` in your runtime and implement the conversion functions accordingly. It is often the case that there is no difference between the two, but you must make sure it is the case. 
+You must understand the difference between an `ObjectReference` and an `Address` in your runtime and implement the conversion functions accordingly. It is often the case that there is no difference between the two, but you must make sure it is the case.
 
 #### Miscellaneous configuration options
 
@@ -173,18 +173,98 @@ On the Rust side of the binding, we want to implement the two functions exposed 
 
 The `mmtk_set_heap_size` function is fairly straightforward. We recommend using the implementation in the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L94-L104). The `mmtk_init` function is straightforward as well. It should simply manually initialize the `MMTK` `static` variable using `lazy_static`, like [here](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L83-L86) in the OpenJDK binding.
 
-## Binding mutator threads to MMTk
-By this point, you should have MMTk initialized. You can check this if you are using a debug build (which is recommended) and have logging turned on.
+By this point, you should have MMTk initialized. If you are using a debug build (which is recommended) and have logging turned on a message similar to below would be printed out:
 
-Create a MMTk mutator instance using `mmtk_bind_mutator`.
+```
+[...]
+[INFO  mmtk::memory_manager] Initialized MMTk with NoGC (FixedHeapSize(10485760))
+[...]
+```
+
+## Binding mutator threads to MMTk
+
+For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by "binding" a mutator thread to MMTk when it is initialized in the runtime.
+
+### Runtime changes
+
+Add the following function to the `mmtk.h` file:
+
+```C
+[...]
+
+/**
+ * Bind a mutator thread in MMTk
+ *
+ * @param tls pointer to mutator thread
+ * @return an instance of an MMTk mutator
+ */
+MmtkMutator mmtk_bind_mutator(VMThread tls);
+
+[...]
+```
+
+The `mmtk_bind_mutator` function takes in an opaque pointer representing an instance of the runtime's mutator thread and returns an opaque pointer to a [`Mutator`](https://www.mmtk.io/mmtk-core/public-doc/plan/struct.Mutator.html) instance back to the runtime. The runtime ***must*** store this pointer somewhere, preferably in its runtime thread local storage implementation, as MMTk requires a `Mutator` instance to allocate and perform other actions.
+
+The placement of the `mmtk_bind_mutator` call in the runtime depends on the runtime's implementation of its thread system. It is recommended to call `mmtk_bind_mutator` when the runtime initializes the thread local storage of a newly created thread. This ensures that the thread can allocate from MMTk immediately after initialization.
+
+### Rust changes
+
+The Rust side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::bind_mutator`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.bind_mutator.html). See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L106-L109) for an example.
 
 ## Allocation
-Replace allocation calls with `mmtk_alloc`. The MMTk handle is the return value of the `mmtk_bind_mutator` call.
+Now we can finally implement the allocation functions.
 
-In order to perform allocations, you will need to know what object alignment the VM expects. VMs often align allocations at word boundaries (e.g. 4- or 8-bytes) as it allows the CPU to access the data faster at execution time. Additionally, the language may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations.
+### Runtime changes
+Add the following two functions to the `mmtk.h` file:
 
-  1. Call `mmtk_bind_mutator` on every thread initialization and save the handle in the thread local storage.
-  2. Call `mmtk_alloc` and use the stored handle for each thread.
+```C
+[...]
+
+/**
+ * Allocate an object
+ *
+ * @param mutator the mutator instance that is requesting the allocation
+ * @param size the size of the requested object
+ * @param align the alignment requirement for the object
+ * @param offset the allocation offset for the object
+ * @param allocator the allocation semantics to use for the allocation
+ * @return the address of the newly allocated object
+ */
+void *mmtk_alloc(MmtkMutator mutator, size_t size, size_t align,
+        ssize_t offset, int allocator);
+
+/**
+ * Set relevant object metadata
+ *
+ * @param mutator the mutator instance that is requesting the allocation
+ * @param object the returned address of the allocated object
+ * @param size the size of the allocated object
+ * @param allocator the allocation semantics to use for the allocation
+ */
+void mmtk_post_alloc(MmtkMutator mutator, void* object, size_t size, int allocator);
+
+[...]
+```
+
+In order to perform allocations, you will need to know what object alignment the runtime expects. Runtimes often align allocations at word boundaries (i.e. 4- or 8-bytes) as it allows the CPU to access the data faster at execution time. Additionally, the language may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations. Once you have figured out the alignment requirements for your runtime, you should update the [`VM::MIN_ALIGNMENT`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.MIN_ALIGNMENT) constant in `VMBinding` to the correct value.
+
+Now that MMTk is aware of each mutator thread, you have to change the runtime's allocation functions to call into MMTk to allocate using `mmtk_alloc` and set object metadata using `mmtk_post_alloc`. Note that there may be multiple allocation functions in the runtime so make sure that you edit them all!
+
+You should use the saved `Mutator` pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.
+
+If your runtime requires a non-zero allocation offset (i.e. returned address vs actual allocated address) then you have to provide the required value as the fourth parameter. Note that you ***must*** also update the [`USE_ALLOCATION_OFFSET`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET) constant in the `VMBinding` implementation as well if your runtime requires a non-zero allocation offset.
+
+For the time-being, you can ignore the `allocator` parameter in both these functions and always pass a value of `0` which means MMTk will pick the default allocator for your collector (a bump pointer allocator in the case of NoGC).
+
+Finally, you need to call `mmtk_post_alloc` with the object address returned from the previous `mmtk_alloc` call in order to initialize object metadata.
+
+**Note:** Currently MMTk faultily assumes object sizes are multiples of the `VM::MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `VM::MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
+
+### Rust changes
+
+The Rust side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::alloc`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.alloc.html) and [`mmtk::memory_manager::post_alloc`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.post_alloc.html) respectively. See the [OpenJDK](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L125-L136) [binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L151-L161) for an example.
+
+Congratulations! At this point, you hopefully have object allocation working and can run simple programs with your runtime using MMTk!
 
 ## Miscellaneous implementation steps
 
