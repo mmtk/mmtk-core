@@ -45,14 +45,26 @@ Later, you can edit the runtime build process to build MMTk at the same time aut
 
 **Note:** If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the `-Wl,--allow-multiple-definition` linker flag, but this unfortunately isn't ideal as it increases code sizes. See [here](https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558) and [here](https://github.com/rust-lang/rust/issues/73632) for more details.
 
-**Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This is to ensure the same package versions are used when building in the future in order to prevent random breakages and improve reproducibility of the build.
+**Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This is to ensure the same package versions are used when building in the future in order to prevent random breakages and improves reproducibility of the build.
 
 ## The `VMBinding` trait
-Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html) trait via stubs.
+Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html) trait.
 
-The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime.
+The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime. We discuss each of its seven key traits briefly:
 
-TODO(kunals) Discuss the `VMBinding` trait and object model/metadata.
+  1. [`ActivePlan`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ActivePlan.html): This trait implements functions related to mutators such as how many mutators exist, getting an iterator for all mutators, etc.
+  2. [`Collection`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.Collection.html): This trait implements functions related to garbage collection such as starting and stopping mutators, blocking current mutator thread for GC, etc.
+  3. [`ObjectModel`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ObjectModel.html): This trait implements the runtime's object model. The object model includes object metadata such as mark-bits, forwarding-bits, etc.; constants regarding assumptions about object addresses; and functions to implement copying objects, querying object sizes, etc. You should ***carefully*** implement and understand this as it is a key trait on which many things depend. We will go into more detail about this trait in the [object model section](#object-model).
+  4. [`ReferenceGlue`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ReferenceGlue.html): This trait implements runtime-specific finalization and weak reference processing methods. Note that each runtime has its own way of dealing with finalization and reference processing, so this is often one of the trickiest traits to implement.
+  5. [`Scanning`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.Scanning.html): This trait implements object scanning functions such as scanning mutator threads for root pointers, scanning a particular object for reference fields, etc.
+  6. [`Edge`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.Edge.html): This trait implements what an edge in the object graph looks like in the runtime. This is useful as it can abstract over compressed pointer or tagged pointers. If an edge in your runtime is indistinguishable from an arbitrary address, you may set it to the [`Address`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.Address.html) type.
+  7. [`MemorySlice`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.MemorySlice.html): This trait implements functions related to memory slices such as arrays. This is mainly used by generational collectors.
+
+For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`.
+
+### Object model
+
+TODO(kunals): Discuss header vs side metadata. Local vs global metadata. ObjectReference <-> Address. Alloc end alignment, etc.
 
 ## MMTk initialization
 Now we want to actually initialize MMTk.
