@@ -23,9 +23,15 @@ use std::num::NonZeroUsize;
 /// size of `Option<Block>` is the same as `Block` itself.
 // TODO: If we actually use the first block, we would need to turn the type into `Block(Address)`, and use `None` and
 // `Block(Address::ZERO)` to differentiate those.
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, PartialOrd, PartialEq)]
 #[repr(transparent)]
 pub struct Block(NonZeroUsize);
+
+impl std::fmt::Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Block(0x{:x})", self.0)
+    }
+}
 
 impl Region for Block {
     const LOG_BYTES: usize = 16;
