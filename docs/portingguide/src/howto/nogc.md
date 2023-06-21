@@ -269,7 +269,15 @@ Congratulations! At this point, you hopefully have object allocation working and
 ## Miscellaneous implementation steps
 
 ### Setting options for MMTk
-You can set [options for MMTk](https://www.mmtk.io/mmtk-core/public-doc/util/options/index.html) by using `process` to pass options, or simply by setting environment variables. For example, to use the NoGC plan, you can set the environment variable `MMTK_PLAN=NoGC`. TODO(kunals) talk about environment variables and processing multiple options.
+
+You can set [options for MMTk](https://www.mmtk.io/mmtk-core/public-doc/util/options/index.html) by using the [`process`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.process.html) function to pass options, or simply by setting environment variables. For example, to use the NoGC plan, you can set the environment variable `MMTK_PLAN=NoGC`. You may want to set multiple options at the same time as well. In such a case you can use the [`process_bulk`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.process_bulk.html) function.
+
+A full list of available options that you can set can be found [here](https://www.mmtk.io/mmtk-core/public-doc/util/options/struct.Options.html).
 
 ### Runtime-specific steps
-TODO(kunals) Describe that certain runtimes may require more than just the above to work. For example the heap iterator in ART.
+
+Often it is the case that the above changes are not enough to allow a runtime to work with MMTk. For example, for the ART binding, the runtime required that all inflated locks be deflated prior to writing the boot image. In order to fix this, we had to implement a heap visitor that visited each allocated object and checked if it had inflated locks, deflating them if they were.
+
+Unfortunately there is no real magic bullet here. If you come across a runtime-specific idiosyncrasy (and you almost certainly will), you will have to understand what is the underlying bug and either fix or work around it.
+
+If you have any confusions or questions, please free to reach us on our [Zulip](https://mmtk.zulipchat.com/)! We would be glad to help.
