@@ -252,7 +252,7 @@ Now that MMTk is aware of each mutator thread, you have to change the runtime's 
 
 You should use the saved `Mutator` pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.
 
-If your runtime requires a non-zero allocation offset (i.e. returned address vs actual allocated address) then you have to provide the required value as the fourth parameter. Note that you ***must*** also update the [`USE_ALLOCATION_OFFSET`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET) constant in the `VMBinding` implementation as well if your runtime requires a non-zero allocation offset.
+If your runtime requires a non-zero allocation offset (i.e. returned address vs actual allocated address) then you have to provide the required value as the fourth parameter. Note that you ***must*** also update the [`USE_ALLOCATION_OFFSET`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET) constant in the `VMBinding` implementation if your runtime requires a non-zero allocation offset.
 
 For the time-being, you can ignore the `allocator` parameter in both these functions and always pass a value of `0` which means MMTk will pick the default allocator for your collector (a bump pointer allocator in the case of NoGC).
 
