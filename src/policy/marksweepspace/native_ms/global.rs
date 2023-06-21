@@ -71,6 +71,23 @@ impl AbandonedBlockLists {
             i += 1;
         }
     }
+
+    fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
+        for i in 0..MI_BIN_FULL {
+            self.available[i].sweep_blocks(space);
+            self.consumed[i].sweep_blocks(space);
+            self.unswept[i].sweep_blocks(space);
+
+            // As we have swept blocks, move blocks in the unswept list to available or consumed list.
+            while let Some(block) = self.unswept[i].pop() {
+                if block.has_free_cells() {
+                    self.available[i].push(block);
+                } else {
+                    self.consumed[i].push(block);
+                }
+            }
+        }
+    }
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -267,8 +284,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let work_packets = self.generate_sweep_tasks();
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
-        let mut abandoned = self.abandoned.lock().unwrap();
-        abandoned.move_consumed_to_unswept();
+        if cfg!(feature = "eager_sweeping") {
+            // For eager sweeping, we have to sweep the lists that are abandoned to these global lists.
+            let mut abandoned = self.abandoned.lock().unwrap();
+            abandoned.sweep(self);
+        } else {
+            // For lazy sweeping, we just move blocks from consumed to unswept. When an allocator tries
+            // to use them, they will sweep the block.
+            let mut abandoned = self.abandoned.lock().unwrap();
+            abandoned.move_consumed_to_unswept();
+        }
     }
 
     /// Release a block.
