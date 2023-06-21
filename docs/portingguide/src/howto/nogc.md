@@ -47,7 +47,7 @@ Later, you can edit the runtime build process to build MMTk at the same time aut
 
 **Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.
 
-We recommend using the `debug` build when doing development work as it has helpful logging statements and assertions that will make development easier.
+We recommend using the `debug` build when doing development work as it has helpful logging statements and assertions that will make catching bugs in your implementation easier.
 
 ## The `VMBinding` trait
 Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html) trait.
