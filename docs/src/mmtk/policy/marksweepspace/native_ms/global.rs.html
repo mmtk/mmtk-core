@@ -356,6 +356,31 @@
 <span id="356">356</span>
 <span id="357">357</span>
 <span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>atomic::Ordering;
@@ -427,6 +452,23 @@
                 <span class="self">self</span>.unswept[i].append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.consumed[i]);
             }
             i += <span class="number">1</span>;
+        }
+    }
+
+    <span class="kw">fn </span>sweep&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>MarkSweepSpace&lt;VM&gt;) {
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..MI_BIN_FULL {
+            <span class="self">self</span>.available[i].sweep_blocks(space);
+            <span class="self">self</span>.consumed[i].sweep_blocks(space);
+            <span class="self">self</span>.unswept[i].sweep_blocks(space);
+
+            <span class="comment">// As we have swept blocks, move blocks in the unswept list to available or consumed list.
+            </span><span class="kw">while let </span><span class="prelude-val">Some</span>(block) = <span class="self">self</span>.unswept[i].pop() {
+                <span class="kw">if </span>block.has_free_cells() {
+                    <span class="self">self</span>.available[i].push(block);
+                } <span class="kw">else </span>{
+                    <span class="self">self</span>.consumed[i].push(block);
+                }
+            }
         }
     }
 }
@@ -625,8 +667,16 @@
         <span class="kw">let </span>work_packets = <span class="self">self</span>.generate_sweep_tasks();
         <span class="self">self</span>.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
-        <span class="kw">let </span><span class="kw-2">mut </span>abandoned = <span class="self">self</span>.abandoned.lock().unwrap();
-        abandoned.move_consumed_to_unswept();
+        <span class="kw">if </span><span class="macro">cfg!</span>(feature = <span class="string">&quot;eager_sweeping&quot;</span>) {
+            <span class="comment">// For eager sweeping, we have to sweep the lists that are abandoned to these global lists.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>abandoned = <span class="self">self</span>.abandoned.lock().unwrap();
+            abandoned.sweep(<span class="self">self</span>);
+        } <span class="kw">else </span>{
+            <span class="comment">// For lazy sweeping, we just move blocks from consumed to unswept. When an allocator tries
+            // to use them, they will sweep the block.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>abandoned = <span class="self">self</span>.abandoned.lock().unwrap();
+            abandoned.move_consumed_to_unswept();
+        }
     }
 
     <span class="doccomment">/// Release a block.

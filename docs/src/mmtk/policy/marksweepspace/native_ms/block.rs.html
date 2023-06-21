@@ -427,6 +427,12 @@
 <span id="427">427</span>
 <span id="428">428</span>
 <span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
 </pre><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -452,9 +458,15 @@
 /// size of `Option&lt;Block&gt;` is the same as `Block` itself.
 </span><span class="comment">// TODO: If we actually use the first block, we would need to turn the type into `Block(Address)`, and use `None` and
 // `Block(Address::ZERO)` to differentiate those.
-</span><span class="attribute">#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+</span><span class="attribute">#[derive(Clone, Copy, PartialOrd, PartialEq)]
 #[repr(transparent)]
 </span><span class="kw">pub struct </span>Block(NonZeroUsize);
+
+<span class="kw">impl </span>std::fmt::Debug <span class="kw">for </span>Block {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Block(0x{:x})&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
+}
 
 <span class="kw">impl </span>Region <span class="kw">for </span>Block {
     <span class="kw">const </span>LOG_BYTES: usize = <span class="number">16</span>;

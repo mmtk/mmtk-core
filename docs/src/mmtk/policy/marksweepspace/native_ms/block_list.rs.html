@@ -321,6 +321,41 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::Block;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
@@ -329,13 +364,18 @@
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
 <span class="doccomment">/// List of blocks owned by the allocator
-</span><span class="attribute">#[derive(Debug)]
-#[repr(C)]
+</span><span class="attribute">#[repr(C)]
 </span><span class="kw">pub struct </span>BlockList {
     <span class="kw">pub </span>first: <span class="prelude-ty">Option</span>&lt;Block&gt;,
     <span class="kw">pub </span>last: <span class="prelude-ty">Option</span>&lt;Block&gt;,
     <span class="kw">pub </span>size: usize,
     <span class="kw">pub </span>lock: AtomicBool,
+}
+
+<span class="kw">impl </span>std::fmt::Debug <span class="kw">for </span>BlockList {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter) -&gt; std::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;BlockList {:?}&quot;</span>, <span class="self">self</span>.iter().collect::&lt;Vec&lt;Block&gt;&gt;())
+    }
 }
 
 <span class="kw">impl </span>BlockList {
@@ -475,6 +515,36 @@
     <span class="doccomment">/// Unlock list. See the comments on the lock method.
     </span><span class="kw">pub fn </span>unlock(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.lock.store(<span class="bool-val">false</span>, Ordering::SeqCst);
+    }
+
+    <span class="doccomment">/// Get an iterator for the block list.
+    </span><span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; BlockListIterator {
+        BlockListIterator { cursor: <span class="self">self</span>.first }
+    }
+
+    <span class="doccomment">/// Sweep all the blocks in the block list.
+    </span><span class="kw">pub fn </span>sweep_blocks&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="kw">super</span>::MarkSweepSpace&lt;VM&gt;) {
+        <span class="kw">for </span>block <span class="kw">in </span><span class="self">self</span>.iter() {
+            <span class="kw">if </span>!block.attempt_release(space) {
+                block.sweep::&lt;VM&gt;();
+            }
+        }
+    }
+}
+
+<span class="kw">pub struct </span>BlockListIterator {
+    cursor: <span class="prelude-ty">Option</span>&lt;Block&gt;,
+}
+
+<span class="kw">impl </span>Iterator <span class="kw">for </span>BlockListIterator {
+    <span class="kw">type </span>Item = Block;
+
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">let </span>ret = <span class="self">self</span>.cursor;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(cur) = <span class="self">self</span>.cursor {
+            <span class="self">self</span>.cursor = cur.load_next_block();
+        }
+        ret
     }
 }
 

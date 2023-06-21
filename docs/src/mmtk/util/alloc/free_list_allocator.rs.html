@@ -503,29 +503,6 @@
 <span id="503">503</span>
 <span id="504">504</span>
 <span id="505">505</span>
-<span id="506">506</span>
-<span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
-<span id="517">517</span>
-<span id="518">518</span>
-<span id="519">519</span>
-<span id="520">520</span>
-<span id="521">521</span>
-<span id="522">522</span>
-<span id="523">523</span>
-<span id="524">524</span>
-<span id="525">525</span>
-<span id="526">526</span>
-<span id="527">527</span>
-<span id="528">528</span>
 </pre><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft&#39;s mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 </span><span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::native_ms::<span class="kw-2">*</span>;
@@ -956,8 +933,7 @@
     </span><span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;reset&quot;</span>);
         <span class="comment">// consumed and available are now unswept
-        </span><span class="kw">let </span><span class="kw-2">mut </span>bin = <span class="number">0</span>;
-        <span class="kw">while </span>bin &lt; MAX_BIN + <span class="number">1 </span>{
+        </span><span class="kw">for </span>bin <span class="kw">in </span><span class="number">0</span>..MI_BIN_FULL {
             <span class="kw">let </span>unswept = <span class="self">self</span>.unswept_blocks.get_mut(bin).unwrap();
             unswept.lock();
 
@@ -972,7 +948,6 @@
             sweep_later(<span class="kw-2">&amp;mut </span><span class="self">self</span>.consumed_blocks[bin]);
 
             unswept.unlock();
-            bin += <span class="number">1</span>;
         }
 
         <span class="kw">if </span><span class="self">Self</span>::ABANDON_BLOCKS_IN_RESET {
@@ -984,29 +959,13 @@
     </span><span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="macro">debug!</span>(<span class="string">&quot;reset&quot;</span>);
         <span class="comment">// sweep all blocks and push consumed onto available list
-        </span><span class="kw">let </span><span class="kw-2">mut </span>bin = <span class="number">0</span>;
-        <span class="kw">while </span>bin &lt; MAX_BIN + <span class="number">1 </span>{
-            <span class="kw">let </span>sweep = |first_block: <span class="prelude-ty">Option</span>&lt;Block&gt;, used_blocks: bool| {
-                <span class="kw">let </span><span class="kw-2">mut </span>cursor = first_block;
-                <span class="kw">while let </span><span class="prelude-val">Some</span>(block) = cursor {
-                    <span class="kw">if </span>used_blocks {
-                        block.sweep::&lt;VM&gt;();
-                        cursor = block.load_next_block();
-                    } <span class="kw">else </span>{
-                        <span class="kw">let </span>next = block.load_next_block();
-                        <span class="kw">if </span>!block.attempt_release(<span class="self">self</span>.space) {
-                            block.sweep::&lt;VM&gt;();
-                        }
-                        cursor = next;
-                    }
-                }
-            };
-
-            sweep(<span class="self">self</span>.available_blocks[bin].first, <span class="bool-val">true</span>);
-            sweep(<span class="self">self</span>.available_blocks_stress[bin].first, <span class="bool-val">true</span>);
+        </span><span class="kw">for </span>bin <span class="kw">in </span><span class="number">0</span>..MI_BIN_FULL {
+            <span class="comment">// Sweep available blocks
+            </span><span class="self">self</span>.available_blocks[bin].sweep_blocks(<span class="self">self</span>.space);
+            <span class="self">self</span>.available_blocks_stress[bin].sweep_blocks(<span class="self">self</span>.space);
 
             <span class="comment">// Sweep consumed blocks, and also push the blocks back to the available list.
-            </span>sweep(<span class="self">self</span>.consumed_blocks[bin].first, <span class="bool-val">false</span>);
+            </span><span class="self">self</span>.consumed_blocks[bin].sweep_blocks(<span class="self">self</span>.space);
             <span class="kw">if </span><span class="self">self</span>.plan.base().is_precise_stress() &amp;&amp; <span class="self">self</span>.plan.base().is_stress_test_gc_enabled()
             {
                 <span class="macro">debug_assert!</span>(<span class="self">self</span>.plan.base().is_precise_stress());
@@ -1015,11 +974,8 @@
                 <span class="self">self</span>.available_blocks[bin].append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.consumed_blocks[bin]);
             }
 
-            bin += <span class="number">1</span>;
-
-            <span class="kw">if </span><span class="self">Self</span>::ABANDON_BLOCKS_IN_RESET {
-                <span class="self">self</span>.abandon_blocks();
-            }
+            <span class="comment">// For eager sweeping, we should not have unswept blocks
+            </span><span class="macro">assert!</span>(<span class="self">self</span>.unswept_blocks[bin].is_empty());
         }
 
         <span class="kw">if </span><span class="self">Self</span>::ABANDON_BLOCKS_IN_RESET {
@@ -1029,8 +985,7 @@
 
     <span class="kw">fn </span>abandon_blocks(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span><span class="kw-2">mut </span>abandoned = <span class="self">self</span>.space.abandoned.lock().unwrap();
-        <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
-        <span class="kw">while </span>i &lt; MI_BIN_FULL {
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..MI_BIN_FULL {
             <span class="kw">let </span>available = <span class="self">self</span>.available_blocks.get_mut(i).unwrap();
             <span class="kw">if </span>!available.is_empty() {
                 abandoned.available[i].append(available);
@@ -1050,7 +1005,6 @@
             <span class="kw">if </span>!unswept.is_empty() {
                 abandoned.unswept[i].append(unswept);
             }
-            i += <span class="number">1</span>;
         }
     }
 }
