@@ -45,7 +45,7 @@ Later, you can edit the runtime build process to build MMTk at the same time aut
 
 **Note:** If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the `-Wl,--allow-multiple-definition` linker flag, but this unfortunately isn't ideal as it increases code sizes. See [here](https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558) and [here](https://github.com/rust-lang/rust/issues/73632) for more details.
 
-**Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This is to ensure the same package versions are used when building in the future in order to prevent random breakages and improves reproducibility of the build.
+**Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.
 
 ## The `VMBinding` trait
 Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html) trait.
@@ -57,14 +57,57 @@ The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other tr
   3. [`ObjectModel`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ObjectModel.html): This trait implements the runtime's object model. The object model includes object metadata such as mark-bits, forwarding-bits, etc.; constants regarding assumptions about object addresses; and functions to implement copying objects, querying object sizes, etc. You should ***carefully*** implement and understand this as it is a key trait on which many things depend. We will go into more detail about this trait in the [object model section](#object-model).
   4. [`ReferenceGlue`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ReferenceGlue.html): This trait implements runtime-specific finalization and weak reference processing methods. Note that each runtime has its own way of dealing with finalization and reference processing, so this is often one of the trickiest traits to implement.
   5. [`Scanning`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.Scanning.html): This trait implements object scanning functions such as scanning mutator threads for root pointers, scanning a particular object for reference fields, etc.
-  6. [`Edge`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.Edge.html): This trait implements what an edge in the object graph looks like in the runtime. This is useful as it can abstract over compressed pointer or tagged pointers. If an edge in your runtime is indistinguishable from an arbitrary address, you may set it to the [`Address`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.Address.html) type.
+  6. [`Edge`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.Edge.html): This trait implements what an edge in the object graph looks like in the runtime. This is useful as it can abstract over compressed or tagged pointers. If an edge in your runtime is indistinguishable from an arbitrary address, you may set it to the [`Address`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.Address.html) type.
   7. [`MemorySlice`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.MemorySlice.html): This trait implements functions related to memory slices such as arrays. This is mainly used by generational collectors.
 
 For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`.
 
 ### Object model
 
-TODO(kunals): Discuss header vs side metadata. Local vs global metadata. ObjectReference <-> Address. Alloc end alignment, etc.
+The `ObjectModel` trait is a fundamental trait describing the layout of an object to MMTk. This is important as MMTk's core doesn't know of how objects look like internally as each runtime will be different. There are certain key aspects you need to be aware of while implementing the `ObjectModel` trait. We discuss them in this section.
+
+#### Header vs Side metadata
+
+Per-object metadata can live in one of two places: in the object header or in a separate space used just for metadata. Each one has its pros and cons.
+
+Header metadata sits in close proximity to the actual object address but it is not easy to perform bulk operations. On the other hand, side metadata sits in a dedicated metadata space where each possible object address is assigned some metadata. This makes performing bulk operations easy and does not require stealing bits from the object header (there may in fact be no bits to steal for certain runtimes), but can result in large heap sizes given the metadata space is counted as part of the heap.
+
+The choice of metadata location depends on the runtime and its object model and header layout. For example the JikesRVM runtime reserved extra space at the start of each object for GC-related metadata. Such space may not be available in your runtime. In such cases you can use side metadata to reserve per-object metadata.
+
+#### Local vs Global metadata
+
+MMTk partitions the heap space into multiple "policies". Each policy may have different semantics from each other. This includes object metadata. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy in the heap space, is referred to as "local" metadata.
+
+However, in certain cases, we may need to have metadata globally for the entire heap space. The classic example is the valid-object bit metadata which tells us if an arbitrary address is allocated/managed by MMTk. Such a metadata, which spans multiple policies, is referred to as "global" metadata.
+
+We describe the most common metadata specifications and potential metadata locations:
+
+  1. **Unlog bit metadata:** A global 1-bit metadata used by generational collectors to keep track of cross-generational pointers. Usually side metadata.
+  2. **Forwarding bits and pointer**: A local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. Almost always in the header.
+  3. **Mark bits**: A local 1-bit metadata used by tracing collectors to mark seen objects. Like with the forwarding bits, we can often steal the last bit in the object header for the mark bit. Though some bindings such as the OpenJDK binding prefer to have the mark bits in side metadata.
+  4. **Large object space mark and nursery bits**: A local 2-bit metadata used by the the large object space to mark objects and set objects as "newly allocated". This should always be in the header. For large objects, we can add an extra word to store this metadata since the metadata size is insignificant in comparison to the object size. See [here](https://github.com/mmtk/mmtk-core/issues/847) for more information.
+
+#### `ObjectReference` vs `Address`
+
+A key principle in MMTk is the distinction between [`ObjectReference`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.ObjectReference.html) and [`Address`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address.
+
+You might be interested in reading the *Demystifying Magic: High-level Low-level Programming* paper[^3] which describes the above in more detail.
+
+[^3]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
+
+**Note:** Currently the `ObjectReference` is not fully opaque to MMTk, so there is some abstraction leakage, but [work is underway](https://github.com/mmtk/mmtk-core/issues/686) to make `ObjectReference` fully opaque to MMTk.
+
+You must understand the difference between an `ObjectReference` and an `Address` in your runtime and implement the conversion functions accordingly. It is often the case that there is no difference between the two, but you must make sure it is the case. 
+
+#### Miscellaneous configuration options
+
+There are many constants in the `ObjectModel` trait that can be overridden in your binding in order to meet your runtime's requirements. For example, the `UNIFIED_OBJECT_REFERENCE_ADDRESS` constant guarantees that an `ObjectReference` and `Address` are the same allowing MMTk to perform some extra optimizations.
+
+An important constant is the `OBJECT_REF_OFFSET_LOWER_BOUND` constant which defines the minimum offset from allocation result start (i.e. the address that MMTk will return to the runtime) and the actual start of the object, i.e. the `ObjectReference`. In other words, the constant represents the minimum offset from the allocation result start such that the following invariant always holds:
+
+    OBJECT_REFERENCE >= ALLOCATION_RESULT_START + OFFSET
+
+We recommend going through the [list of constants in the documentation](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ObjectModel.html) and seeing if the default values suit your runtime's semantics, changing them if required.
 
 ## MMTk initialization
 Now we want to actually initialize MMTk.
