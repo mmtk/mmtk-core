@@ -47,6 +47,8 @@ Later, you can edit the runtime build process to build MMTk at the same time aut
 
 **Note:** It is *highly* recommended to also check-in the generated `Cargo.lock` file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.
 
+We recommend using the `debug` build when doing development work as it has helpful logging statements and assertions that will make development easier.
+
 ## The `VMBinding` trait
 Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. `mmtk-X/mmtk`). What we want to do is implement the [`VMBinding`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html) trait.
 
@@ -60,7 +62,7 @@ The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other tr
   6. [`Edge`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.Edge.html): This trait implements what an edge in the object graph looks like in the runtime. This is useful as it can abstract over compressed or tagged pointers. If an edge in your runtime is indistinguishable from an arbitrary address, you may set it to the [`Address`](https://www.mmtk.io/mmtk-core/public-doc/util/address/struct.Address.html) type.
   7. [`MemorySlice`](https://www.mmtk.io/mmtk-core/public-doc/vm/edge_shape/trait.MemorySlice.html): This trait implements functions related to memory slices such as arrays. This is mainly used by generational collectors.
 
-For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`.
+For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`. Note that you should change the type that implements `VMBinding` from `DummyVM` to an appropriately named type for your runtime. For example, the OpenJDK binding defines the zero-struct [`OpenJDK`](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L139-L162) which implements the `VMBinding` trait. 
 
 ### Object model
 
@@ -84,7 +86,7 @@ We describe the most common metadata specifications and potential metadata locat
 
   1. **Unlog bit metadata:** A global 1-bit metadata used by generational collectors to keep track of cross-generational pointers. Usually side metadata.
   2. **Forwarding bits and pointer**: A local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. Almost always in the header.
-  3. **Mark bits**: A local 1-bit metadata used by tracing collectors to mark seen objects. Like with the forwarding bits, we can often steal the last bit in the object header for the mark bit. Though some bindings such as the OpenJDK binding prefer to have the mark bits in side metadata.
+  3. **Mark bits**: A local 1-bit metadata used by tracing collectors to mark seen objects. Like with the forwarding bits, we can often steal the last bit in the object header for the mark bit. Though some bindings such as the OpenJDK binding prefer to have the mark bits in side metadata to allow for bulk updates.
   4. **Large object space mark and nursery bits**: A local 2-bit metadata used by the the large object space to mark objects and set objects as "newly allocated". This should always be in the header. For large objects, we can add an extra word to store this metadata since the metadata size is insignificant in comparison to the object size. See [here](https://github.com/mmtk/mmtk-core/issues/847) for more information.
 
 #### `ObjectReference` vs `Address`
@@ -110,10 +112,12 @@ An important constant is the `OBJECT_REF_OFFSET_LOWER_BOUND` constant which defi
 We recommend going through the [list of constants in the documentation](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ObjectModel.html) and seeing if the default values suit your runtime's semantics, changing them if required.
 
 ## MMTk initialization
-Now we want to actually initialize MMTk.
+Now that we have most of the boilerplate set up, the next step is to initialize MMTk so that we can start allocating objects.
 
 ### Runtime changes
-Create a `mmtk.h` header file which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example. Note: It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
+Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example.
+
+**Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
 
 Having a clean heap API for MMTk to implement makes life easier. Some runtimes may already have a sufficiently clean abstraction such as OpenJDK after the merging of [JEP 304](https://openjdk.org/jeps/304). In (most) other cases, the runtime doesn't provide a clean enough heap API for MMTk to implement. In such cases, it is recommended to create a class (or equivalent) that abstracts allocation and other heap functions like what the [V8](https://chromium.googlesource.com/v8/v8/+/a9976e160f4755990ec065d4b077c9401340c8fb/src/heap/third-party/heap-api.h) and ART bindings do. Ideally these changes are upstreamed like in the case of V8.
 
@@ -144,13 +148,6 @@ typedef void* VMThread;
 void mmtk_init();
 
 /**
- * Initialize collection for MMTk
- *
- * @param tls reference to the calling VMThread
- */
-void mmtk_initialize_collection(VMThread tls);
-
-/**
  * Set the heap size
  *
  * @param min minimum heap size
@@ -163,14 +160,22 @@ void mmtk_set_heap_size(size_t min, size_t max);
 #endif // MMTK_H
 ```
 
-We now want to initialize MMTK. This has two parts: inserting calls in the runtime to initialize MMTk and actually initializing the MMTk instance in the Rust part of the binding. Most of the work we have to do in this step is in the Rust part of the binding.
+Now we can initialize MMTk in the runtime. Note that MMTk should ideally be initialized around when the default heap of the runtime is initialized. You will have to figure out where is the best location to initialize MMTk in your runtime.
 
-Initialize the heap size by calling `mmtk_set_heap_size` with the initial heap size and the maximum heap size. Then initialize MMTk by calling `mmtk_init`. In the future, you may wish to make the heap size configurable via a command line argument or environment variable.
+Initializing MMTk requires two steps. First, we set the heap size by calling `mmtk_set_heap_size` with the initial heap size and the maximum heap size. Then, we initialize MMTk by calling `mmtk_init`. In the future, you may wish to make the heap size configurable via a command line argument or environment variable (See [setting options for MMTk](#setting-options-for-mmtk)).
 
-### Rust binding
-On the Rust side of the binding, we first want to define a type that will implement the [`VMBinding`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html) trait. If you are using the `DummyVM` binding as a starting point, you should rename the `DummyVM` type to your the name of your runtime. For example for the OpenJDK binding, we define the zero-struct [`OpenJDK`](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L139-L162) which implements the `VMBinding` trait.
+<!-- You may have noticed the `mmtk_initialize_collection` function defined above in the `mmtk.h` file. This function is called after the runtime has completely set up including (but not limited to) its thread system. This function will spawn GC threads and allow MMTk to collect objects. For the time-being we can ignore calling this function as NoGC does not collect objects so does not require calling `mmtk_initialize_collection`. -->
+
+### Rust changes
+On the Rust side of the binding, we want to implement the two functions exposed by the `mmtk.h` file above. We use an [`MMTKBuilder`](https://www.mmtk.io/mmtk-core/public-doc/struct.MMTKBuilder.html) instance to actually create our concrete [`MMTK`](https://www.mmtk.io/mmtk-core/public-doc/struct.MMTK.html) instance. We recommend following the paradigm used by all our bindings wherein we have a `static` single `MMTK` instance and an `MMTKBuilder` instance that we can use to set relevant options. See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L169-L178) for an example.
+
+**Note:** MMTk currently assumes that there is only one `MMTK` instance in your runtime process. Multiple `MMTK` instances are currently not supported.
+
+The `mmtk_set_heap_size` function is fairly straightforward. We recommend using the implementation in the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L94-L104). The `mmtk_init` function is straightforward as well. It should simply manually initialize the `MMTK` `static` variable using `lazy_static`, like [here](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L83-L86) in the OpenJDK binding.
 
 ## Binding mutator threads to MMTk
+By this point, you should have MMTk initialized. You can check this if you are using a debug build (which is recommended) and have logging turned on.
+
 Create a MMTk mutator instance using `mmtk_bind_mutator`.
 
 ## Allocation
