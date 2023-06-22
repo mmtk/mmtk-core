@@ -741,38 +741,26 @@ mod tests {
                 || {
                     let data_addr = vm_layout_constants::HEAP_START;
 
-                    #[cfg(target_pointer_width = "64")]
+                    let log_num_of_bits = 0;
+                    let log_bytes_in_region = 3;
+                    let num_regions = 0x400; // 1024
+                    let bytes_per_region = 1 << log_bytes_in_region;
+                    let total_size = num_regions * bytes_per_region; // 8192
+
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
                         is_global: true,
-                        offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
-                        log_num_of_bits: 0,
-                        log_bytes_in_region: 3,
-                    };
-                    #[cfg(target_pointer_width = "64")]
-                    let metadata_2_spec = SideMetadataSpec {
-                        name: "metadata_2_spec",
-                        is_global: true,
-                        offset: SideMetadataOffset::layout_after(&metadata_1_spec),
-                        log_num_of_bits: 0,
-                        log_bytes_in_region: 3,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits,
+                        log_bytes_in_region,
                     };
 
-                    #[cfg(target_pointer_width = "32")]
-                    let metadata_1_spec = SideMetadataSpec {
-                        name: "metadata_1_spec",
-                        is_global: true,
-                        offset: SideMetadataOffset::rel(0),
-                        log_num_of_bits: 0,
-                        log_bytes_in_region: 3,
-                    };
-                    #[cfg(target_pointer_width = "32")]
                     let metadata_2_spec = SideMetadataSpec {
                         name: "metadata_2_spec",
                         is_global: true,
                         offset: SideMetadataOffset::layout_after(&metadata_1_spec),
-                        log_num_of_bits: 0,
-                        log_bytes_in_region: 3,
+                        log_num_of_bits,
+                        log_bytes_in_region,
                     };
 
                     // Currently global metadata are contiguous.
@@ -785,11 +773,11 @@ mod tests {
                     metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
 
                     metadata
-                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE)
+                        .try_map_metadata_space(data_addr, total_size)
                         .unwrap();
 
-                    let num_regions = 0x400; // 1024
-                    let bytes_per_region = 0x8; // 8
+                    metadata_1_spec.bzero_metadata(data_addr, total_size);
+                    metadata_2_spec.bzero_metadata(data_addr, total_size);
 
                     for i in 0..num_regions {
                         metadata_1_spec.store_atomic::<u8>(
@@ -824,7 +812,7 @@ mod tests {
                             );
                         }
 
-                        metadata_2_spec.bzero_metadata(data_addr, num_regions * bytes_per_region);
+                        metadata_2_spec.bzero_metadata(data_addr, total_size);
                     };
 
                     // Whole bytes
@@ -839,7 +827,8 @@ mod tests {
                     // Start and end unaligned
                     test_copy_region(0x82, 0x1fd);
 
-                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+                    metadata_1_spec.bzero_metadata(data_addr, total_size);
+                    metadata_2_spec.bzero_metadata(data_addr, total_size);
 
                     metadata_sanity.reset();
                 },

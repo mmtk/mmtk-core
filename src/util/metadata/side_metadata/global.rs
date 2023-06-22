@@ -393,6 +393,12 @@ impl SideMetadataSpec {
     /// * `size`: The size of the memory region.
     /// * `other`: The other metadata to copy from.
     pub fn bcopy_metadata_contiguous(&self, start: Address, size: usize, other: &SideMetadataSpec) {
+        #[cfg(feature = "extreme_assertions")]
+        let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        #[cfg(feature = "extreme_assertions")]
+        sanity::verify_bcopy(self, start, size, other);
+
         debug_assert_eq!(other.log_bytes_in_region, self.log_bytes_in_region);
         debug_assert_eq!(other.log_num_of_bits, self.log_num_of_bits);
 
