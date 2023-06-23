@@ -28,4 +28,4 @@ The leftmost box should be entirely free of any MMTk-specific code.
 
 > Note: we do currently maintain a fork of OpenJDK which includes some necessary changes to their code base, but this is not MMTk-specific and ideally this will be upstreamed.  Our port to V8 is a cleaner example, where we’ve managed to work closely with the V8 team to upstream all of the refactoring of the V8 code base that was necessary for it to support a third party heap.
 
-We structure the code into three repos.  The [MMTk core](https://github.com/mmtk/mmtk-core), the [binding repo](https://github.com/mmtk/mmtk-openjdk) containing both parts of the binding, and the OpenJDK repo, which is currently [a fork](https://github.com/mmtk/openjdk) we maintain.
+We structure the code into three repos. Taking the example of the OpenJDK port, the three repos are: the [MMTk core](https://github.com/mmtk/mmtk-core), the [binding repo](https://github.com/mmtk/mmtk-openjdk) containing both parts of the binding, and the OpenJDK repo, which is currently [a fork](https://github.com/mmtk/openjdk) we maintain.
