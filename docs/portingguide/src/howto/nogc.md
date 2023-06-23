@@ -104,7 +104,7 @@ We recommend going through the [list of constants in the documentation](https://
 ## MMTk initialization
 Now that we have most of the boilerplate set up, the next step is to initialize MMTk so that we can start allocating objects.
 
-### Runtime changes
+### Runtime-side changes
 Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example.
 
 **Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
@@ -156,7 +156,7 @@ Initializing MMTk requires two steps. First, we set the heap size by calling `mm
 
 <!-- You may have noticed the `mmtk_initialize_collection` function defined above in the `mmtk.h` file. This function is called after the runtime has completely set up including (but not limited to) its thread system. This function will spawn GC threads and allow MMTk to collect objects. For the time-being we can ignore calling this function as NoGC does not collect objects so does not require calling `mmtk_initialize_collection`. -->
 
-### Rust changes
+### MMTk-side changes
 On the Rust side of the binding, we want to implement the two functions exposed by the `mmtk.h` file above. We use an [`MMTKBuilder`](https://www.mmtk.io/mmtk-core/public-doc/struct.MMTKBuilder.html) instance to actually create our concrete [`MMTK`](https://www.mmtk.io/mmtk-core/public-doc/struct.MMTK.html) instance. We recommend following the paradigm used by all our bindings wherein we have a `static` single `MMTK` instance and an `MMTKBuilder` instance that we can use to set relevant options. See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L169-L178) for an example.
 
 **Note:** MMTk currently assumes that there is only one `MMTK` instance in your runtime process. Multiple `MMTK` instances are currently not supported.
@@ -175,7 +175,7 @@ By this point, you should have MMTk initialized. If you are using a debug build 
 
 For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by "binding" a mutator thread to MMTk when it is initialized in the runtime.
 
-### Runtime changes
+### Runtime-side changes
 
 Add the following function to the `mmtk.h` file:
 
@@ -197,14 +197,14 @@ The `mmtk_bind_mutator` function takes in an opaque pointer representing an inst
 
 The placement of the `mmtk_bind_mutator` call in the runtime depends on the runtime's implementation of its thread system. It is recommended to call `mmtk_bind_mutator` when the runtime initializes the thread local storage of a newly created thread. This ensures that the thread can allocate from MMTk immediately after initialization.
 
-### Rust changes
+### MMTk-side changes
 
 The Rust side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::bind_mutator`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.bind_mutator.html). See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L106-L109) for an example.
 
 ## Allocation
 Now we can finally implement the allocation functions.
 
-### Runtime changes
+### Runtime-side changes
 Add the following two functions to the `mmtk.h` file:
 
 ```C
@@ -250,7 +250,7 @@ Finally, you need to call `mmtk_post_alloc` with the object address returned fro
 
 **Note:** Currently MMTk assumes object sizes are multiples of the `MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
 
-### Rust changes
+### MMTk-side changes
 
 The Rust side of the binding should simply defer the actual implementation to [`mmtk::memory_manager::alloc`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.alloc.html) and [`mmtk::memory_manager::post_alloc`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.post_alloc.html) respectively. See the [OpenJDK](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L125-L136) [binding](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L151-L161) for an example.
 
@@ -272,6 +272,6 @@ A full list of available options that you can set can be found [here](https://ww
 
 Often it is the case that the above changes are not enough to allow a runtime to work with MMTk. For example, for the ART binding, the runtime required that all inflated locks be deflated prior to writing the boot image. In order to fix this, we had to implement a heap visitor that visited each allocated object and checked if it had inflated locks, deflating them if they were.
 
-Unfortunately there is no real magic bullet here. If you come across a runtime-specific idiosyncrasy (and you almost certainly will), you will have to understand what is the underlying bug and either fix or work around it.
+Unfortunately there is no real magic bullet here. If you come across a runtime-specific idiosyncrasy (and you almost certainly will), you will have to understand what the underlying bug is and either fix or work around it.
 
 If you have any confusions or questions, please free to reach us on our [Zulip](https://mmtk.zulipchat.com/)! We would be glad to help.
