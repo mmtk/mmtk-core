@@ -13,10 +13,9 @@ You want to set up the binding repository/directory structure. For the sake of t
 
 [^1]: In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime.
 
-  - `/mmtk` - the MMTk side of the binding. To start with, this can be an almost direct copy of the [Dummy VM binding](https://github.com/mmtk/mmtk-core/tree/master/vmbindings/dummyvm). This is implemented in Rust.
-  - `/rt` (rename this to your runtime name) - Runtime-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the runtime and the MMTk side of the binding. This is implemented in the runtime's implementation language. Often this will be one of C or C++.
-  - You can place your runtime repository at any path. For the sake of this guide, we assume you will place the runtime repo as a sibling of the binding repo. You can also clone `mmtk-core` to a local path. Using
-    a local repo of `mmtk-core` can be beneficial to your development in case you need to make certain changes to the core (though this is unlikely).
+  - `mmtk-X/mmtk`: The MMTk side of the binding. To start with, this can be an almost direct copy of the [Dummy VM binding](https://github.com/mmtk/mmtk-core/tree/master/vmbindings/dummyvm). This is implemented in Rust.
+  - `mmtk-X/X`: Runtime-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the runtime and the MMTk side of the binding. This is implemented in the runtime's implementation language. Often this will be one of C or C++.
+  - You can place your runtime repository at any path. For the sake of this guide, we assume you will place the runtime repo as a sibling of the binding repo. You can also clone `mmtk-core` to a local path. Using a local repo of `mmtk-core` can be beneficial to your development in case you need to make certain changes to the core (though this is unlikely).
 
 Your working directory may look like this (assuming your runtime is named as `X`):
  ```
@@ -28,12 +27,12 @@ Your working directory may look like this (assuming your runtime is named as `X`
  └─ mmtk-core/ (optional)
  ```
 
-You may also find it helpful to take inspiration from the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk), particularly for a more complete example of the relevant `Cargo.toml` files. (Note: the use of submodules is no longer recommended).
+You may also find it helpful to take inspiration from the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk), particularly for a more complete example of the relevant `Cargo.toml` files.
 
 ## Adding a Rust library to the runtime
 We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust "hello world" library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.
 
-In case the build system is too complex and you want get to hacking, a quick and dirty way to add MMTk could be to build a static and/or dynamic binary for MMTk and link it to the language directly, manually building new binaries as necessary, like so:
+In case the build system is too complex and you want get to hacking, a quick and dirty way to add MMTk could be to build a static and/or dynamic binary for MMTk and link it to the runtime directly, manually building new binaries as necessary, like so:
 
   1. `cd mmtk-X/mmtk`
   2. `cargo build` to build in debug mode or add `--release` for release mode
@@ -78,16 +77,13 @@ The choice of metadata location depends on the runtime and its object model and 
 
 #### Local vs Global metadata
 
-MMTk partitions the heap space into multiple "policies". Each policy may have different semantics from each other. This includes object metadata. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy in the heap space, is referred to as "local" metadata.
+MMTk uses multiple GC policies and each policy may use a different set of object metadata from each other. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy, is referred to as "local" metadata.
 
 However, in certain cases, we may need to have metadata globally for the entire heap space. The classic example is the valid-object bit metadata which tells us if an arbitrary address is allocated/managed by MMTk. Such a metadata, which spans multiple policies, is referred to as "global" metadata.
 
-We describe the most common metadata specifications and potential metadata locations:
+For example, the *Forwarding bits and pointer* metadata is a local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. This metadata is almost always in the header.
 
-  1. **Unlog bit metadata:** A global 1-bit metadata used by generational collectors to keep track of cross-generational pointers. Usually side metadata.
-  2. **Forwarding bits and pointer**: A local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. Almost always in the header.
-  3. **Mark bits**: A local 1-bit metadata used by tracing collectors to mark seen objects. Like with the forwarding bits, we can often steal the last bit in the object header for the mark bit. Though some bindings such as the OpenJDK binding prefer to have the mark bits in side metadata to allow for bulk updates.
-  4. **Large object space mark and nursery bits**: A local 2-bit metadata used by the the large object space to mark objects and set objects as "newly allocated". This should always be in the header. For large objects, we can add an extra word to store this metadata since the metadata size is insignificant in comparison to the object size. See [here](https://github.com/mmtk/mmtk-core/issues/847) for more information.
+We recommend going through the [list of metadata specifications](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.ObjectModel.html#required-associated-consts) that are defined by MMTk. You should set them to locations that are appropriate for your runtime.
 
 #### `ObjectReference` vs `Address`
 
@@ -97,15 +93,9 @@ You might be interested in reading the *Demystifying Magic: High-level Low-level
 
 [^3]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
 
-**Note:** Currently the `ObjectReference` is not fully opaque to MMTk, so there is some abstraction leakage, but [work is underway](https://github.com/mmtk/mmtk-core/issues/686) to make `ObjectReference` fully opaque to MMTk.
-
-You must understand the difference between an `ObjectReference` and an `Address` in your runtime and implement the conversion functions accordingly. It is often the case that there is no difference between the two, but you must make sure it is the case.
-
 #### Miscellaneous configuration options
 
-There are many constants in the `ObjectModel` trait that can be overridden in your binding in order to meet your runtime's requirements. For example, the `UNIFIED_OBJECT_REFERENCE_ADDRESS` constant guarantees that an `ObjectReference` and `Address` are the same allowing MMTk to perform some extra optimizations.
-
-An important constant is the `OBJECT_REF_OFFSET_LOWER_BOUND` constant which defines the minimum offset from allocation result start (i.e. the address that MMTk will return to the runtime) and the actual start of the object, i.e. the `ObjectReference`. In other words, the constant represents the minimum offset from the allocation result start such that the following invariant always holds:
+There are many constants in the `ObjectModel` trait that can be overridden in your binding in order to meet your runtime's requirements. For example, the `OBJECT_REF_OFFSET_LOWER_BOUND` constant which defines the minimum offset from allocation result start (i.e. the address that MMTk will return to the runtime) and the actual start of the object, i.e. the `ObjectReference`. In other words, the constant represents the minimum offset from the allocation result start such that the following invariant always holds:
 
     OBJECT_REFERENCE >= ALLOCATION_RESULT_START + OFFSET
 
@@ -119,7 +109,7 @@ Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X
 
 **Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
 
-Having a clean heap API for MMTk to implement makes life easier. Some runtimes may already have a sufficiently clean abstraction such as OpenJDK after the merging of [JEP 304](https://openjdk.org/jeps/304). In (most) other cases, the runtime doesn't provide a clean enough heap API for MMTk to implement. In such cases, it is recommended to create a class (or equivalent) that abstracts allocation and other heap functions like what the [V8](https://chromium.googlesource.com/v8/v8/+/a9976e160f4755990ec065d4b077c9401340c8fb/src/heap/third-party/heap-api.h) and ART bindings do. Ideally these changes are upstreamed like in the case of V8.
+Having a clean heap API for MMTk to implement makes life easier. Some runtimes may already have a sufficiently clean abstraction such as OpenJDK after the merging of [JEP 304](https://openjdk.org/jeps/304). In (most) other cases, the runtime doesn't provide a clean enough heap API for MMTk to implement. In such cases, it is recommended to create a class (or equivalent) that abstracts allocation and other heap functions like what the [V8](https://chromium.googlesource.com/v8/v8/+/a9976e160f4755990ec065d4b077c9401340c8fb/src/heap/third-party/heap-api.h) and ART bindings do. This allows making minimal changes to the actual runtime and having a concrete implementation of the exposed heap API in the binding, reducing MMTk-specific code in the runtime. Ideally these changes are upstreamed like in the case of V8.
 
 It is also recommended that any change you do in the runtime be guarded by build-time flags as it helps in maintaining a clean port.
 
@@ -246,19 +236,19 @@ void mmtk_post_alloc(MmtkMutator mutator, void* object, size_t size, int allocat
 [...]
 ```
 
-In order to perform allocations, you will need to know what object alignment the runtime expects. Runtimes often align allocations at word boundaries (i.e. 4- or 8-bytes) as it allows the CPU to access the data faster at execution time. Additionally, the language may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations. Once you have figured out the alignment requirements for your runtime, you should update the [`VM::MIN_ALIGNMENT`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.MIN_ALIGNMENT) constant in `VMBinding` to the correct value.
+In order to perform allocations, you will need to know what object alignment the runtime expects. Runtimes often align allocations at word boundaries (i.e. 4- or 8-bytes) as it allows the CPU to access the data faster at execution time. Additionally, the runtime may use the unused lowest order bits to store flags (e.g. type information), so it is important that MMTk respects these expectations. Once you have figured out the alignment requirements for your runtime, you should update the [`MIN_ALIGNMENT`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.MIN_ALIGNMENT) constant in `VMBinding` to the correct value.
 
 Now that MMTk is aware of each mutator thread, you have to change the runtime's allocation functions to call into MMTk to allocate using `mmtk_alloc` and set object metadata using `mmtk_post_alloc`. Note that there may be multiple allocation functions in the runtime so make sure that you edit them all!
 
 You should use the saved `Mutator` pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.
 
-If your runtime requires a non-zero allocation offset (i.e. returned address vs actual allocated address) then you have to provide the required value as the fourth parameter. Note that you ***must*** also update the [`USE_ALLOCATION_OFFSET`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET) constant in the `VMBinding` implementation if your runtime requires a non-zero allocation offset.
+If your runtime requires a non-zero allocation offset (i.e. the alignment requirements are for the offset address, not the returned address) then you have to provide the required value as the fourth parameter. Note that you ***must*** also update the [`USE_ALLOCATION_OFFSET`](https://www.mmtk.io/mmtk-core/public-doc/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET) constant in the `VMBinding` implementation if your runtime requires a non-zero allocation offset.
 
 For the time-being, you can ignore the `allocator` parameter in both these functions and always pass a value of `0` which means MMTk will pick the default allocator for your collector (a bump pointer allocator in the case of NoGC).
 
 Finally, you need to call `mmtk_post_alloc` with the object address returned from the previous `mmtk_alloc` call in order to initialize object metadata.
 
-**Note:** Currently MMTk faultily assumes object sizes are multiples of the `VM::MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `VM::MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
+**Note:** Currently MMTk assumes object sizes are multiples of the `MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
 
 ### Rust changes
 
@@ -270,7 +260,11 @@ Congratulations! At this point, you hopefully have object allocation working and
 
 ### Setting options for MMTk
 
-You can set [options for MMTk](https://www.mmtk.io/mmtk-core/public-doc/util/options/index.html) by using the [`process`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.process.html) function to pass options, or simply by setting environment variables. For example, to use the NoGC plan, you can set the environment variable `MMTK_PLAN=NoGC`. You may want to set multiple options at the same time as well. In such a case you can use the [`process_bulk`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.process_bulk.html) function.
+The preferred method of setting [options for MMTk](https://www.mmtk.io/mmtk-core/public-doc/util/options/index.html) is by setting them via the `MMTKBuilder` instance. See [here](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/api.rs#L79) for an example in the OpenJDK binding.
+
+The [`process`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.process.html) function can also be used to pass options. You may want to set multiple options at the same time. In such a case you can use the [`process_bulk`](https://www.mmtk.io/mmtk-core/public-doc/memory_manager/fn.process_bulk.html) function.
+
+MMTk also supports setting options via environment variables. This is generally only recommended at early stages of the porting process in order for quick development. For example, to use the NoGC plan, you can set the environment variable `MMTK_PLAN=NoGC`.
 
 A full list of available options that you can set can be found [here](https://www.mmtk.io/mmtk-core/public-doc/util/options/struct.Options.html).
 
