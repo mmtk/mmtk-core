@@ -33,28 +33,35 @@ use crate::{
 /// The strategy to update the valid object (VO) bits.
 ///
 /// Each stategy has its strength and limitation.  We should choose a strategy according to the
-/// configuration of the VM binding.  See [`strategy`].
+/// configuration of the VM binding.
+///
+/// Current experiments show that the `CopyFromMarkBits` strategy is faster while also makes the
+/// VO bits available during tracing, therefore it is currently always used.  We include the
+/// `ClearAndReconstruct` strategy because
+///
+/// 1.  It was the strategy described in the original paper that described the algorithm for
+///     filtering roots using VO bits for stack-conservative GC.  See: *Fast Conservative Garbage
+///     Collection* published in OOPSLA'14 <https://dl.acm.org/doi/10.1145/2660193.2660198>
+/// 2.  It does not require mark bits to be on the side.  It will be needed if we implement
+///     in-header mark bits in the future.
 #[derive(Debug)]
 enum VOBitUpdateStrategy {
     /// Clear all VO bits after stacks are scanned, and reconstruct the VO bits during tracing.
     ///
     /// Pros:
-    /// -   Minimum overhead.
+    /// -   Proven to work by published paper.
     ///
     /// Cons:
     /// -   VO bits are not available during tracing.
-    ///
-    /// This strategy is described in the paper *Fast Conservative Garbage Collection* published
-    /// in OOPSLA'14.  See: <https://dl.acm.org/doi/10.1145/2660193.2660198>
     ClearAndReconstruct,
     /// Copy the mark bits metadata over to the VO bits metadata after tracing.
     ///
     /// Pros:
     /// -   VO bits are available during tracing.
+    /// -   Faster according to current experiment.
     ///
     /// Cons:
     /// -   Requires marking bits to be on the side.
-    /// -   Has extra time overhead.
     CopyFromMarkBits,
 }
 
@@ -71,12 +78,11 @@ impl VOBitUpdateStrategy {
 /// Select a strategy for the VM.  It is a `const` function so it always returns the same strategy
 /// for a given VM.
 const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
-    // TODO: Select strategy wisely if we add features for heap dumping or interior reference.
-    if VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING {
-        VOBitUpdateStrategy::CopyFromMarkBits
-    } else {
-        VOBitUpdateStrategy::ClearAndReconstruct
-    }
+    // TODO: Revisit this choice in the future if non-trivial changes are made and the performance
+    // characterestics may change for the strategies.
+    // TODO: If we start to support in-header mark bits, we need to use `ClearAndReconstruct` if
+    // the VM uses in-header mark bits.
+    VOBitUpdateStrategy::CopyFromMarkBits
 }
 
 pub(crate) fn validate_config<VM: VMBinding>() {

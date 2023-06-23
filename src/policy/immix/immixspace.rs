@@ -1105,7 +1105,7 @@ impl ClearVOBitsAfterPrepare {
             .iter_region::<Block>()
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
-            block.clear_vo_bits_for_young_regions(line_mark_state);
+            block.clear_vo_bits_for_unmarked_regions(line_mark_state);
         }
     }
 }

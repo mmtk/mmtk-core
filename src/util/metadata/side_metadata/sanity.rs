@@ -500,10 +500,8 @@ pub fn verify_bcopy(
         let mut cursor = start;
         let step: usize = 1 << src_spec.log_bytes_in_region;
         while cursor < end {
-            let src_value = src_map.get(&cursor).unwrap_or_else(|| {
-                panic!("No data in source metadata map for data address {}", cursor);
-            });
-            tmp_map.insert(cursor, *src_value);
+            let src_value = src_map.get(&cursor).copied().unwrap_or(0u64);
+            tmp_map.insert(cursor, src_value);
             cursor += step;
         }
     }
@@ -515,8 +513,8 @@ pub fn verify_bcopy(
         let mut cursor = start;
         let step: usize = 1 << dst_spec.log_bytes_in_region;
         while cursor < end {
-            let src_value = tmp_map.get(&cursor).unwrap();
-            dst_map.insert(cursor, *src_value);
+            let src_value = tmp_map.get(&cursor).copied().unwrap();
+            dst_map.insert(cursor, src_value);
             cursor += step;
         }
     }

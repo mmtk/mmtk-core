@@ -293,13 +293,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
 
 impl<VM: VMBinding> StickyImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        // TODO: For the valid object (VO) bits to work for StickyImmix, we need to update the
-        // metadata for blocks (or more precisely, lines) occupied by young objects in each nursery
-        // GC.  Currently those lines may contain stale VO bits from dead or moved objects, making
-        // the VO bits inaccurate.
-        #[cfg(feature = "vo_bit")]
-        warn!("The VO bits metadata is not fully implemented for StickyImmix!");
-
         let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &STICKY_IMMIX_CONSTRAINTS,

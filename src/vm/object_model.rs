@@ -91,7 +91,10 @@ pub trait ObjectModel<VM: VMBinding> {
     /// object scanning, they need to set this constant to `true`. See the comments of individual
     /// methods in the `Scanning` trait.
     ///
-    /// Setting this to true may incur some overhead for certain plans, such as immix-related plans.
+    /// Depending on the internal implementation of mmtk-core, different strategies for handling
+    /// VO bits have different time/space overhead.  mmtk-core will choose the best strategy
+    /// according to the configuration of the VM binding, including this flag.  Currently, setting
+    /// this flag to true does not impose any additional overhead.
     #[cfg(feature = "vo_bit")]
     const NEED_VO_BITS_DURING_TRACING: bool = false;
 

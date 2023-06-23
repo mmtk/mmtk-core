@@ -269,9 +269,12 @@ impl Block {
         }
     }
 
-    /// Clear VO bits metadata for regions that contain young objects.
+    /// Clear VO bits metadata for unmarked regions.
+    /// This is useful for clearing VO bits during nursery GC for StickyImmix
+    /// at which time young objects (allocated in unmarked regions) may die
+    /// but we always consider old objects (in marked regions) as live.
     #[cfg(feature = "vo_bit")]
-    pub fn clear_vo_bits_for_young_regions(&self, line_mark_state: Option<u8>) {
+    pub fn clear_vo_bits_for_unmarked_regions(&self, line_mark_state: Option<u8>) {
         match line_mark_state {
             None => {
                 match self.get_state() {
