@@ -64,21 +64,40 @@ pub trait ObjectModel<VM: VMBinding> {
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
     // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
-    /// The metadata specification of the global log bit. 1 bit.
+    /// A global 1-bit metadata used by generational plans to track cross-generational pointers. It is generally
+    /// located in side metadata.
+    ///
     /// Note that for this bit, 0 represents logged (default), and 1 represents unlogged.
     /// This bit is also referred to as unlogged bit in Java MMTk for this reason.
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
 
-    /// The metadata specification for the forwarding pointer, used by copying plans. Word size.
+    /// A local word-size metadata for the forwarding pointer, used by copying plans. It is almost always
+    /// located in the object header as it is fine to destroy an object header in order to copy it.
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
-    /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits.
+
+    /// A local 2-bit metadata for the forwarding status bits, used by copying plans. If your runtime requires
+    /// word-aligned addresses (i.e. 2- or 4-bytes), you can use the last two bits in the object header to store
+    /// the forwarding bits. Note that you must be careful if you place this in the header as the runtime may
+    /// be using those bits for some other reason.
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
-    /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
+
+    /// A local 1-bit metadata for the mark bit, used by most plans that need to mark live objects. Like with the
+    /// [forwarding bits](crate::vm::ObjectModel::LOCAL_FORWARDING_BITS_SPEC), you can often steal the last bit in
+    /// the object header (due to alignment requirements) for the mark bit. Though some bindings such as the
+    /// OpenJDK binding prefer to have the mark bits in side metadata to allow for bulk operations.
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
+
     #[cfg(feature = "object_pinning")]
-    /// The metadata specification for the pinning bit, used by most plans that need to pin objects. 1 bit.
+    /// A local 1-bit metadata specification for the pinning bit, used by plans that need to pin objects. It is
+    /// generally in side metadata.
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec;
-    /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
+
+    /// A local 2-bit metadata used by the large object space to mark objects and set objects as "newly allocated".
+    /// Used by any plan with large object allocation. It is generally in the header as we can add an extra word
+    /// before the large object to store this metadata. This is fine as the metadata size is insignificant in
+    /// comparison to the object size.
+    //
+    // TODO: Cleanup and place the LOS mark and nursery bits in the header. See here: https://github.com/mmtk/mmtk-core/issues/847
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
     /// A function to non-atomically load the specified per-object metadata's content.

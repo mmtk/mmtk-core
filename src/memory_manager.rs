@@ -137,6 +137,9 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// Allocate memory for an object. For performance reasons, a VM should
 /// implement the allocation fast-path on their side rather than just calling this function.
 ///
+/// If the VM provides a non-zero `offset` parameter, then the returned address will be
+/// such that the `RETURNED_ADDRESS + offset` is aligned to the `align` parameter.
+///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
 /// * `size`: The number of bytes required for the object.
