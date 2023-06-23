@@ -26,7 +26,11 @@
 use atomic::Ordering;
 
 use crate::{
-    util::{linear_scan::Region, metadata::vo_bit, ObjectReference},
+    util::{
+        linear_scan::Region,
+        metadata::{vo_bit, MetadataSpec},
+        ObjectReference,
+    },
     vm::{ObjectModel, VMBinding},
 };
 
@@ -36,8 +40,7 @@ use crate::{
 /// configuration of the VM binding.
 ///
 /// Current experiments show that the `CopyFromMarkBits` strategy is faster while also makes the
-/// VO bits available during tracing, therefore it is currently always used.  We include the
-/// `ClearAndReconstruct` strategy because
+/// VO bits available during tracing.  We also include the `ClearAndReconstruct` strategy because
 ///
 /// 1.  It was the strategy described in the original paper that described the algorithm for
 ///     filtering roots using VO bits for stack-conservative GC.  See: *Fast Conservative Garbage
@@ -82,12 +85,25 @@ const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
     // VO bits during tracing. We use it as the default strategy.
     // TODO: Revisit this choice in the future if non-trivial changes are made and the performance
     // characterestics may change for the strategies.
-    // TODO: If we start to support in-header mark bits, we need to use `ClearAndReconstruct` if
-    // the VM uses in-header mark bits.
-    VOBitUpdateStrategy::CopyFromMarkBits
+    match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.as_spec() {
+        // Note that currently ImmixSpace doesn't support in-header mark bits,
+        // but the DummyVM for testing declares mark bits to be "in header" as a place holder
+        // because it never runs GC.
+        MetadataSpec::InHeader(_) => VOBitUpdateStrategy::ClearAndReconstruct,
+        MetadataSpec::OnSide(_) => VOBitUpdateStrategy::CopyFromMarkBits,
+    }
 }
 
 pub(crate) fn validate_config<VM: VMBinding>() {
+    assert!(
+        !(VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING
+            && VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .as_spec()
+                .is_in_header()),
+        "The VM binding needs VO bits during tracing but also has in-header mark bits.  \
+We currently don't have an appropriate strategy for this case."
+    );
+
     let s = strategy::<VM>();
     match s {
         VOBitUpdateStrategy::ClearAndReconstruct => {
