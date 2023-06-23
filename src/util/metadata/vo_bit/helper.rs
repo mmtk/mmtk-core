@@ -78,6 +78,8 @@ impl VOBitUpdateStrategy {
 /// Select a strategy for the VM.  It is a `const` function so it always returns the same strategy
 /// for a given VM.
 const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
+    // CopyFromMarkBits performs better than ClearAndReconstruct, and it also allows using
+    // VO bits during tracing. We use it as the default strategy.
     // TODO: Revisit this choice in the future if non-trivial changes are made and the performance
     // characterestics may change for the strategies.
     // TODO: If we start to support in-header mark bits, we need to use `ClearAndReconstruct` if
