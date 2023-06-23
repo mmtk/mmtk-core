@@ -9,7 +9,7 @@ At a high level, in order to implement NoGC, we need to handle MMTk initializati
 If you're ever stuck at any point, feel free to send a message in the `#Porting` channel of our [Zulip](https://mmtk.zulipchat.com/)!
 
 ## Set up
-You want to set up the binding repository/directory structure. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement[^1] but a recommendation. We assume you are using some form of version control system (such as `git` or `mercurial`) in this guide.
+You want to set up the binding repository/directory structure before starting the port. For the sake of the tutorial guide we assume you have a directory structure similar to the one below. Note that such a directory structure is not a requirement[^1] but a recommendation. We assume you are using some form of version control system (such as `git` or `mercurial`) in this guide.
 
 [^1]: In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime.
 
@@ -28,6 +28,8 @@ Your working directory may look like this (assuming your runtime is named as `X`
  ```
 
 You may also find it helpful to take inspiration from the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk), particularly for a more complete example of the relevant `Cargo.toml` files.
+
+For this guide, we will assume your runtime is implemented in C or C++ as they are the most common implementation languages. However note that your runtime does not *need* to be implemented in C/C++ to work with MMTk.
 
 ## Adding a Rust library to the runtime
 We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust "hello world" library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.
