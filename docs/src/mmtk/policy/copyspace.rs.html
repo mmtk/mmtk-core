@@ -330,6 +330,10 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -574,6 +578,10 @@
                 semantics.unwrap(),
                 worker.get_copy_context_mut(),
             );
+
+            <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+            </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
+
             <span class="macro">trace!</span>(<span class="string">&quot;Forwarding pointer&quot;</span>);
             queue.enqueue(new_object);
             <span class="macro">trace!</span>(<span class="string">&quot;Copied [{:?} -&gt; {:?}]&quot;</span>, object, new_object);

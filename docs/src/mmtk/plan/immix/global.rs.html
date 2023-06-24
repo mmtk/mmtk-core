@@ -198,6 +198,7 @@
 <span id="198">198</span>
 <span id="199">199</span>
 <span id="200">200</span>
+<span id="201">201</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
@@ -338,6 +339,7 @@
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: <span class="bool-val">false</span>,
                 unlog_object_when_traced: <span class="bool-val">false</span>,
+                mixed_age: <span class="bool-val">false</span>,
             },
         )
     }

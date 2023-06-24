@@ -547,6 +547,23 @@
 <span id="547">547</span>
 <span id="548">548</span>
 <span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="self">self</span>::specs::<span class="kw-2">*</span>;
@@ -648,6 +665,23 @@
     </span><span class="comment">//
     // TODO: Cleanup and place the LOS mark and nursery bits in the header. See here: https://github.com/mmtk/mmtk-core/issues/847
     </span><span class="kw">const </span>LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
+
+    <span class="doccomment">/// Set this to true if the VM binding requires the valid object (VO) bits to be available
+    /// during tracing. If this constant is set to `false`, it is undefined behavior if the binding
+    /// attempts to access VO bits during tracing.
+    ///
+    /// Note that the VO bits is always available during root scanning even if this flag is false,
+    /// which is suitable for using VO bits (and the `is_mmtk_object()` method) for conservative
+    /// stack scanning. However, if a binding is also conservative in finding references during
+    /// object scanning, they need to set this constant to `true`. See the comments of individual
+    /// methods in the `Scanning` trait.
+    ///
+    /// Depending on the internal implementation of mmtk-core, different strategies for handling
+    /// VO bits have different time/space overhead.  mmtk-core will choose the best strategy
+    /// according to the configuration of the VM binding, including this flag.  Currently, setting
+    /// this flag to true does not impose any additional overhead.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+    </span><span class="kw">const </span>NEED_VO_BITS_DURING_TRACING: bool = <span class="bool-val">false</span>;
 
     <span class="doccomment">/// A function to non-atomically load the specified per-object metadata&#39;s content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.

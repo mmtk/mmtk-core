@@ -413,18 +413,6 @@
 <span id="413">413</span>
 <span id="414">414</span>
 <span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
@@ -432,11 +420,11 @@
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::options::AffinityKind;
+<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::array_from_fn;
 <span class="kw">use </span><span class="kw">crate</span>::vm::Collection;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{GCThreadContext, VMBinding};
 <span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Steal};
-<span class="kw">use </span>enum_map::Enum;
-<span class="kw">use </span>enum_map::{enum_map, EnumMap};
+<span class="kw">use </span>enum_map::{Enum, EnumMap};
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -464,24 +452,12 @@
         <span class="kw">let </span>worker_group = WorkerGroup::new(num_workers);
 
         <span class="comment">// Create work buckets for workers.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = <span class="macro">enum_map! </span>{
-            WorkBucketStage::Unconstrained =&gt; WorkBucket::new(<span class="bool-val">true</span>, worker_monitor.clone()),
-            WorkBucketStage::Prepare =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::Closure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::SoftRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::WeakRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::FinalRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::PhantomRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::VMRefClosure =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::CalculateForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::SecondRoots =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::RefForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::FinalizableForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::VMRefForwarding =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::Compact =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::Release =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-            WorkBucketStage::Final =&gt; WorkBucket::new(<span class="bool-val">false</span>, worker_monitor.clone()),
-        };
+        // TODO: Replace `array_from_fn` with `std::array::from_fn` after bumping MSRV.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>work_buckets = EnumMap::from_array(array_from_fn(|stage_num| {
+            <span class="kw">let </span>stage = WorkBucketStage::from_usize(stage_num);
+            <span class="kw">let </span>active = stage == WorkBucketStage::Unconstrained;
+            WorkBucket::new(active, worker_monitor.clone())
+        }));
 
         <span class="comment">// Set the open condition of each bucket.
         </span>{

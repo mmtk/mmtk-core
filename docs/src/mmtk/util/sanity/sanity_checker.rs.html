@@ -233,6 +233,14 @@
 <span id="233">233</span>
 <span id="234">234</span>
 <span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -457,6 +465,14 @@
             </span><span class="macro">trace!</span>(<span class="string">&quot;Sanity mark object {}&quot;</span>, object);
             <span class="self">self</span>.nodes.enqueue(object);
         }
+
+        <span class="comment">// If the valid object (VO) bit metadata is enabled, all live objects should have the VO
+        // bit set when sanity GC starts.
+        </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        </span><span class="kw">if </span>!<span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object) {
+            <span class="macro">panic!</span>(<span class="string">&quot;VO bit is not set: {}&quot;</span>, object);
+        }
+
         object
     }
 

@@ -296,6 +296,27 @@
 <span id="296">296</span>
 <span id="297">297</span>
 <span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -451,6 +472,10 @@
     /// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged
     /// references, it must skip tagged reference fields which are not holding references.
     ///
+    /// The `memory_manager::is_mmtk_object` function can be used in this function if
+    /// -   the &quot;is_mmtk_object&quot; feature is enabled, and
+    /// -   `VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING` is true.
+    ///
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
@@ -471,6 +496,10 @@
     ///
     /// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged
     /// references, it must skip tagged reference fields which are not holding references.
+    ///
+    /// The `memory_manager::is_mmtk_object` function can be used in this function if
+    /// -   the &quot;is_mmtk_object&quot; feature is enabled, and
+    /// -   `VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING` is true.
     ///
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
@@ -495,6 +524,9 @@
 
     <span class="doccomment">/// Scan all the mutators for roots.
     ///
+    /// The `memory_manager::is_mmtk_object` function can be used in this function if
+    /// -   the &quot;is_mmtk_object&quot; feature is enabled.
+    ///
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `factory`: The VM uses it to create work packets for scanning roots.
@@ -504,6 +536,9 @@
     );
 
     <span class="doccomment">/// Scan one mutator for roots.
+    ///
+    /// The `memory_manager::is_mmtk_object` function can be used in this function if
+    /// -   the &quot;is_mmtk_object&quot; feature is enabled.
     ///
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
@@ -517,6 +552,9 @@
 
     <span class="doccomment">/// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.
+    ///
+    /// The `memory_manager::is_mmtk_object` function can be used in this function if
+    /// -   the &quot;is_mmtk_object&quot; feature is enabled.
     ///
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
@@ -563,6 +601,10 @@
     /// again.  The VM binding can make use of this by adding custom work packets into the
     /// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.
     /// See below.
+    ///
+    /// The `memory_manager::is_mmtk_object` function can be used in this function if
+    /// -   the &quot;is_mmtk_object&quot; feature is enabled, and
+    /// -   `VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING` is true.
     ///
     /// Arguments:
     /// * `worker`: The current GC worker.

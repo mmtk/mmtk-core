@@ -734,6 +734,111 @@
 <span id="734">734</span>
 <span id="735">735</span>
 <span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
 </pre><pre class="rust"><code><span class="attribute">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use </span>atomic::Ordering;
@@ -1469,6 +1574,111 @@
         </span>SideMetadataSpec::zero_meta_bits(start, <span class="number">2</span>, end - <span class="number">1</span>, <span class="number">6</span>);
         <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ start.load::&lt;u32&gt;() }, <span class="number">0xC000_0003</span>); <span class="comment">// 1100....0011
     </span>}
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_side_metadata_bcopy_metadata_contiguous() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+
+                    <span class="kw">let </span>log_num_of_bits = <span class="number">0</span>;
+                    <span class="kw">let </span>log_bytes_in_region = <span class="number">3</span>;
+                    <span class="kw">let </span>num_regions = <span class="number">0x400</span>; <span class="comment">// 1024
+                    </span><span class="kw">let </span>bytes_per_region = <span class="number">1 </span>&lt;&lt; log_bytes_in_region;
+                    <span class="kw">let </span>total_size = num_regions * bytes_per_region; <span class="comment">// 8192
+
+                    </span><span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_1_spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits,
+                        log_bytes_in_region,
+                    };
+
+                    <span class="kw">let </span>metadata_2_spec = SideMetadataSpec {
+                        name: <span class="string">&quot;metadata_2_spec&quot;</span>,
+                        is_global: <span class="bool-val">true</span>,
+                        offset: SideMetadataOffset::layout_after(<span class="kw-2">&amp;</span>metadata_1_spec),
+                        log_num_of_bits,
+                        log_bytes_in_region,
+                    };
+
+                    <span class="comment">// Currently global metadata are contiguous.
+                    </span><span class="kw">let </span>metadata = SideMetadataContext {
+                        global: <span class="macro">vec!</span>[metadata_1_spec, metadata_2_spec],
+                        local: <span class="macro">vec!</span>[],
+                    };
+
+                    <span class="kw">let </span><span class="kw-2">mut </span>metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
+
+                    metadata
+                        .try_map_metadata_space(data_addr, total_size)
+                        .unwrap();
+
+                    metadata_1_spec.bzero_metadata(data_addr, total_size);
+                    metadata_2_spec.bzero_metadata(data_addr, total_size);
+
+                    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..num_regions {
+                        metadata_1_spec.store_atomic::&lt;u8&gt;(
+                            data_addr + i * bytes_per_region,
+                            (i % <span class="number">2</span>) <span class="kw">as </span>u8,
+                            Ordering::Relaxed,
+                        );
+                    }
+
+                    <span class="kw">let </span>test_copy_region = |begin: usize, end: usize| {
+                        <span class="comment">// Test copying whole bytes.
+                        </span>metadata_2_spec.bcopy_metadata_contiguous(
+                            data_addr + begin * bytes_per_region,
+                            (end - begin) * bytes_per_region,
+                            <span class="kw-2">&amp;</span>metadata_1_spec,
+                        );
+
+                        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..num_regions {
+                            <span class="kw">let </span>bit = metadata_2_spec.load_atomic::&lt;u8&gt;(
+                                data_addr + i * bytes_per_region,
+                                Ordering::Relaxed,
+                            );
+
+                            <span class="kw">let </span>expected = <span class="kw">if </span>begin &lt;= i &amp;&amp; i &lt; end {
+                                (i % <span class="number">2</span>) <span class="kw">as </span>u8
+                            } <span class="kw">else </span>{
+                                <span class="number">0
+                            </span>};
+                            <span class="macro">assert_eq!</span>(
+                                bit, expected,
+                                <span class="string">&quot;Expected: {expected}, actual: {bit}, i: {i}, begin: {begin}, end: {end}&quot;
+                            </span>);
+                        }
+
+                        metadata_2_spec.bzero_metadata(data_addr, total_size);
+                    };
+
+                    <span class="comment">// Whole bytes
+                    </span>test_copy_region(<span class="number">0x100</span>, <span class="number">0x200</span>);
+
+                    <span class="comment">// End unaligned
+                    </span>test_copy_region(<span class="number">0x18</span>, <span class="number">0xcc</span>);
+
+                    <span class="comment">// Start unaligned
+                    </span>test_copy_region(<span class="number">0x263</span>, <span class="number">0x3f0</span>);
+
+                    <span class="comment">// Start and end unaligned
+                    </span>test_copy_region(<span class="number">0x82</span>, <span class="number">0x1fd</span>);
+
+                    metadata_1_spec.bzero_metadata(data_addr, total_size);
+                    metadata_2_spec.bzero_metadata(data_addr, total_size);
+
+                    metadata_sanity.reset();
+                },
+                || {
+                    sanity::reset();
+                },
+            );
+        });
+    }
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

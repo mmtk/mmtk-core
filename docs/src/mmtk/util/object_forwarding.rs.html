@@ -214,8 +214,6 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
 <span class="doccomment">/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
@@ -299,8 +297,6 @@
     copy_context: <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt;,
 ) -&gt; ObjectReference {
     <span class="kw">let </span>new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
-    </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
     <span class="kw">if let </span><span class="prelude-val">Some</span>(shift) = forwarding_bits_offset_in_forwarding_pointer::&lt;VM&gt;() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::&lt;VM, usize&gt;(
             object,

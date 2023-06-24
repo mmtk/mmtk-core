@@ -305,6 +305,47 @@
 <span id="305">305</span>
 <span id="306">306</span>
 <span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::Histogram;
 <span class="kw">use </span><span class="kw">super</span>::line::Line;
 <span class="kw">use </span><span class="kw">super</span>::ImmixSpace;
@@ -313,6 +354,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::Chunk;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::{Region, RegionIterator};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
+<span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -473,8 +516,6 @@
 
     <span class="doccomment">/// Deinitalize a block before releasing.
     </span><span class="kw">pub fn </span>deinit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
-        </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
         <span class="self">self</span>.set_state(BlockState::Unallocated);
     }
 
@@ -505,11 +546,17 @@
             <span class="kw">match </span><span class="self">self</span>.get_state() {
                 BlockState::Unallocated =&gt; <span class="bool-val">false</span>,
                 BlockState::Unmarked =&gt; {
+                    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                    </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">false</span>);
+
                     <span class="comment">// Release the block if it is allocated but not marked by the current GC.
                     </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
                     <span class="bool-val">true
                 </span>}
                 BlockState::Marked =&gt; {
+                    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                    </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">true</span>);
+
                     <span class="comment">// The block is live.
                     </span><span class="bool-val">false
                 </span>}
@@ -531,9 +578,6 @@
                         holes += <span class="number">1</span>;
                     }
 
-                    <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
-                    </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
-
                     <span class="attribute">#[cfg(feature = <span class="string">&quot;immix_zero_on_release&quot;</span>)]
                     </span><span class="kw">crate</span>::util::memory::zero(line.start(), Line::BYTES);
 
@@ -542,6 +586,9 @@
             }
 
             <span class="kw">if </span>marked_lines == <span class="number">0 </span>{
+                <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">false</span>);
+
                 <span class="comment">// Release the block if non of its lines are marked.
                 </span>space.release_block(<span class="kw-2">*</span><span class="self">self</span>);
                 <span class="bool-val">true
@@ -561,8 +608,43 @@
                 </span>mark_histogram[holes] += marked_lines;
                 <span class="comment">// Record number of holes in block side metadata.
                 </span><span class="self">self</span>.set_holes(holes);
+
+                <span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+                </span>vo_bit::helper::on_region_swept::&lt;VM, <span class="kw">_</span>&gt;(<span class="self">self</span>, <span class="bool-val">true</span>);
+
                 <span class="bool-val">false
             </span>}
+        }
+    }
+
+    <span class="doccomment">/// Clear VO bits metadata for unmarked regions.
+    /// This is useful for clearing VO bits during nursery GC for StickyImmix
+    /// at which time young objects (allocated in unmarked regions) may die
+    /// but we always consider old objects (in marked regions) as live.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+    </span><span class="kw">pub fn </span>clear_vo_bits_for_unmarked_regions(<span class="kw-2">&amp;</span><span class="self">self</span>, line_mark_state: <span class="prelude-ty">Option</span>&lt;u8&gt;) {
+        <span class="kw">match </span>line_mark_state {
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="kw">match </span><span class="self">self</span>.get_state() {
+                    BlockState::Unmarked =&gt; {
+                        <span class="comment">// It may contain young objects.  Clear it.
+                        </span>vo_bit::bzero_vo_bit(<span class="self">self</span>.start(), <span class="self">Self</span>::BYTES);
+                    }
+                    BlockState::Marked =&gt; {
+                        <span class="comment">// It contains old objects.  Skip it.
+                    </span>}
+                    <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+                }
+            }
+            <span class="prelude-val">Some</span>(state) =&gt; {
+                <span class="comment">// With lines.
+                </span><span class="kw">for </span>line <span class="kw">in </span><span class="self">self</span>.lines() {
+                    <span class="kw">if </span>!line.is_marked(state) {
+                        <span class="comment">// It may contain young objects.  Clear it.
+                        </span>vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                    }
+                }
+            }
         }
     }
 }

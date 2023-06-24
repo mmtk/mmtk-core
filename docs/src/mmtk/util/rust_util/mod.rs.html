@@ -125,6 +125,19 @@
 <span id="125">125</span>
 <span id="126">126</span>
 <span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module works around limitations of the Rust programming language, and provides missing
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
@@ -251,6 +264,19 @@
         <span class="comment">// The initialize_usize should only be called once
         </span><span class="macro">assert_eq!</span>(INITIALIZE_COUNT.load(Ordering::SeqCst), <span class="number">1</span>);
     }
+}
+
+<span class="doccomment">/// This implements `std::array::from_fn` introduced in Rust 1.63.
+/// We should replace this with the standard counterpart after bumping MSRV.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>array_from_fn&lt;T, <span class="kw">const </span>N: usize, F&gt;(cb: F) -&gt; [T; N]
+<span class="kw">where
+    </span>F: FnMut(usize) -&gt; T,
+{
+    <span class="kw">let </span><span class="kw-2">mut </span>index_array = [<span class="number">0</span>; N];
+    <span class="kw">for </span>(index, item) <span class="kw">in </span>index_array.iter_mut().enumerate() {
+        <span class="kw-2">*</span>item = index;
+    }
+    index_array.map(cb)
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

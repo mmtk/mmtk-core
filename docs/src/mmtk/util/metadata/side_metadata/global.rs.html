@@ -1634,6 +1634,67 @@
 <span id="1634">1634</span>
 <span id="1635">1635</span>
 <span id="1636">1636</span>
+<span id="1637">1637</span>
+<span id="1638">1638</span>
+<span id="1639">1639</span>
+<span id="1640">1640</span>
+<span id="1641">1641</span>
+<span id="1642">1642</span>
+<span id="1643">1643</span>
+<span id="1644">1644</span>
+<span id="1645">1645</span>
+<span id="1646">1646</span>
+<span id="1647">1647</span>
+<span id="1648">1648</span>
+<span id="1649">1649</span>
+<span id="1650">1650</span>
+<span id="1651">1651</span>
+<span id="1652">1652</span>
+<span id="1653">1653</span>
+<span id="1654">1654</span>
+<span id="1655">1655</span>
+<span id="1656">1656</span>
+<span id="1657">1657</span>
+<span id="1658">1658</span>
+<span id="1659">1659</span>
+<span id="1660">1660</span>
+<span id="1661">1661</span>
+<span id="1662">1662</span>
+<span id="1663">1663</span>
+<span id="1664">1664</span>
+<span id="1665">1665</span>
+<span id="1666">1666</span>
+<span id="1667">1667</span>
+<span id="1668">1668</span>
+<span id="1669">1669</span>
+<span id="1670">1670</span>
+<span id="1671">1671</span>
+<span id="1672">1672</span>
+<span id="1673">1673</span>
+<span id="1674">1674</span>
+<span id="1675">1675</span>
+<span id="1676">1676</span>
+<span id="1677">1677</span>
+<span id="1678">1678</span>
+<span id="1679">1679</span>
+<span id="1680">1680</span>
+<span id="1681">1681</span>
+<span id="1682">1682</span>
+<span id="1683">1683</span>
+<span id="1684">1684</span>
+<span id="1685">1685</span>
+<span id="1686">1686</span>
+<span id="1687">1687</span>
+<span id="1688">1688</span>
+<span id="1689">1689</span>
+<span id="1690">1690</span>
+<span id="1691">1691</span>
+<span id="1692">1692</span>
+<span id="1693">1693</span>
+<span id="1694">1694</span>
+<span id="1695">1695</span>
+<span id="1696">1696</span>
+<span id="1697">1697</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -2014,6 +2075,67 @@
         </span>sanity::verify_bset(<span class="self">self</span>, start, size);
 
         <span class="self">self</span>.bulk_update_metadata(start, size, <span class="kw-2">&amp;</span><span class="self">Self</span>::set_meta_bits)
+    }
+
+    <span class="doccomment">/// Bulk copy the `other` side metadata for a memory region to this side metadata.
+    ///
+    /// This function only works for contiguous metadata.
+    /// Curently all global metadata are contiguous.
+    /// It also requires the other metadata to have the same number of bits per region
+    /// and the same region size.
+    ///
+    /// # Arguments
+    ///
+    /// * `start`: The starting address of a memory region.
+    /// * `size`: The size of the memory region.
+    /// * `other`: The other metadata to copy from.
+    </span><span class="kw">pub fn </span>bcopy_metadata_contiguous(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize, other: <span class="kw-2">&amp;</span>SideMetadataSpec) {
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span>sanity::verify_bcopy(<span class="self">self</span>, start, size, other);
+
+        <span class="macro">debug_assert_eq!</span>(other.log_bytes_in_region, <span class="self">self</span>.log_bytes_in_region);
+        <span class="macro">debug_assert_eq!</span>(other.log_num_of_bits, <span class="self">self</span>.log_num_of_bits);
+
+        <span class="kw">let </span>dst_meta_start_addr = address_to_meta_address(<span class="self">self</span>, start);
+        <span class="kw">let </span>dst_meta_start_bit = meta_byte_lshift(<span class="self">self</span>, start);
+        <span class="kw">let </span>dst_meta_end_addr = address_to_meta_address(<span class="self">self</span>, start + size);
+        <span class="kw">let </span>dst_meta_end_bit = meta_byte_lshift(<span class="self">self</span>, start + size);
+
+        <span class="kw">let </span>src_meta_start_addr = address_to_meta_address(other, start);
+        <span class="kw">let </span>src_meta_start_bit = meta_byte_lshift(other, start);
+
+        <span class="macro">debug_assert_eq!</span>(dst_meta_start_bit, src_meta_start_bit);
+
+        <span class="kw">let </span>copy_bytes = |dst_start: Address, dst_end: Address| <span class="kw">unsafe </span>{
+            <span class="kw">let </span>byte_offset = dst_start - dst_meta_start_addr;
+            <span class="kw">let </span>src_start = src_meta_start_addr + byte_offset;
+            <span class="kw">let </span>size = dst_end - dst_start;
+            std::ptr::copy::&lt;u8&gt;(src_start.to_ptr(), dst_start.to_mut_ptr(), size);
+        };
+
+        <span class="kw">let </span>copy_bits = |dst: Address, start_bit: u8, end_bit: u8| {
+            <span class="kw">let </span>byte_offset = dst - dst_meta_start_addr;
+            <span class="kw">let </span>src = src_meta_start_addr + byte_offset;
+            <span class="comment">// we are setting selected bits in one byte
+            </span><span class="kw">let </span>mask: u8 =
+                !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(<span class="number">0</span>)) &amp; (u8::MAX &lt;&lt; start_bit); <span class="comment">// Get a mask that the bits we need to set are 1, and the other bits are 0.
+            </span><span class="kw">let </span>old_src = <span class="kw">unsafe </span>{ src.as_ref::&lt;AtomicU8&gt;() }.load(Ordering::Relaxed);
+            <span class="kw">let </span>old_dst = <span class="kw">unsafe </span>{ dst.as_ref::&lt;AtomicU8&gt;() }.load(Ordering::Relaxed);
+            <span class="kw">let </span>new = (old_src &amp; mask) | (old_dst &amp; !mask);
+            <span class="kw">unsafe </span>{ dst.as_ref::&lt;AtomicU8&gt;() }.store(new, Ordering::Relaxed);
+        };
+
+        <span class="self">Self</span>::update_meta_bits(
+            dst_meta_start_addr,
+            dst_meta_start_bit,
+            dst_meta_end_addr,
+            dst_meta_end_bit,
+            <span class="kw-2">&amp;</span>copy_bytes,
+            <span class="kw-2">&amp;</span>copy_bits,
+        );
     }
 
     <span class="doccomment">/// This is a wrapper method for implementing side metadata access. It does nothing other than

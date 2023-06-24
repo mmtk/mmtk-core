@@ -279,6 +279,9 @@
 <span id="279">279</span>
 <span id="280">280</span>
 <span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerMonitor;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -510,6 +513,9 @@
     <span class="doccomment">/// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     </span>Prepare,
+    <span class="doccomment">/// Clear the VO bit metadata.  Mainly used by ImmixSpace.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+    </span>ClearVOBits,
     <span class="doccomment">/// Compute the transtive closure following only strong references.
     </span>Closure,
     <span class="doccomment">/// Handle Java-style soft references, and potentially expand the transitive closure.
