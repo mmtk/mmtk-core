@@ -380,6 +380,67 @@ impl SideMetadataSpec {
         self.bulk_update_metadata(start, size, &Self::set_meta_bits)
     }
 
+    /// Bulk copy the `other` side metadata for a memory region to this side metadata.
+    ///
+    /// This function only works for contiguous metadata.
+    /// Curently all global metadata are contiguous.
+    /// It also requires the other metadata to have the same number of bits per region
+    /// and the same region size.
+    ///
+    /// # Arguments
+    ///
+    /// * `start`: The starting address of a memory region.
+    /// * `size`: The size of the memory region.
+    /// * `other`: The other metadata to copy from.
+    pub fn bcopy_metadata_contiguous(&self, start: Address, size: usize, other: &SideMetadataSpec) {
+        #[cfg(feature = "extreme_assertions")]
+        let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        #[cfg(feature = "extreme_assertions")]
+        sanity::verify_bcopy(self, start, size, other);
+
+        debug_assert_eq!(other.log_bytes_in_region, self.log_bytes_in_region);
+        debug_assert_eq!(other.log_num_of_bits, self.log_num_of_bits);
+
+        let dst_meta_start_addr = address_to_meta_address(self, start);
+        let dst_meta_start_bit = meta_byte_lshift(self, start);
+        let dst_meta_end_addr = address_to_meta_address(self, start + size);
+        let dst_meta_end_bit = meta_byte_lshift(self, start + size);
+
+        let src_meta_start_addr = address_to_meta_address(other, start);
+        let src_meta_start_bit = meta_byte_lshift(other, start);
+
+        debug_assert_eq!(dst_meta_start_bit, src_meta_start_bit);
+
+        let copy_bytes = |dst_start: Address, dst_end: Address| unsafe {
+            let byte_offset = dst_start - dst_meta_start_addr;
+            let src_start = src_meta_start_addr + byte_offset;
+            let size = dst_end - dst_start;
+            std::ptr::copy::<u8>(src_start.to_ptr(), dst_start.to_mut_ptr(), size);
+        };
+
+        let copy_bits = |dst: Address, start_bit: u8, end_bit: u8| {
+            let byte_offset = dst - dst_meta_start_addr;
+            let src = src_meta_start_addr + byte_offset;
+            // we are setting selected bits in one byte
+            let mask: u8 =
+                !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
+            let old_src = unsafe { src.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
+            let old_dst = unsafe { dst.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
+            let new = (old_src & mask) | (old_dst & !mask);
+            unsafe { dst.as_ref::<AtomicU8>() }.store(new, Ordering::Relaxed);
+        };
+
+        Self::update_meta_bits(
+            dst_meta_start_addr,
+            dst_meta_start_bit,
+            dst_meta_end_addr,
+            dst_meta_end_bit,
+            &copy_bytes,
+            &copy_bits,
+        );
+    }
+
     /// This is a wrapper method for implementing side metadata access. It does nothing other than
     /// calling the access function with no overhead, but in debug builds,
     /// it includes multiple checks to make sure the access is sane.

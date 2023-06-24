@@ -461,6 +461,65 @@ pub fn verify_bset(metadata_spec: &SideMetadataSpec, start: Address, size: usize
     }
 }
 
+/// Commits a side metadata bulk copy operation
+/// (set the bits to the corresponding bits of another metadata).
+/// Panics if the metadata spec is not valid.
+///
+/// The source and destination metadata must have the same granularity.
+///
+/// Arguments:
+/// * `dst_spec`: the metadata spec to bulk copy to
+/// * `start`: the starting address of the data
+/// * `size`: size of the data
+/// * `src_spec`: the metadata spec to bulk copy from
+#[cfg(feature = "extreme_assertions")]
+pub fn verify_bcopy(
+    dst_spec: &SideMetadataSpec,
+    start: Address,
+    size: usize,
+    src_spec: &SideMetadataSpec,
+) {
+    assert_eq!(src_spec.log_num_of_bits, dst_spec.log_num_of_bits);
+    assert_eq!(src_spec.log_bytes_in_region, dst_spec.log_bytes_in_region);
+
+    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+    let start = align_to_region_start(dst_spec, start);
+    let end = align_to_region_start(dst_spec, start + size);
+
+    // Rust doesn't like mutably borrowing two entries from `sanity_map` at the same time.
+    // So we load all values from `sanity_map[src_spec]` into an intermediate HashMap,
+    // and then store them to `sanity_map[dst_spec]`.
+
+    let mut tmp_map = HashMap::new();
+
+    {
+        let src_map = sanity_map
+            .get_mut(src_spec)
+            .expect("Invalid source Metadata Spec!");
+
+        let mut cursor = start;
+        let step: usize = 1 << src_spec.log_bytes_in_region;
+        while cursor < end {
+            let src_value = src_map.get(&cursor).copied().unwrap_or(0u64);
+            tmp_map.insert(cursor, src_value);
+            cursor += step;
+        }
+    }
+    {
+        let dst_map = sanity_map
+            .get_mut(dst_spec)
+            .expect("Invalid destination Metadata Spec!");
+
+        let mut cursor = start;
+        let step: usize = 1 << dst_spec.log_bytes_in_region;
+        while cursor < end {
+            let src_value = tmp_map.get(&cursor).copied().unwrap();
+            dst_map.insert(cursor, src_value);
+            cursor += step;
+        }
+    }
+}
+
 #[cfg(feature = "extreme_assertions")]
 use crate::util::metadata::metadata_val_traits::*;
 

@@ -6,6 +6,8 @@ use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
@@ -166,8 +168,6 @@ impl Block {
 
     /// Deinitalize a block before releasing.
     pub fn deinit(&self) {
-        #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
         self.set_state(BlockState::Unallocated);
     }
 
@@ -198,11 +198,17 @@ impl Block {
             match self.get_state() {
                 BlockState::Unallocated => false,
                 BlockState::Unmarked => {
+                    #[cfg(feature = "vo_bit")]
+                    vo_bit::helper::on_region_swept::<VM, _>(self, false);
+
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
                     true
                 }
                 BlockState::Marked => {
+                    #[cfg(feature = "vo_bit")]
+                    vo_bit::helper::on_region_swept::<VM, _>(self, true);
+
                     // The block is live.
                     false
                 }
@@ -224,9 +230,6 @@ impl Block {
                         holes += 1;
                     }
 
-                    #[cfg(feature = "vo_bit")]
-                    crate::util::metadata::vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
-
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);
 
@@ -235,6 +238,9 @@ impl Block {
             }
 
             if marked_lines == 0 {
+                #[cfg(feature = "vo_bit")]
+                vo_bit::helper::on_region_swept::<VM, _>(self, false);
+
                 // Release the block if non of its lines are marked.
                 space.release_block(*self);
                 true
@@ -254,7 +260,42 @@ impl Block {
                 mark_histogram[holes] += marked_lines;
                 // Record number of holes in block side metadata.
                 self.set_holes(holes);
+
+                #[cfg(feature = "vo_bit")]
+                vo_bit::helper::on_region_swept::<VM, _>(self, true);
+
                 false
+            }
+        }
+    }
+
+    /// Clear VO bits metadata for unmarked regions.
+    /// This is useful for clearing VO bits during nursery GC for StickyImmix
+    /// at which time young objects (allocated in unmarked regions) may die
+    /// but we always consider old objects (in marked regions) as live.
+    #[cfg(feature = "vo_bit")]
+    pub fn clear_vo_bits_for_unmarked_regions(&self, line_mark_state: Option<u8>) {
+        match line_mark_state {
+            None => {
+                match self.get_state() {
+                    BlockState::Unmarked => {
+                        // It may contain young objects.  Clear it.
+                        vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+                    }
+                    BlockState::Marked => {
+                        // It contains old objects.  Skip it.
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            Some(state) => {
+                // With lines.
+                for line in self.lines() {
+                    if !line.is_marked(state) {
+                        // It may contain young objects.  Clear it.
+                        vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                    }
+                }
             }
         }
     }

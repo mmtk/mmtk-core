@@ -229,6 +229,9 @@ pub enum WorkBucketStage {
     /// Preparation work.  Plans, spaces, GC workers, mutators, etc. should be prepared for GC at
     /// this stage.
     Prepare,
+    /// Clear the VO bit metadata.  Mainly used by ImmixSpace.
+    #[cfg(feature = "vo_bit")]
+    ClearVOBits,
     /// Compute the transtive closure following only strong references.
     Closure,
     /// Handle Java-style soft references, and potentially expand the transitive closure.
