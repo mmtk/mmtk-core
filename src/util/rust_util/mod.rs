@@ -125,3 +125,16 @@ mod initialize_once_tests {
         assert_eq!(INITIALIZE_COUNT.load(Ordering::SeqCst), 1);
     }
 }
+
+/// This implements `std::array::from_fn` introduced in Rust 1.63.
+/// We should replace this with the standard counterpart after bumping MSRV.
+pub(crate) fn array_from_fn<T, const N: usize, F>(cb: F) -> [T; N]
+where
+    F: FnMut(usize) -> T,
+{
+    let mut index_array = [0; N];
+    for (index, item) in index_array.iter_mut().enumerate() {
+        *item = index;
+    }
+    index_array.map(cb)
+}

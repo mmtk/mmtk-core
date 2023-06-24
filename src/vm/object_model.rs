@@ -100,6 +100,23 @@ pub trait ObjectModel<VM: VMBinding> {
     // TODO: Cleanup and place the LOS mark and nursery bits in the header. See here: https://github.com/mmtk/mmtk-core/issues/847
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
+    /// Set this to true if the VM binding requires the valid object (VO) bits to be available
+    /// during tracing. If this constant is set to `false`, it is undefined behavior if the binding
+    /// attempts to access VO bits during tracing.
+    ///
+    /// Note that the VO bits is always available during root scanning even if this flag is false,
+    /// which is suitable for using VO bits (and the `is_mmtk_object()` method) for conservative
+    /// stack scanning. However, if a binding is also conservative in finding references during
+    /// object scanning, they need to set this constant to `true`. See the comments of individual
+    /// methods in the `Scanning` trait.
+    ///
+    /// Depending on the internal implementation of mmtk-core, different strategies for handling
+    /// VO bits have different time/space overhead.  mmtk-core will choose the best strategy
+    /// according to the configuration of the VM binding, including this flag.  Currently, setting
+    /// this flag to true does not impose any additional overhead.
+    #[cfg(feature = "vo_bit")]
+    const NEED_VO_BITS_DURING_TRACING: bool = false;
+
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
     /// Returns the metadata value.

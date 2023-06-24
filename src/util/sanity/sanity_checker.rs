@@ -222,6 +222,14 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             trace!("Sanity mark object {}", object);
             self.nodes.enqueue(object);
         }
+
+        // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
+        // bit set when sanity GC starts.
+        #[cfg(feature = "vo_bit")]
+        if !crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object) {
+            panic!("VO bit is not set: {}", object);
+        }
+
         object
     }
 

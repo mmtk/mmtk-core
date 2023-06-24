@@ -5,11 +5,11 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
+use crate::util::rust_util::array_from_fn;
 use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
-use enum_map::Enum;
-use enum_map::{enum_map, EnumMap};
+use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -37,24 +37,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
-        let mut work_buckets = enum_map! {
-            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
-            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::VMRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::VMRefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
-        };
+        // TODO: Replace `array_from_fn` with `std::array::from_fn` after bumping MSRV.
+        let mut work_buckets = EnumMap::from_array(array_from_fn(|stage_num| {
+            let stage = WorkBucketStage::from_usize(stage_num);
+            let active = stage == WorkBucketStage::Unconstrained;
+            WorkBucket::new(active, worker_monitor.clone())
+        }));
 
         // Set the open condition of each bucket.
         {
