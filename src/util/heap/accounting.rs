@@ -36,7 +36,8 @@ impl PageAccounting {
     /// the allocation cannot be satisfied. We can call this to clear the number of reserved pages,
     /// so later we can reserve and attempt again.
     pub fn clear_reserved(&self, pages: usize) {
-        self.reserved.fetch_sub(pages, Ordering::Relaxed);
+        let _prev = self.reserved.fetch_sub(pages, Ordering::Relaxed);
+        debug_assert!(_prev >= pages);
     }
 
     /// Inform of successfully committing a certain number of pages. This is used after we have reserved
@@ -48,8 +49,11 @@ impl PageAccounting {
     /// Inform of releasing a certain number of pages. The number of pages will be deducted from
     /// both reserved and committed pages.
     pub fn release(&self, pages: usize) {
-        self.reserved.fetch_sub(pages, Ordering::Relaxed);
-        self.committed.fetch_sub(pages, Ordering::Relaxed);
+        let _prev_reserved = self.reserved.fetch_sub(pages, Ordering::Relaxed);
+        debug_assert!(_prev_reserved >= pages);
+
+        let _prev_committed = self.committed.fetch_sub(pages, Ordering::Relaxed);
+        debug_assert!(_prev_committed >= pages);
     }
 
     /// Set both reserved and committed pages to zero. This is only used when we completely clear a space.

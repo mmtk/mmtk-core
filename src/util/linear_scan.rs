@@ -1,27 +1,30 @@
-use crate::util::alloc_bit;
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-/// Iterate over an address range, and find each object by alloc bit.
-/// ATOMIC_LOAD_ALLOC_BIT can be set to false if it is known that loading alloc bit
+// FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
+// It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
+// In the future, we should let MarkCompact do linear scanning using its local metadata instead.
+
+/// Iterate over an address range, and find each object by VO bit.
+/// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit
 /// non-atomically is correct (e.g. a single thread is scanning this address range, and
-/// it is the only thread that accesses alloc bit).
-pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool>
-{
+/// it is the only thread that accesses VO bit).
+pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> {
     start: Address,
     end: Address,
     cursor: Address,
     _p: PhantomData<(VM, S)>,
 }
 
-impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool>
-    ObjectIterator<VM, S, ATOMIC_LOAD_ALLOC_BIT>
+impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
+    ObjectIterator<VM, S, ATOMIC_LOAD_VO_BIT>
 {
     /// Create an iterator for the address range. The caller must ensure
-    /// that the alloc bit metadata is mapped for the address range.
+    /// that the VO bit metadata is mapped for the address range.
     pub fn new(start: Address, end: Address) -> Self {
         debug_assert!(start < end);
         ObjectIterator {
@@ -33,17 +36,17 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool>
     }
 }
 
-impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> std::iter::Iterator
-    for ObjectIterator<VM, S, ATOMIC_LOAD_ALLOC_BIT>
+impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std::iter::Iterator
+    for ObjectIterator<VM, S, ATOMIC_LOAD_VO_BIT>
 {
     type Item = ObjectReference;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
-            let is_object = if ATOMIC_LOAD_ALLOC_BIT {
-                alloc_bit::is_alloced_object::<VM>(self.cursor)
+            let is_object = if ATOMIC_LOAD_VO_BIT {
+                vo_bit::is_vo_bit_set_for_addr::<VM>(self.cursor)
             } else {
-                unsafe { alloc_bit::is_alloced_object_unsafe::<VM>(self.cursor) }
+                unsafe { vo_bit::is_vo_bit_set_unsafe::<VM>(self.cursor) }
             };
 
             if let Some(object) = is_object {
@@ -67,7 +70,6 @@ pub trait LinearScanObjectSize {
 /// Default object size as ObjectModel::get_current_size()
 pub struct DefaultObjectSize<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
-    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
     }
@@ -86,45 +88,37 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     fn start(&self) -> Address;
 
     /// Create a region from an arbitrary address.
-    #[inline(always)]
     fn from_unaligned_address(address: Address) -> Self {
         Self::from_aligned_address(Self::align(address))
     }
 
     /// Align the address to the region.
-    #[inline(always)]
     fn align(address: Address) -> Address {
         address.align_down(Self::BYTES)
     }
     /// Check if an address is aligned to the region.
-    #[inline(always)]
     fn is_aligned(address: Address) -> bool {
         address.is_aligned_to(Self::BYTES)
     }
 
     /// Return the end address of the region. Note that the end address is not in the region.
-    #[inline(always)]
     fn end(&self) -> Address {
         self.start() + Self::BYTES
     }
     /// Return the next region after this one.
-    #[inline(always)]
     fn next(&self) -> Self {
         self.next_nth(1)
     }
     /// Return the next nth region after this one.
-    #[inline(always)]
     fn next_nth(&self, n: usize) -> Self {
         debug_assert!(self.start().as_usize() < usize::MAX - (n << Self::LOG_BYTES));
         Self::from_aligned_address(self.start() + (n << Self::LOG_BYTES))
     }
     /// Return the region that contains the object (by its cell address).
-    #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
         Self::from_unaligned_address(object.to_address::<VM>())
     }
     /// Check if the given address is in the region.
-    #[inline(always)]
     fn includes_address(&self, addr: Address) -> bool {
         Self::align(addr) == self.start()
     }
@@ -171,13 +165,11 @@ mod tests {
     impl Region for Page {
         const LOG_BYTES: usize = LOG_BYTES_IN_PAGE as usize;
 
-        #[inline(always)]
         fn from_aligned_address(address: Address) -> Self {
             debug_assert!(address.is_aligned_to(Self::BYTES));
             Self(address)
         }
 
-        #[inline(always)]
         fn start(&self) -> Address {
             self.0
         }

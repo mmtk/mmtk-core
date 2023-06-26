@@ -57,12 +57,6 @@ use crate::vm::VMBinding;
 /// and for a third SideMetadataSpec (`LS3`), the `offset` will be `BASE(LS2) + required_metadata_space_per_chunk(LS2)`.
 ///
 /// For all other policies, the `offset` starts from zero. This is safe because no two policies ever manage one chunk, so there will be no overlap.
-///
-/// [`HeaderMetadataSpec`]: ../util/metadata/header_metadata/struct.HeaderMetadataSpec.html
-/// [`SideMetadataSpec`]:   ../util/metadata/side_metadata/strutc.SideMetadataSpec.html
-/// [`header_metadata`]:    ../util/metadata/header_metadata/index.html
-/// [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`]: ../util/metadata/side_metadata/constant.GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS.html
-/// [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`]:  ../util/metadata/side_metadata/constant.LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.html
 pub trait ObjectModel<VM: VMBinding> {
     // Per-object Metadata Spec definitions go here
     //
@@ -70,22 +64,58 @@ pub trait ObjectModel<VM: VMBinding> {
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
     // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
-    /// The metadata specification of the global log bit. 1 bit.
+    /// A global 1-bit metadata used by generational plans to track cross-generational pointers. It is generally
+    /// located in side metadata.
+    ///
     /// Note that for this bit, 0 represents logged (default), and 1 represents unlogged.
     /// This bit is also referred to as unlogged bit in Java MMTk for this reason.
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
 
-    /// The metadata specification for the forwarding pointer, used by copying plans. Word size.
+    /// A local word-size metadata for the forwarding pointer, used by copying plans. It is almost always
+    /// located in the object header as it is fine to destroy an object header in order to copy it.
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
-    /// The metadata specification for the forwarding status bits, used by copying plans. 2 bits.
+
+    /// A local 2-bit metadata for the forwarding status bits, used by copying plans. If your runtime requires
+    /// word-aligned addresses (i.e. 4- or 8-bytes), you can use the last two bits in the object header to store
+    /// the forwarding bits. Note that you must be careful if you place this in the header as the runtime may
+    /// be using those bits for some other reason.
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
-    /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
+
+    /// A local 1-bit metadata for the mark bit, used by most plans that need to mark live objects. Like with the
+    /// [forwarding bits](crate::vm::ObjectModel::LOCAL_FORWARDING_BITS_SPEC), you can often steal the last bit in
+    /// the object header (due to alignment requirements) for the mark bit. Though some bindings such as the
+    /// OpenJDK binding prefer to have the mark bits in side metadata to allow for bulk operations.
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
+
     #[cfg(feature = "object_pinning")]
-    /// The metadata specification for the pinning bit, used by most plans that need to pin objects. 1 bit.
+    /// A local 1-bit metadata specification for the pinning bit, used by plans that need to pin objects. It is
+    /// generally in side metadata.
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec;
-    /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
+
+    /// A local 2-bit metadata used by the large object space to mark objects and set objects as "newly allocated".
+    /// Used by any plan with large object allocation. It is generally in the header as we can add an extra word
+    /// before the large object to store this metadata. This is fine as the metadata size is insignificant in
+    /// comparison to the object size.
+    //
+    // TODO: Cleanup and place the LOS mark and nursery bits in the header. See here: https://github.com/mmtk/mmtk-core/issues/847
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
+
+    /// Set this to true if the VM binding requires the valid object (VO) bits to be available
+    /// during tracing. If this constant is set to `false`, it is undefined behavior if the binding
+    /// attempts to access VO bits during tracing.
+    ///
+    /// Note that the VO bits is always available during root scanning even if this flag is false,
+    /// which is suitable for using VO bits (and the `is_mmtk_object()` method) for conservative
+    /// stack scanning. However, if a binding is also conservative in finding references during
+    /// object scanning, they need to set this constant to `true`. See the comments of individual
+    /// methods in the `Scanning` trait.
+    ///
+    /// Depending on the internal implementation of mmtk-core, different strategies for handling
+    /// VO bits have different time/space overhead.  mmtk-core will choose the best strategy
+    /// according to the configuration of the VM binding, including this flag.  Currently, setting
+    /// this flag to true does not impose any additional overhead.
+    #[cfg(feature = "vo_bit")]
+    const NEED_VO_BITS_DURING_TRACING: bool = false;
 
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
@@ -99,7 +129,6 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
-    #[inline(always)]
     unsafe fn load_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -118,7 +147,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: is a reference to the target object.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the atomic ordering for the load operation.
-    #[inline(always)]
     fn load_metadata_atomic<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -140,7 +168,6 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Safety
     /// This is a non-atomic store, thus not thread-safe.
-    #[inline(always)]
     unsafe fn store_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -160,7 +187,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the optional atomic ordering for the store operation.
-    #[inline(always)]
     fn store_metadata_atomic<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -184,7 +210,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `success_order`: is the atomic ordering used if the operation is successful.
     /// * `failure_order`: is the atomic ordering used if the operation fails.
-    #[inline(always)]
     fn compare_exchange_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -215,7 +240,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    #[inline(always)]
     fn fetch_add_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -236,7 +260,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    #[inline(always)]
     fn fetch_sub_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -256,7 +279,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-and with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    #[inline(always)]
     fn fetch_and_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -276,7 +298,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    #[inline(always)]
     fn fetch_or_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -298,7 +319,6 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
     /// # Returns the old metadata value.
-    #[inline(always)]
     fn fetch_update_metadata<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
@@ -367,7 +387,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `object`: The object to be queried.
-    fn get_align_offset_when_copied(object: ObjectReference) -> isize;
+    fn get_align_offset_when_copied(object: ObjectReference) -> usize;
 
     /// Get the type descriptor for an object.
     ///
@@ -446,6 +466,12 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Arguments:
     /// * `object`: The object to be dumped.
     fn dump_object(object: ObjectReference);
+
+    /// Return if an object is valid from the runtime point of view. This is used
+    /// to debug MMTk.
+    fn is_object_sane(_object: ObjectReference) -> bool {
+        true
+    }
 }
 
 pub mod specs {
@@ -504,7 +530,6 @@ pub mod specs {
                         log_bytes_in_region: $side_min_obj_size as usize,
                     }))
                 }
-                #[inline(always)]
                 pub const fn as_spec(&self) -> &MetadataSpec {
                     &self.0
                 }
@@ -514,7 +539,6 @@ pub mod specs {
             }
             impl std::ops::Deref for $spec_name {
                 type Target = MetadataSpec;
-                #[inline(always)]
                 fn deref(&self) -> &Self::Target {
                     self.as_spec()
                 }

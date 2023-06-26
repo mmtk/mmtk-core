@@ -3,19 +3,12 @@ use std::sync::Arc;
 use atomic::Ordering;
 
 use crate::{
-    policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef, space::SpaceOptions},
+    policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef},
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
-        heap::{
-            layout::heap_layout::{Mmapper, VMMap},
-            FreeListPageResource, HeapMeta, VMRequest,
-        },
-        metadata::{
-            self,
-            side_metadata::{SideMetadataContext, SideMetadataSpec},
-            MetadataSpec,
-        },
+        heap::FreeListPageResource,
+        metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
     vm::VMBinding,
@@ -78,6 +71,23 @@ impl AbandonedBlockLists {
             i += 1;
         }
     }
+
+    fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
+        for i in 0..MI_BIN_FULL {
+            self.available[i].sweep_blocks(space);
+            self.consumed[i].sweep_blocks(space);
+            self.unswept[i].sweep_blocks(space);
+
+            // As we have swept blocks, move blocks in the unswept list to available or consumed list.
+            while let Some(block) = self.unswept[i].pop() {
+                if block.has_free_cells() {
+                    self.available[i].push(block);
+                } else {
+                    self.consumed[i].push(block);
+                }
+            }
+        }
+    }
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -114,14 +124,13 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(
@@ -181,22 +190,17 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
 pub const MAX_OBJECT_SIZE: usize = crate::policy::marksweepspace::native_ms::MI_LARGE_OBJ_SIZE_MAX;
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
+    // Allow ptr_arg as we want to keep the function signature the same as for malloc marksweep
+    #[allow(clippy::ptr_arg)]
     pub fn extend_global_side_metadata_specs(_specs: &mut Vec<SideMetadataSpec>) {
         // MarkSweepSpace does not need any special global specs. This method exists, as
         // we need this method for MallocSpace, and we want those two spaces to be used interchangably.
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> MarkSweepSpace<VM> {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> MarkSweepSpace<VM> {
+        let scheduler = args.scheduler.clone();
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = {
             metadata::extract_side_metadata(&vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
@@ -214,26 +218,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ])
         };
-
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: false,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
         MarkSweepSpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 FreeListPageResource::new_discontiguous(vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
@@ -276,7 +263,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
     }
 
-    #[inline]
     pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
         Block::NEXT_BLOCK_TABLE
     }
@@ -298,8 +284,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let work_packets = self.generate_sweep_tasks();
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
 
-        let mut abandoned = self.abandoned.lock().unwrap();
-        abandoned.move_consumed_to_unswept();
+        if cfg!(feature = "eager_sweeping") {
+            // For eager sweeping, we have to sweep the lists that are abandoned to these global lists.
+            let mut abandoned = self.abandoned.lock().unwrap();
+            abandoned.sweep(self);
+        } else {
+            // For lazy sweeping, we just move blocks from consumed to unswept. When an allocator tries
+            // to use them, they will sweep the block.
+            let mut abandoned = self.abandoned.lock().unwrap();
+            abandoned.move_consumed_to_unswept();
+        }
     }
 
     /// Release a block.
@@ -314,8 +308,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         for metadata_spec in Block::METADATA_SPECS {
             metadata_spec.set_zero_atomic(block.start(), Ordering::SeqCst);
         }
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
     pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
@@ -366,7 +360,6 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
         // number of allocated blocks.

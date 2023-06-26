@@ -28,17 +28,17 @@ use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
-/// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
+/// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
 ///
 /// We expect a binding to ininitialize MMTk in the following steps:
 ///
-/// 1. Create an [MMTKBuilder](../mmtk/struct.MMTKBuilder.html) instance.
-/// 2. Set command line options for MMTKBuilder by [process()](./fn.process.html) or [process_bulk()](./fn.process_bulk.html).
+/// 1. Create an [`crate::MMTKBuilder`] instance.
+/// 2. Set command line options for MMTKBuilder by [`crate::memory_manager::process`] or [`crate::memory_manager::process_bulk`].
 /// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
 ///    supported. Currently we assume a binding will only need one MMTk instance.
-/// 4. Enable garbage collection in MMTk by [enable_collection()](./fn.enable_collection.html). A binding should only call this once its
+/// 4. Enable garbage collection in MMTk by [`crate::memory_manager::enable_collection`]. A binding should only call this once its
 ///    thread system is ready. MMTk will not trigger garbage collection before this call.
 ///
 /// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
@@ -78,17 +78,27 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
         }
     }
     let mmtk = builder.build();
-    info!("Initialized MMTk with {:?}", *mmtk.options.plan);
+
+    info!(
+        "Initialized MMTk with {:?} ({:?})",
+        *mmtk.options.plan, *mmtk.options.gc_trigger
+    );
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
     Box::new(mmtk)
+}
+
+#[cfg(feature = "vm_space")]
+pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
+    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
 }
 
 /// Request MMTk to create a mutator for the given thread. The ownership
 /// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its
 /// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage
 /// that can be accessed efficiently. A VM may also copy and embed the mutator stucture to a thread-local data
-/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied).
+/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied --
+/// Note that `Mutator` may contain pointers so a binding may drop the box only if they perform a deep copy).
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -127,18 +137,20 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// Allocate memory for an object. For performance reasons, a VM should
 /// implement the allocation fast-path on their side rather than just calling this function.
 ///
+/// If the VM provides a non-zero `offset` parameter, then the returned address will be
+/// such that the `RETURNED_ADDRESS + offset` is aligned to the `align` parameter.
+///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
 /// * `size`: The number of bytes required for the object.
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
-#[inline(always)]
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
-    offset: isize,
+    offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
     // MMTk has assumptions about minimal object size.
@@ -167,7 +179,6 @@ pub fn alloc<VM: VMBinding>(
 /// * `refer`: The newly allocated object.
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
-#[inline(always)]
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     refer: ObjectReference,
@@ -191,7 +202,6 @@ pub fn post_alloc<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-#[inline(always)]
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -216,7 +226,6 @@ pub fn object_reference_write<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-#[inline(always)]
 pub fn object_reference_write_pre<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -243,7 +252,6 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
-#[inline(always)]
 pub fn object_reference_write_post<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -270,7 +278,6 @@ pub fn object_reference_write_post<VM: VMBinding>(
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-#[inline(always)]
 pub fn memory_region_copy<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: VM::VMMemorySlice,
@@ -296,7 +303,6 @@ pub fn memory_region_copy<VM: VMBinding>(
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-#[inline(always)]
 pub fn memory_region_copy_pre<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: VM::VMMemorySlice,
@@ -322,7 +328,6 @@ pub fn memory_region_copy_pre<VM: VMBinding>(
 /// * `dst`: Destination memory slice to copy to.
 ///
 /// The size of `src` and `dst` shoule be equal
-#[inline(always)]
 pub fn memory_region_copy_post<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: VM::VMMemorySlice,
@@ -416,7 +421,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     );
 
     let plan = mmtk.get_plan();
-    if plan.should_trigger_gc_when_heap_is_full() && plan.poll(false, None) {
+    if plan.should_trigger_gc_when_heap_is_full() && plan.base().gc_trigger.poll(false, None) {
         debug!("Collection required");
         assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
         VM::VMCollection::block_for_gc(tls);
@@ -570,7 +575,7 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
 pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    mmtk.plan.handle_user_collection_request(tls, false);
+    mmtk.plan.handle_user_collection_request(tls, false, false);
 }
 
 /// Is the object alive?
@@ -589,20 +594,20 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// 2.  Also return true if there exists an `objref: ObjectReference` such that
 ///     -   `objref` is a valid object reference to an object in any space in MMTk, and
 ///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(ALLOC_BIT_REGION_SIZE)` and
-///         -   `hi = lo + ALLOC_BIT_REGION_SIZE` and
-///         -   `ALLOC_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
-///             It is the byte granularity of the alloc bit.
+///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
+///         -   `hi = lo + VO_BIT_REGION_SIZE` and
+///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
+///             It is the byte granularity of the valid object (VO) bit.
 /// 3.  Return false otherwise.  This function never panics.
 ///
 /// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the "alloc bits" side metadata, i.e. a bitmap.
+/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
 /// For space efficiency, each bit of the bitmap governs a small region of memory.
 /// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
 /// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
 /// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
 /// The alignment of a region is also the region size.
-/// If an alloc bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
+/// If a VO bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
 /// is the valid object reference.
 /// Therefore, if the input `addr` is not properly aligned, but is close to a valid object
 /// reference, this function may still return true.
@@ -610,7 +615,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
 /// function.  For most VMs, valid object references are always aligned to the word size, so
 /// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
-/// always check against [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
+/// always check against [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
@@ -625,7 +630,6 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 #[cfg(feature = "is_mmtk_object")]
 pub fn is_mmtk_object(addr: Address) -> bool {
     use crate::mmtk::SFT_MAP;
-    use crate::policy::sft_map::SFTMap;
     SFT_MAP.get_checked(addr).is_mmtk_object(addr)
 }
 
@@ -659,7 +663,6 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// * `object`: The object reference to query.
 pub fn is_in_mmtk_spaces<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
-    use crate::policy::sft_map::SFTMap;
     if object.is_null() {
         return false;
     }
@@ -771,7 +774,6 @@ pub fn add_finalizer<VM: VMBinding>(
 #[cfg(feature = "object_pinning")]
 pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
-    use crate::policy::sft_map::SFTMap;
     SFT_MAP
         .get_checked(object.to_address::<VM>())
         .pin_object(object)
@@ -786,7 +788,6 @@ pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 #[cfg(feature = "object_pinning")]
 pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
-    use crate::policy::sft_map::SFTMap;
     SFT_MAP
         .get_checked(object.to_address::<VM>())
         .unpin_object(object)
@@ -799,7 +800,6 @@ pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 #[cfg(feature = "object_pinning")]
 pub fn is_pinned<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
-    use crate::policy::sft_map::SFTMap;
     SFT_MAP
         .get_checked(object.to_address::<VM>())
         .is_object_pinned(object)
@@ -904,10 +904,4 @@ pub fn add_work_packets<VM: VMBinding>(
     packets: Vec<Box<dyn GCWork<VM>>>,
 ) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
-}
-
-/// Add a callback to be notified after the transitive closure is finished.
-/// The callback should return true if it add more work packets to the closure bucket.
-pub fn on_closure_end<VM: VMBinding>(mmtk: &'static MMTK<VM>, f: Box<dyn Send + Fn() -> bool>) {
-    mmtk.scheduler.on_closure_end(f)
 }

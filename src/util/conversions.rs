@@ -67,7 +67,7 @@ pub fn pages_to_bytes(pages: usize) -> usize {
 
 /// Convert size in bytes to the number of pages (aligned up)
 pub fn bytes_to_pages_up(bytes: usize) -> usize {
-    (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_PAGE
+    raw_align_up(bytes, BYTES_IN_PAGE) >> LOG_BYTES_IN_PAGE
 }
 
 pub fn bytes_to_pages(bytes: usize) -> usize {
@@ -102,7 +102,7 @@ pub fn bytes_to_formatted_string(bytes: usize) -> String {
         num = new_num;
         i += 1;
     }
-    return format!("{}{}", num, UNITS.last().unwrap());
+    format!("{}{}", num, UNITS.last().unwrap())
 }
 
 #[cfg(test)]

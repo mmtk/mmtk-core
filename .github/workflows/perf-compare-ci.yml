@@ -11,6 +11,11 @@ on:
         description: The pull request number to run the perf tests. The workflow compares the specified pull request with the trunk.
         required: true
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
     # Figure out binding PRs.
     binding-refs:
@@ -20,7 +25,7 @@ jobs:
 
     # Figure out the core PR. We need to get the specific commit and repo from a pull request number.
     mmtk-refs:
-      runs-on: ubuntu-18.04
+      runs-on: ubuntu-22.04
       outputs:
         mmtk_repo: ${{ steps.print.outputs.mmtk_repo }}
         mmtk-ref: ${{ steps.print.outputs.mmtk_ref }}

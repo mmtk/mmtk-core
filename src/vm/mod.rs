@@ -20,7 +20,7 @@ use crate::util::constants::*;
 mod active_plan;
 mod collection;
 pub mod edge_shape;
-mod object_model;
+pub(crate) mod object_model;
 mod reference_glue;
 mod scanning;
 pub use self::active_plan::ActivePlan;
@@ -32,6 +32,7 @@ pub use self::reference_glue::Finalizable;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::EdgeVisitor;
 pub use self::scanning::ObjectTracer;
+pub use self::scanning::ObjectTracerContext;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 

@@ -86,7 +86,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         allocator: AllocationSemantics,
     ) -> Address {
         unsafe {
@@ -116,14 +116,12 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     }
 
     /// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
-    #[inline(always)]
     unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B {
         debug_assert!(self.barrier().is::<B>());
         let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
         &mut *payload
     }
 
-    #[inline(always)]
     fn barrier(&mut self) -> &mut dyn Barrier<VM> {
         &mut *self.barrier
     }
@@ -163,7 +161,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
     fn post_alloc(&mut self, refer: ObjectReference, bytes: usize, allocator: AllocationSemantics);

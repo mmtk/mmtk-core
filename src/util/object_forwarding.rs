@@ -81,8 +81,6 @@ pub fn forward_object<VM: VMBinding>(
     copy_context: &mut GCWorkerCopyContext<VM>,
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    #[cfg(feature = "global_alloc_bit")]
-    crate::util::alloc_bit::set_alloc_bit::<VM>(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
@@ -94,7 +92,7 @@ pub fn forward_object<VM: VMBinding>(
         write_forwarding_pointer::<VM>(object, new_object);
         VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
             object,
-            FORWARDED as u8,
+            FORWARDED,
             None,
             Ordering::SeqCst,
         );
@@ -103,7 +101,6 @@ pub fn forward_object<VM: VMBinding>(
 }
 
 /// Return the forwarding bits for a given `ObjectReference`.
-#[inline]
 pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
     VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(
         object,

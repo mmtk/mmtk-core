@@ -1,11 +1,16 @@
+use crate::plan::PlanConstraints;
+use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::{
+    SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
+};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
+use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
@@ -16,19 +21,17 @@ use crate::mmtk::SFT_MAP;
 #[cfg(debug_assertions)]
 use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
-use crate::policy::sft_map::SFTMap;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::map::Map;
+use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::layout::Mmapper as IMmapper;
+use crate::util::heap::layout::Mmapper;
+use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
-
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use downcast_rs::Downcast;
@@ -60,10 +63,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        if should_poll && VM::VMActivePlan::global().poll(false, Some(self.as_space())) {
+        if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+
+            // Clear the request, and inform GC trigger about the pending allocation.
             pr.clear_request(pages_reserved);
+            self.get_gc_trigger()
+                .policy
+                .on_pending_allocation(pages_reserved);
+
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
@@ -168,9 +177,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         "Physical allocation failed when GC is not allowed!"
                     );
 
-                    let gc_performed = VM::VMActivePlan::global().poll(true, Some(self.as_space()));
+                    let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
+
+                    // Clear the request, and inform GC trigger about the pending allocation.
                     pr.clear_request(pages_reserved);
+                    self.get_gc_trigger()
+                        .policy
+                        .on_pending_allocation(pages_reserved);
+
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
@@ -248,7 +263,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             panic!("failed to mmap meta memory");
         }
 
-        use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
             .mark_as_mapped(self.common().start, self.common().extent);
@@ -270,6 +284,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn common(&self) -> &CommonSpace<VM>;
+    fn get_gc_trigger(&self) -> &GCTrigger<VM> {
+        self.common().gc_trigger.as_ref()
+    }
 
     fn release_multiple_pages(&mut self, start: Address);
 
@@ -374,8 +391,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
     pub head_discontiguous_region: Address,
 
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
+    pub vm_map: &'static dyn VMMap,
+    pub mmapper: &'static dyn Mmapper,
 
     pub metadata: SideMetadataContext,
 
@@ -386,47 +403,78 @@ pub struct CommonSpace<VM: VMBinding> {
     /// A lock used during acquire() to make sure only one thread can allocate.
     pub acquire_lock: Mutex<()>,
 
+    pub gc_trigger: Arc<GCTrigger<VM>>,
+
     p: PhantomData<VM>,
 }
 
-pub struct SpaceOptions {
-    pub name: &'static str,
+/// Arguments passed from a policy to create a space. This includes policy specific args.
+pub struct PolicyCreateSpaceArgs<'a, VM: VMBinding> {
+    pub plan_args: PlanCreateSpaceArgs<'a, VM>,
     pub movable: bool,
     pub immortal: bool,
+    pub local_side_metadata_specs: Vec<SideMetadataSpec>,
+}
+
+/// Arguments passed from a plan to create a space.
+pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
+    pub name: &'static str,
     pub zeroed: bool,
-    pub needs_log_bit: bool,
     pub vmrequest: VMRequest,
-    pub side_metadata_specs: SideMetadataContext,
+    pub global_side_metadata_specs: Vec<SideMetadataSpec>,
+    pub vm_map: &'static dyn VMMap,
+    pub mmapper: &'static dyn Mmapper,
+    pub heap: &'a mut HeapMeta,
+    pub constraints: &'a PlanConstraints,
+    pub gc_trigger: Arc<GCTrigger<VM>>,
+    pub scheduler: Arc<GCWorkScheduler<VM>>,
+    pub options: &'a Options,
+}
+
+impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
+    /// Turning PlanCreateSpaceArgs into a PolicyCreateSpaceArgs
+    pub fn into_policy_args(
+        self,
+        movable: bool,
+        immortal: bool,
+        policy_metadata_specs: Vec<SideMetadataSpec>,
+    ) -> PolicyCreateSpaceArgs<'a, VM> {
+        PolicyCreateSpaceArgs {
+            movable,
+            immortal,
+            local_side_metadata_specs: policy_metadata_specs,
+            plan_args: self,
+        }
+    }
 }
 
 impl<VM: VMBinding> CommonSpace<VM> {
-    pub fn new(
-        opt: SpaceOptions,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-    ) -> Self {
+    pub fn new(args: PolicyCreateSpaceArgs<VM>) -> Self {
         let mut rtn = CommonSpace {
-            name: opt.name,
+            name: args.plan_args.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
-            vmrequest: opt.vmrequest,
+            vmrequest: args.plan_args.vmrequest,
             copy: None,
-            immortal: opt.immortal,
-            movable: opt.movable,
+            immortal: args.immortal,
+            movable: args.movable,
             contiguous: true,
-            zeroed: opt.zeroed,
+            zeroed: args.plan_args.zeroed,
             start: unsafe { Address::zero() },
             extent: 0,
             head_discontiguous_region: unsafe { Address::zero() },
-            vm_map,
-            mmapper,
-            needs_log_bit: opt.needs_log_bit,
-            metadata: opt.side_metadata_specs,
-            p: PhantomData,
+            vm_map: args.plan_args.vm_map,
+            mmapper: args.plan_args.mmapper,
+            needs_log_bit: args.plan_args.constraints.needs_log_bit,
+            gc_trigger: args.plan_args.gc_trigger,
+            metadata: SideMetadataContext {
+                global: args.plan_args.global_side_metadata_specs,
+                local: args.local_side_metadata_specs,
+            },
             acquire_lock: Mutex::new(()),
+            p: PhantomData,
         };
 
-        let vmrequest = opt.vmrequest;
+        let vmrequest = args.plan_args.vmrequest;
         if vmrequest.is_discontiguous() {
             rtn.contiguous = false;
             // FIXME
@@ -442,10 +490,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 top: _top,
             } => (_extent, _top),
             VMRequest::Fixed {
-                extent: _extent,
-                top: _top,
-                ..
-            } => (_extent, _top),
+                extent: _extent, ..
+            } => (_extent, false),
             _ => unreachable!(),
         };
 
@@ -461,7 +507,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         } else {
             // FIXME
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            heap.reserve(extent, top)
+            args.plan_args.heap.reserve(extent, top)
         };
         assert!(
             start == chunk_align_up(start),
@@ -476,7 +522,22 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // FIXME
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-        vm_map.insert(start, extent, rtn.descriptor);
+
+        // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
+        // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
+        // insert into our vm map if the range overlaps with our heap.
+        {
+            use crate::util::heap::layout;
+            let overlap =
+                Address::range_intersection(&(start..start + extent), &layout::available_range());
+            if !overlap.is_empty() {
+                args.plan_args.vm_map.insert(
+                    overlap.start,
+                    overlap.end - overlap.start,
+                    rtn.descriptor,
+                );
+            }
+        }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
         if rtn
@@ -512,7 +573,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
     }
 
-    pub fn vm_map(&self) -> &'static VMMap {
+    pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
     }
 }

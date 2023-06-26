@@ -3,9 +3,9 @@ use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
-use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -15,20 +15,15 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(not(feature = "global_alloc_bit"))]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+#[cfg(not(feature = "vo_bit"))]
+use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -66,6 +61,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         &self.common.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.common.base
+    }
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
@@ -81,7 +80,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -126,10 +125,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
 
-            // VM-specific weak ref processing
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
-
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
                 .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
@@ -151,6 +146,17 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
                 .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }
+
+        // VM-specific weak ref processing
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new()));
+
+        // VM-specific weak ref forwarding
+        scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
+            .add(VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new());
+
+        // VM-specific work after forwarding, possible to implement ref enququing.
+        scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
 
         // Analysis GC work
         #[cfg(feature = "analysis")]
@@ -177,38 +183,29 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        // if vo_bit is enabled, VO_BIT_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
-        #[cfg(feature = "global_alloc_bit")]
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        // if global_alloc_bit is NOT enabled,
-        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
-        #[cfg(not(feature = "global_alloc_bit"))]
-        let global_metadata_specs =
-            SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
+        #[cfg(feature = "vo_bit")]
+        let global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        // if vo_bit is NOT enabled,
+        // we need to add VO_BIT_SIDE_METADATA_SPEC to SideMetadataContext here.
+        #[cfg(not(feature = "vo_bit"))]
+        let global_side_metadata_specs =
+            SideMetadataContext::new_global_specs(&[VO_BIT_SIDE_METADATA_SPEC]);
 
-        let mc_space = MarkCompactSpace::new(
-            "mark_compact_space",
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &MARKCOMPACT_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
+
+        let mc_space =
+            MarkCompactSpace::new(plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
 
         let res = MarkCompact {
             mc_space,
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &MARKCOMPACT_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

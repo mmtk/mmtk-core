@@ -2,7 +2,7 @@
 //!
 //! This module is designed to enable the implementation of a wide range of GC algorithms for VMs with various combinations of in-object and on-side space for GC-specific metadata (e.g. forwarding bits, marking bit, logging bit, etc.).
 //!
-//! The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. alloc-bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.
+//! The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. VO bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.
 //!
 //! MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the ['ObjectModel'](crate::vm::ObjectModel).
 //!
@@ -227,5 +227,6 @@ pub use metadata_val_traits::*;
 pub(crate) mod log_bit;
 pub(crate) mod mark_bit;
 pub(crate) mod pin_bit;
+pub(crate) mod vo_bit;
 
 pub use global::*;

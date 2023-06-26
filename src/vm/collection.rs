@@ -12,15 +12,6 @@ pub enum GCThreadContext<VM: VMBinding> {
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
-    /// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.
-    /// If false, any GC thread can call these methods.
-    ///
-    /// This constant exists because some VMs require the thread that resumes a thread to be the same thread that
-    /// stopped it.  The MMTk Core will use the appropriate thread to stop or start the world according to the value of
-    /// this constant.  If a VM does not have such a requirement, the VM binding shall set this to false to reduce an
-    /// unnecessary context switch.
-    const COORDINATOR_ONLY_STW: bool = true;
-
     /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
     /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
@@ -98,9 +89,26 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the current GC thread.
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
-    /// Inform the VM to do its VM-specific release work at the end of a GC.
-    fn vm_release() {}
-
-    /// Delegate to the VM binding for reference processing.
-    fn process_weak_refs(_worker: &mut GCWorker<VM>) {} // FIXME: Add an appropriate factory/callback parameter.
+    /// A hook for the VM to do work after forwarding objects.
+    ///
+    /// This function is called after all of the following have finished:
+    /// -   The life and death of objects are determined.  Objects determined to be live will not
+    ///     be reclaimed in this GC.
+    /// -   Live objects have been moved to their destinations. (copying GC only)
+    /// -   References in objects have been updated to point to new addresses. (copying GC only)
+    ///
+    /// And this function may run concurrently with the release work of GC, i.e. freeing the space
+    /// occupied by dead objects.
+    ///
+    /// It is safe for the VM to read and write object fields at this time, although GC has not
+    /// finished yet.  GC will be reclaiming spaces of dead objects, but will not damage live
+    /// objects.  However, the VM cannot allocate new objects at this time.
+    ///
+    /// One possible use of this hook is enqueuing `{Soft,Weak,Phantom}Reference` instances to
+    /// reference queues (for Java).  VMs (including JVM implementations) do not have to handle
+    /// weak references this way, but mmtk-core provides this opportunity.
+    ///
+    /// Arguments:
+    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
+    fn post_forwarding(_tls: VMWorkerThread) {}
 }

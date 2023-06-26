@@ -36,8 +36,8 @@ mod jemalloc {
 
 #[cfg(feature = "malloc_mimalloc")]
 mod mimalloc {
-    // MiMalloc 64K Page
-    pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = 16;
+    // Normal 4K page accounting
+    pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;
     // ANSI C
     pub use mimalloc_sys::{
         mi_calloc as calloc, mi_free as free, mi_malloc as malloc, mi_realloc as realloc,
@@ -74,5 +74,12 @@ mod libc_malloc {
     // Posix
     pub use libc::posix_memalign;
     // GNU
+    #[cfg(target_os = "linux")]
     pub use libc::malloc_usable_size;
+    #[cfg(target_os = "macos")]
+    extern "C" {
+        pub fn malloc_size(ptr: *const libc::c_void) -> usize;
+    }
+    #[cfg(target_os = "macos")]
+    pub use self::malloc_size as malloc_usable_size;
 }

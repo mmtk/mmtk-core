@@ -6,10 +6,15 @@ on:
     branches:
       - master
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   # Trigger ci.yml from mmtk/mmtk-dev-env to make sure mmtk-core can build with mmtk-dev-env.
   check-mmtk-dev-env:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: convictional/trigger-workflow-and-wait@v1.3.0
         with:

@@ -55,6 +55,10 @@ impl MemorySlice for DummyVMMemorySlice {
         }
     }
 
+    fn object(&self) -> Option<ObjectReference> {
+        None
+    }
+
     fn start(&self) -> Address {
         Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
     }
@@ -88,7 +92,6 @@ pub struct DummyVMMemorySliceIterator {
 impl Iterator for DummyVMMemorySliceIterator {
     type Item = DummyVMEdge;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.limit {
             None
@@ -205,7 +208,6 @@ impl TaggedEdge {
     // Using a two-bit tag should be safe on both 32-bit and 64-bit platforms.
     const TAG_BITS_MASK: usize = 0b11;
 
-    #[inline(always)]
     pub fn new(address: Address) -> Self {
         Self {
             slot_addr: address.to_mut_ptr(),

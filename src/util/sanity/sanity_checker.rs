@@ -14,7 +14,9 @@ pub struct SanityChecker<ES: Edge> {
     /// Visited objects
     refs: HashSet<ObjectReference>,
     /// Cached root edges for sanity root scanning
-    roots: Vec<Vec<ES>>,
+    root_edges: Vec<Vec<ES>>,
+    /// Cached root nodes for sanity root scanning
+    root_nodes: Vec<Vec<ObjectReference>>,
 }
 
 impl<ES: Edge> Default for SanityChecker<ES> {
@@ -27,18 +29,24 @@ impl<ES: Edge> SanityChecker<ES> {
     pub fn new() -> Self {
         Self {
             refs: HashSet::new(),
-            roots: vec![],
+            root_edges: vec![],
+            root_nodes: vec![],
         }
     }
 
     /// Cache a list of root edges to the sanity checker.
-    pub fn add_roots(&mut self, roots: Vec<ES>) {
-        self.roots.push(roots)
+    pub fn add_root_edges(&mut self, roots: Vec<ES>) {
+        self.root_edges.push(roots)
+    }
+
+    pub fn add_root_nodes(&mut self, roots: Vec<ObjectReference>) {
+        self.root_nodes.push(roots)
     }
 
     /// Reset roots cache at the end of the sanity gc.
     fn clear_roots_cache(&mut self) {
-        self.roots.clear();
+        self.root_edges.clear();
+        self.root_nodes.clear();
     }
 }
 
@@ -59,6 +67,10 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
 
         scheduler.reset_state();
 
+        // We are going to do sanity GC which will traverse the object graph again. Reset edge logger to clear recorded edges.
+        #[cfg(feature = "extreme_assertions")]
+        mmtk.edge_logger.reset();
+
         plan.base().inside_sanity.store(true, Ordering::SeqCst);
         // Stop & scan mutators (mutator scanning can happen before STW)
 
@@ -73,13 +85,21 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         //     scheduler.work_buckets[WorkBucketStage::Prepare]
         //         .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));
         // }
-        for roots in &mmtk.sanity_checker.lock().unwrap().roots {
-            scheduler.work_buckets[WorkBucketStage::Closure].add(
-                SanityGCProcessEdges::<P::VM>::new(roots.clone(), true, mmtk),
-            );
+        {
+            let sanity_checker = mmtk.sanity_checker.lock().unwrap();
+            for roots in &sanity_checker.root_edges {
+                scheduler.work_buckets[WorkBucketStage::Closure].add(
+                    SanityGCProcessEdges::<P::VM>::new(roots.clone(), true, mmtk),
+                );
+            }
+            for roots in &sanity_checker.root_nodes {
+                scheduler.work_buckets[WorkBucketStage::Closure].add(ScanObjects::<
+                    SanityGCProcessEdges<P::VM>,
+                >::new(
+                    roots.clone(), false, true
+                ));
+            }
         }
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(ScanVMSpecificRoots::<SanityGCProcessEdges<P::VM>>::new());
         // Prepare global/collectors/mutators
         worker.scheduler().work_buckets[WorkBucketStage::Prepare]
             .add(SanityPrepare::<P>::new(plan.downcast_ref::<P>().unwrap()));
@@ -101,6 +121,7 @@ impl<P: Plan> SanityPrepare<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        info!("Sanity GC prepare");
         mmtk.plan.enter_sanity();
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
@@ -129,6 +150,7 @@ impl<P: Plan> SanityRelease<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+        info!("Sanity GC release");
         mmtk.plan.leave_sanity();
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
@@ -172,7 +194,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         }
     }
 
-    #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -181,10 +202,34 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);
+
+            // Let plan check object
+            assert!(
+                self.mmtk().plan.sanity_check_object(object),
+                "Invalid reference {:?}",
+                object
+            );
+
+            // Let VM check object
+            assert!(
+                VM::VMObjectModel::is_object_sane(object),
+                "Invalid reference {:?}",
+                object
+            );
+
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
+            trace!("Sanity mark object {}", object);
             self.nodes.enqueue(object);
         }
+
+        // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
+        // bit set when sanity GC starts.
+        #[cfg(feature = "vo_bit")]
+        if !crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object) {
+            panic!("VO bit is not set: {}", object);
+        }
+
         object
     }
 

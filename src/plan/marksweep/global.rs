@@ -1,5 +1,7 @@
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
@@ -9,17 +11,12 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
-use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::PlanTraceObject;
-use std::sync::Arc;
 
 #[cfg(feature = "malloc_mark_sweep")]
 pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::malloc_ms::MallocSpace<VM>;
@@ -65,7 +62,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -90,6 +87,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &self.common.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.common.base
+    }
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
@@ -100,38 +101,23 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 }
 
 impl<VM: VMBinding> MarkSweep<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let mut global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_metadata_specs);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
-        let res = {
-            let ms = MarkSweepSpace::new(
-                "MarkSweepSpace",
-                false,
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &MS_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
+
+        let res = MarkSweep {
+            ms: MarkSweepSpace::new(plan_args.get_space_args(
+                "ms",
+                true,
                 VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-            );
-
-            let common = CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &MS_CONSTRAINTS,
-                global_metadata_specs,
-            );
-
-            MarkSweep { common, ms }
+            )),
+            common: CommonPlan::new(plan_args),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();

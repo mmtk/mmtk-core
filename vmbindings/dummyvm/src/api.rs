@@ -19,7 +19,7 @@ pub extern "C" fn mmtk_init(heap_size: usize) {
     // set heap size first
     {
         let mut builder = BUILDER.lock().unwrap();
-        let success = builder.options.heap_size.set(heap_size);
+        let success = builder.options.gc_trigger.set(mmtk::util::options::GCTriggerSelector::FixedHeapSize(heap_size));
         assert!(success, "Failed to set heap size to {}", heap_size);
     }
 
@@ -44,7 +44,7 @@ pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<DummyVM>) {
 
 #[no_mangle]
 pub extern "C" fn mmtk_alloc(mutator: *mut Mutator<DummyVM>, size: usize,
-                    align: usize, offset: isize, mut semantics: AllocationSemantics) -> Address {
+                    align: usize, offset: usize, mut semantics: AllocationSemantics) -> Address {
     if size >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
         semantics = AllocationSemantics::Los;
     }

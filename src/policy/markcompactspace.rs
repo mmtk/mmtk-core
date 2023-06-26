@@ -1,5 +1,5 @@
 use super::sft::SFT;
-use super::space::{CommonSpace, Space, SpaceOptions};
+use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::sft::GCWorkerMutRef;
@@ -7,11 +7,9 @@ use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
-use crate::util::metadata::extract_side_metadata;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::{alloc_bit, Address, ObjectReference};
+use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::metadata::{extract_side_metadata, vo_bit};
+use crate::util::{Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
@@ -36,7 +34,6 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         self.get_name()
     }
 
-    #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         let forwarding_pointer = Self::get_header_forwarding_pointer(object);
         if forwarding_pointer.is_null() {
@@ -72,7 +69,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
     }
 
     #[cfg(feature = "sanity")]
@@ -81,12 +78,10 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
 
-    #[inline(always)]
     fn sft_trace_object(
         &self,
         _queue: &mut VectorObjectQueue,
@@ -126,7 +121,6 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -142,7 +136,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
             unreachable!()
         }
     }
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         if KIND == TRACE_KIND_MARK {
             false
@@ -172,19 +165,16 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     // From the cell address, `cell - GC_EXTRA_HEADER_WORD` is where we store the header forwarding pointer.
 
     /// Get the address for header forwarding pointer
-    #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
         object.to_object_start::<VM>() - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
-    #[inline(always)]
     fn get_header_forwarding_pointer(object: ObjectReference) -> ObjectReference {
         unsafe { Self::header_forwarding_pointer_address(object).load::<ObjectReference>() }
     }
 
     /// Store header forwarding pointer for an object
-    #[inline(always)]
     fn store_header_forwarding_pointer(
         object: ObjectReference,
         forwarding_pointer: ObjectReference,
@@ -196,7 +186,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     // Clear header forwarding pointer for an object
-    #[inline(always)]
     fn clear_header_forwarding_pointer(object: ObjectReference) {
         crate::util::memory::zero(
             Self::header_forwarding_pointer_address(object),
@@ -204,36 +193,13 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-    ) -> Self {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         MarkCompactSpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
@@ -252,8 +218,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
@@ -268,8 +234,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::alloc_bit::is_alloced::<VM>(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
         // from this stage and onwards, mark bit is no longer needed
@@ -397,8 +363,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 start, end,
             );
         for obj in linear_scan {
-            // clear the alloc bit
-            alloc_bit::unset_alloc_bit::<VM>(obj);
+            // clear the VO bit
+            vo_bit::unset_vo_bit::<VM>(obj);
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 
@@ -411,8 +377,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 // copy object
                 trace!(" copy from {} to {}", obj, new_object);
                 let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                // update alloc_bit,
-                alloc_bit::set_alloc_bit::<VM>(new_object);
+                // update VO bit,
+                vo_bit::set_vo_bit::<VM>(new_object);
                 to = new_object.to_object_start::<VM>() + copied_size;
                 debug_assert_eq!(end_of_new_object, to);
             }
@@ -427,7 +393,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
 struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
-    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
     }

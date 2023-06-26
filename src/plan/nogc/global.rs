@@ -1,4 +1,6 @@
 use crate::plan::global::BasePlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -7,17 +9,12 @@ use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
-use std::sync::Arc;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -56,6 +53,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &self.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.base
+    }
+
     fn prepare(&mut self, _tls: VMWorkerThread) {
         unreachable!()
     }
@@ -65,7 +66,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<VM>) {
@@ -79,69 +80,41 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             + self.base.get_used_pages()
     }
 
-    fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
+    fn handle_user_collection_request(
+        &self,
+        _tls: VMMutatorThread,
+        _force: bool,
+        _exhaustive: bool,
+    ) {
         warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }
 
 impl<VM: VMBinding> NoGC<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let mut heap = HeapMeta::new(&options);
-        #[cfg(feature = "nogc_lock_free")]
-        let mut heap = HeapMeta::new(&options);
-
-        let global_specs = SideMetadataContext::new_global_specs(&[]);
-
-        #[cfg(feature = "nogc_lock_free")]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
-            cfg!(not(feature = "nogc_no_zeroing")),
-            &options,
-            global_specs.clone(),
-        );
-        #[cfg(not(feature = "nogc_lock_free"))]
-        let nogc_space = NoGCImmortalSpace::new(
-            "nogc_space",
-            true,
-            VMRequest::discontiguous(),
-            global_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
-            &NOGC_CONSTRAINTS,
-        );
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &NOGC_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
 
         let res = NoGC {
-            nogc_space,
-            immortal: ImmortalSpace::new(
+            nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
+                "nogc_space",
+                cfg!(not(feature = "nogc_no_zeroing")),
+                VMRequest::discontiguous(),
+            )),
+            immortal: ImmortalSpace::new(plan_args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
-                global_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                &NOGC_CONSTRAINTS,
-            ),
-            los: ImmortalSpace::new(
+            )),
+            los: ImmortalSpace::new(plan_args.get_space_args(
                 "los",
                 true,
                 VMRequest::discontiguous(),
-                global_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                &NOGC_CONSTRAINTS,
-            ),
-            base: BasePlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &NOGC_CONSTRAINTS,
-                global_specs,
-            ),
+            )),
+            base: BasePlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

@@ -5,9 +5,14 @@ on:
   release:
     types: [published]
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   cargo-publish:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
       - name: Install latest nightly

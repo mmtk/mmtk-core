@@ -6,6 +6,8 @@ use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
@@ -33,7 +35,6 @@ impl BlockState {
 }
 
 impl From<u8> for BlockState {
-    #[inline(always)]
     fn from(state: u8) -> Self {
         match state {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
@@ -45,7 +46,6 @@ impl From<u8> for BlockState {
 }
 
 impl From<BlockState> for u8 {
-    #[inline(always)]
     fn from(state: BlockState) -> Self {
         match state {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
@@ -74,13 +74,11 @@ impl Region for Block {
     #[cfg(feature = "immix_smaller_block")]
     const LOG_BYTES: usize = 13;
 
-    #[inline(always)]
     fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
 
-    #[inline(always)]
     fn start(&self) -> Address {
         self.0
     }
@@ -105,28 +103,24 @@ impl Block {
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
 
     /// Get the chunk containing the block.
-    #[inline(always)]
     pub fn chunk(&self) -> Chunk {
         Chunk::from_unaligned_address(self.0)
     }
 
     /// Get the address range of the block's line mark table.
     #[allow(clippy::assertions_on_constants)]
-    #[inline(always)]
     pub fn line_mark_table(&self) -> MetadataByteArrayRef<{ Block::LINES }> {
         debug_assert!(!super::BLOCK_ONLY);
         MetadataByteArrayRef::<{ Block::LINES }>::new(&Line::MARK_TABLE, self.start(), Self::BYTES)
     }
 
     /// Get block mark state.
-    #[inline(always)]
     pub fn get_state(&self) -> BlockState {
         let byte = Self::MARK_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         byte.into()
     }
 
     /// Set block mark state.
-    #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
         let state = u8::from(state);
         Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
@@ -137,28 +131,25 @@ impl Block {
     const DEFRAG_SOURCE_STATE: u8 = u8::MAX;
 
     /// Test if the block is marked for defragmentation.
-    #[inline(always)]
     pub fn is_defrag_source(&self) -> bool {
         let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
-        debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
+        // The byte should be 0 (not defrag source) or 255 (defrag source) if this is a major defrag GC, as we set the values in PrepareBlockState.
+        // But it could be any value in a nursery GC.
         byte == Self::DEFRAG_SOURCE_STATE
     }
 
     /// Mark the block for defragmentation.
-    #[inline(always)]
     pub fn set_as_defrag_source(&self, defrag: bool) {
         let byte = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
         Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), byte, Ordering::SeqCst);
     }
 
     /// Record the number of holes in the block.
-    #[inline(always)]
     pub fn set_holes(&self, holes: usize) {
         Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), holes as u8, Ordering::SeqCst);
     }
 
     /// Get the number of holes.
-    #[inline(always)]
     pub fn get_holes(&self) -> usize {
         let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
@@ -166,7 +157,6 @@ impl Block {
     }
 
     /// Initialize a clean block after acquired from page-resource.
-    #[inline]
     pub fn init(&self, copy: bool) {
         self.set_state(if copy {
             BlockState::Marked
@@ -177,26 +167,20 @@ impl Block {
     }
 
     /// Deinitalize a block before releasing.
-    #[inline]
     pub fn deinit(&self) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::bzero_alloc_bit(self.start(), Self::BYTES);
         self.set_state(BlockState::Unallocated);
     }
 
-    #[inline(always)]
     pub fn start_line(&self) -> Line {
         Line::from_aligned_address(self.start())
     }
 
-    #[inline(always)]
     pub fn end_line(&self) -> Line {
         Line::from_aligned_address(self.end())
     }
 
     /// Get the range of lines within the block.
     #[allow(clippy::assertions_on_constants)]
-    #[inline(always)]
     pub fn lines(&self) -> RegionIterator<Line> {
         debug_assert!(!super::BLOCK_ONLY);
         RegionIterator::<Line>::new(self.start_line(), self.end_line())
@@ -204,7 +188,6 @@ impl Block {
 
     /// Sweep this block.
     /// Return true if the block is swept.
-    #[inline(always)]
     pub fn sweep<VM: VMBinding>(
         &self,
         space: &ImmixSpace<VM>,
@@ -215,11 +198,17 @@ impl Block {
             match self.get_state() {
                 BlockState::Unallocated => false,
                 BlockState::Unmarked => {
+                    #[cfg(feature = "vo_bit")]
+                    vo_bit::helper::on_region_swept::<VM, _>(self, false);
+
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
                     true
                 }
                 BlockState::Marked => {
+                    #[cfg(feature = "vo_bit")]
+                    vo_bit::helper::on_region_swept::<VM, _>(self, true);
+
                     // The block is live.
                     false
                 }
@@ -240,11 +229,18 @@ impl Block {
                     if prev_line_is_marked {
                         holes += 1;
                     }
+
+                    #[cfg(feature = "immix_zero_on_release")]
+                    crate::util::memory::zero(line.start(), Line::BYTES);
+
                     prev_line_is_marked = false;
                 }
             }
 
             if marked_lines == 0 {
+                #[cfg(feature = "vo_bit")]
+                vo_bit::helper::on_region_swept::<VM, _>(self, false);
+
                 // Release the block if non of its lines are marked.
                 space.release_block(*self);
                 true
@@ -264,7 +260,42 @@ impl Block {
                 mark_histogram[holes] += marked_lines;
                 // Record number of holes in block side metadata.
                 self.set_holes(holes);
+
+                #[cfg(feature = "vo_bit")]
+                vo_bit::helper::on_region_swept::<VM, _>(self, true);
+
                 false
+            }
+        }
+    }
+
+    /// Clear VO bits metadata for unmarked regions.
+    /// This is useful for clearing VO bits during nursery GC for StickyImmix
+    /// at which time young objects (allocated in unmarked regions) may die
+    /// but we always consider old objects (in marked regions) as live.
+    #[cfg(feature = "vo_bit")]
+    pub fn clear_vo_bits_for_unmarked_regions(&self, line_mark_state: Option<u8>) {
+        match line_mark_state {
+            None => {
+                match self.get_state() {
+                    BlockState::Unmarked => {
+                        // It may contain young objects.  Clear it.
+                        vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+                    }
+                    BlockState::Marked => {
+                        // It contains old objects.  Skip it.
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            Some(state) => {
+                // With lines.
+                for line in self.lines() {
+                    if !line.is_marked(state) {
+                        // It may contain young objects.  Clear it.
+                        vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                    }
+                }
             }
         }
     }
@@ -286,19 +317,16 @@ impl ReusableBlockPool {
     }
 
     /// Get number of blocks in this list.
-    #[inline(always)]
     pub fn len(&self) -> usize {
         self.queue.len()
     }
 
     /// Add a block to the list.
-    #[inline(always)]
     pub fn push(&self, block: Block) {
         self.queue.push(block)
     }
 
     /// Pop a block out of the list.
-    #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
         self.queue.pop()
     }
@@ -309,7 +337,6 @@ impl ReusableBlockPool {
     }
 
     /// Iterate all the blocks in the queue. Call the visitor for each reported block.
-    #[inline]
     pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
         self.queue.iterate_blocks(&mut f);
     }

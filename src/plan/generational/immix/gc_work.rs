@@ -8,7 +8,7 @@ pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkContext<VM> {
     type VM = VM;
     type PlanType = GenImmix<VM>;
-    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::PlanType>;
 }
 
 pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(

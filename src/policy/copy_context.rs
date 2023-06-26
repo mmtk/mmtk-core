@@ -9,7 +9,7 @@ use crate::vm::VMBinding;
 /// mature space is ImmixSpace. When we copy from nursery to mature, ImmixCopyContext should be
 /// used.
 /// Note that this trait should only be implemented with policy specific behaviors. Please
-/// refer to [GCWorkerCopyContext](util/copy/struct.GCWorkerCopyContext.html) which implements common
+/// refer to [`crate::util::copy::GCWorkerCopyContext`] which implements common
 /// behaviors for copying.
 pub trait PolicyCopyContext: 'static + Send {
     type VM: VMBinding;
@@ -20,8 +20,7 @@ pub trait PolicyCopyContext: 'static + Send {
         original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address;
-    #[inline(always)]
     fn post_copy(&mut self, _obj: ObjectReference, _bytes: usize) {}
 }
