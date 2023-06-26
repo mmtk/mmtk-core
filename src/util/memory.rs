@@ -4,6 +4,7 @@ use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
+use sysinfo::{RefreshKind, System, SystemExt};
 
 pub fn result_is_mapped(result: Result<()>) -> bool {
     match result {
@@ -13,8 +14,13 @@ pub fn result_is_mapped(result: Result<()>) -> bool {
 }
 
 pub fn zero(start: Address, len: usize) {
-    let ptr = start.to_mut_ptr();
-    wrap_libc_call(&|| unsafe { libc::memset(ptr, 0, len) }, ptr).unwrap()
+    set(start, 0, len);
+}
+
+pub fn set(start: Address, val: u8, len: usize) {
+    unsafe {
+        std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
+    }
 }
 
 /// Demand-zero mmap:
@@ -39,13 +45,20 @@ pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
     ret
 }
 
+#[cfg(target_os = "linux")]
+// MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+#[cfg(target_os = "macos")]
+// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
+
 /// Demand-zero mmap (no replace):
 /// This function mmaps the memory and guarantees to zero all mapped memory.
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+    let flags = MMAP_FLAGS;
     let ret = mmap_fixed(start, size, prot, flags);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     #[cfg(not(target_os = "linux"))]
@@ -61,8 +74,7 @@ pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
 pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
     let prot = PROT_NONE;
-    let flags =
-        libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
+    let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
     mmap_fixed(start, size, prot, flags)
 }
 
@@ -119,10 +131,10 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 /// Checks if the memory has already been mapped. If not, we panic.
 // Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
 // Be very careful about using this function.
+#[cfg(target_os = "linux")]
 pub fn panic_if_unmapped(start: Address, size: usize) {
     let prot = PROT_READ | PROT_WRITE;
-    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+    let flags = MMAP_FLAGS;
     match mmap_fixed(start, size, prot, flags) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
         Err(e) => {
@@ -133,6 +145,13 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
             );
         }
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn panic_if_unmapped(_start: Address, _size: usize) {
+    // This is only used for assertions, so MMTk will still run even if we never panic.
+    // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
+    // Possibly we can use posix_mem_offset for both OS/s.
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
@@ -171,6 +190,23 @@ pub fn get_process_memory_maps() -> String {
     let mut f = File::open("/proc/self/maps").unwrap();
     f.read_to_string(&mut data).unwrap();
     data
+}
+
+/// Returns the total physical memory for the system in bytes.
+pub(crate) fn get_system_total_memory() -> u64 {
+    // TODO: Note that if we want to get system info somewhere else in the future, we should
+    // refactor this instance into some global struct. sysinfo recommends sharing one instance of
+    // `System` instead of making multiple instances.
+    // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
+    //
+    // If we refactor the `System` instance to use it for other purposes, please make sure start-up
+    // time is not affected.  It takes a long time to load all components in sysinfo (e.g. by using
+    // `System::new_all()`).  Some applications, especially short-running scripts, are sensitive to
+    // start-up time.  During start-up, MMTk core only needs the total memory to initialize the
+    // `Options`.  If we only load memory-related components on start-up, it should only take <1ms
+    // to initialize the `System` instance.
+    let sys = System::new_with_specifics(RefreshKind::new().with_memory());
+    sys.total_memory()
 }
 
 #[cfg(test)]
@@ -218,6 +254,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn test_mmap_noreplace() {
         serial_test(|| {
@@ -255,6 +292,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped() {
@@ -286,6 +324,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped_next_to_mapped() {
@@ -325,5 +364,11 @@ mod tests {
                 },
             )
         })
+    }
+
+    #[test]
+    fn test_get_system_total_memory() {
+        let total = get_system_total_memory();
+        println!("Total memory: {:?}", total);
     }
 }

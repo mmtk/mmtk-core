@@ -1,8 +1,5 @@
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::GCWorker;
-#[cfg(feature = "is_mmtk_object")]
-use crate::util::alloc_bit;
-use crate::util::conversions;
 use crate::util::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -30,7 +27,6 @@ pub trait SFT {
     fn name(&self) -> &str;
 
     /// Get forwarding pointer if the object is forwarded.
-    #[inline(always)]
     fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
         None
     }
@@ -40,10 +36,23 @@ pub trait SFT {
 
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
         self.is_live(object)
     }
+
+    // Functions for pinning/unpining and checking if an object is pinned
+    // For non moving policies, all the objects are considered as forever pinned,
+    // thus attempting to pin or unpin them will not succeed and will always return false.
+    // For policies where moving is compusory, pin/unpin is impossible and will panic (is_object_pinned will return false).
+    // For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the
+    // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
+    // is currently pinned.
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, object: ObjectReference) -> bool;
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, object: ObjectReference) -> bool;
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, object: ObjectReference) -> bool;
 
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
@@ -58,7 +67,6 @@ pub trait SFT {
     /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
     /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
     /// in the space contain actual MMTk objects. So they need a further check.
-    #[inline(always)]
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         true
     }
@@ -68,18 +76,7 @@ pub trait SFT {
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        // Having found the SFT means the `addr` is in one of our spaces.
-        // Although the SFT map is allocated eagerly when the space is contiguous,
-        // the pages of the space itself are acquired on demand.
-        // Therefore, the page of `addr` may not have been mapped, yet.
-        if !addr.is_mapped() {
-            return false;
-        }
-        // The `addr` is mapped. We use the global alloc bit to get the exact answer.
-        alloc_bit::is_alloced_object(addr)
-    }
+    fn is_mmtk_object(&self, addr: Address) -> bool;
 
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
@@ -130,6 +127,18 @@ impl SFT for EmptySpaceSFT {
         warn!("Object in empty space!");
         false
     }
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of EmptySpace.")
+    }
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of EmptySpace.")
+    }
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        false
+    }
     fn is_movable(&self) -> bool {
         /*
          * FIXME steveb I think this should panic (ie the function should not
@@ -141,12 +150,10 @@ impl SFT for EmptySpaceSFT {
          */
         false
     }
-    #[inline(always)]
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, _addr: Address) -> bool {
         false
     }
@@ -166,9 +173,8 @@ impl SFT for EmptySpaceSFT {
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
             object,
-            conversions::chunk_align_down(object.to_address()),
         )
     }
 }

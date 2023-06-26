@@ -1,4 +1,3 @@
-use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
@@ -25,9 +24,7 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// Arguments:
     /// * `new_reference`: The reference whose referent is to be cleared.
     fn clear_referent(new_reference: ObjectReference) {
-        Self::set_referent(new_reference, unsafe {
-            Address::zero().to_object_reference()
-        });
+        Self::set_referent(new_reference, ObjectReference::NULL);
     }
 
     /// Get the referent from a weak reference object.
@@ -83,15 +80,12 @@ pub trait Finalizable: std::fmt::Debug + Send {
 /// This provides an implementation of `Finalizable` for `ObjectReference`. Most bindings
 /// should be able to use `ObjectReference` as `ReferenceGlue::FinalizableType`.
 impl Finalizable for ObjectReference {
-    #[inline(always)]
     fn get_reference(&self) -> ObjectReference {
         *self
     }
-    #[inline(always)]
     fn set_reference(&mut self, object: ObjectReference) {
         *self = object;
     }
-    #[inline(always)]
     fn keep_alive<E: ProcessEdgesWork>(&mut self, trace: &mut E) {
         *self = trace.trace_object(*self);
     }

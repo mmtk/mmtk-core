@@ -1,5 +1,4 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use super::object_ref_guard::adjust_thread_local_buffer_limit;
 use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
@@ -66,8 +65,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         crate::policy::immix::block::Block::BYTES
     }
 
-    #[inline(always)]
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         debug_assert!(
             size <= crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
             "Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}",
@@ -82,7 +80,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls
             );
-            if get_maximum_aligned_size::<VM>(size, align, VM::MIN_ALIGNMENT) > Line::BYTES {
+            if get_maximum_aligned_size::<VM>(size, align) > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(size, align, offset)
             } else {
@@ -106,7 +104,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     }
 
     /// Acquire a clean block from ImmixSpace for allocation.
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("{:?}: alloc_slow_once", self.tls);
         self.acquire_clean_block(size, align, offset)
     }
@@ -119,7 +117,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         trace!("{:?}: alloc_slow_once_precise_stress", self.tls);
@@ -192,13 +190,12 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         }
     }
 
-    #[inline(always)]
     pub fn immix_space(&self) -> &'static ImmixSpace<VM> {
         self.space
     }
 
     /// Large-object (larger than a line) bump allocation.
-    fn overflow_alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn overflow_alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("{:?}: overflow_alloc", self.tls);
         let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
         let end = start + size;
@@ -215,8 +212,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     }
 
     /// Bump allocate small objects into recyclable lines (i.e. holes).
-    #[cold]
-    fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("{:?}: alloc_slow_hot", self.tls);
         if self.acquire_recyclable_lines(size, align, offset) {
             // If stress test is active, then we need to go to the slow path instead of directly
@@ -242,14 +238,14 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     }
 
     /// Search for recyclable lines.
-    fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: isize) -> bool {
+    fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: usize) -> bool {
         while self.line.is_some() || self.acquire_recyclable_block() {
             let line = self.line.unwrap();
             if let Some((start_line, end_line)) = self.immix_space().get_next_available_lines(line)
             {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.cursor = start_line.start();
-                self.limit = adjust_thread_local_buffer_limit::<VM>(end_line.start());
+                self.limit = end_line.start();
                 trace!(
                     "{:?}: acquire_recyclable_lines -> {:?} [{:?}, {:?}) {:?}",
                     self.tls,
@@ -258,8 +254,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     end_line,
                     self.tls
                 );
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::bzero_alloc_bit(self.cursor, self.limit - self.cursor);
                 crate::util::memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(
                     align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit
@@ -295,7 +289,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     }
 
     // Get a clean block from ImmixSpace.
-    fn acquire_clean_block(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
         match self.immix_space().get_clean_block(self.tls, self.copy) {
             None => Address::ZERO,
             Some(block) => {
@@ -307,10 +301,10 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 );
                 if self.request_for_large {
                     self.large_cursor = block.start();
-                    self.large_limit = adjust_thread_local_buffer_limit::<VM>(block.end());
+                    self.large_limit = block.end();
                 } else {
                     self.cursor = block.start();
-                    self.limit = adjust_thread_local_buffer_limit::<VM>(block.end());
+                    self.limit = block.end();
                 }
                 self.alloc(size, align, offset)
             }
@@ -320,7 +314,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     /// Return whether the TLAB has been exhausted and we need to acquire a new block. Assumes that
     /// the buffer limits have been restored using [`ImmixAllocator::restore_limit_for_stress`].
     /// Note that this function may implicitly change the limits of the allocator.
-    fn require_new_block(&mut self, size: usize, align: usize, offset: isize) -> bool {
+    fn require_new_block(&mut self, size: usize, align: usize, offset: usize) -> bool {
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
         let insufficient_space = new_cursor > self.limit;
@@ -329,9 +323,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         // size check and then return the conditions where `alloc_slow_inline()` would be called
         // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
         // to service the allocation request
-        if insufficient_space
-            && get_maximum_aligned_size::<VM>(size, align, VM::MIN_ALIGNMENT) > Line::BYTES
-        {
+        if insufficient_space && get_maximum_aligned_size::<VM>(size, align) > Line::BYTES {
             let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
             let end = start + size;
             end > self.large_limit

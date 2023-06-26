@@ -19,7 +19,7 @@ pub extern "C" fn mmtk_init(heap_size: usize) {
     // set heap size first
     {
         let mut builder = BUILDER.lock().unwrap();
-        let success = builder.options.heap_size.set(heap_size);
+        let success = builder.options.gc_trigger.set(mmtk::util::options::GCTriggerSelector::FixedHeapSize(heap_size));
         assert!(success, "Failed to set heap size to {}", heap_size);
     }
 
@@ -36,12 +36,15 @@ pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyV
 
 #[no_mangle]
 pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<DummyVM>) {
-    memory_manager::destroy_mutator(unsafe { Box::from_raw(mutator) })
+    // notify mmtk-core about destroyed mutator
+    memory_manager::destroy_mutator(unsafe { &mut *mutator });
+    // turn the ptr back to a box, and let Rust properly reclaim it
+    let _ = unsafe { Box::from_raw(mutator) };
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_alloc(mutator: *mut Mutator<DummyVM>, size: usize,
-                    align: usize, offset: isize, mut semantics: AllocationSemantics) -> Address {
+                    align: usize, offset: usize, mut semantics: AllocationSemantics) -> Address {
     if size >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
         semantics = AllocationSemantics::Los;
     }
@@ -115,7 +118,7 @@ pub extern "C" fn mmtk_is_mmtk_object(addr: Address) -> bool {
 
 #[no_mangle]
 pub extern "C" fn mmtk_is_in_mmtk_spaces(object: ObjectReference) -> bool {
-    memory_manager::is_in_mmtk_spaces(object)
+    memory_manager::is_in_mmtk_spaces::<DummyVM>(object)
 }
 
 #[no_mangle]

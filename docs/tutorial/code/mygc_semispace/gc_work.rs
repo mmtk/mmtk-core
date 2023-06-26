@@ -25,7 +25,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {
 }
 // ANCHOR: workcontext_plan
 
-use crate::util::{Address, ObjectReference};
+use crate::util::ObjectReference;
 use crate::util::copy::CopySemantics;
 use crate::MMTK;
 use crate::policy::space::Space;
@@ -48,7 +48,6 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
         Self { base, plan }
     }
 
-    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -74,7 +73,6 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
         }
     }
 
-    #[inline(always)]
     fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
         ScanObjects::<Self>::new(nodes, false, roots)
     }
@@ -84,14 +82,12 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
 // ANCHOR: mygc_process_edges_deref
 impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
     type Target = ProcessEdgesBase<VM>;
-    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
 impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
-    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

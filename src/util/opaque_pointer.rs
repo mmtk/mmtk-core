@@ -26,6 +26,10 @@ impl OpaquePointer {
         OpaquePointer(addr.to_mut_ptr::<c_void>())
     }
 
+    pub fn to_address(self) -> Address {
+        Address::from_mut_ptr(self.0)
+    }
+
     pub fn is_null(self) -> bool {
         self.0.is_null()
     }
@@ -44,14 +48,14 @@ impl VMThread {
     pub const UNINITIALIZED: Self = Self(OpaquePointer::UNINITIALIZED);
 }
 
-/// A VMMutatorThread is a VMThread that associates with a [Mutator](plan/mutator_context/Mutator).
+/// A VMMutatorThread is a VMThread that associates with a [`crate::plan::Mutator`].
 /// When a VMMutatorThread is used as an argument or a field of a type, it generally means
 /// the function or the functions for the type is executed in the context of the mutator thread.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct VMMutatorThread(pub VMThread);
 
-/// A VMWorkerThread is a VMThread that is associates with a [GCWorker](scheduler/GCWorker).
+/// A VMWorkerThread is a VMThread that is associates with a [`crate::scheduler::GCWorker`].
 /// When a VMWorkerThread is used as an argument or a field of a type, it generally means
 /// the function or the functions for the type is executed in the context of the mutator thread.
 #[repr(transparent)]

@@ -3,18 +3,14 @@ use atomic::Ordering;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
-use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
+use crate::util::heap::{MonotonePageResource, PageResource};
+use crate::util::metadata::mark_bit::MarkState;
 
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 
-use crate::plan::PlanConstraints;
 use crate::policy::sft::GCWorkerMutRef;
-use crate::policy::space::SpaceOptions;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
 
 /// This type implements a simple immortal collection
@@ -22,12 +18,12 @@ use crate::vm::{ObjectModel, VMBinding};
 /// "collector" to propagate marks in a liveness trace.  It does not
 /// actually collect.
 pub struct ImmortalSpace<VM: VMBinding> {
-    mark_state: u8,
+    mark_state: MarkState,
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
+    /// Is this used as VM space? If this is used as VM space, we never allocate into this space, but we trace objects normally.
+    vm_space: bool,
 }
-
-const GC_MARK_BIT_MASK: u8 = 1;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn name(&self) -> &str {
@@ -36,14 +32,20 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn is_live(&self, _object: ObjectReference) -> bool {
         true
     }
-    #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
-        old_value == self.mark_state
+        self.mark_state.is_marked::<VM>(object)
+    }
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        true
     }
     fn is_movable(&self) -> bool {
         false
@@ -53,26 +55,18 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
-        let new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
-            object,
-            new_value,
-            None,
-            Ordering::SeqCst,
-        );
-
+        self.mark_state
+            .on_object_metadata_initialization::<VM>(object);
         if self.common.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
     }
-    #[inline(always)]
+    #[cfg(feature = "is_mmtk_object")]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    }
     fn sft_trace_object(
         &self,
         queue: &mut VectorObjectQueue,
@@ -110,7 +104,6 @@ use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -120,100 +113,87 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSp
     ) -> ObjectReference {
         self.trace_object(queue, object)
     }
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         false
     }
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints,
-    ) -> Self {
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: false,
-                immortal: true,
-                needs_log_bit: constraints.needs_log_bit,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: metadata::extract_side_metadata(&[
-                        *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                    ]),
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let common = CommonSpace::new(args.into_policy_args(
+            false,
+            true,
+            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+        ));
         ImmortalSpace {
-            mark_state: 0,
-            pr: if vmrequest.is_discontiguous() {
+            mark_state: MarkState::new(),
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
+            vm_space: false,
         }
     }
 
-    fn test_and_mark(object: ObjectReference, value: u8) -> bool {
-        loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
-            if old_value == value {
-                return false;
-            }
-
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    old_value ^ GC_MARK_BIT_MASK,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
+    #[cfg(feature = "vm_space")]
+    pub fn new_vm_space(
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
+        start: Address,
+        size: usize,
+    ) -> Self {
+        assert!(!args.vmrequest.is_discontiguous());
+        ImmortalSpace {
+            mark_state: MarkState::new(),
+            pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),
+            common: CommonSpace::new(args.into_policy_args(
+                false,
+                true,
+                metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+            )),
+            vm_space: true,
         }
-        true
     }
 
     pub fn prepare(&mut self) {
-        self.mark_state = GC_MARK_BIT_MASK - self.mark_state;
+        self.mark_state.on_global_prepare::<VM>();
+        if self.vm_space {
+            // If this is VM space, we never allocate into it, and we should reset the mark bit for the entire space.
+            self.mark_state
+                .on_block_reset::<VM>(self.common.start, self.common.extent)
+        } else {
+            // Otherwise, we reset the mark bit for the allocated regions.
+            self.pr.for_allocated_regions(|addr, size| {
+                debug!(
+                    "{:?}: reset mark bit from {} to {}",
+                    self.name(),
+                    addr,
+                    addr + size
+                );
+                self.mark_state.on_block_reset::<VM>(addr, size);
+            })
+        }
     }
 
-    pub fn release(&mut self) {}
+    pub fn release(&mut self) {
+        self.mark_state.on_global_release::<VM>();
+    }
 
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
-        if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {
+        if self.mark_state.test_and_mark::<VM>(object) {
             queue.enqueue(object);
         }
         object

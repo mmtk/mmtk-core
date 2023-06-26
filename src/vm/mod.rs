@@ -20,7 +20,7 @@ use crate::util::constants::*;
 mod active_plan;
 mod collection;
 pub mod edge_shape;
-mod object_model;
+pub(crate) mod object_model;
 mod reference_glue;
 mod scanning;
 pub use self::active_plan::ActivePlan;
@@ -32,8 +32,12 @@ pub use self::reference_glue::Finalizable;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::EdgeVisitor;
 pub use self::scanning::ObjectTracer;
+pub use self::scanning::ObjectTracerContext;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
+
+const DEFAULT_LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
+const DEFAULT_LOG_MAX_ALIGNMENT: usize = LOG_BYTES_IN_LONG as usize;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding
@@ -53,15 +57,14 @@ where
 
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;
-    /// Allowed minimal alignment.
-    const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
     /// Allowed minimal alignment in bytes.
-    const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
-    /// Allowed maximum alignment as shift by min alignment.
-    const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-
+    const MIN_ALIGNMENT: usize = 1 << DEFAULT_LOG_MIN_ALIGNMENT;
     /// Allowed maximum alignment in bytes.
-    const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
+    const MAX_ALIGNMENT: usize = 1 << DEFAULT_LOG_MAX_ALIGNMENT;
+    /// Does the binding use a non-zero allocation offset? If this is false, we expect the binding
+    /// to always use offset === 0 for allocation, and we are able to do some optimization if we know
+    /// offset === 0.
+    const USE_ALLOCATION_OFFSET: bool = true;
 
     /// This value is used to assert if the cursor is reasonable after allocations.
     /// At the end of an allocation, the allocation cursor should be aligned to this value.

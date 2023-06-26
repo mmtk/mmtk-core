@@ -3,18 +3,16 @@
 //! MMTk has many GC threads.  There are many GC worker threads and one GC controller thread.
 //! The GC controller thread responds to GC requests and coordinates the workers to perform GC.
 
-use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 
 use crate::plan::gc_requester::GCRequester;
 use crate::scheduler::gc_work::{EndOfGC, ScheduleCollection};
-use crate::scheduler::CoordinatorMessage;
+use crate::scheduler::{GCWork, WorkBucketStage};
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
-use atomic::Ordering;
 
-use super::{GCWork, GCWorkScheduler, GCWorker};
+use super::{GCWorkScheduler, GCWorker};
 
 /// The thread local struct for the GC controller, the counterpart of `GCWorker`.
 pub struct GCController<VM: VMBinding> {
@@ -24,25 +22,21 @@ pub struct GCController<VM: VMBinding> {
     requester: Arc<GCRequester<VM>>,
     /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
-    /// The receiving end of the channel to get controller/coordinator message from workers.
-    receiver: Receiver<CoordinatorMessage<VM>>,
     /// The `GCWorker` is used to execute packets. The controller is also a `GCWorker`.
     coordinator_worker: GCWorker<VM>,
 }
 
 impl<VM: VMBinding> GCController<VM> {
-    pub fn new(
+    pub(crate) fn new(
         mmtk: &'static MMTK<VM>,
         requester: Arc<GCRequester<VM>>,
         scheduler: Arc<GCWorkScheduler<VM>>,
-        receiver: Receiver<CoordinatorMessage<VM>>,
         coordinator_worker: GCWorker<VM>,
     ) -> Box<GCController<VM>> {
         Box::new(Self {
             mmtk,
             requester,
             scheduler,
-            receiver,
             coordinator_worker,
         })
     }
@@ -57,75 +51,88 @@ impl<VM: VMBinding> GCController<VM> {
             self.requester.wait_for_request();
             debug!("[STWController: Request recieved.]");
 
-            // For heap growth logic
-            // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
-            // when GC is requested.
-            // let user_triggered_collection: bool = SelectedPlan::is_user_triggered_collection();
-
             self.do_gc_until_completion();
             debug!("[STWController: Worker threads complete!]");
         }
     }
 
-    /// Process a message. Return true if the GC is finished.
-    fn process_message(&mut self, message: CoordinatorMessage<VM>) -> bool {
-        let worker = &mut self.coordinator_worker;
-        let mmtk = self.mmtk;
-        match message {
-            CoordinatorMessage::Work(mut work) => {
-                work.do_work_with_stat(worker, mmtk);
-                let old_count = self
-                    .scheduler
-                    .pending_coordinator_packets
-                    .fetch_sub(1, Ordering::SeqCst);
-                if old_count == 1 {
-                    // When the coordinator finishes executing all coordinator work packets,
-                    // it is a chance to open more work buckets.
-                    // Notify one worker so it can open buckets.
-                    let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
-                    self.scheduler.worker_monitor.1.notify_one();
-                }
-                false
-            }
-            CoordinatorMessage::Finish => {
-                // Quit only if all the buckets are empty.
-                // For concurrent GCs, the coordinator thread may receive this message when
-                // some buckets are still not empty. Under such case, the coordinator
-                // should ignore the message.
-                let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
-                self.scheduler.worker_group.all_parked() && self.scheduler.all_buckets_empty()
-            }
+    /// Find more work for workers to do.  Return true if more work is available.
+    fn find_more_work_for_workers(&mut self) -> bool {
+        if self.scheduler.worker_group.has_designated_work() {
+            return true;
         }
+
+        // See if any bucket has a sentinel.
+        if self.scheduler.schedule_sentinels() {
+            return true;
+        }
+
+        // Try to open new buckets.
+        if self.scheduler.update_buckets() {
+            return true;
+        }
+
+        // If all of the above failed, it means GC has finished.
+        false
     }
 
     /// Coordinate workers to perform GC in response to a GC request.
     pub fn do_gc_until_completion(&mut self) {
-        // Schedule collection.
-        ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
+        let gc_start = std::time::Instant::now();
 
-        // Drain the message queue and execute coordinator work.
+        debug_assert!(
+            self.scheduler.worker_monitor.debug_is_sleeping(),
+            "Workers are still doing work when GC started."
+        );
+
+        // Add a ScheduleCollection work packet.  It is the seed of other work packets.
+        self.scheduler.work_buckets[WorkBucketStage::Unconstrained].add(ScheduleCollection);
+
+        // Notify only one worker at this time because there is only one work packet,
+        // namely `ScheduleCollection`.
+        self.scheduler.worker_monitor.resume_and_wait(false);
+
+        // Gradually open more buckets as workers stop each time they drain all open bucket.
         loop {
-            let message = self.receiver.recv().unwrap();
-            let finished = self.process_message(message);
-            if finished {
+            // Workers should only transition to the `Sleeping` state when all open buckets have
+            // been drained.
+            self.scheduler.assert_all_activated_buckets_are_empty();
+
+            let new_work_available = self.find_more_work_for_workers();
+
+            // GC finishes if there is no new work to do.
+            if !new_work_available {
                 break;
             }
+
+            // Notify all workers because there should be many work packets available in the newly
+            // opened bucket(s).
+            self.scheduler.worker_monitor.resume_and_wait(true);
         }
+
+        // All GC workers must have parked by now.
+        debug_assert!(self.scheduler.worker_monitor.debug_is_sleeping());
         debug_assert!(!self.scheduler.worker_group.has_designated_work());
-        // Sometimes multiple finish messages will be sent. Skip them.
-        for message in self.receiver.try_iter() {
-            match message {
-                CoordinatorMessage::Work(_) => unreachable!(),
-                CoordinatorMessage::Finish => {}
-            }
-        }
+        debug_assert!(self.scheduler.all_buckets_empty());
+
+        // Deactivate all work buckets to prepare for the next GC.
+        // NOTE: There is no need to hold any lock.
+        // Workers are in the `Sleeping` state.
+        // so they will not wake up while we deactivate buckets.
         self.scheduler.deactivate_all();
+
+        // Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.
+        self.mmtk.plan.base().gc_trigger.policy.on_gc_end(self.mmtk);
+
         // Finalization: Resume mutators, reset gc states
         // Note: Resume-mutators must happen after all work buckets are closed.
         //       Otherwise, for generational GCs, workers will receive and process
         //       newly generated remembered-sets from those open buckets.
         //       But these remsets should be preserved until next GC.
-        EndOfGC.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
+        let mut end_of_gc = EndOfGC {
+            elapsed: gc_start.elapsed(),
+        };
+        end_of_gc.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
     }

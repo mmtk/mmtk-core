@@ -1,9 +1,13 @@
 use super::gc_work::GenCopyGCWorkContext;
 use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::plan::generational::global::Gen;
+use crate::plan::generational::global::CommonGenPlan;
+use crate::plan::generational::global::GenerationalPlan;
+use crate::plan::generational::global::GenerationalPlanExt;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -13,24 +17,22 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::Options;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::ObjectQueue;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct GenCopy<VM: VMBinding> {
     #[fallback_trace]
-    pub gen: Gen<VM>,
+    pub gen: CommonGenPlan<VM>,
     pub hi: AtomicBool,
     #[trace(CopySemantics::Mature)]
     pub copyspace0: CopySpace<VM>,
@@ -70,14 +72,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn force_full_heap_collection(&self) {
-        self.gen.force_full_heap_collection()
-    }
-
-    fn last_collection_full_heap(&self) -> bool {
-        self.gen.last_collection_full_heap()
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.gen.get_spaces();
         ret.push(&self.copyspace0);
@@ -97,11 +91,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
             self.hi
@@ -121,19 +115,16 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
             self.fromspace().release();
         }
+    }
 
-        // TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker
-        // NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is
-        // called _after_ all spaces have been released (including ones in `gen`) as otherwise we
-        // may get incorrect results since the function uses values such as available pages that
-        // will change dependant on which spaces have been released
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         self.gen
-            .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
+            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -146,71 +137,91 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     /// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
     fn get_available_pages(&self) -> usize {
-        // super.get_pages_avail() / 2 to reserve pages for copying
+        // super.get_available_pages() / 2 to reserve pages for copying
         (self
             .get_total_pages()
             .saturating_sub(self.get_reserved_pages()))
             >> 1
     }
 
-    fn get_mature_physical_pages_available(&self) -> usize {
-        self.tospace().available_physical_pages()
-    }
-
     fn base(&self) -> &BasePlan<VM> {
         &self.gen.common.base
+    }
+
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.gen.common.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.gen.common
     }
 
-    fn generational(&self) -> &Gen<VM> {
-        &self.gen
+    fn generational(&self) -> Option<&dyn GenerationalPlan<VM = Self::VM>> {
+        Some(self)
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
+    fn is_current_gc_nursery(&self) -> bool {
+        self.gen.is_current_gc_nursery()
     }
 
-    fn is_current_gc_nursery(&self) -> bool {
-        !self.gen.gc_full_heap.load(Ordering::SeqCst)
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
+        self.gen.nursery.in_space(object)
+    }
+
+    fn is_address_in_nursery(&self, addr: Address) -> bool {
+        self.gen.nursery.address_in_space(addr)
+    }
+
+    fn get_mature_physical_pages_available(&self) -> usize {
+        self.tospace().available_physical_pages()
+    }
+
+    fn get_mature_reserved_pages(&self) -> usize {
+        self.tospace().reserved_pages()
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlanExt<VM> for GenCopy<VM> {
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.gen.trace_object_nursery(queue, object, worker)
     }
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        // We have no specific side metadata for copying. So just use the ones from generational.
-        let global_metadata_specs =
-            crate::plan::generational::new_generational_global_metadata_specs::<VM>();
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &GENCOPY_CONSTRAINTS,
+            global_side_metadata_specs:
+                crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
+        };
 
         let copyspace0 = CopySpace::new(
-            "copyspace0",
+            plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
             false,
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
         );
         let copyspace1 = CopySpace::new(
-            "copyspace1",
+            plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
             true,
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
         );
 
         let res = GenCopy {
-            gen: Gen::new(
-                heap,
-                global_metadata_specs,
-                &GENCOPY_CONSTRAINTS,
-                vm_map,
-                mmapper,
-                options,
-            ),
+            gen: CommonGenPlan::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,

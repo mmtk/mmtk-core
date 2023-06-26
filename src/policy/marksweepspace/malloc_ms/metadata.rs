@@ -1,9 +1,9 @@
-use crate::util::alloc_bit;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
@@ -105,7 +105,7 @@ fn map_active_chunk_metadata(chunk_start: Address) {
     );
 }
 
-/// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
+/// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
 pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize) {
@@ -153,16 +153,21 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
 }
 
 /// Check if a given object was allocated by malloc
-pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    has_object_alloced_by_malloc(object.to_address())
+pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
+    is_meta_space_mapped_for_address(object.to_address::<VM>())
+        && vo_bit::is_vo_bit_set::<VM>(object)
 }
 
 /// Check if there is an object allocated by malloc at the address.
 ///
 /// This function doesn't check if `addr` is aligned.
-/// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
-pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
-    is_meta_space_mapped_for_address(addr) && alloc_bit::is_alloced_object(addr)
+/// If not, it will try to load the VO bit for the address rounded down to the metadata's granularity.
+#[cfg(feature = "is_mmtk_object")]
+pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<ObjectReference> {
+    if !is_meta_space_mapped_for_address(addr) {
+        return None;
+    }
+    vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {
@@ -213,8 +218,8 @@ pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
     ACTIVE_CHUNK_METADATA_SPEC.load::<u8>(chunk_start) == 1
 }
 
-pub fn set_alloc_bit(object: ObjectReference) {
-    alloc_bit::set_alloc_bit(object);
+pub fn set_vo_bit<VM: VMBinding>(object: ObjectReference) {
+    vo_bit::set_vo_bit::<VM>(object);
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) {
@@ -222,8 +227,8 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) 
 }
 
 #[allow(unused)]
-pub fn unset_alloc_bit(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit(object);
+pub fn unset_vo_bit<VM: VMBinding>(object: ObjectReference) {
+    vo_bit::unset_vo_bit::<VM>(object);
 }
 
 #[allow(unused)]
@@ -235,20 +240,23 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
     ACTIVE_CHUNK_METADATA_SPEC.store_atomic::<u8>(chunk_start, 1, Ordering::SeqCst);
 }
 
+/// Is this allocation an offset malloc? The argument address should be the allocation address (object start)
 pub(super) fn is_offset_malloc(address: Address) -> bool {
     unsafe { OFFSET_MALLOC_METADATA_SPEC.load::<u8>(address) == 1 }
 }
 
+/// Set the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) fn set_offset_malloc_bit(address: Address) {
     OFFSET_MALLOC_METADATA_SPEC.store_atomic::<u8>(address, 1, Ordering::SeqCst);
 }
 
+/// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
     OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0);
 }
 
-pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit_unsafe(object);
+pub unsafe fn unset_vo_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
+    vo_bit::unset_vo_bit_unsafe::<VM>(object);
 }
 
 #[allow(unused)]
@@ -272,8 +280,8 @@ pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
 pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u128 {
     let meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "extreme_assertions"))]
     metadata_spec.assert_metadata_mapped(data_addr);
 
-    meta_addr.load::<u128>() as u128
+    meta_addr.load::<u128>()
 }

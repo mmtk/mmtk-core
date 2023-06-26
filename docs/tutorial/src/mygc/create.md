@@ -71,17 +71,13 @@ files.
             options: Arc<UnsafeOptionsWrapper>,
         ) -> Box<dyn Plan<VM = VM>> {
             match plan {
-                PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
-                PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-                    vm_map, mmapper, options,
-                )),
+                PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(args)),
+                PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(args)),
 
                 // ...
 
                 // Create MyGC plan based on selector
-                PlanSelector::MyGC => Box::new(crate::plan::mygc::MyGC::new(
-                    vm_map, mmapper, options,
-                ))
+                PlanSelector::MyGC => Box::new(crate::plan::mygc::MyGC::new(args))
             }
         }       
         ```

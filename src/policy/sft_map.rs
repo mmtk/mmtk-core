@@ -1,10 +1,6 @@
 use super::sft::*;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
-#[cfg(debug_assertions)]
-use crate::util::ObjectReference;
-#[cfg(debug_assertions)]
-use crate::vm::VMBinding;
 
 /// SFTMap manages the SFT table, and mapping between addresses with indices in the table. The trait allows
 /// us to have multiple implementations of the SFT table.
@@ -62,40 +58,20 @@ pub trait SFTMap {
     /// The address must have a valid SFT entry in the map. Usually we know this if the address is from an object reference, or from our space address range.
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
     unsafe fn clear(&self, address: Address);
-
-    /// Make sure we have valid SFT entries for the object reference.
-    #[cfg(debug_assertions)]
-    fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
-        use crate::vm::ObjectModel;
-        let object_sft = self.get_checked(object.to_address());
-        let object_start_sft = self.get_checked(VM::VMObjectModel::object_start_ref(object));
-
-        debug_assert!(
-            object_sft.name() != EMPTY_SFT_NAME,
-            "Object {} has empty SFT",
-            object
-        );
-        debug_assert_eq!(
-            object_sft.name(),
-            object_start_sft.name(),
-            "Object {} has incorrect SFT entries (object start = {}, object = {}).",
-            object,
-            object_start_sft.name(),
-            object_sft.name()
-        );
-    }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))] {
-        // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
-        pub type SFTMapType<'a> = dense_chunk_map::SFTDenseChunkMap<'a>;
-    } else if #[cfg(target_pointer_width = "64")] {
-        pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
-    } else if #[cfg(target_pointer_width = "32")] {
-        pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
-    } else {
-        compile_err!("Cannot figure out which SFT map to use.");
+pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
+    cfg_if::cfg_if! {
+        if #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))] {
+            // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
+            return Box::new(dense_chunk_map::SFTDenseChunkMap::<'static>::new());
+        } else if #[cfg(target_pointer_width = "64")] {
+            return Box::new(space_map::SFTSpaceMap::<'static>::new());
+        } else if #[cfg(target_pointer_width = "32")] {
+            return Box::new(sparse_chunk_map::SFTSparseChunkMap::<'static>::new());
+        } else {
+            compile_err!("Cannot figure out which SFT map to use.");
+        }
     }
 }
 
@@ -115,7 +91,6 @@ mod space_map {
     unsafe impl<'a> Sync for SFTSpaceMap<'a> {}
 
     impl<'a> SFTMap for SFTSpaceMap<'a> {
-        #[inline(always)]
         fn has_sft_entry(&self, _addr: Address) -> bool {
             // Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
             // So any address has an SFT entry.
@@ -126,14 +101,12 @@ mod space_map {
             None
         }
 
-        #[inline(always)]
         fn get_checked(&self, address: Address) -> &'a dyn SFT {
             // We should be able to map the entire address range to indices in the table.
             debug_assert!(Self::addr_to_index(address) < self.sft.len());
             unsafe { *self.sft.get_unchecked(Self::addr_to_index(address)) }
         }
 
-        #[inline(always)]
         unsafe fn get_unchecked(&self, address: Address) -> &'a dyn SFT {
             *self.sft.get_unchecked(Self::addr_to_index(address))
         }
@@ -147,8 +120,13 @@ mod space_map {
                 assert!(old.name() == EMPTY_SFT_NAME || old.name() == space.name());
                 // Make sure the range is in the space
                 let space_start = Self::index_to_space_start(index);
-                assert!(start >= space_start);
-                assert!(start + bytes <= space_start + MAX_SPACE_EXTENT);
+                // FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
+                // but the VM space is an exception. Any address after the last space is considered as the last space,
+                // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
+                if index != Self::TABLE_SIZE - 1 {
+                    assert!(start >= space_start);
+                    assert!(start + bytes <= space_start + MAX_SPACE_EXTENT);
+                }
             }
             *mut_self.sft.get_unchecked_mut(index) = space;
         }
@@ -189,7 +167,6 @@ mod space_map {
             &mut *(self as *const _ as *mut _)
         }
 
-        #[inline(always)]
         const fn addr_to_index(addr: Address) -> usize {
             addr.and(Self::ADDRESS_MASK) >> LOG_SPACE_EXTENT
         }
@@ -280,7 +257,6 @@ mod dense_chunk_map {
     unsafe impl<'a> Sync for SFTDenseChunkMap<'a> {}
 
     impl<'a> SFTMap for SFTDenseChunkMap<'a> {
-        #[inline(always)]
         fn has_sft_entry(&self, addr: Address) -> bool {
             if SFT_DENSE_CHUNK_MAP_INDEX.is_mapped(addr) {
                 let index = Self::addr_to_index(addr);
@@ -295,7 +271,6 @@ mod dense_chunk_map {
             Some(&crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX)
         }
 
-        #[inline(always)]
         fn get_checked(&self, address: Address) -> &dyn SFT {
             if self.has_sft_entry(address) {
                 unsafe {
@@ -308,7 +283,6 @@ mod dense_chunk_map {
             }
         }
 
-        #[inline(always)]
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
             *self
                 .sft
@@ -395,7 +369,6 @@ mod dense_chunk_map {
             &mut *(self as *const _ as *mut _)
         }
 
-        #[inline(always)]
         pub fn addr_to_index(addr: Address) -> u8 {
             SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::<u8>(addr, Ordering::Relaxed)
         }
@@ -418,7 +391,6 @@ mod sparse_chunk_map {
     unsafe impl<'a> Sync for SFTSparseChunkMap<'a> {}
 
     impl<'a> SFTMap for SFTSparseChunkMap<'a> {
-        #[inline(always)]
         fn has_sft_entry(&self, addr: Address) -> bool {
             addr.chunk_index() < MAX_CHUNKS
         }
@@ -427,7 +399,6 @@ mod sparse_chunk_map {
             None
         }
 
-        #[inline(always)]
         fn get_checked(&self, address: Address) -> &'a dyn SFT {
             if self.has_sft_entry(address) {
                 unsafe { *self.sft.get_unchecked(address.chunk_index()) }
@@ -436,7 +407,6 @@ mod sparse_chunk_map {
             }
         }
 
-        #[inline(always)]
         unsafe fn get_unchecked(&self, address: Address) -> &'a dyn SFT {
             *self.sft.get_unchecked(address.chunk_index())
         }
@@ -547,8 +517,9 @@ mod sparse_chunk_map {
                 // in which case, we still set SFT map again.
                 debug_assert!(
                     old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
-                    "attempt to overwrite a non-empty chunk {} in SFT map (from {} to {})",
+                    "attempt to overwrite a non-empty chunk {} ({}) in SFT map (from {} to {})",
                     chunk,
+                    crate::util::conversions::chunk_index_to_address(chunk),
                     old,
                     new
                 );

@@ -1,12 +1,13 @@
-use super::map::Map;
+use super::map::VMMap;
 use crate::util::constants::*;
 use crate::util::conversions;
-use crate::util::generic_freelist::GenericFreeList;
+use crate::util::freelist::FreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -27,10 +28,8 @@ pub struct Map64 {
     cumulative_committed_pages: AtomicUsize,
 }
 
-impl Map for Map64 {
-    type FreeList = RawMemoryFreeList;
-
-    fn new() -> Self {
+impl Map64 {
+    pub fn new() -> Self {
         let mut high_water = vec![Address::ZERO; MAX_SPACES];
         let mut base_address = vec![Address::ZERO; MAX_SPACES];
 
@@ -41,7 +40,12 @@ impl Map for Map64 {
         }
 
         Self {
-            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
+            // Note: descriptor_map is very large. Although it is initialized to
+            // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
+            // elide the storing of 0 for each of the element.  Using standard vector creation,
+            // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
+            // slowdown during start-up.
+            descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(MAX_CHUNKS) },
             high_water,
             base_address,
             fl_page_resources: vec![None; MAX_SPACES],
@@ -50,7 +54,9 @@ impl Map for Map64 {
             cumulative_committed_pages: AtomicUsize::new(0),
         }
     }
+}
 
+impl VMMap for Map64 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
         debug_assert!(extent <= SPACE_SIZE_64);
@@ -61,7 +67,7 @@ impl Map for Map64 {
         self_mut.descriptor_map[index] = descriptor;
     }
 
-    fn create_freelist(&self, start: Address) -> Box<Self::FreeList> {
+    fn create_freelist(&self, start: Address) -> Box<dyn FreeList> {
         let units = SPACE_SIZE_64 >> LOG_BYTES_IN_PAGE;
         self.create_parent_freelist(start, units, units as _)
     }
@@ -71,7 +77,7 @@ impl Map for Map64 {
         start: Address,
         mut units: usize,
         grain: i32,
-    ) -> Box<Self::FreeList> {
+    ) -> Box<dyn FreeList> {
         // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut = unsafe { self.mut_self() };
         let index = Self::space_index(start).unwrap();
@@ -202,7 +208,6 @@ impl Map for Map64 {
         self.finalized
     }
 
-    #[inline]
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = Self::space_index(address).unwrap();
         self.descriptor_map[index]

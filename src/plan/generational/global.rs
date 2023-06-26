@@ -1,20 +1,15 @@
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::ObjectQueue;
 use crate::plan::Plan;
-use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
-use crate::util::conversions;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::options::Options;
 use crate::util::statistics::counter::EventCounter;
+use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::{ObjectModel, VMBinding};
@@ -27,7 +22,7 @@ use mmtk_macros::PlanTraceObject;
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
 #[derive(PlanTraceObject)]
-pub struct Gen<VM: VMBinding> {
+pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
     #[trace(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
@@ -41,37 +36,21 @@ pub struct Gen<VM: VMBinding> {
     pub full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
-impl<VM: VMBinding> Gen<VM> {
-    pub fn new(
-        mut heap: HeapMeta,
-        global_metadata_specs: Vec<SideMetadataSpec>,
-        constraints: &'static PlanConstraints,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-    ) -> Self {
+impl<VM: VMBinding> CommonGenPlan<VM> {
+    pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
         let nursery = CopySpace::new(
-            "nursery",
-            false,
+            args.get_space_args(
+                "nursery",
+                true,
+                VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), false),
+            ),
             true,
-            VMRequest::fixed_extent(options.get_max_nursery(), false),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
         );
-        let common = CommonPlan::new(
-            vm_map,
-            mmapper,
-            options,
-            heap,
-            constraints,
-            global_metadata_specs,
-        );
+        let common = CommonPlan::new(args);
 
         let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 
-        Gen {
+        CommonGenPlan {
             nursery,
             common,
             gc_full_heap: AtomicBool::default(),
@@ -118,7 +97,7 @@ impl<VM: VMBinding> Gen<VM> {
     ///
     /// Returns `true` if the nursery has grown to the extent that it may not be able to be copied
     /// into the mature space.
-    fn virtual_memory_exhausted<P: Plan>(&self, plan: &P) -> bool {
+    fn virtual_memory_exhausted(plan: &dyn GenerationalPlan<VM = VM>) -> bool {
         ((plan.get_collection_reserved_pages() as f64
             * VM::VMObjectModel::VM_WORST_CASE_COPY_EXPANSION) as usize)
             > plan.get_mature_physical_pages_available()
@@ -126,20 +105,27 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check if we need a GC based on the nursery space usage. This method may mark
     /// the following GC as a full heap GC.
-    pub fn collection_required<P: Plan>(
+    pub fn collection_required<P: Plan<VM = VM>>(
         &self,
         plan: &P,
         space_full: bool,
         space: Option<&dyn Space<VM>>,
     ) -> bool {
-        let nursery_full = self.nursery.reserved_pages()
-            >= (conversions::bytes_to_pages_up(self.common.base.options.get_max_nursery()));
+        let cur_nursery = self.nursery.reserved_pages();
+        let max_nursery = self.common.base.options.get_max_nursery_pages();
+        let nursery_full = cur_nursery >= max_nursery;
+        trace!(
+            "nursery_full = {:?} (nursery = {}, max_nursery = {})",
+            nursery_full,
+            cur_nursery,
+            max_nursery,
+        );
 
         if nursery_full {
             return true;
         }
 
-        if self.virtual_memory_exhausted(plan) {
+        if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             return true;
         }
 
@@ -158,7 +144,7 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     pub fn force_full_heap_collection(&self) {
-        self.next_gc_full_heap.store(true, Ordering::Relaxed);
+        self.next_gc_full_heap.store(true, Ordering::SeqCst);
     }
 
     pub fn last_collection_full_heap(&self) -> bool {
@@ -167,11 +153,12 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
     /// It also sets gc_full_heap based on the result.
-    pub fn requires_full_heap_collection<P: Plan>(&self, plan: &P) -> bool {
+    pub fn requires_full_heap_collection<P: Plan<VM = VM>>(&self, plan: &P) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
-        #[allow(clippy::if_same_then_else)]
+        #[allow(clippy::if_same_then_else, clippy::needless_bool)]
         let is_full_heap = if crate::plan::generational::FULL_NURSERY_GC {
+            trace!("full heap: forced full heap");
             // For barrier overhead measurements, we always do full gc in nursery collections.
             true
         } else if self
@@ -181,6 +168,7 @@ impl<VM: VMBinding> Gen<VM> {
             .load(Ordering::SeqCst)
             && *self.common.base.options.full_heap_system_gc
         {
+            trace!("full heap: user triggered");
             // User triggered collection, and we force full heap for user triggered collection
             true
         } else if self.next_gc_full_heap.load(Ordering::SeqCst)
@@ -191,12 +179,26 @@ impl<VM: VMBinding> Gen<VM> {
                 .load(Ordering::SeqCst)
                 > 1
         {
+            trace!(
+                "full heap: next_gc_full_heap = {}, cur_collection_attempts = {}",
+                self.next_gc_full_heap.load(Ordering::SeqCst),
+                self.common
+                    .base
+                    .cur_collection_attempts
+                    .load(Ordering::SeqCst)
+            );
             // Forces full heap collection
             true
-        } else if self.virtual_memory_exhausted(plan) {
+        } else if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
+            trace!("full heap: virtual memory exhausted");
             true
         } else {
-            plan.get_total_pages() <= plan.get_reserved_pages()
+            // We use an Appel-style nursery. The default GC (even for a "heap-full" collection)
+            // for generational GCs should be a nursery GC. A full-heap GC should only happen if
+            // there is not enough memory available for allocating into the nursery (i.e. the
+            // available pages in the nursery are less than the minimum nursery pages), if the
+            // virtual memory has been exhausted, or if it is an emergency GC.
+            false
         };
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
@@ -214,6 +216,7 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
+    #[allow(unused)] // We now use `PlanTraceObject`, and this mehtod is not used.
     pub fn trace_object_full_heap<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -266,8 +269,16 @@ impl<VM: VMBinding> Gen<VM> {
     /// [`get_available_pages`](crate::plan::Plan::get_available_pages)
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
-        plan.get_available_pages()
-            < conversions::bytes_to_pages_up(plan.base().options.get_min_nursery())
+        let available = plan.get_available_pages();
+        let min_nursery = plan.base().options.get_min_nursery_pages();
+        let next_gc_full_heap = available < min_nursery;
+        trace!(
+            "next gc will be full heap? {}, available pages = {}, min nursery = {}",
+            next_gc_full_heap,
+            available,
+            min_nursery
+        );
+        next_gc_full_heap
     }
 
     /// Set next_gc_full_heap to the given value.
@@ -277,7 +288,7 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Get pages reserved for the collection by a generational plan. A generational plan should
-    /// add their own reservatioin with the value returned by this method.
+    /// add their own reservation with the value returned by this method.
     pub fn get_collection_reserved_pages(&self) -> usize {
         self.nursery.reserved_pages()
     }
@@ -287,4 +298,55 @@ impl<VM: VMBinding> Gen<VM> {
     pub fn get_used_pages(&self) -> usize {
         self.nursery.reserved_pages() + self.common.get_used_pages()
     }
+}
+
+/// This trait includes methods that are specific to generational plans. This trait needs
+/// to be object safe.
+pub trait GenerationalPlan: Plan {
+    /// Is the current GC a nursery GC? If a GC is not a nursery GC, it will be a full heap GC.
+    /// This should only be called during GC.
+    fn is_current_gc_nursery(&self) -> bool;
+
+    /// Is the object in the nursery?
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
+
+    /// Is the address in the nursery? As we only know addresses rather than object references, the
+    /// implementation cannot access per-object metadata. If the plan does not have knowledge whether
+    /// the address is in nursery or not (e.g. mature/nursery objects share the same space and are
+    /// only differentiated by object metadata), the implementation should return `false` as a more
+    /// conservative result.
+    fn is_address_in_nursery(&self, addr: Address) -> bool;
+
+    /// Return the number of pages available for allocation into the mature space.
+    fn get_mature_physical_pages_available(&self) -> usize;
+
+    /// Return the number of used pages in the mature space.
+    fn get_mature_reserved_pages(&self) -> usize;
+
+    /// Return whether last GC is a full GC.
+    fn last_collection_full_heap(&self) -> bool;
+
+    /// Force the next collection to be full heap.
+    fn force_full_heap_collection(&self);
+}
+
+/// This trait is the extension trait for [`GenerationalPlan`] (see Rust's extension trait pattern).
+/// Generally any method should be put to [`GenerationalPlan`] if possible while keeping [`GenerationalPlan`]
+/// object safe. In this case, generic methods will be put to this extension trait.
+pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {
+    /// Trace an object in nursery collection. If the object is in nursery, we should call `trace_object`
+    /// on the space. Otherwise, we can just return the object.
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+}
+
+/// Is current GC only collecting objects allocated since last GC? This method can be called
+/// with any plan (generational or not). For non generational plans, it will always return false.
+pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
+    plan.generational()
+        .map_or(false, |plan| plan.is_current_gc_nursery())
 }

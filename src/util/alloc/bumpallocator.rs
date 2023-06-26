@@ -1,5 +1,4 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use super::object_ref_guard::adjust_thread_local_buffer_limit;
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
@@ -29,9 +28,9 @@ pub struct BumpAllocator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
-    pub fn set_limit(&mut self, cursor: Address, limit: Address) {
-        self.cursor = cursor;
-        self.limit = adjust_thread_local_buffer_limit::<VM>(limit);
+    pub fn set_limit(&mut self, start: Address, limit: Address) {
+        self.cursor = start;
+        self.limit = limit;
     }
 
     pub fn reset(&mut self) {
@@ -62,7 +61,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         BLOCK_SIZE
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("alloc");
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
@@ -84,7 +83,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         }
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("alloc_slow");
         self.acquire_block(size, align, offset, false)
     }
@@ -101,7 +100,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         if need_poll {
@@ -152,12 +151,11 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
     }
 
-    #[inline]
     fn acquire_block(
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         stress_test: bool,
     ) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);

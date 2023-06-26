@@ -1,5 +1,7 @@
 use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -10,16 +12,11 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::VMWorkerThread;
-use crate::util::options::Options;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -82,7 +79,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -121,8 +118,19 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.tospace().reserved_pages() + self.common.get_used_pages()
     }
 
+    fn get_available_pages(&self) -> usize {
+        (self
+            .get_total_pages()
+            .saturating_sub(self.get_reserved_pages()))
+            >> 1
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
+    }
+
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.common.base
     }
 
     fn common(&self) -> &CommonPlan<VM> {
@@ -131,40 +139,24 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &SS_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
 
         let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
-                "copyspace0",
+                plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
                 false,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
             ),
             copyspace1: CopySpace::new(
-                "copyspace1",
+                plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
                 true,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
             ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &SS_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

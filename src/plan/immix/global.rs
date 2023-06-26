@@ -2,25 +2,24 @@ use super::gc_work::ImmixGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -83,25 +82,15 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        let in_defrag = self.immix_space.decide_whether_to_defrag(
-            self.is_emergency_collection(),
-            true,
-            self.base().cur_collection_attempts.load(Ordering::SeqCst),
-            self.base().is_user_triggered_collection(),
-            *self.base().options.full_heap_system_gc,
-        );
-
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        #[allow(clippy::if_same_then_else)]
-        if in_defrag {
-            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self);
-        } else {
-            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_FAST>>(self);
-        }
+        Self::schedule_immix_full_heap_collection::<
+            Immix<VM>,
+            ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
+            ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>,
+        >(self, &self.immix_space, scheduler)
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -128,37 +117,42 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &self.common.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.common.base
+    }
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
 }
 
 impl<VM: VMBinding> Immix<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &IMMIX_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
+        Self::new_with_args(
+            plan_args,
+            ImmixSpaceArgs {
+                reset_log_bit_in_major_gc: false,
+                unlog_object_when_traced: false,
+                mixed_age: false,
+            },
+        )
+    }
+
+    pub fn new_with_args(
+        mut plan_args: CreateSpecificPlanArgs<VM>,
+        space_args: ImmixSpaceArgs,
     ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         let immix = Immix {
             immix_space: ImmixSpace::new(
-                "immix",
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-                global_metadata_specs.clone(),
+                plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
+                space_args,
             ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &IMMIX_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };
 
@@ -173,5 +167,35 @@ impl<VM: VMBinding> Immix<VM> {
         }
 
         immix
+    }
+
+    /// Schedule a full heap immix collection. This method is used by immix/genimmix/stickyimmix
+    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
+    pub(crate) fn schedule_immix_full_heap_collection<
+        PlanType: Plan<VM = VM>,
+        FastContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
+        DefragContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
+    >(
+        plan: &'static DefragContext::PlanType,
+        immix_space: &ImmixSpace<VM>,
+        scheduler: &GCWorkScheduler<VM>,
+    ) {
+        let in_defrag = immix_space.decide_whether_to_defrag(
+            plan.is_emergency_collection(),
+            true,
+            plan.base().cur_collection_attempts.load(Ordering::SeqCst),
+            plan.base().is_user_triggered_collection(),
+            *plan.base().options.full_heap_system_gc,
+        );
+
+        if in_defrag {
+            scheduler.schedule_common_work::<DefragContext>(plan);
+        } else {
+            scheduler.schedule_common_work::<FastContext>(plan);
+        }
+    }
+
+    pub(in crate::plan) fn set_last_gc_was_defrag(&self, defrag: bool, order: Ordering) {
+        self.last_gc_was_defrag.store(defrag, order)
     }
 }

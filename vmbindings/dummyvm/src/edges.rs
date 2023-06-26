@@ -55,6 +55,10 @@ impl MemorySlice for DummyVMMemorySlice {
         }
     }
 
+    fn object(&self) -> Option<ObjectReference> {
+        None
+    }
+
     fn start(&self) -> Address {
         Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
     }
@@ -88,7 +92,6 @@ pub struct DummyVMMemorySliceIterator {
 impl Iterator for DummyVMMemorySliceIterator {
     type Item = DummyVMEdge;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.limit {
             None
@@ -132,11 +135,11 @@ pub mod only_64_bit {
         fn load(&self) -> ObjectReference {
             let compressed = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let expanded = (compressed as usize) << 3;
-            unsafe { Address::from_usize(expanded).to_object_reference() }
+            ObjectReference::from_raw_address(unsafe { Address::from_usize(expanded) })
         }
 
         fn store(&self, object: ObjectReference) {
-            let expanded = object.to_address().as_usize();
+            let expanded = object.to_raw_address().as_usize();
             let compressed = (expanded >> 3) as u32;
             unsafe { (*self.slot_addr).store(compressed, atomic::Ordering::Relaxed) }
         }
@@ -182,11 +185,11 @@ impl Edge for OffsetEdge {
     fn load(&self) -> ObjectReference {
         let middle = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         let begin = middle - self.offset;
-        unsafe { begin.to_object_reference() }
+        ObjectReference::from_raw_address(begin)
     }
 
     fn store(&self, object: ObjectReference) {
-        let begin = object.to_address();
+        let begin = object.to_raw_address();
         let middle = begin + self.offset;
         unsafe { (*self.slot_addr).store(middle, atomic::Ordering::Relaxed) }
     }
@@ -205,7 +208,6 @@ impl TaggedEdge {
     // Using a two-bit tag should be safe on both 32-bit and 64-bit platforms.
     const TAG_BITS_MASK: usize = 0b11;
 
-    #[inline(always)]
     pub fn new(address: Address) -> Self {
         Self {
             slot_addr: address.to_mut_ptr(),
@@ -217,12 +219,12 @@ impl Edge for TaggedEdge {
     fn load(&self) -> ObjectReference {
         let tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         let untagged = tagged & !Self::TAG_BITS_MASK;
-        unsafe { Address::from_usize(untagged).to_object_reference() }
+        ObjectReference::from_raw_address(unsafe { Address::from_usize(untagged) })
     }
 
     fn store(&self, object: ObjectReference) {
         let old_tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
-        let new_untagged = object.to_address().as_usize();
+        let new_untagged = object.to_raw_address().as_usize();
         let new_tagged = new_untagged | (old_tagged & Self::TAG_BITS_MASK);
         unsafe { (*self.slot_addr).store(new_tagged, atomic::Ordering::Relaxed) }
     }

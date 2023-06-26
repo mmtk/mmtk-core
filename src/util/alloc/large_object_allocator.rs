@@ -34,23 +34,19 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         false
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        #[cfg(debug_assertions)]
-        crate::util::alloc::object_ref_guard::assert_object_ref_in_cell::<VM>(size);
-
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         let cell: Address = self.alloc_slow(size, align, offset);
         // We may get a null ptr from alloc due to the VM being OOM
         if !cell.is_zero() {
-            allocator::align_allocation::<VM>(cell, align, offset, VM::MIN_ALIGNMENT, true)
+            allocator::align_allocation::<VM>(cell, align, offset)
         } else {
             cell
         }
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
         let header = 0; // HashSet is used instead of DoublyLinkedList
-        let maxbytes =
-            allocator::get_maximum_aligned_size::<VM>(size + header, align, VM::MIN_ALIGNMENT);
+        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size + header, align);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
         let sp = self.space.allocate_pages(self.tls, pages);
         if sp.is_zero() {

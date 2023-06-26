@@ -1,3 +1,150 @@
+0.18.0 (2023-04-03)
+===
+
+Plan
+---
+* Add a new plan, `StickyImmix`. This is an variant of immix using a sticky mark bit. This plan allows generational behaviors without using a compulsory copying nursery.
+* Side log bits in generational plans are now set using relaxed store for the entire byte as an optimization.
+
+Policy
+---
+* Add constants `STRESS_DEFRAG` and `DEFRAG_EVERY_BLOCK` to allow immix to stress defrag copying for debugging.
+
+API
+---
+* Add a new write barrier method `object_probable_write`. The method can be called before the fields of an object may get updated without a normal write barrier.
+* Add a feature `immix_non_moving` to replace the current `immix_no_defrag` feature. This is only intended for debugging uses to rule out issues from copying.
+
+Misc
+---
+* Refactor `Mmapper` and `VMMap`. Their implementation is now chosen dynamically, rather than statically based on the pointer size of the architecture. This allows
+  us to use a more appropriate implementation to support compressed pointers.
+* Revert changes in d341506 about forwarding bits, and bulk zero side forward bits for defrag source blocks.
+* Fix a bug in the scheduler where a worker may spuriously wake up and attempt to open new buckets while the coordinator is executing a coordinator work packet, 
+  which would result in an assertion failure.
+* Fix a bug in the mem balancer where subtraction may silently overflow and cause unexpected statistics to be used for computing new heap sizes.
+* Fix a bug where `ScanObjectsWork` does not properly set the worker when it internally uses `ProcessEdgesWork`.
+* Fix a bug where nodes pushed during root scanning were not cached for sanity GC.
+* Fix a bug where `harness_begin` does not force a full heap GC for generational plans.
+* Add info-level logging for each GC to show the memory usage before and after the GC, and elapsed time for the GC.
+
+
+0.17.0 (2023-02-17)
+===
+
+Plan
+---
+* Fix a bug where `SemiSpace::get_available_pages` returned unused pages as 'available pages'. It should return half of the unused pages as 'available'.
+* Fix a bug where generational plans may make full-heap GC decision before all the releasing work is done. Now plans have a `Plan::end_of_gc()` method
+  that is executed after all the GC work is done.
+* Fix a bug where generational plans tended to trigger full heap GCs when heap is full. Now we properly use Appel-style nursery and allow
+  the nursery to extend to the heap size.
+* Add a feature `immix_zero_on_release` as a debug feature for Immix to eagerly zero any reclaimed memory.
+* Fix a bug where the alloc bits for dead objects were still set after the objects were reclaimed. Now Immix eagerly clears the alloc bits
+  once the memory is reclaimed.
+* Fix a bug where Immix uses forwarding bits and forwarding pointers but did not declare it.
+
+
+Allocator
+---
+* Fix a bug about the maximum object size in `FreeListAllocator`. The allowed maximum object size depends on both the block size and the largest bin size.
+
+
+Scheduler
+---
+* Add a 'sentinel' mechanism to execute a specified 'sentinel' work packet when a bucket is drained, and prevent the GC from entering the next stage depending
+  on the sentinel packet. This makes it possible to expand the transitive closure multiple times. It replaces `GCWorkScheduler::closure_end()`.
+
+
+API
+---
+* Add a new set of APIs to support binding-specific weak reference processing:
+  * Add `Scanning::process_weak_refs()` and `Scanning::forward_weak_refs()`. They both supply an `ObjectTracerContext` argument for retaining and
+    updating weak references. `Scanning::process_weak_refs()` allows a boolean return value to indicate if the method should be called again
+    by MMTk after finishing transitive closures for the weak references, which can be used to implement ephemeron.
+  * Add `Collection::post_forwarding()` which is called by MMTk after all weak reference related work is done. A binding can use this call
+    for any post processing for weak references, such as enqueue cleared weak references to a queue (Java).
+  * These replace old methods for the same purpose, like `Collection::process_weak_refs()`, `Collection::vm_release()`, and `memory_manager::on_closure_end`.
+
+
+Misc
+---
+* Upgrade the Rust toolchain we use to 1.66.1 and upgrade MSRV to 1.61.0.
+* Improve the boot time significantly for MMTk:
+  * Space descriptor map is created as an zeroed vector.
+  * Mmapper coalesces the mmap requests for adjancent chunks, and reduces our `mmap` system calls at boot time.
+* Add `GCTrigger` to allow different heuristics to trigger a GC:
+  * Implement `FixedHeapSizeTrigger` that triggers the GC when the maximum heap size is reached (the current approach).
+  * Implement `MemBalancerTrigger` (https://dl.acm.org/doi/pdf/10.1145/3563323) as the dynamic heap resize heuristic.
+* Refactor `SFTMap` so it is dynamically created now.
+* Fix a bug where `Address::store` dropped the value after store.
+* Fix a bug about an incorrect pointer cast in unsafe code in `CommonFreeListPageResource`.
+* Remove all inline directives from our code base. We rely on Rust compiler and PGO for inlining decisions.
+* Remove `SynchronizedCounter`.
+
+
+0.16.0 (2022-12-06)
+===
+
+Plan
+---
+
+* Refactor `MarkSweep` to work with both our native mark sweep policy and the malloc mark sweep policy backed by malloc libraries.
+
+Allocators
+---
+
+* Add `FreeListAllocator` which is implemented as a `MiMalloc` allocator.
+* Fix a bug in `ImmixAllocator` that alignment is properly taken into consideration when deciding whether to do overflow allocation.
+
+Policies
+---
+
+* Add `MarkSweepSpace`:
+  * It uses our native MiMalloc implementation in MMTk core.
+  * When the feature `malloc_mark_sweep` is enabled, it uses the selected malloc library to back up its allocation.
+* Malloc mark sweep now accounts for memory based on page usage, and each malloc library may use a different page size.
+* The immix space now uses the newly added `BlockPageResource`.
+* Changes to Space Function Table (SFT) to improve our boot time and reduce the memory footprint:
+  * Rename the current SFT map to `SFTSparseChunkMap`, and only use it for 32 bits architectures.
+  * Add `SFTSpaceMap` and by default use it for 64 bits architectures.
+  * Add `SFTDenseChunkMap` and use it when we have no control of the virtual address range for a MMTk space on 64 bits architectures.
+
+API
+---
+
+* Add an option `thread_affinity` to set processor affinity for MMTk GC threads.
+* Add `AllocationSemantics::NonMoving` to allocate objects that are known to be non-moving at allocation time.
+* Add `ReferenceGlue::is_referent_cleared` to allow some bindings to use a special value rather than a normal null reference for a cleared referent.
+* Add `pin`, `unpin`, and `is_pinned` for object pinning. Note that some spaces do not support object pinning, and using these methods may
+  cause panic if the space does not support object pinning.
+* Refactor `ObjectReference`:
+  * MMTk core now pervasively uses `ObjectModel::ref_to_address` to get an address from an object reference for setting per-object side metadata.
+  * Add `ObjectModel::address_to_ref` that does the opposite of `ref_to_address`: getting an object reference from an address that is returned by `ref_to_address`.
+  * Add `ObjectModel::ref_to_header` for the binding to tell us the base header address from an object reference.
+  * Rename `ObjectModel::object_start_ref` to `ObjectModel::ref_to_object_start` (to be consistent with other methods).
+  * Remove `ObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL`, as we no longer use the raw address of an object reference.
+  * Add `ObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS`. If a binding uses the same address for `ObjectReference`, `ref_to_address` and `ref_to_object_start`,
+    they should set this to `true`. MMTk can utilize this information for optimization.
+  * Add `ObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND` to specify the minimam value of the possible offsets between an allocation result and object reference's raw address.
+* `destroy_mutator()` no longer requires a boxed mutator as its argument. Instead, a mutable reference to the mutator is required. It is made clear that the binding should
+  manage the lifetime of the boxed mutator from a `bind_mutator()` call.
+* Remove `VMBinding::LOG_MIN_ALIGNMENT` and `VMBinding::MAX_ALIGNMENT_SHIFT` (so we only keep `VMBinding::MIN_ALIGNMENT` and `VMBinding::MAX_ALIGNMENT`).
+
+Misc
+---
+
+* Add a lock-free `BlockPageResource` that can be used for policies that always allocate memory at the granularity of a fixed sized block.
+  This page resource facilitates block allocation and reclamation, and uses lock-free operations where possible.
+* Fix a race condition in `FreeListPageResource` when multiple threads release pages.
+* Fix a bug in `fetch_and/or` in our metadata implementation.
+* Fix a bug in side metadata bulk zeroing that may zero unrelated bits if the zeroed region cannot be mapped to whole metadata bytes.
+* Remove unused `meta_data_pages_per_region` in page resource implementations.
+* Remove the use of `MaybeUninit::uninit().assume_init()` in `FreeListPageResource` which has undefined behaviors
+  and causes the illegal instruction error with newer Rust toolchains.
+* Remove the trait bound `From<Address>` and `Into<Address>` for `Region`, as we cannot guarantee safe conversion between those two types.
+* Extract `Chunk` and `ChunkMap` from the immix policy, and make it available for all the policies.
+
 0.15.0 (2022-09-20)
 ===
 

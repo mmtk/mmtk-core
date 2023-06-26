@@ -1,5 +1,7 @@
 use super::gc_work::PPGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -7,19 +9,14 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::options::Options;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
     plan::global::CommonPlan, policy::largeobjectspace::LargeObjectSpace,
     util::opaque_pointer::VMWorkerThread,
 };
 use enum_map::EnumMap;
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -55,7 +52,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        &*ALLOCATOR_MAPPING
+        &ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -80,13 +77,17 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &self.common.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.common.base
+    }
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
 }
 
 impl<VM: VMBinding> PageProtect<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         // Warn users that the plan may fail due to maximum mapping allowed.
         warn!(
             "PageProtect uses a high volume of memory mappings. \
@@ -99,29 +100,18 @@ impl<VM: VMBinding> PageProtect<VM> {
             }
         );
 
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                "los",
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                &CONSTRAINTS,
+                plan_args.get_space_args("pageprotect", true, VMRequest::discontiguous()),
                 true,
             ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

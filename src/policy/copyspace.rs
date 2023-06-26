@@ -2,17 +2,12 @@ use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
-use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-#[cfg(feature = "global_alloc_bit")]
+#[cfg(feature = "vo_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
@@ -36,6 +31,21 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.is_from_space() || object_forwarding::is_forwarded::<VM>(object)
     }
 
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of CopySpace.")
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of CopySpace.")
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        false
+    }
+
     fn is_movable(&self) -> bool {
         true
     }
@@ -46,11 +56,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
 
-    #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         if !self.is_from_space() {
             return None;
@@ -63,7 +72,11 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         }
     }
 
-    #[inline(always)]
+    #[cfg(feature = "is_mmtk_object")]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    }
+
     fn sft_trace_object(
         &self,
         queue: &mut VectorObjectQueue,
@@ -106,7 +119,6 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -117,47 +129,25 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         self.trace_object(queue, object, copy, worker)
     }
 
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         true
     }
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        from_space: bool,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-    ) -> Self {
-        let local_specs = extract_side_metadata(&[
-            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
-        ]);
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>, from_space: bool) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let common = CommonSpace::new(args.into_policy_args(
+            true,
+            false,
+            extract_side_metadata(&[
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            ]),
+        ));
         CopySpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
@@ -182,21 +172,21 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
-            #[cfg(feature = "global_alloc_bit")]
-            self.reset_alloc_bit();
+            #[cfg(feature = "vo_bit")]
+            self.reset_vo_bit();
             self.pr.reset();
         }
         self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
     }
 
-    #[cfg(feature = "global_alloc_bit")]
-    unsafe fn reset_alloc_bit(&self) {
+    #[cfg(feature = "vo_bit")]
+    unsafe fn reset_vo_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            // If we have allocated something into this space, we need to clear its alloc bit.
+            // If we have allocated something into this space, we need to clear its VO bit.
             if current_chunk != self.common.start {
-                crate::util::alloc_bit::bzero_alloc_bit(
+                crate::util::metadata::vo_bit::bzero_vo_bit(
                     self.common.start,
                     current_chunk + BYTES_IN_CHUNK - self.common.start,
                 );
@@ -210,7 +200,6 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space.load(Ordering::SeqCst)
     }
 
-    #[inline(always)]
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -229,10 +218,10 @@ impl<VM: VMBinding> CopySpace<VM> {
         // This object is in from space, we will copy. Make sure we have a valid copy semantic.
         debug_assert!(semantics.is_some());
 
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
-            "{:x}: alloc bit not set",
+            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            "{:x}: VO bit not set",
             object
         );
 
@@ -253,6 +242,10 @@ impl<VM: VMBinding> CopySpace<VM> {
                 semantics.unwrap(),
                 worker.get_copy_context_mut(),
             );
+
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
+
             trace!("Forwarding pointer");
             queue.enqueue(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
@@ -312,13 +305,12 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
 
     fn release(&mut self) {}
 
-    #[inline(always)]
     fn alloc_copy(
         &mut self,
         _original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
     }

@@ -163,7 +163,6 @@ pub struct WorkStat {
 impl WorkStat {
     /// Stop all work counters for the work packet type of the just executed
     /// work packet
-    #[inline(always)]
     pub fn end_of_work<VM: VMBinding>(&self, worker_stat: &mut WorkerLocalStat<VM>) {
         if !worker_stat.is_enabled() {
             return;
@@ -208,17 +207,14 @@ impl<C> Default for WorkerLocalStat<C> {
 }
 
 impl<VM: VMBinding> WorkerLocalStat<VM> {
-    #[inline]
     pub fn is_enabled(&self) -> bool {
         self.enabled.load(Ordering::SeqCst)
     }
-    #[inline]
     pub fn enable(&self) {
         self.enabled.store(true, Ordering::SeqCst);
     }
     /// Measure the execution of a work packet by starting all counters for that
     /// type
-    #[inline]
     pub fn measure_work(
         &mut self,
         work_id: TypeId,

@@ -23,6 +23,10 @@ impl MetadataSpec {
         matches!(self, &MetadataSpec::OnSide(_))
     }
 
+    pub const fn is_in_header(&self) -> bool {
+        matches!(self, &MetadataSpec::InHeader(_))
+    }
+
     /// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.
     pub const fn extract_side_spec(&self) -> &SideMetadataSpec {
         match self {
@@ -41,14 +45,13 @@ impl MetadataSpec {
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
-    #[inline(always)]
     pub unsafe fn load<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
         mask: Option<T>,
     ) -> T {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load(object.to_address()),
+            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load(object.to_address::<VM>()),
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask)
             }
@@ -64,7 +67,6 @@ impl MetadataSpec {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the ordering for the load operation.
     ///
-    #[inline(always)]
     pub fn load_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -73,7 +75,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.load_atomic(object.to_address(), ordering)
+                metadata_spec.load_atomic(object.to_address::<VM>(), ordering)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::load_metadata_atomic::<T>(metadata_spec, object, mask, ordering)
@@ -91,7 +93,6 @@ impl MetadataSpec {
     ///
     /// # Safety
     /// This is a non-atomic store, thus not thread-safe.
-    #[inline(always)]
     pub unsafe fn store<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -100,7 +101,7 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.store(object.to_address(), val);
+                metadata_spec.store(object.to_address::<VM>(), val);
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask)
@@ -116,7 +117,6 @@ impl MetadataSpec {
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `ordering`: is the ordering for the store operation.
-    #[inline(always)]
     pub fn store_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -126,7 +126,7 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.store_atomic(object.to_address(), val, ordering);
+                metadata_spec.store_atomic(object.to_address::<VM>(), val, ordering);
             }
             MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::store_metadata_atomic::<T>(
                 metadata_spec,
@@ -150,7 +150,6 @@ impl MetadataSpec {
     /// * `success_order`: is the atomic ordering used if the operation is successful.
     /// * `failure_order`: is the atomic ordering used if the operation fails.
     ///
-    #[inline(always)]
     pub fn compare_exchange_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -162,7 +161,7 @@ impl MetadataSpec {
     ) -> std::result::Result<T, T> {
         match self {
             MetadataSpec::OnSide(metadata_spec) => metadata_spec.compare_exchange_atomic(
-                object.to_address(),
+                object.to_address::<VM>(),
                 old_val,
                 new_val,
                 success_order,
@@ -191,7 +190,6 @@ impl MetadataSpec {
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_add_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -200,7 +198,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_add_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_add_atomic(object.to_address::<VM>(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_add_metadata::<T>(metadata_spec, object, val, order)
@@ -217,7 +215,6 @@ impl MetadataSpec {
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_sub_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -226,7 +223,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_sub_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_sub_atomic(object.to_address::<VM>(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_sub_metadata::<T>(metadata_spec, object, val, order)
@@ -243,7 +240,6 @@ impl MetadataSpec {
     /// * `val`: is the value to bit-and with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_and_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -252,7 +248,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_and_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_and_atomic(object.to_address::<VM>(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_and_metadata::<T>(metadata_spec, object, val, order)
@@ -269,7 +265,6 @@ impl MetadataSpec {
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_or_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -278,7 +273,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_or_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_or_atomic(object.to_address::<VM>(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_or_metadata::<T>(metadata_spec, object, val, order)
@@ -296,7 +291,6 @@ impl MetadataSpec {
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     /// * `f`: the update function. The function may be called multiple times.
     ///
-    #[inline(always)]
     pub fn fetch_update_metadata<
         VM: VMBinding,
         T: MetadataValue,
@@ -309,9 +303,12 @@ impl MetadataSpec {
         f: F,
     ) -> std::result::Result<T, T> {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_update_atomic(object.to_address(), set_order, fetch_order, f)
-            }
+            MetadataSpec::OnSide(metadata_spec) => metadata_spec.fetch_update_atomic(
+                object.to_address::<VM>(),
+                set_order,
+                fetch_order,
+                f,
+            ),
             MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::fetch_update_metadata(
                 metadata_spec,
                 object,

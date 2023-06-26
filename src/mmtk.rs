@@ -1,14 +1,12 @@
 ///! MMTk instance.
 use crate::plan::Plan;
-use crate::policy::sft_map::SFTMapType;
+use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::map::Map;
+use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
@@ -31,16 +29,16 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     /// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    pub static ref VM_MAP: VMMap = VMMap::new();
+    pub static ref VM_MAP: Box<dyn VMMap> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Mmapper = Mmapper::new();
+    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
 
 // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
-pub static SFT_MAP: InitializeOnce<SFTMapType<'static>> = InitializeOnce::new();
+pub static SFT_MAP: InitializeOnce<Box<dyn SFTMap>> = InitializeOnce::new();
 
 // MMTk builder. This is used to set options before actually creating an MMTk instance.
 pub struct MMTKBuilder {
@@ -99,7 +97,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
-        SFT_MAP.initialize_once(&SFTMapType::new);
+        SFT_MAP.initialize_once(&create_sft_map);
 
         let num_workers = if cfg!(feature = "single_worker") {
             1
@@ -111,8 +109,8 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let plan = crate::plan::create_plan(
             *options.plan,
-            &VM_MAP,
-            &MMAPPER,
+            VM_MAP.as_ref(),
+            MMAPPER.as_ref(),
             options.clone(),
             scheduler.clone(),
         );
@@ -142,8 +140,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
-        // FIXME Do a full heap GC if we have generational GC
-        self.plan.handle_user_collection_request(tls, true);
+        self.plan.handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
         self.scheduler.enable_stat();
@@ -158,7 +155,6 @@ impl<VM: VMBinding> MMTK<VM> {
         self.plan.as_ref()
     }
 
-    #[inline(always)]
     pub fn get_options(&self) -> &Options {
         &self.options
     }

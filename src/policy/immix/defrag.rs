@@ -29,7 +29,6 @@ impl Defrag {
     const NUM_BINS: usize = (Block::LINES >> 1) + 1;
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
-    const DEFRAG_STRESS: bool = false;
     const DEFRAG_HEADROOM_PERCENT: usize = 2;
 
     /// Allocate a new local histogram.
@@ -38,13 +37,11 @@ impl Defrag {
     }
 
     /// Report back a completed mark histogram
-    #[inline(always)]
     pub fn add_completed_mark_histogram(&self, histogram: Histogram) {
         self.mark_histograms.lock().push(histogram)
     }
 
     /// Check if the current GC is a defrag GC.
-    #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.in_defrag_collection.load(Ordering::Acquire)
     }
@@ -63,7 +60,7 @@ impl Defrag {
             && (emergency_collection
                 || (collection_attempts > 1)
                 || !exhausted_reusable_space
-                || Self::DEFRAG_STRESS
+                || super::STRESS_DEFRAG
                 || (collect_whole_heap && user_triggered && full_heap_system_gc));
         // println!("Defrag: {}", in_defrag);
         self.in_defrag_collection
@@ -76,7 +73,6 @@ impl Defrag {
     }
 
     /// Check if the defrag space is exhausted.
-    #[inline(always)]
     pub fn space_exhausted(&self) -> bool {
         self.defrag_space_exhausted.load(Ordering::Acquire)
     }
@@ -139,7 +135,7 @@ impl Defrag {
         spill_avail_histograms: &mut Histogram,
     ) -> usize {
         let mut total_available_lines = 0;
-        for block in space.reusable_blocks.get_blocks().iter() {
+        space.reusable_blocks.iterate_blocks(|block| {
             let bucket = block.get_holes();
             let unavailable_lines = match block.get_state() {
                 BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
@@ -148,7 +144,7 @@ impl Defrag {
             let available_lines = Block::LINES - unavailable_lines;
             spill_avail_histograms[bucket] += available_lines;
             total_available_lines += available_lines;
-        }
+        });
         total_available_lines
     }
 
@@ -182,7 +178,7 @@ impl Defrag {
             // Calculate the number of free lines in this bucket.
             let this_bucket_avail = spill_avail_histograms[threshold] as isize;
             // Update counters
-            limit -= this_bucket_avail as isize;
+            limit -= this_bucket_avail;
             required_lines += this_bucket_mark;
             // Stop scanning. Lines to evacuate exceeds the free to-space lines.
             if limit < required_lines {
