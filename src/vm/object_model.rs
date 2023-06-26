@@ -76,7 +76,7 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
 
     /// A local 2-bit metadata for the forwarding status bits, used by copying plans. If your runtime requires
-    /// word-aligned addresses (i.e. 2- or 4-bytes), you can use the last two bits in the object header to store
+    /// word-aligned addresses (i.e. 4- or 8-bytes), you can use the last two bits in the object header to store
     /// the forwarding bits. Note that you must be careful if you place this in the header as the runtime may
     /// be using those bits for some other reason.
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
