@@ -248,60 +248,21 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
-        loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
-            let mark_bit = old_value & GC_MARK_BIT_MASK;
-            if mark_bit != 0 {
-                return false;
-            }
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    1,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_or_metadata::<VM, u8>(
+            object,
+            GC_MARK_BIT_MASK,
+            Ordering::SeqCst,
+        );
+        old_value == 0
     }
 
     pub fn test_and_clear_mark(object: ObjectReference) -> bool {
-        loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
-            let mark_bit = old_value & GC_MARK_BIT_MASK;
-            if mark_bit == 0 {
-                return false;
-            }
-
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    0,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.fetch_and_metadata::<VM, u8>(
+            object,
+            !GC_MARK_BIT_MASK,
+            Ordering::SeqCst,
+        );
+        old_value == 1
     }
 
     pub fn is_marked(object: ObjectReference) -> bool {
