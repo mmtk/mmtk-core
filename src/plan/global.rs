@@ -501,7 +501,11 @@ impl<VM: VMBinding> BasePlan<VM> {
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: VMSpace::new(&mut args),
+            vm_space: VMSpace::new(args.get_space_args(
+                "vm_space",
+                false,
+                VMRequest::discontiguous(),
+            )),
 
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),

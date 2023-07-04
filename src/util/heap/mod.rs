@@ -3,6 +3,7 @@ mod accounting;
 pub mod layout;
 pub mod blockpageresource;
 pub mod chunk_map;
+pub mod externalpageresource;
 pub mod freelistpageresource;
 pub mod gc_trigger;
 mod heap_meta;
