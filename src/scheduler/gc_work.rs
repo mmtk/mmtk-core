@@ -249,7 +249,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 /// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
-struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
+pub struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
     process_edges_work: E,
     stage: WorkBucketStage,
 }
@@ -269,6 +269,10 @@ impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
 }
 
 impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
+    pub fn new(process_edges_work: E, stage: WorkBucketStage) -> Self {
+        Self { process_edges_work, stage }
+    }
+
     fn flush_if_full(&mut self) {
         if self.process_edges_work.nodes.is_full() {
             self.flush();

@@ -9,20 +9,21 @@ use crate::vm::VMBinding;
 pub trait EdgeVisitor<ES: Edge> {
     /// Call this function for each edge.
     fn visit_edge(&mut self, edge: ES);
+    fn visit_object_immediately(&mut self, object: ObjectReference) -> ObjectReference;
 }
 
 /// This lets us use closures as EdgeVisitor.
-impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
-    fn visit_edge(&mut self, edge: ES) {
-        #[cfg(debug_assertions)]
-        trace!(
-            "(FunctionClosure) Visit edge {:?} (pointing to {})",
-            edge,
-            edge.load()
-        );
-        self(edge)
-    }
-}
+// impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
+//     fn visit_edge(&mut self, edge: ES) {
+//         #[cfg(debug_assertions)]
+//         trace!(
+//             "(FunctionClosure) Visit edge {:?} (pointing to {})",
+//             edge,
+//             edge.load()
+//         );
+//         self(edge)
+//     }
+// }
 
 /// Callback trait of scanning functions that directly trace through edges.
 pub trait ObjectTracer {
