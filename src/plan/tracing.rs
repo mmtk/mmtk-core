@@ -71,10 +71,14 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
     }
 }
 
+use crate::scheduler::gc_work::ProcessEdgesWorkTracer;
+use crate::vm::ObjectTracer;
+
 /// A transitive closure visitor to collect all the edges of an object.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<EdgeOf<E>>,
     worker: &'a mut GCWorker<E::VM>,
+    tracer: Option<ProcessEdgesWorkTracer<E>>
 }
 
 impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
@@ -82,6 +86,7 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
         Self {
             buffer: VectorQueue::new(),
             worker,
+            tracer: None,
         }
     }
 
@@ -92,6 +97,9 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
                 WorkBucketStage::Closure,
                 E::new(buf, false, self.worker.mmtk),
             );
+        }
+        if let Some(ref mut tracer) = self.tracer {
+            tracer.flush_if_not_empty();
         }
     }
 }
@@ -111,6 +119,15 @@ impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
         if self.buffer.is_full() {
             self.flush();
         }
+    }
+
+    fn visit_object_immediately(&mut self, object: ObjectReference) -> ObjectReference {
+        if self.tracer.is_none() {
+            let mut work = E::new(vec![], false, self.worker.mmtk);
+            work.set_worker(self.worker);
+            self.tracer = Some(ProcessEdgesWorkTracer::<E>::new(work, WorkBucketStage::Closure));
+        }
+        self.tracer.as_mut().unwrap().trace_object(object)
     }
 }
 
