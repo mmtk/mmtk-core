@@ -111,4 +111,29 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
+
+    /// Return the amount of memory (in pages) the VM allocated off-heap which could be released
+    /// by doing GC.  MMTk core will trigger a GC if the amount of allocated memory in MMTk spaces
+    /// plus this amount exceeds a certain limit.
+    ///
+    /// This function will be called when MMTk polls for GC.  It happens every time the allocators
+    /// allocated a certain amount of memory, usually one or a few blocks.  Because this function
+    /// is called very frequently, its implementation must be efficient.
+    ///
+    /// The return value does not have to be precise.  It is a hint for mmtk-core to trigger GC.
+    /// The default implementation which returns 0 should usually work.  But the VM should try its
+    /// best to estimate the amount of memory allocated outside the MMTk heap (e.g. memory obtained
+    /// from `malloc`, `mmap` and other means) that can be released when cleaning up dead objects
+    /// in the MMTk heap (e.g. via finalizers, weak references, etc.).
+    ///
+    /// A page is defined as [`crate::util::constants::LOG_BYTES_IN_PAGE`] which is currently 4096
+    /// bytes.  The VM should account its off-heap allocation by pages because that is how the
+    /// underlying operating system and hardware manage large chunks of memory.  If that is not
+    /// possible (e.g. if the VM uses `malloc` to allocate off-heap memory, and the implementation
+    /// of `malloc` is opaque to the VM), the total number of bytes divided by the page size can be
+    /// use an approximation.  The [`crate::util::conversions::bytes_to_pages_up`] function can be
+    /// helpful.
+    fn vm_allocated_pages() -> usize {
+        0
+    }
 }
