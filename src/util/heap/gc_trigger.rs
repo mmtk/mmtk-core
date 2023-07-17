@@ -4,7 +4,6 @@ use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
@@ -128,7 +127,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
 
     fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the total pages, the heap is full.
-        plan.get_reserved_pages() + VM::VMCollection::vm_allocated_pages() > self.total_pages
+        plan.get_reserved_pages() > self.total_pages
     }
 
     fn get_heap_size_in_pages(&self) -> usize {
@@ -392,8 +391,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
 
     fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the current heap size, the heap is full.
-        plan.get_reserved_pages() + VM::VMCollection::vm_allocated_pages()
-            > self.current_heap_pages.load(Ordering::Relaxed)
+        plan.get_reserved_pages() > self.current_heap_pages.load(Ordering::Relaxed)
     }
 
     fn get_heap_size_in_pages(&self) -> usize {
