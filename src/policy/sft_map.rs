@@ -89,7 +89,6 @@ mod space_map {
     unsafe impl<'a> Sync for SFTSpaceMap<'a> {}
 
     impl<'a> SFTMap for SFTSpaceMap<'a> {
-        #[inline(always)]
         fn has_sft_entry(&self, _addr: Address) -> bool {
             // Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
             // So any address has an SFT entry.
@@ -100,14 +99,12 @@ mod space_map {
             None
         }
 
-        #[inline(always)]
         fn get_checked(&self, address: Address) -> &'a dyn SFT {
             // We should be able to map the entire address range to indices in the table.
             debug_assert!(Self::addr_to_index(address) < self.sft.len());
             unsafe { *self.sft.get_unchecked(Self::addr_to_index(address)) }
         }
 
-        #[inline(always)]
         unsafe fn get_unchecked(&self, address: Address) -> &'a dyn SFT {
             *self.sft.get_unchecked(Self::addr_to_index(address))
         }
@@ -160,7 +157,6 @@ mod space_map {
             &mut *(self as *const _ as *mut _)
         }
 
-        #[inline(always)]
         fn addr_to_index(addr: Address) -> usize {
             addr.and(Self::ADDRESS_MASK) >> VM_LAYOUT_CONSTANTS.log_space_extent
         }
@@ -258,7 +254,6 @@ mod dense_chunk_map {
     unsafe impl<'a> Sync for SFTDenseChunkMap<'a> {}
 
     impl<'a> SFTMap for SFTDenseChunkMap<'a> {
-        #[inline(always)]
         fn has_sft_entry(&self, addr: Address) -> bool {
             if SFT_DENSE_CHUNK_MAP_INDEX.is_mapped(addr) {
                 let index = Self::addr_to_index(addr);
@@ -273,7 +268,6 @@ mod dense_chunk_map {
             Some(&crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX)
         }
 
-        #[inline(always)]
         fn get_checked(&self, address: Address) -> &dyn SFT {
             if self.has_sft_entry(address) {
                 unsafe {
@@ -286,7 +280,6 @@ mod dense_chunk_map {
             }
         }
 
-        #[inline(always)]
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
             *self
                 .sft
@@ -373,7 +366,6 @@ mod dense_chunk_map {
             &mut *(self as *const _ as *mut _)
         }
 
-        #[inline(always)]
         pub fn addr_to_index(addr: Address) -> u8 {
             SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::<u8>(addr, Ordering::Relaxed)
         }
@@ -396,7 +388,6 @@ mod sparse_chunk_map {
     unsafe impl<'a> Sync for SFTSparseChunkMap<'a> {}
 
     impl<'a> SFTMap for SFTSparseChunkMap<'a> {
-        #[inline(always)]
         fn has_sft_entry(&self, addr: Address) -> bool {
             addr.chunk_index() < VM_LAYOUT_CONSTANTS.max_chunks()
         }
@@ -405,7 +396,6 @@ mod sparse_chunk_map {
             None
         }
 
-        #[inline(always)]
         fn get_checked(&self, address: Address) -> &'a dyn SFT {
             if self.has_sft_entry(address) {
                 unsafe { *self.sft.get_unchecked(address.chunk_index()) }
@@ -414,7 +404,6 @@ mod sparse_chunk_map {
             }
         }
 
-        #[inline(always)]
         unsafe fn get_unchecked(&self, address: Address) -> &'a dyn SFT {
             *self.sft.get_unchecked(address.chunk_index())
         }

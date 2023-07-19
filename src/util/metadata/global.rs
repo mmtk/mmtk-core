@@ -41,7 +41,6 @@ impl MetadataSpec {
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
-    #[inline(always)]
     pub unsafe fn load<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -64,7 +63,6 @@ impl MetadataSpec {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the ordering for the load operation.
     ///
-    #[inline(always)]
     pub fn load_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -91,7 +89,6 @@ impl MetadataSpec {
     ///
     /// # Safety
     /// This is a non-atomic store, thus not thread-safe.
-    #[inline(always)]
     pub unsafe fn store<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -116,7 +113,6 @@ impl MetadataSpec {
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `ordering`: is the ordering for the store operation.
-    #[inline(always)]
     pub fn store_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -150,7 +146,6 @@ impl MetadataSpec {
     /// * `success_order`: is the atomic ordering used if the operation is successful.
     /// * `failure_order`: is the atomic ordering used if the operation fails.
     ///
-    #[inline(always)]
     pub fn compare_exchange_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -191,7 +186,6 @@ impl MetadataSpec {
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_add_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -217,7 +211,6 @@ impl MetadataSpec {
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_sub_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -243,7 +236,6 @@ impl MetadataSpec {
     /// * `val`: is the value to bit-and with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_and_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -269,7 +261,6 @@ impl MetadataSpec {
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
-    #[inline(always)]
     pub fn fetch_or_metadata<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
@@ -296,7 +287,6 @@ impl MetadataSpec {
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     /// * `f`: the update function. The function may be called multiple times.
     ///
-    #[inline(always)]
     pub fn fetch_update_metadata<
         VM: VMBinding,
         T: MetadataValue,

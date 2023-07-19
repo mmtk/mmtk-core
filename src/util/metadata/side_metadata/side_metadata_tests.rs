@@ -598,7 +598,7 @@ mod tests {
 
                     // First 9 regions
                     let regions = (0..9)
-                        .map(|i| data_addr + (region_size * i) as usize)
+                        .map(|i| data_addr + (region_size * i))
                         .collect::<Vec<Address>>();
                     // Set metadata for the regions
                     regions
@@ -655,7 +655,7 @@ mod tests {
 
                     // First 9 regions
                     let regions = (0..9)
-                        .map(|i| data_addr + (region_size * i) as usize)
+                        .map(|i| data_addr + (region_size * i))
                         .collect::<Vec<Address>>();
                     // Set metadata for the regions
                     regions

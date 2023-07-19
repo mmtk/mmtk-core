@@ -60,7 +60,6 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
     }
 
-    #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         if !self.is_from_space() {
             return None;
@@ -74,12 +73,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
-    #[inline(always)]
     fn sft_trace_object(
         &self,
         queue: &mut VectorObjectQueue,
@@ -122,7 +119,6 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 }
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
-    #[inline(always)]
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         queue: &mut Q,
@@ -133,7 +129,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         self.trace_object(queue, object, copy, worker)
     }
 
-    #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         true
     }
@@ -205,7 +200,6 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space.load(Ordering::SeqCst)
     }
 
-    #[inline(always)]
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -307,7 +301,6 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
 
     fn release(&mut self) {}
 
-    #[inline(always)]
     fn alloc_copy(
         &mut self,
         _original: ObjectReference,

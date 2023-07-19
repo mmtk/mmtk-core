@@ -164,3 +164,5 @@ impl FixtureContent for MutatorFixture {
         }
     }
 }
+
+unsafe impl Send for MutatorFixture {}

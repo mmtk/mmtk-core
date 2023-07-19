@@ -107,7 +107,7 @@ impl Counter for EventCounter {
             }
             Some(m) => {
                 let mut total = 0;
-                let mut p = if m { 0 } else { 1 };
+                let mut p = !m as usize;
                 while p <= self.stats.get_phase() {
                     total += self.count[p];
                     p += 2;
@@ -122,7 +122,7 @@ impl Counter for EventCounter {
     }
 
     fn print_min(&self, other: bool) {
-        let mut p = if other { 0 } else { 1 };
+        let mut p = !other as usize;
         let mut min = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] < min {
@@ -134,7 +134,7 @@ impl Counter for EventCounter {
     }
 
     fn print_max(&self, other: bool) {
-        let mut p = if other { 0 } else { 1 };
+        let mut p = !other as usize;
         let mut max = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] > max {
