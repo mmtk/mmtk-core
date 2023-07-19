@@ -9,6 +9,7 @@ use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::statistics::counter::EventCounter;
+use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::{ObjectModel, VMBinding};
@@ -143,7 +144,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     pub fn force_full_heap_collection(&self) {
-        self.next_gc_full_heap.store(true, Ordering::Relaxed);
+        self.next_gc_full_heap.store(true, Ordering::SeqCst);
     }
 
     pub fn last_collection_full_heap(&self) -> bool {
@@ -215,6 +216,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
+    #[allow(unused)] // We now use `PlanTraceObject`, and this mehtod is not used.
     pub fn trace_object_full_heap<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -271,7 +273,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let min_nursery = plan.base().options.get_min_nursery_pages();
         let next_gc_full_heap = available < min_nursery;
         trace!(
-            "next gc will be full heap? {}, availabe pages = {}, min nursery = {}",
+            "next gc will be full heap? {}, available pages = {}, min nursery = {}",
             next_gc_full_heap,
             available,
             min_nursery
@@ -286,7 +288,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     /// Get pages reserved for the collection by a generational plan. A generational plan should
-    /// add their own reservatioin with the value returned by this method.
+    /// add their own reservation with the value returned by this method.
     pub fn get_collection_reserved_pages(&self) -> usize {
         self.nursery.reserved_pages()
     }
@@ -298,21 +300,53 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 }
 
-/// This trait include methods that are specific to generational plans.
+/// This trait includes methods that are specific to generational plans. This trait needs
+/// to be object safe.
 pub trait GenerationalPlan: Plan {
-    /// Return the common generational implementation [`crate::plan::generational::global::CommonGenPlan`].
-    fn common_gen(&self) -> &CommonGenPlan<Self::VM>;
+    /// Is the current GC a nursery GC? If a GC is not a nursery GC, it will be a full heap GC.
+    /// This should only be called during GC.
+    fn is_current_gc_nursery(&self) -> bool;
+
+    /// Is the object in the nursery?
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
+
+    /// Is the address in the nursery? As we only know addresses rather than object references, the
+    /// implementation cannot access per-object metadata. If the plan does not have knowledge whether
+    /// the address is in nursery or not (e.g. mature/nursery objects share the same space and are
+    /// only differentiated by object metadata), the implementation should return `false` as a more
+    /// conservative result.
+    fn is_address_in_nursery(&self, addr: Address) -> bool;
 
     /// Return the number of pages available for allocation into the mature space.
     fn get_mature_physical_pages_available(&self) -> usize;
 
     /// Return the number of used pages in the mature space.
     fn get_mature_reserved_pages(&self) -> usize;
+
+    /// Return whether last GC is a full GC.
+    fn last_collection_full_heap(&self) -> bool;
+
+    /// Force the next collection to be full heap.
+    fn force_full_heap_collection(&self);
+}
+
+/// This trait is the extension trait for [`GenerationalPlan`] (see Rust's extension trait pattern).
+/// Generally any method should be put to [`GenerationalPlan`] if possible while keeping [`GenerationalPlan`]
+/// object safe. In this case, generic methods will be put to this extension trait.
+pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {
+    /// Trace an object in nursery collection. If the object is in nursery, we should call `trace_object`
+    /// on the space. Otherwise, we can just return the object.
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
 }
 
 /// Is current GC only collecting objects allocated since last GC? This method can be called
 /// with any plan (generational or not). For non generational plans, it will always return false.
 pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
     plan.generational()
-        .map_or(false, |plan| plan.common_gen().is_current_gc_nursery())
+        .map_or(false, |plan| plan.is_current_gc_nursery())
 }

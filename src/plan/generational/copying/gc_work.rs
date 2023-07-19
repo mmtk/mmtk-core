@@ -9,7 +9,7 @@ pub struct GenCopyNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<V
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyNurseryGCWorkContext<VM> {
     type VM = VM;
     type PlanType = GenCopy<VM>;
-    type ProcessEdgesWorkType = GenNurseryProcessEdges<Self::VM>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<Self::VM, Self::PlanType>;
 }
 
 pub struct GenCopyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);

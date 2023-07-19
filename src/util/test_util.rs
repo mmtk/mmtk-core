@@ -25,6 +25,20 @@ impl MmapTestRegion {
     }
 }
 
+// Make sure we use the address range before our heap start so we won't conflict with our heap range.
+const_assert!(
+    TEST_ADDRESS.as_usize()
+        <= crate::util::heap::layout::vm_layout_constants::HEAP_START.as_usize()
+);
+
+// Test with an address that works for 32bits.
+#[cfg(target_os = "linux")]
+const TEST_ADDRESS: Address =
+    crate::util::conversions::chunk_align_down(unsafe { Address::from_usize(0x6000_0000) });
+#[cfg(target_os = "macos")]
+const TEST_ADDRESS: Address =
+    crate::util::conversions::chunk_align_down(unsafe { Address::from_usize(0x2_0000_0000) });
+
 // util::heap::layout::fragmented_mmapper
 pub(crate) fn fragmented_mmapper_test_region() -> MmapTestRegion {
     MmapTestRegion::reserve_before_address(VM_LAYOUT_CONSTANTS.heap_start, MMAP_CHUNK_BYTES * 2)

@@ -1,4 +1,4 @@
-use super::map::Map;
+use super::map::VMMap;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
@@ -52,7 +52,7 @@ impl Map32 {
     }
 }
 
-impl Map for Map32 {
+impl VMMap for Map32 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.

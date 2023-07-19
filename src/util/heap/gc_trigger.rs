@@ -54,13 +54,15 @@ impl<VM: VMBinding> GCTrigger<VM> {
         let plan = unsafe { self.plan.assume_init() };
         if self.policy.is_gc_required(space_full, space, plan) {
             info!(
-                "[POLL] {}{}",
+                "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {
                     format!("{}: ", space.get_name())
                 } else {
                     "".to_string()
                 },
-                "Triggering collection"
+                "Triggering collection",
+                plan.get_reserved_pages(),
+                plan.get_total_pages(),
             );
             plan.base().gc_requester.request();
             return true;
@@ -230,11 +232,13 @@ impl MemBalancerStats {
         &mut self,
         plan: &dyn GenerationalPlan<VM = VM>,
     ) {
-        if !plan.common_gen().is_current_gc_nursery() {
+        if !plan.is_current_gc_nursery() {
             self.gc_release_live_pages = plan.get_mature_reserved_pages();
 
             // Calculate the promoted pages (including pre tentured objects)
-            let promoted = self.gc_release_live_pages - self.gc_end_live_pages;
+            let promoted = self
+                .gc_release_live_pages
+                .saturating_sub(self.gc_end_live_pages);
             self.allocation_pages = promoted as f64;
             trace!(
                 "promoted = mature live before release {} - mature live at prev gc end {} = {}",
@@ -253,9 +257,11 @@ impl MemBalancerStats {
         &mut self,
         plan: &dyn GenerationalPlan<VM = VM>,
     ) -> bool {
-        if !plan.common_gen().is_current_gc_nursery() {
+        if !plan.is_current_gc_nursery() {
             self.gc_end_live_pages = plan.get_mature_reserved_pages();
-            self.collection_pages = (self.gc_release_live_pages - self.gc_end_live_pages) as f64;
+            self.collection_pages = self
+                .gc_release_live_pages
+                .saturating_sub(self.gc_end_live_pages) as f64;
             trace!(
                 "collected pages = mature live at gc end {} - mature live at gc release {} = {}",
                 self.gc_release_live_pages,
@@ -273,7 +279,10 @@ impl MemBalancerStats {
     // * collection = live pages at the end of GC - live pages before release
 
     fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
-        self.allocation_pages = (mmtk.plan.get_reserved_pages() - self.gc_end_live_pages) as f64;
+        self.allocation_pages = mmtk
+            .plan
+            .get_reserved_pages()
+            .saturating_sub(self.gc_end_live_pages) as f64;
         trace!(
             "allocated pages = used {} - live in last gc {} = {}",
             mmtk.plan.get_reserved_pages(),
@@ -288,7 +297,9 @@ impl MemBalancerStats {
     fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.gc_end_live_pages = mmtk.plan.get_reserved_pages();
         trace!("live pages = {}", self.gc_end_live_pages);
-        self.collection_pages = (self.gc_release_live_pages - self.gc_end_live_pages) as f64;
+        self.collection_pages = self
+            .gc_release_live_pages
+            .saturating_sub(self.gc_end_live_pages) as f64;
         trace!(
             "collected pages = live at gc end {} - live at gc release {} = {}",
             self.gc_release_live_pages,
@@ -471,14 +482,15 @@ impl MemBalancerTrigger {
         stats.collection_time = 0f64;
 
         // Calculate the square root
-        let e: f64 = if gc_mem != 0f64 {
+        let e: f64 = if alloc_mem != 0f64 && gc_mem != 0f64 && alloc_time != 0f64 && gc_time != 0f64
+        {
             let mut e = live as f64;
             e *= alloc_mem / alloc_time;
             e /= TUNING_FACTOR;
             e /= gc_mem / gc_time;
             e.sqrt()
         } else {
-            // If collected memory is zero, we cannot do division by zero. So use an estimate value instead.
+            // If any collected stat is abnormal, we use the fallback heuristics.
             (live as f64 * 4096f64).sqrt()
         };
 

@@ -219,11 +219,18 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
 impl<E: ProcessEdgesWork> CoordinatorWork<E::VM> for StopMutators<E> {}
 
 #[derive(Default)]
-pub struct EndOfGC;
+pub struct EndOfGC {
+    pub elapsed: std::time::Duration,
+}
 
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        info!("End of GC");
+        info!(
+            "End of GC ({}/{} pages, took {} ms)",
+            mmtk.plan.get_reserved_pages(),
+            mmtk.plan.get_total_pages(),
+            self.elapsed.as_millis()
+        );
 
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
@@ -590,7 +597,7 @@ pub trait ProcessEdgesWork:
             .sanity_checker
             .lock()
             .unwrap()
-            .add_roots(self.edges.clone());
+            .add_root_edges(self.edges.clone());
     }
 
     /// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
@@ -644,7 +651,6 @@ pub trait ProcessEdgesWork:
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("ProcessEdgesWork");
         self.set_worker(worker);
         self.process_edges();
         if !self.nodes.is_empty() {
@@ -769,6 +775,16 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
     ) {
         let tls = worker.tls;
 
+        #[cfg(feature = "sanity")]
+        {
+            if self.roots() {
+                mmtk.sanity_checker
+                    .lock()
+                    .unwrap()
+                    .add_root_nodes(buffer.to_vec());
+            }
+        }
+
         // If this is a root packet, the objects in this packet will have not been traced, yet.
         //
         // This step conceptually traces the edges from root slots to the objects they point to.
@@ -781,6 +797,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         let scanned_root_objects = self.roots().then(|| {
             // We create an instance of E to use its `trace_object` method and its object queue.
             let mut process_edges_work = Self::E::new(vec![], false, mmtk);
+            process_edges_work.set_worker(worker);
 
             for object in buffer.iter().copied() {
                 let new_object = process_edges_work.trace_object(object);
@@ -806,6 +823,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             let mut closure = ObjectsClosure::<Self::E>::new(worker);
             for object in objects_to_scan.iter().copied() {
                 if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
+                    trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
@@ -831,6 +849,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 // Scan objects and trace their edges at the same time.
                 for object in scan_later.iter().copied() {
+                    trace!("Scan object (node) {}", object);
                     <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
                         tls,
                         object,

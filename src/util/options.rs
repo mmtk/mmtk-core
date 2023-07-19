@@ -24,6 +24,7 @@ pub enum PlanSelector {
     PageProtect,
     Immix,
     MarkCompact,
+    StickyImmix,
 }
 
 /// MMTk option for perf events

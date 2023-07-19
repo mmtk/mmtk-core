@@ -43,6 +43,8 @@ extern crate crossbeam;
 extern crate num_cpus;
 #[macro_use]
 extern crate downcast_rs;
+#[macro_use]
+extern crate static_assertions;
 
 mod mmtk;
 pub use mmtk::MMTKBuilder;

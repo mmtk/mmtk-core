@@ -1,4 +1,4 @@
-use super::map::Map;
+use super::map::VMMap;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
@@ -58,7 +58,7 @@ impl Map64 {
     }
 }
 
-impl Map for Map64 {
+impl VMMap for Map64 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
         debug_assert!(extent <= VM_LAYOUT_CONSTANTS.space_size_64);
