@@ -259,6 +259,9 @@ pub trait Plan: 'static + Sync + Downcast {
         let used_pages = self.get_used_pages();
         let collection_reserve = self.get_collection_reserved_pages();
         let vm_live_bytes = <Self::VM as VMBinding>::VMCollection::vm_live_bytes();
+        // Note that `vm_live_bytes` may not be the exact number of bytes in whole pages.  The VM
+        // binding is allowed to return an approximate value if it is expensive or impossible to
+        // compute the exact number of pages occupied.
         let vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
         let total = used_pages + collection_reserve + vm_live_pages;
 
