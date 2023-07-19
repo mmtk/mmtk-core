@@ -112,23 +112,22 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
 
-    /// Return the amount of memory (in bytes) the VM allocated (but not released yet) outside the
-    /// MMTk heap which can be released by doing GC.
+    /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
+    /// wants to include into the current MMTk heap size.
     ///
-    /// MMTk core will add this amount to the amount of memory allocated or reserved in MMTk
-    /// spaces, and will trigger a GC if the sum exceeds a certain limit.
+    /// MMTk core will consider this amount for triggering GC.  In the current implementation, MMTk
+    /// will add this amount to the amount of memory allocated or reserved in MMTk spaces, and will
+    /// trigger a GC if the sum exceeds the maximum heap size or a limit dynamically determined by
+    /// the MemBalancer.
     ///
-    /// MMTk does not specify what memory this amount should includes.  However, because this
-    /// amount is used to trigger GC, it is advisable to include memory that can be released by
-    /// executing finalizers or other language-specific cleaning-up routines that are executed when
-    /// an in-heap object is dead.  For example, if a language implementation allocates array
-    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
-    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
-    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
-    ///
-    /// This function is a hint for the MMTk core to trigger GC, therefore does not have to be
-    /// precise.  However, the more precise it is, the better the MMTk core and the VM can work
-    /// together to control the memory footprint of the VM.
+    /// MMTk does not specify what memory this amount should include.  However, because this amount
+    /// is used to trigger GC, it is advisable to include memory that is kept alive by heap objects
+    /// and can be released by executing finalizers (or other language-specific cleaning-up
+    /// routines) that are executed when the heap objects are dead.  For example, if a language
+    /// implementation allocates array headers in the MMTk heap, but allocates their underlying
+    /// buffers that hold the actual elements using `malloc`, then those buffers should be included
+    /// in this amount.  When the GC finds such an array dead, its finalizer shall `free` the
+    /// buffer and reduce this amount.
     ///
     /// If possible, the VM should account off-heap memory by pages.  That is, count the number of
     /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
@@ -140,15 +139,16 @@ pub trait Collection<VM: VMBinding> {
     /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
     /// can simply return the total number of bytes of those off-heap objects as an approximation.
     ///
-    /// The default implementation which returns 0 should also work if the VM only allocates a
-    /// small amount of off-heap objects.
-    ///
     /// # Performance note
     ///
-    /// This function will be called when MMTk polls for GC.  It happens every time the allocators
-    /// allocated a certain amount of memory, usually one or a few blocks.  Because this function
-    /// is called very frequently, its implementation must be efficient.
+    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
+    /// allocators allocated a certain amount of memory, usually one or a few blocks.  Because this
+    /// function is called very frequently, its implementation must be efficient.  If it is too
+    /// expensive to compute the exact amount, an approximate value should be sufficient for MMTk
+    /// to trigger GC promptly in order to release off-heap memory, and keep the memory footprint
+    /// under control.
     fn vm_live_bytes() -> usize {
+        // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
         0
     }
 }
