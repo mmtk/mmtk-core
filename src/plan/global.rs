@@ -25,7 +25,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
-use crate::util::ObjectReference;
+use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
@@ -253,19 +253,21 @@ pub trait Plan: 'static + Sync + Downcast {
     // if necessary.
 
     /// Get the number of pages that are reserved, including pages used by MMTk spaces, pages that
-    /// will be used (e.g. for copying), and VM-allocated pages as reported by the VM binding.
+    /// will be used (e.g. for copying), and live pages allocated by the VM as reported by the VM
+    /// binding.
     fn get_reserved_pages(&self) -> usize {
         let used_pages = self.get_used_pages();
         let collection_reserve = self.get_collection_reserved_pages();
-        let vm_allocated_pages = <Self::VM as VMBinding>::VMCollection::vm_allocated_pages();
-        let total = used_pages + collection_reserve + vm_allocated_pages;
+        let vm_live_bytes = <Self::VM as VMBinding>::VMCollection::vm_live_bytes();
+        let vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
+        let total = used_pages + collection_reserve + vm_live_pages;
 
         trace!(
-            "Reserved pages = {}, used pages: {}, collection reserve: {}, VM-allocated pages: {}",
+            "Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}",
             total,
             used_pages,
             collection_reserve,
-            vm_allocated_pages,
+            vm_live_pages,
         );
 
         total

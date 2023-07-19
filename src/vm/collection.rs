@@ -112,28 +112,43 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
 
-    /// Return the amount of memory (in pages) the VM allocated off-heap which could be released
-    /// by doing GC.  MMTk core will trigger a GC if the amount of allocated memory in MMTk spaces
-    /// plus this amount exceeds a certain limit.
+    /// Return the amount of memory (in bytes) the VM allocated (but not released yet) outside the
+    /// MMTk heap which can be released by doing GC.
+    ///
+    /// MMTk core will add this amount to the amount of memory allocated or reserved in MMTk
+    /// spaces, and will trigger a GC if the sum exceeds a certain limit.
+    ///
+    /// MMTk does not specify what memory this amount should includes.  However, because this
+    /// amount is used to trigger GC, it is advisable to include memory that can be released by
+    /// executing finalizers or other language-specific cleaning-up routines that are executed when
+    /// an in-heap object is dead.  For example, if a language implementation allocates array
+    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
+    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
+    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
+    ///
+    /// This function is a hint for the MMTk core to trigger GC, therefore does not have to be
+    /// precise.  However, the more precise it is, the better the MMTk core and the VM can work
+    /// together to control the memory footprint of the VM.
+    ///
+    /// If possible, the VM should account off-heap memory by pages.  That is, count the number of
+    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
+    /// instead of individual objects.  Because the underlying operating system manages memory at
+    /// page granularity, the occupied pages (instead of individual objects) determine the memory
+    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
+    ///
+    /// However, if the VM is incapable of accouting off-heap memory by pages (for example, if the
+    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
+    /// can simply return the total number of bytes of those off-heap objects as an approximation.
+    ///
+    /// The default implementation which returns 0 should also work if the VM only allocates a
+    /// small amount of off-heap objects.
+    ///
+    /// # Performance note
     ///
     /// This function will be called when MMTk polls for GC.  It happens every time the allocators
     /// allocated a certain amount of memory, usually one or a few blocks.  Because this function
     /// is called very frequently, its implementation must be efficient.
-    ///
-    /// The return value does not have to be precise.  It is a hint for mmtk-core to trigger GC.
-    /// The default implementation which returns 0 should usually work.  But the VM should try its
-    /// best to estimate the amount of memory allocated outside the MMTk heap (e.g. memory obtained
-    /// from `malloc`, `mmap` and other means) that can be released when cleaning up dead objects
-    /// in the MMTk heap (e.g. via finalizers, weak references, etc.).
-    ///
-    /// A page is defined as [`crate::util::constants::LOG_BYTES_IN_PAGE`] which is currently 4096
-    /// bytes.  The VM should account its off-heap allocation by pages because that is how the
-    /// underlying operating system and hardware manage large chunks of memory.  If that is not
-    /// possible (e.g. if the VM uses `malloc` to allocate off-heap memory, and the implementation
-    /// of `malloc` is opaque to the VM), the total number of bytes divided by the page size can be
-    /// use an approximation.  The [`crate::util::conversions::bytes_to_pages_up`] function can be
-    /// helpful.
-    fn vm_allocated_pages() -> usize {
+    fn vm_live_bytes() -> usize {
         0
     }
 }
