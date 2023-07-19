@@ -113,21 +113,15 @@ pub trait Collection<VM: VMBinding> {
     fn post_forwarding(_tls: VMWorkerThread) {}
 
     /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
-    /// wants to include into the current MMTk heap size.
+    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
+    /// memory as part of MMTk heap for the purpose of heap size accounting.
     ///
-    /// MMTk core will consider this amount for triggering GC.  In the current implementation, MMTk
-    /// will add this amount to the amount of memory allocated or reserved in MMTk spaces, and will
-    /// trigger a GC if the sum exceeds the maximum heap size or a limit dynamically determined by
-    /// the MemBalancer.
-    ///
-    /// MMTk does not specify what memory this amount should include.  However, because this amount
-    /// is used to trigger GC, it is advisable to include memory that is kept alive by heap objects
-    /// and can be released by executing finalizers (or other language-specific cleaning-up
-    /// routines) that are executed when the heap objects are dead.  For example, if a language
-    /// implementation allocates array headers in the MMTk heap, but allocates their underlying
-    /// buffers that hold the actual elements using `malloc`, then those buffers should be included
-    /// in this amount.  When the GC finds such an array dead, its finalizer shall `free` the
-    /// buffer and reduce this amount.
+    /// This amount should include memory that is kept alive by heap objects and can be released by
+    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
+    /// when the heap objects are dead.  For example, if a language implementation allocates array
+    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
+    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
+    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
     ///
     /// If possible, the VM should account off-heap memory by pages.  That is, count the number of
     /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
