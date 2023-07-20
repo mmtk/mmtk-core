@@ -364,6 +364,20 @@ pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
     crate::util::malloc::counted_malloc(mmtk, size)
 }
 
+pub fn posix_memalign(ptr: *mut Address, align: usize, size: usize) -> i32 {
+    crate::util::malloc::posix_memalign(ptr, align, size)
+}
+
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_posix_memalign<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    ptr: *mut Address,
+    align: usize,
+    size: usize,
+) -> i32 {
+    crate::util::malloc::counted_posix_memalign(mmtk, ptr, align, size)
+}
+
 /// The standard calloc.
 pub fn calloc(num: usize, size: usize) -> Address {
     crate::util::malloc::calloc(num, size)
@@ -385,13 +399,13 @@ pub fn realloc(addr: Address, size: usize) -> Address {
 /// Thus the method requires a reference to an MMTk instance, and the size of the existing memory that will be reallocated.
 /// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
 #[cfg(feature = "malloc_counted_size")]
-pub fn realloc_with_old_size<VM: VMBinding>(
+pub fn counted_realloc_with_old_size<VM: VMBinding>(
     mmtk: &MMTK<VM>,
     addr: Address,
     size: usize,
     old_size: usize,
 ) -> Address {
-    crate::util::malloc::realloc_with_old_size(mmtk, addr, size, old_size)
+    crate::util::malloc::counted_realloc_with_old_size(mmtk, addr, size, old_size)
 }
 
 /// The standard free.
@@ -404,8 +418,13 @@ pub fn free(addr: Address) {
 /// Thus the method requires a reference to an MMTk instance, and the size of the memory to free.
 /// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
 #[cfg(feature = "malloc_counted_size")]
-pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
-    crate::util::malloc::free_with_size(mmtk, addr, old_size)
+pub fn counted_free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
+    crate::util::malloc::counted_free_with_size(mmtk, addr, old_size)
+}
+
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_free<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address) {
+    crate::util::malloc::counted_free(mmtk, addr)
 }
 
 /// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block

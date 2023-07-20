@@ -32,6 +32,24 @@ pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
     res
 }
 
+pub fn posix_memalign(ptr: *mut Address, align: usize, size: usize) -> i32 {
+    unsafe { self::library::posix_memalign(ptr as _, align, size) }
+}
+
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_posix_memalign<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    ptr: *mut Address,
+    align: usize,
+    size: usize,
+) -> i32 {
+    let ret = unsafe { self::library::posix_memalign(ptr as _, align, size) };
+    if ret == 0 {
+        mmtk.plan.base().increase_malloc_bytes_by(size);
+    }
+    ret
+}
+
 pub fn calloc(num: usize, size: usize) -> Address {
     Address::from_mut_ptr(unsafe { self::library::calloc(num, size) })
 }
@@ -50,7 +68,7 @@ pub fn realloc(addr: Address, size: usize) -> Address {
 }
 
 #[cfg(feature = "malloc_counted_size")]
-pub fn realloc_with_old_size<VM: VMBinding>(
+pub fn counted_realloc_with_old_size<VM: VMBinding>(
     mmtk: &MMTK<VM>,
     addr: Address,
     size: usize,
@@ -73,9 +91,18 @@ pub fn free(addr: Address) {
 }
 
 #[cfg(feature = "malloc_counted_size")]
-pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
+pub fn counted_free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
     free(addr);
     if !addr.is_zero() {
         mmtk.plan.base().decrease_malloc_bytes_by(old_size);
+    }
+}
+
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_free<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address) {
+    let sz = unsafe { self::library::malloc_usable_size(addr.to_mut_ptr()) };
+    free(addr);
+    if !addr.is_zero() {
+        mmtk.plan.base().decrease_malloc_bytes_by(sz);
     }
 }
