@@ -253,8 +253,8 @@ pub trait Plan: 'static + Sync + Downcast {
     // if necessary.
 
     /// Get the number of pages that are reserved, including pages used by MMTk spaces, pages that
-    /// will be used (e.g. for copying), and live pages allocated by the VM as reported by the VM
-    /// binding.
+    /// will be used (e.g. for copying), and live pages allocated outside MMTk spaces as reported
+    /// by the VM binding.
     fn get_reserved_pages(&self) -> usize {
         let used_pages = self.get_used_pages();
         let collection_reserve = self.get_collection_reserved_pages();
