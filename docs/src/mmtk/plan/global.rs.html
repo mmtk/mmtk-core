@@ -1043,6 +1043,26 @@
 <span id="1043">1043</span>
 <span id="1044">1044</span>
 <span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1070,7 +1090,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
 <span class="kw">use </span><span class="kw">crate</span>::util::options::PlanSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::Stats;
-<span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+<span class="kw">use </span><span class="kw">crate</span>::util::{conversions, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span>downcast_rs::Downcast;
@@ -1297,10 +1317,28 @@
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
     // if necessary.
 
-    </span><span class="doccomment">/// Get the number of pages that are reserved, including used pages and pages that will
-    /// be used (e.g. for copying).
+    </span><span class="doccomment">/// Get the number of pages that are reserved, including pages used by MMTk spaces, pages that
+    /// will be used (e.g. for copying), and live pages allocated outside MMTk spaces as reported
+    /// by the VM binding.
     </span><span class="kw">fn </span>get_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.get_used_pages() + <span class="self">self</span>.get_collection_reserved_pages()
+        <span class="kw">let </span>used_pages = <span class="self">self</span>.get_used_pages();
+        <span class="kw">let </span>collection_reserve = <span class="self">self</span>.get_collection_reserved_pages();
+        <span class="kw">let </span>vm_live_bytes = &lt;<span class="self">Self</span>::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::vm_live_bytes();
+        <span class="comment">// Note that `vm_live_bytes` may not be the exact number of bytes in whole pages.  The VM
+        // binding is allowed to return an approximate value if it is expensive or impossible to
+        // compute the exact number of pages occupied.
+        </span><span class="kw">let </span>vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
+        <span class="kw">let </span>total = used_pages + collection_reserve + vm_live_pages;
+
+        <span class="macro">trace!</span>(
+            <span class="string">&quot;Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}&quot;</span>,
+            total,
+            used_pages,
+            collection_reserve,
+            vm_live_pages,
+        );
+
+        total
     }
 
     <span class="doccomment">/// Get the total number of pages for the heap.
@@ -1311,6 +1349,9 @@
     <span class="doccomment">/// Get the number of pages that are still available for use. The available pages
     /// should always be positive or 0.
     </span><span class="kw">fn </span>get_available_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">let </span>reserved_pages = <span class="self">self</span>.get_reserved_pages();
+        <span class="kw">let </span>total_pages = <span class="self">self</span>.get_total_pages();
+
         <span class="comment">// It is possible that the reserved pages is larger than the total pages so we are doing
         // a saturating subtraction to make sure we return a non-negative number.
         // For example,
@@ -1319,15 +1360,14 @@
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
-        </span><span class="macro">trace!</span>(
+        </span><span class="kw">let </span>available_pages = total_pages.saturating_sub(reserved_pages);
+        <span class="macro">trace!</span>(
             <span class="string">&quot;Total pages = {}, reserved pages = {}, available pages = {}&quot;</span>,
-            <span class="self">self</span>.get_total_pages(),
-            <span class="self">self</span>.get_reserved_pages(),
-            <span class="self">self</span>.get_reserved_pages()
-                .saturating_sub(<span class="self">self</span>.get_reserved_pages())
+            total_pages,
+            reserved_pages,
+            available_pages,
         );
-        <span class="self">self</span>.get_total_pages()
-            .saturating_sub(<span class="self">self</span>.get_reserved_pages())
+        available_pages
     }
 
     <span class="doccomment">/// Get the number of pages that are reserved for collection. By default, we return 0.

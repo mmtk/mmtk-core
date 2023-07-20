@@ -112,6 +112,40 @@
 <span id="112">112</span>
 <span id="113">113</span>
 <span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::MutatorContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -225,6 +259,40 @@
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     </span><span class="kw">fn </span>post_forwarding(_tls: VMWorkerThread) {}
+
+    <span class="doccomment">/// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
+    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
+    /// memory as part of MMTk heap for the purpose of heap size accounting.
+    ///
+    /// This amount should include memory that is kept alive by heap objects and can be released by
+    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
+    /// when the heap objects are dead.  For example, if a language implementation allocates array
+    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
+    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
+    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
+    ///
+    /// If possible, the VM should account off-heap memory in pages.  That is, count the number of
+    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
+    /// instead of individual objects.  Because the underlying operating system manages memory at
+    /// page granularity, the occupied pages (instead of individual objects) determine the memory
+    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
+    ///
+    /// However, if the VM is incapable of accounting off-heap memory in pages (for example, if the
+    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
+    /// can simply return the total number of bytes of those off-heap objects as an approximation.
+    ///
+    /// # Performance note
+    ///
+    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
+    /// allocators have allocated a certain amount of memory, usually one or a few blocks.  Because
+    /// this function is called very frequently, its implementation must be efficient.  If it is
+    /// too expensive to compute the exact amount, an approximate value should be sufficient for
+    /// MMTk to trigger GC promptly in order to release off-heap memory, and keep the memory
+    /// footprint under control.
+    </span><span class="kw">fn </span>vm_live_bytes() -&gt; usize {
+        <span class="comment">// By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
+        </span><span class="number">0
+    </span>}
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>
