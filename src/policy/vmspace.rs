@@ -105,8 +105,22 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
 
     fn address_in_space(&self, start: Address) -> bool {
         // The default implementation checks with vm map. But vm map has some assumptions about
-        // the address range for spaces and the VM space breaks those assumptions (as the space is
+        // the address range for spaces and the VM space may break those assumptions (as the space is
         // mmapped by the runtime rather than us). So we we use SFT here.
+
+        // However, SFT map may not be an ideal solution either for 64 bits. The default
+        // implementation of SFT map on 64 bits is `SFTSpaceMap`, which maps the entire address
+        // space into an index between 0 and 31, and assumes any address with the same index
+        // is in the same space (with the same SFT). MMTk spaces uses 1-16. We guarantee that
+        // VM space does not overlap with the address range that MMTk spaces may use. So
+        // any region used as VM space will have an index of 0, or 17-31, and all the addresses
+        // that are mapped to the same index will be considered as in the VM space. That means,
+        // after we map a region as VM space, the nearby addresses will also be considered
+        // as in the VM space if we use the default `SFTSpaceMap`. We can guarantee the nearby
+        // addresses are not MMTk spaces, but we cannot tell whether they really in the VM space
+        // or not.
+        // A solution to this is to use `SFTDenseChunkMap` if `vm_space` is enabled on 64 bits.
+        // `SFTDenseChunkMap` has an overhead of a few percentages (~3%) compared to `SFTSpaceMap`.
         SFT_MAP.get_checked(start).name() == self.name()
     }
 }
@@ -188,7 +202,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             .metadata
             .try_map_metadata_space(chunk_start, chunk_size)
             .unwrap();
-        // Insert to vm map
+        // Insert to vm map: it would be good if we can make VM map aware of the region. However, the region may be outside what we can map in our VM map implementation.
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);
         // Update SFT
         assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
