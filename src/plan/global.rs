@@ -25,7 +25,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
-use crate::util::ObjectReference;
+use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
@@ -252,10 +252,28 @@ pub trait Plan: 'static + Sync + Downcast {
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
     // if necessary.
 
-    /// Get the number of pages that are reserved, including used pages and pages that will
-    /// be used (e.g. for copying).
+    /// Get the number of pages that are reserved, including pages used by MMTk spaces, pages that
+    /// will be used (e.g. for copying), and live pages allocated outside MMTk spaces as reported
+    /// by the VM binding.
     fn get_reserved_pages(&self) -> usize {
-        self.get_used_pages() + self.get_collection_reserved_pages()
+        let used_pages = self.get_used_pages();
+        let collection_reserve = self.get_collection_reserved_pages();
+        let vm_live_bytes = <Self::VM as VMBinding>::VMCollection::vm_live_bytes();
+        // Note that `vm_live_bytes` may not be the exact number of bytes in whole pages.  The VM
+        // binding is allowed to return an approximate value if it is expensive or impossible to
+        // compute the exact number of pages occupied.
+        let vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
+        let total = used_pages + collection_reserve + vm_live_pages;
+
+        trace!(
+            "Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}",
+            total,
+            used_pages,
+            collection_reserve,
+            vm_live_pages,
+        );
+
+        total
     }
 
     /// Get the total number of pages for the heap.
@@ -266,6 +284,9 @@ pub trait Plan: 'static + Sync + Downcast {
     /// Get the number of pages that are still available for use. The available pages
     /// should always be positive or 0.
     fn get_available_pages(&self) -> usize {
+        let reserved_pages = self.get_reserved_pages();
+        let total_pages = self.get_total_pages();
+
         // It is possible that the reserved pages is larger than the total pages so we are doing
         // a saturating subtraction to make sure we return a non-negative number.
         // For example,
@@ -274,15 +295,14 @@ pub trait Plan: 'static + Sync + Downcast {
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        let available_pages = total_pages.saturating_sub(reserved_pages);
         trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
-            self.get_total_pages(),
-            self.get_reserved_pages(),
-            self.get_reserved_pages()
-                .saturating_sub(self.get_reserved_pages())
+            total_pages,
+            reserved_pages,
+            available_pages,
         );
-        self.get_total_pages()
-            .saturating_sub(self.get_reserved_pages())
+        available_pages
     }
 
     /// Get the number of pages that are reserved for collection. By default, we return 0.
