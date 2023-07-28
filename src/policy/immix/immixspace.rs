@@ -13,6 +13,7 @@ use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::metadata::mark_bit::MarkState;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
@@ -47,7 +48,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// How many lines have been consumed since last GC?
     lines_consumed: AtomicUsize,
     /// Object mark state
-    mark_state: u8,
+    pub mark_state: MarkState,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
@@ -132,9 +133,11 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+        // We may have to set mark bit to 1 in case the marked state is 0
+        self.mark_state.on_object_metadata_initialization::<VM>(object);
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
@@ -228,10 +231,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
-    #[allow(unused)]
-    const UNMARKED_STATE: u8 = 0;
-    const MARKED_STATE: u8 = 1;
-
     /// Get side metadata specs
     fn side_metadata_specs() -> Vec<SideMetadataSpec> {
         metadata::extract_side_metadata(&if super::BLOCK_ONLY {
@@ -308,8 +307,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             lines_consumed: AtomicUsize::new(0),
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
-            // Set to the correct mark state when inititialized. We cannot rely on prepare to set it (prepare may get skipped in nursery GCs).
-            mark_state: Self::MARKED_STATE,
+            mark_state: MarkState::new(),
             scheduler: scheduler.clone(),
             space_args,
         }
@@ -359,13 +357,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub fn prepare(&mut self, major_gc: bool) {
         if major_gc {
-            // Update mark_state
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
-                self.mark_state = Self::MARKED_STATE;
-            } else {
-                // For header metadata, we use cyclic mark bits.
-                unimplemented!("cyclic mark bits is not supported at the moment");
-            }
+            self.mark_state.on_global_prepare::<VM>();
 
             // Prepare defrag info
             if super::DEFRAG {
@@ -438,6 +430,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Release for the immix space. This is called when a GC finished.
     /// Return whether this GC was a defrag GC, as a plan may want to know this.
     pub fn release(&mut self, major_gc: bool) -> bool {
+        // Update mark state
+        self.mark_state.on_global_release::<VM>();
+
         let did_defrag = self.defrag.in_defrag();
         if major_gc {
             // Update line_unavail_state for hole searching afte this GC.
@@ -544,7 +539,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::on_trace_object::<VM>(object);
 
-        if self.attempt_mark(object, self.mark_state) {
+        if self.mark_state.test_and_mark::<VM>(object) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
                 if !super::MARK_LINE_AT_SCAN_TIME {
@@ -619,7 +614,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             let new_object = if self.is_pinned(object)
                 || (!nursery_collection && self.defrag.space_exhausted())
             {
-                self.attempt_mark(object, self.mark_state);
+                self.mark_state.test_and_mark::<VM>(object);
                 object_forwarding::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
 
@@ -683,47 +678,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         Line::mark_lines_for_object::<VM>(object, self.line_mark_state.load(Ordering::Acquire));
     }
 
-    /// Atomically mark an object.
-    fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
-        loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
-            if old_value == mark_state {
-                return false;
-            }
-
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .compare_exchange_metadata::<VM, u8>(
-                    object,
-                    old_value,
-                    mark_state,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                )
-                .is_ok()
-            {
-                break;
-            }
-        }
-        true
-    }
-
-    /// Check if an object is marked.
-    fn is_marked_with(&self, object: ObjectReference, mark_state: u8) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
-        old_value == mark_state
-    }
-
     pub(crate) fn is_marked(&self, object: ObjectReference) -> bool {
-        self.is_marked_with(object, self.mark_state)
+        self.mark_state.is_marked::<VM>(object)
     }
 
     /// Check if an object is pinned.
@@ -793,12 +749,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Post copy routine for Immix copy contexts
     fn post_copy(&self, object: ObjectReference, _bytes: usize) {
         // Mark the object
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
-            object,
-            self.mark_state,
-            None,
-            Ordering::SeqCst,
-        );
+        self.mark_state.mark::<VM>(object);
         // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
@@ -817,11 +768,8 @@ pub struct PrepareBlockState<VM: VMBinding> {
 impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     fn reset_object_mark(&self) {
-        // NOTE: We reset the mark bits because cyclic mark bit is currently not supported, yet.
-        // See `ImmixSpace::prepare`.
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-        }
+        // We reset the mark bits if they are on the side
+        self.space.mark_state.on_block_reset::<VM>(self.chunk.start(), Chunk::BYTES);
         if self.space.space_args.reset_log_bit_in_major_gc {
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
                 // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.

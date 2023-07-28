@@ -60,6 +60,18 @@ impl MarkState {
         state == self.state
     }
 
+    /// Unconditionally mark object. Note that users of this function should ensure that either
+    /// there is no possible race (only one thread can set the mark bit) or the races are benign
+    /// (it doesn't matter which thread sets the mark bit).
+    pub fn mark<VM: VMBinding>(&self, object: ObjectReference) {
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
+            object,
+            self.state,
+            None,
+            Ordering::SeqCst,
+        );
+    }
+
     /// Attempt to mark an object. If the object is marked by this invocation, return true.
     /// Otherwise return false -- the object was marked by others.
     pub fn test_and_mark<VM: VMBinding>(&self, object: ObjectReference) -> bool {
