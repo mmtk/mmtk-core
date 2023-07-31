@@ -1,4 +1,3 @@
-use crate::plan::MutatorContext;
 use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -16,9 +15,12 @@ pub trait Collection<VM: VMBinding> {
     /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
+    /// MMTk provide a callback function and expects the binding to use the callback for each mutator when it
+    /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the GC controller/coordinator.
+    /// * `mutator_visitor`: A callback for each mutator to notify MMTk when a mutator is ready to be stack scanned.
     fn stop_all_mutators<F>(tls: VMWorkerThread, mutator_visitor: F)
     where
         F: FnMut(&'static mut Mutator<VM>);
@@ -53,18 +55,6 @@ pub trait Collection<VM: VMBinding> {
     ///     The spawned thread shall call `memory_manager::start_worker`.
     ///   In either case, the `Box` inside should be passed back to the called function.
     fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
-
-    /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
-    ///
-    /// Arguments:
-    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
-    /// * `tls_mutator`: The thread pointer for the target mutator thread.
-    /// * `m`: The mutator context for the thread.
-    fn prepare_mutator<T: MutatorContext<VM>>(
-        tls_worker: VMWorkerThread,
-        tls_mutator: VMMutatorThread,
-        m: &T,
-    );
 
     /// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
     /// routine for OOM. Note that there are two different categories of OOM:

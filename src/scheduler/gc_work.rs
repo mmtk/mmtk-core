@@ -182,33 +182,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
         <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
+            // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+            // Should we push to Unconstrained instead?
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
         });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
-        if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
-            // Prepare mutators if necessary
-            // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-            if !mmtk.plan.base().stacks_prepared() {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                    <E::VM as VMBinding>::VMCollection::prepare_mutator(
-                        worker.tls,
-                        mutator.get_tls(),
-                        mutator,
-                    );
-                }
-            }
-            // Scan mutators
-            if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                    .add(ScanStackRoots::<E>::new());
-            } else {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                        .add(ScanStackRoot::<E>(mutator));
-                }
-            }
-        }
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
     }
 }
@@ -428,28 +407,6 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
         trace!("VMPostForwarding start");
         <VM as VMBinding>::VMCollection::post_forwarding(worker.tls);
         trace!("VMPostForwarding end");
-    }
-}
-
-#[derive(Default)]
-pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
-
-impl<E: ProcessEdgesWork> ScanStackRoots<E> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanStackRoots");
-        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_roots_in_all_mutator_threads(worker.tls, factory);
-        <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
-        for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-            mutator.flush();
-        }
-        mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
     }
 }
 
