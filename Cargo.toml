@@ -47,7 +47,8 @@ spin = "0.9.5"
 static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-sysinfo = "0.29"
+# Fix to 0.29.5.  Updating to 0.29.6 requires MSRV 1.63.
+sysinfo = "=0.29.5"
 
 [dev-dependencies]
 paste = "1.0.8"
