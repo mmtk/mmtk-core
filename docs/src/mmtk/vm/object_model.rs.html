@@ -1085,9 +1085,9 @@
                     }
                 }
                 <span class="kw">pub const fn </span>side_after(spec: <span class="kw-2">&amp;</span>MetadataSpec) -&gt; <span class="self">Self </span>{
-                    <span class="macro">debug_assert!</span>(spec.is_on_side());
+                    <span class="macro">assert!</span>(spec.is_on_side());
                     <span class="kw">let </span>side_spec = spec.extract_side_spec();
-                    <span class="macro">debug_assert!</span>(side_spec.is_global == <span class="self">Self</span>::IS_GLOBAL);
+                    <span class="macro">assert!</span>(side_spec.is_global == <span class="self">Self</span>::IS_GLOBAL);
                     <span class="self">Self</span>(MetadataSpec::OnSide(SideMetadataSpec {
                         name: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$spec_name</span>),
                         is_global: <span class="self">Self</span>::IS_GLOBAL,
