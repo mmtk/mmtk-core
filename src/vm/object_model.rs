@@ -519,9 +519,9 @@ pub mod specs {
                     }
                 }
                 pub const fn side_after(spec: &MetadataSpec) -> Self {
-                    debug_assert!(spec.is_on_side());
+                    assert!(spec.is_on_side());
                     let side_spec = spec.extract_side_spec();
-                    debug_assert!(side_spec.is_global == Self::IS_GLOBAL);
+                    assert!(side_spec.is_global == Self::IS_GLOBAL);
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
                         name: stringify!($spec_name),
                         is_global: Self::IS_GLOBAL,
