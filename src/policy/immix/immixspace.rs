@@ -480,13 +480,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let epilogue = WorkPacketEpilogue::new(Box::new(|_, _| {
             space.flush_page_resource();
         }));
-        let tasks = self.chunk_map.generate_tasks(|chunk| {
+        self.chunk_map.generate_tasks(|chunk| {
             Box::new(WorkPacketWithEpilogue::new(
                 SweepChunk { space, chunk },
                 &epilogue,
             ))
-        });
-        tasks
+        })
     }
 
     /// Release a block.
