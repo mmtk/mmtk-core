@@ -34,7 +34,7 @@ pub trait SFTMap {
     /// # Safety
     /// The address must have a valid SFT entry in the map. Usually we know this if the address is from an object reference, or from our space address range.
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
-    unsafe fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize);
+    unsafe fn update(&self, space: *const (dyn SFT + Sync + 'static), start: Address, bytes: usize);
 
     /// Eagerly initialize the SFT table. For most implementations, it could be the same as update().
     /// However, we need this as a seprate method for SFTDenseChunkMap, as it needs to map side metadata first
@@ -45,7 +45,7 @@ pub trait SFTMap {
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
     unsafe fn eager_initialize(
         &self,
-        space: &(dyn SFT + Sync + 'static),
+        space: *const (dyn SFT + Sync + 'static),
         start: Address,
         bytes: usize,
     ) {
@@ -64,11 +64,11 @@ pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
     cfg_if::cfg_if! {
         if #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))] {
             // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
-            return Box::new(dense_chunk_map::SFTDenseChunkMap::<'static>::new());
+            Box::new(dense_chunk_map::SFTDenseChunkMap::<'static>::new())
         } else if #[cfg(target_pointer_width = "64")] {
-            return Box::new(space_map::SFTSpaceMap::<'static>::new());
+            Box::new(space_map::SFTSpaceMap::new())
         } else if #[cfg(target_pointer_width = "32")] {
-            return Box::new(sparse_chunk_map::SFTSparseChunkMap::<'static>::new());
+            Box::new(sparse_chunk_map::SFTSparseChunkMap::<'static>::new())
         } else {
             compile_err!("Cannot figure out which SFT map to use.");
         }
@@ -82,15 +82,16 @@ mod space_map {
     use crate::util::heap::layout::vm_layout_constants::{
         HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
     };
+    use std::cell::UnsafeCell;
 
     /// Space map is a small table, and it has one entry for each MMTk space.
-    pub struct SFTSpaceMap<'a> {
-        sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+    pub struct SFTSpaceMap {
+        sft: UnsafeCell<Vec<*const (dyn SFT + Sync + 'static)>>,
     }
 
-    unsafe impl<'a> Sync for SFTSpaceMap<'a> {}
+    unsafe impl Sync for SFTSpaceMap {}
 
-    impl<'a> SFTMap for SFTSpaceMap<'a> {
+    impl SFTMap for SFTSpaceMap {
         fn has_sft_entry(&self, _addr: Address) -> bool {
             // Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
             // So any address has an SFT entry.
@@ -101,23 +102,28 @@ mod space_map {
             None
         }
 
-        fn get_checked(&self, address: Address) -> &'a dyn SFT {
+        fn get_checked(&self, address: Address) -> &dyn SFT {
             // We should be able to map the entire address range to indices in the table.
-            debug_assert!(Self::addr_to_index(address) < self.sft.len());
-            unsafe { *self.sft.get_unchecked(Self::addr_to_index(address)) }
+            debug_assert!(Self::addr_to_index(address) < unsafe { (*self.sft.get()).len() });
+            unsafe { &**(*self.sft.get()).get_unchecked(Self::addr_to_index(address)) }
         }
 
-        unsafe fn get_unchecked(&self, address: Address) -> &'a dyn SFT {
-            *self.sft.get_unchecked(Self::addr_to_index(address))
+        unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
+            &**(*self.sft.get()).get_unchecked(Self::addr_to_index(address))
         }
 
-        unsafe fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
-            let mut_self = self.mut_self();
+        unsafe fn update(
+            &self,
+            space: *const (dyn SFT + Sync + 'static),
+            start: Address,
+            bytes: usize,
+        ) {
+            //let mut_self = self.mut_self();
             let index = Self::addr_to_index(start);
             if cfg!(debug_assertions) {
                 // Make sure we only update from empty to a valid space, or overwrite the space
-                let old = mut_self.sft[index];
-                assert!(old.name() == EMPTY_SFT_NAME || old.name() == space.name());
+                let old = (*self.sft.get())[index];
+                assert!((*old).name() == EMPTY_SFT_NAME || (*old).name() == (*space).name());
                 // Make sure the range is in the space
                 let space_start = Self::index_to_space_start(index);
                 // FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
@@ -128,17 +134,19 @@ mod space_map {
                     assert!(start + bytes <= space_start + MAX_SPACE_EXTENT);
                 }
             }
-            *mut_self.sft.get_unchecked_mut(index) = space;
+
+            //*mut_self.sft.get_unchecked_mut(index) = space;
+            *(*self.sft.get()).get_unchecked_mut(index) = unsafe { std::mem::transmute(space) };
         }
 
         unsafe fn clear(&self, addr: Address) {
-            let mut_self = self.mut_self();
             let index = Self::addr_to_index(addr);
-            *mut_self.sft.get_unchecked_mut(index) = &EMPTY_SPACE_SFT;
+            *(*self.sft.get()).get_unchecked_mut(index) = &EMPTY_SPACE_SFT;
+            //*mut_self.sft.get_unchecked_mut(index) = &EMPTY_SPACE_SFT;
         }
     }
 
-    impl<'a> SFTSpaceMap<'a> {
+    impl SFTSpaceMap {
         /// This mask extracts a few bits from address, and use it as index to the space map table.
         /// This constant is specially picked for the current heap range (HEAP_STRAT/HEAP_END), and the space size (MAX_SPACE_EXTENT).
         /// If any of these changes, the test `test_address_arithmetic()` may fail, and this constant will need to be updated.
@@ -155,16 +163,8 @@ mod space_map {
                 Self::TABLE_SIZE >= crate::util::heap::layout::heap_parameters::MAX_SPACES
             );
             Self {
-                sft: vec![&EMPTY_SPACE_SFT; Self::TABLE_SIZE],
+                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT; Self::TABLE_SIZE]),
             }
-        }
-
-        // This is a temporary solution to allow unsafe mut reference.
-        // FIXME: We need a safe implementation.
-        #[allow(clippy::cast_ref_to_mut)]
-        #[allow(clippy::mut_from_ref)]
-        unsafe fn mut_self(&self) -> &mut Self {
-            &mut *(self as *const _ as *mut _)
         }
 
         const fn addr_to_index(addr: Address) -> usize {
@@ -234,6 +234,7 @@ mod dense_chunk_map {
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     use crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX;
     use crate::util::metadata::side_metadata::*;
+    use std::cell::UnsafeCell;
     use std::collections::HashMap;
     use std::sync::atomic::Ordering;
 
@@ -245,22 +246,22 @@ mod dense_chunk_map {
     /// For example, when we use library malloc for mark sweep, we have no control of where the
     /// library malloc may allocate into, so we cannot use the space map. And using a sparse chunk map
     /// will be costly in terms of memory. In this case, the dense chunk map is a good solution.
-    pub struct SFTDenseChunkMap<'a> {
+    pub struct SFTDenseChunkMap {
         /// The dense table, one entry per space. We use side metadata to store the space index for each chunk.
         /// 0 is EMPTY_SPACE_SFT.
-        sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+        sft: UnsafeCell<Vec<*const (dyn SFT + Sync + 'static)>>,
         /// A map from space name (assuming they are unique) to their index. We use this to know whether we have
         /// pushed &dyn SFT for a space, and to know its index.
-        index_map: HashMap<String, usize>,
+        index_map: UnsafeCell<HashMap<String, usize>>,
     }
 
-    unsafe impl<'a> Sync for SFTDenseChunkMap<'a> {}
+    unsafe impl Sync for SFTDenseChunkMap {}
 
-    impl<'a> SFTMap for SFTDenseChunkMap<'a> {
+    impl SFTMap for SFTDenseChunkMap {
         fn has_sft_entry(&self, addr: Address) -> bool {
             if SFT_DENSE_CHUNK_MAP_INDEX.is_mapped(addr) {
                 let index = Self::addr_to_index(addr);
-                index < self.sft.len() as u8
+                index < self.sft().len() as u8
             } else {
                 // We haven't mapped side metadata for the chunk, so we do not have an SFT entry for the address.
                 false
@@ -274,8 +275,8 @@ mod dense_chunk_map {
         fn get_checked(&self, address: Address) -> &dyn SFT {
             if self.has_sft_entry(address) {
                 unsafe {
-                    *self
-                        .sft
+                    &**self
+                        .sft()
                         .get_unchecked(Self::addr_to_index(address) as usize)
                 }
             } else {
@@ -284,14 +285,14 @@ mod dense_chunk_map {
         }
 
         unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
-            *self
-                .sft
+            &**self
+                .sft()
                 .get_unchecked(Self::addr_to_index(address) as usize)
         }
 
         unsafe fn eager_initialize(
             &self,
-            space: &(dyn SFT + Sync + 'static),
+            space: *const (dyn SFT + Sync + 'static),
             start: Address,
             bytes: usize,
         ) {
@@ -306,17 +307,19 @@ mod dense_chunk_map {
             self.update(space, start, bytes);
         }
 
-        unsafe fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
-            let mut_self = self.mut_self();
-
+        unsafe fn update(
+            &self,
+            space: *const (dyn SFT + Sync + 'static),
+            start: Address,
+            bytes: usize,
+        ) {
             // Check if we have an entry in self.sft for the space. If so, get the index.
             // If not, push the space pointer to the table and add an entry to the hahs map.
-            let index: u8 = *mut_self
-                .index_map
-                .entry(space.name().to_string())
+            let index: u8 = *(*self.index_map.get())
+                .entry((*space).name().to_string())
                 .or_insert_with(|| {
-                    let count = mut_self.sft.len();
-                    mut_self.sft.push(space);
+                    let count = self.sft().len();
+                    (*self.sft.get()).push(space);
                     count
                 }) as u8;
 
@@ -348,35 +351,37 @@ mod dense_chunk_map {
         }
     }
 
-    impl<'a> SFTDenseChunkMap<'a> {
+    impl SFTDenseChunkMap {
         /// Empty space is at index 0
         const EMPTY_SFT_INDEX: u8 = 0;
 
         pub fn new() -> Self {
             Self {
                 /// Empty space is at index 0
-                sft: vec![&EMPTY_SPACE_SFT],
-                index_map: HashMap::new(),
+                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT]),
+                index_map: UnsafeCell::new(HashMap::new()),
             }
-        }
-
-        // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-        // of the same unsafe code.
-        // FIXME: We need a safe implementation.
-        #[allow(clippy::cast_ref_to_mut)]
-        #[allow(clippy::mut_from_ref)]
-        unsafe fn mut_self(&self) -> &mut Self {
-            &mut *(self as *const _ as *mut _)
         }
 
         pub fn addr_to_index(addr: Address) -> u8 {
             SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::<u8>(addr, Ordering::Relaxed)
+        }
+        #[inline(always)]
+        fn sft(&self) -> &Vec<*const (dyn SFT + Sync + 'static)> {
+            unsafe { &*self.sft.get() }
+        }
+
+        #[inline(always)]
+        fn index_map(&self) -> &HashMap<String, usize> {
+            unsafe { &*self.index_map.get() }
         }
     }
 }
 
 #[allow(dead_code)]
 mod sparse_chunk_map {
+    use std::cell::UnsafeCell;
+
     use super::*;
     use crate::util::conversions;
     use crate::util::conversions::*;
@@ -384,13 +389,13 @@ mod sparse_chunk_map {
     use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 
     /// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
-    pub struct SFTSparseChunkMap<'a> {
-        sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+    pub struct SFTSparseChunkMap {
+        sft: UnsafeCell<Vec<*const (dyn SFT + Sync + 'static)>>,
     }
 
-    unsafe impl<'a> Sync for SFTSparseChunkMap<'a> {}
+    unsafe impl Sync for SFTSparseChunkMap {}
 
-    impl<'a> SFTMap for SFTSparseChunkMap<'a> {
+    impl SFTMap for SFTSparseChunkMap {
         fn has_sft_entry(&self, addr: Address) -> bool {
             addr.chunk_index() < MAX_CHUNKS
         }
@@ -399,29 +404,34 @@ mod sparse_chunk_map {
             None
         }
 
-        fn get_checked(&self, address: Address) -> &'a dyn SFT {
+        fn get_checked(&self, address: Address) -> &dyn SFT {
             if self.has_sft_entry(address) {
-                unsafe { *self.sft.get_unchecked(address.chunk_index()) }
+                unsafe { &**(*self.sft.get()).get_unchecked(address.chunk_index()) }
             } else {
                 &EMPTY_SPACE_SFT
             }
         }
 
-        unsafe fn get_unchecked(&self, address: Address) -> &'a dyn SFT {
-            *self.sft.get_unchecked(address.chunk_index())
+        unsafe fn get_unchecked(&self, address: Address) -> &dyn SFT {
+            &**(*self.sft.get()).get_unchecked(address.chunk_index())
         }
 
         /// Update SFT map for the given address range.
         /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
         /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-        unsafe fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
+        unsafe fn update(
+            &self,
+            space: *const (dyn SFT + Sync + 'static),
+            start: Address,
+            bytes: usize,
+        ) {
             if DEBUG_SFT {
-                self.log_update(space, start, bytes);
+                self.log_update(&*space, start, bytes);
             }
             let first = start.chunk_index();
             let last = conversions::chunk_align_up(start + bytes).chunk_index();
             for chunk in first..last {
-                self.set(chunk, space);
+                self.set(chunk, &*space);
             }
             if DEBUG_SFT {
                 self.trace_sft_map();
@@ -444,19 +454,11 @@ mod sparse_chunk_map {
         }
     }
 
-    impl<'a> SFTSparseChunkMap<'a> {
+    impl SFTSparseChunkMap {
         pub fn new() -> Self {
             SFTSparseChunkMap {
-                sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
+                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT; MAX_CHUNKS]),
             }
-        }
-        // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-        // of the same unsafe code.
-        // FIXME: We need a safe implementation.
-        #[allow(clippy::cast_ref_to_mut)]
-        #[allow(clippy::mut_from_ref)]
-        unsafe fn mut_self(&self) -> &mut Self {
-            &mut *(self as *const _ as *mut _)
         }
 
         fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
@@ -479,20 +481,25 @@ mod sparse_chunk_map {
             let mut res = String::new();
 
             const SPACE_PER_LINE: usize = 10;
-            for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
-                let max = if i + SPACE_PER_LINE > self.sft.len() {
-                    self.sft.len()
-                } else {
-                    i + SPACE_PER_LINE
-                };
-                let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
-                res.push_str(&format!(
-                    "{}: {}",
-                    chunk_index_to_address(i),
-                    space_names.join(",")
-                ));
-                res.push('\n');
+            unsafe {
+                for i in (0..(*self.sft.get()).len()).step_by(SPACE_PER_LINE) {
+                    let max = if i + SPACE_PER_LINE > (*self.sft.get()).len() {
+                        (*self.sft.get()).len()
+                    } else {
+                        i + SPACE_PER_LINE
+                    };
+                    let chunks: Vec<usize> = (i..max).collect();
+                    let space_names: Vec<&str> = chunks
+                        .iter()
+                        .map(|&x| (*(*self.sft.get())[x]).name())
+                        .collect();
+                    res.push_str(&format!(
+                        "{}: {}",
+                        chunk_index_to_address(i),
+                        space_names.join(",")
+                    ));
+                    res.push('\n');
+                }
             }
 
             res
@@ -508,10 +515,10 @@ mod sparse_chunk_map {
              * which are reasonable), and in the other case it would either see the
              * old (valid) space or an empty space, both of which are valid.
              */
-            let self_mut = unsafe { self.mut_self() };
+
             // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
             if cfg!(debug_assertions) {
-                let old = self_mut.sft[chunk].name();
+                let old = unsafe { (*(*self.sft.get())[chunk]).name() };
                 let new = sft.name();
                 // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
                 // in which case, we still set SFT map again.
@@ -524,7 +531,7 @@ mod sparse_chunk_map {
                     new
                 );
             }
-            unsafe { *self_mut.sft.get_unchecked_mut(chunk) = sft };
+            unsafe { *(*self.sft.get()).get_unchecked_mut(chunk) = sft };
         }
     }
 }
