@@ -138,6 +138,16 @@
 <span id="138">138</span>
 <span id="139">139</span>
 <span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module works around limitations of the Rust programming language, and provides missing
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
@@ -267,16 +277,26 @@
 }
 
 <span class="doccomment">/// This implements `std::array::from_fn` introduced in Rust 1.63.
-/// We should replace this with the standard counterpart after bumping MSRV.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>array_from_fn&lt;T, <span class="kw">const </span>N: usize, F&gt;(cb: F) -&gt; [T; N]
+/// We should replace this with the standard counterpart after bumping MSRV,
+/// but we also need to evaluate whether it would use too much stack space (see code comments).
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>array_from_fn&lt;T, <span class="kw">const </span>N: usize, F&gt;(<span class="kw-2">mut </span>cb: F) -&gt; [T; N]
 <span class="kw">where
     </span>F: FnMut(usize) -&gt; T,
 {
-    <span class="kw">let </span><span class="kw-2">mut </span>index_array = [<span class="number">0</span>; N];
-    <span class="kw">for </span>(index, item) <span class="kw">in </span>index_array.iter_mut().enumerate() {
-        <span class="kw-2">*</span>item = index;
+    <span class="comment">// Note on unsafety: An alternative to the unsafe implementation below is creating a fixed
+    // array of `[0, 1, 2, ..., N-1]` and using the `.map(cb)` method to create the result.
+    // However, the `array::map` method implemented in the standard library consumes a surprisingly
+    // large amount of stack space.  For VMs that run on confined stacks, such as JikesRVM, that
+    // would cause stack overflow.  Therefore we implement it manually using unsafe primitives.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>result_array: MaybeUninit&lt;[T; N]&gt; = MaybeUninit::zeroed();
+    <span class="kw">let </span>array_ptr = result_array.as_mut_ptr();
+    <span class="kw">for </span>index <span class="kw">in </span><span class="number">0</span>..N {
+        <span class="kw">let </span>item = cb(index);
+        <span class="kw">unsafe </span>{
+            <span class="macro">std::ptr::addr_of_mut!</span>((<span class="kw-2">*</span>array_ptr)[index]).write(item);
+        }
     }
-    index_array.map(cb)
+    <span class="kw">unsafe </span>{ result_array.assume_init() }
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>
