@@ -47,7 +47,7 @@ spin = "0.9.5"
 static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-# Fix to 0.29.5.  Updating to 0.29.6 requires MSRV 1.63.
+# Fix on 0.29.5 so we have MSRV 1.61. Remove this when we update MSRV
 sysinfo = "=0.29.5"
 
 [dev-dependencies]
