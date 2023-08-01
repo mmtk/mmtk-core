@@ -1028,3 +1028,70 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
         trace!("PlanScanObjects End");
     }
 }
+
+/// WorkPacketWithEpilogue provides a way to run some code after certain work packets
+/// are all executed. You can create a WorkPacketEpilogue, and create multiple work packets with
+/// the epilogue. Once the work packets are executed, the epilogue code will be run in the
+/// context of the last work packet.
+pub struct WorkPacketWithEpilogue<VM: VMBinding, W: GCWork<VM>> {
+    work: W,
+    epilogue: WorkPacketEpilogue<VM>,
+    _p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding, W: GCWork<VM>> WorkPacketWithEpilogue<VM, W> {
+    pub fn new(work: W, epilogue: &WorkPacketEpilogue<VM>) -> Self {
+        Self {
+            work,
+            epilogue: epilogue.attach_to_new_work(),
+            _p: PhantomData,
+        }
+    }
+}
+
+impl<VM: VMBinding, W: GCWork<VM>> GCWork<VM> for WorkPacketWithEpilogue<VM, W> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        self.work.do_work(worker, mmtk);
+        self.epilogue.on_work_finish(worker, mmtk);
+    }
+}
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+/// The epilogue that runs when all the work packets with the epilogue are executed.
+pub struct WorkPacketEpilogue<VM: VMBinding> {
+    inner: Arc<WorkPacketEpilogueInner<VM>>,
+}
+type WorkPacketEpilogueFn<VM> = Box<dyn Fn(&mut GCWorker<VM>, &'static MMTK<VM>) + Send + Sync>;
+struct WorkPacketEpilogueInner<VM: VMBinding> {
+    // We maintain our counter. If we use `Arc` as the counter (and potentially `Drop` as the epilogue),
+    // we do not have the context (e.g. GCWorker, and MMTK) to run the epilogue function.
+    /// The count of current work packets with the epilogue. When this count drops to 0, we execute the
+    /// epilogue in the context of the last work packet.
+    counter: AtomicUsize,
+    epilogue: WorkPacketEpilogueFn<VM>,
+}
+
+impl<VM: VMBinding> WorkPacketEpilogue<VM> {
+    pub fn new(epilogue: WorkPacketEpilogueFn<VM>) -> Self {
+        Self {
+            inner: Arc::new(WorkPacketEpilogueInner {
+                counter: AtomicUsize::new(0),
+                epilogue,
+            }),
+        }
+    }
+
+    fn attach_to_new_work(&self) -> Self {
+        self.inner.counter.fetch_add(1, Ordering::SeqCst);
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+
+    fn on_work_finish(&self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        if 1 == self.inner.counter.fetch_sub(1, Ordering::SeqCst) {
+            (self.inner.epilogue)(worker, mmtk)
+        }
+    }
+}

@@ -5,6 +5,7 @@ use crate::policy::gc_work::TraceKind;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
+use crate::scheduler::gc_work::{WorkPacketEpilogue, WorkPacketWithEpilogue};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::*;
 use crate::util::heap::chunk_map::*;
@@ -476,18 +477,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.defrag.mark_histograms.lock().clear();
         // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
-        let epilogue = Arc::new(FlushPageResource {
-            space,
-            counter: AtomicUsize::new(0),
-        });
+        let epilogue = WorkPacketEpilogue::new(Box::new(|_, _| {
+            space.flush_page_resource();
+        }));
         let tasks = self.chunk_map.generate_tasks(|chunk| {
-            Box::new(SweepChunk {
-                space,
-                chunk,
-                epilogue: epilogue.clone(),
-            })
+            Box::new(WorkPacketWithEpilogue::new(
+                SweepChunk { space, chunk },
+                &epilogue,
+            ))
         });
-        epilogue.counter.store(tasks.len(), Ordering::SeqCst);
         tasks
     }
 
@@ -899,8 +897,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
 struct SweepChunk<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,
     chunk: Chunk,
-    /// A destructor invoked when all `SweepChunk` packets are finished.
-    epilogue: Arc<FlushPageResource<VM>>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
@@ -931,24 +927,6 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             }
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
-        self.epilogue.finish_one_work_packet();
-    }
-}
-
-/// Count number of remaining work pacets, and flush page resource if all packets are finished.
-struct FlushPageResource<VM: VMBinding> {
-    space: &'static ImmixSpace<VM>,
-    counter: AtomicUsize,
-}
-
-impl<VM: VMBinding> FlushPageResource<VM> {
-    /// Called after a related work packet is finished.
-    fn finish_one_work_packet(&self) {
-        if 1 == self.counter.fetch_sub(1, Ordering::SeqCst) {
-            // We've finished releasing all the dead blocks to the BlockPageResource's thread-local queues.
-            // Now flush the BlockPageResource.
-            self.space.flush_page_resource()
-        }
     }
 }
 
