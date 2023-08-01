@@ -9,6 +9,7 @@ pub use allocator::Allocator;
 /// A list of all the allocators, embedded in Mutator
 pub(crate) mod allocators;
 pub use allocators::AllocatorSelector;
+pub use allocators::Allocators;
 
 /// Bump pointer allocator
 mod bumpallocator;
