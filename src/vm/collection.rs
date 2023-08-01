@@ -111,4 +111,38 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn post_forwarding(_tls: VMWorkerThread) {}
+
+    /// Return the amount of memory (in bytes) which the VM allocated outside the MMTk heap but
+    /// wants to include into the current MMTk heap size.  MMTk core will consider the reported
+    /// memory as part of MMTk heap for the purpose of heap size accounting.
+    ///
+    /// This amount should include memory that is kept alive by heap objects and can be released by
+    /// executing finalizers (or other language-specific cleaning-up routines) that are executed
+    /// when the heap objects are dead.  For example, if a language implementation allocates array
+    /// headers in the MMTk heap, but allocates their underlying buffers that hold the actual
+    /// elements using `malloc`, then those buffers should be included in this amount.  When the GC
+    /// finds such an array dead, its finalizer shall `free` the buffer and reduce this amount.
+    ///
+    /// If possible, the VM should account off-heap memory in pages.  That is, count the number of
+    /// pages occupied by off-heap objects, and report the number of bytes of those whole pages
+    /// instead of individual objects.  Because the underlying operating system manages memory at
+    /// page granularity, the occupied pages (instead of individual objects) determine the memory
+    /// footprint of a process, and how much memory MMTk spaces can obtain from the OS.
+    ///
+    /// However, if the VM is incapable of accounting off-heap memory in pages (for example, if the
+    /// VM uses `malloc` and the implementation of `malloc` is opaque to the VM), the VM binding
+    /// can simply return the total number of bytes of those off-heap objects as an approximation.
+    ///
+    /// # Performance note
+    ///
+    /// This function will be called when MMTk polls for GC.  It happens every time the MMTk
+    /// allocators have allocated a certain amount of memory, usually one or a few blocks.  Because
+    /// this function is called very frequently, its implementation must be efficient.  If it is
+    /// too expensive to compute the exact amount, an approximate value should be sufficient for
+    /// MMTk to trigger GC promptly in order to release off-heap memory, and keep the memory
+    /// footprint under control.
+    fn vm_live_bytes() -> usize {
+        // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
+        0
+    }
 }
