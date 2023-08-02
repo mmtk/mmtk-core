@@ -135,7 +135,6 @@ mod space_map {
                 }
             }
 
-            //*mut_self.sft.get_unchecked_mut(index) = space;
             *(*self.sft.get()).get_unchecked_mut(index) = std::mem::transmute(space);
         }
 
