@@ -16,9 +16,9 @@ use crate::vm::*;
 pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
     /// Bump pointer
-    cursor: Address,
+    pub cursor: Address,
     /// Limit for bump pointer
-    limit: Address,
+    pub limit: Address,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
     /// [`Plan`] instance that this allocator instance is associated with.

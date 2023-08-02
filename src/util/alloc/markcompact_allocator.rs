@@ -10,7 +10,7 @@ use crate::vm::VMBinding;
 /// reserve extra bytes when allocating
 #[repr(C)]
 pub struct MarkCompactAllocator<VM: VMBinding> {
-    bump_allocator: BumpAllocator<VM>,
+    pub bump_allocator: BumpAllocator<VM>,
 }
 
 impl<VM: VMBinding> MarkCompactAllocator<VM> {
