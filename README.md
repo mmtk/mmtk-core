@@ -115,6 +115,19 @@ A full list of all the unit tests we run in our CI can be found [here](.github/s
 MMTk is also tested with the VM bindings we are maintaining by running standard test/benchmark suites for the VMs.
 For details, please refer to each VM binding repository.
 
+## Supported Rust versions
+
+As a research project, MMTk is quite aggressive in following the latest releases of the Rust
+toolchain. The minimum supported Rust version (MSRV) is "N-1", that is, one minor version before the
+latest stable Rust release.  For example, if the latest Rust stable release is "1.61.2", then the
+MSRV will be "1.60.0".
+
+MMTk has a six-week release cycle, roughly the same as Rust itself.  We bump the MSRV version
+*after* every release of MMTk core.  This gives users (including bindings) a six-week grace period
+to update their supported Rust versions.
+
+Note, however, that our MSRV policy may change in the future when MMTk reaches a stable state.
+
 ## Contributing to MMTk
 
 Thank you for your interest in contributing to MMTk. We appreciate all the contributors. Generally you can contribute to MMTk by either
