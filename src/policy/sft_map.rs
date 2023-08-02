@@ -118,7 +118,6 @@ mod space_map {
             start: Address,
             bytes: usize,
         ) {
-            //let mut_self = self.mut_self();
             let index = Self::addr_to_index(start);
             if cfg!(debug_assertions) {
                 // Make sure we only update from empty to a valid space, or overwrite the space
@@ -141,7 +140,6 @@ mod space_map {
         unsafe fn clear(&self, addr: Address) {
             let index = Self::addr_to_index(addr);
             *(*self.sft.get()).get_unchecked_mut(index) = &EMPTY_SPACE_SFT;
-            //*mut_self.sft.get_unchecked_mut(index) = &EMPTY_SPACE_SFT;
         }
     }
 
