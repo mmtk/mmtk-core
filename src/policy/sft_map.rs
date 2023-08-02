@@ -363,12 +363,11 @@ mod dense_chunk_map {
         pub fn addr_to_index(addr: Address) -> u8 {
             SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::<u8>(addr, Ordering::Relaxed)
         }
-        #[inline(always)]
+       
         fn sft(&self) -> &Vec<*const (dyn SFT + Sync + 'static)> {
             unsafe { &*self.sft.get() }
         }
 
-        #[inline(always)]
         fn index_map(&self) -> &HashMap<String, usize> {
             unsafe { &*self.index_map.get() }
         }
