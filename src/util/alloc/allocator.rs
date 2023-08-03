@@ -219,7 +219,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             } else {
                 // If we are not doing precise stress GC, just call the normal alloc_slow_once().
                 // Normal stress test only checks for stress GC in the slowpath.
-                self.alloc_slow_once(size, align, offset)
+                self.alloc_slow_once_traced(size, align, offset)
             };
 
             if !is_mutator {
@@ -318,6 +318,21 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `offset` the required offset in bytes.
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address;
 
+    /// A wrapper method for [`alloc_slow_once`](Allocator::alloc_slow_once) to insert USDT tracepoints.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    fn alloc_slow_once_traced(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        probe!(mmtk, alloc_slow_once_start);
+        // probe! expands to an empty block on unsupported platforms
+        #[allow(clippy::let_and_return)]
+        let ret = self.alloc_slow_once(size, align, offset);
+        probe!(mmtk, alloc_slow_once_end);
+        ret
+    }
+
     /// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to
     /// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for
     /// allocators that do thread local allocation, they may allocate from their thread local
@@ -358,7 +373,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         if self.does_thread_local_allocation() && need_poll {
             warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
         }
-        self.alloc_slow_once(size, align, offset)
+        self.alloc_slow_once_traced(size, align, offset)
     }
 
     /// The [`crate::plan::Mutator`] that includes this allocator is going to be destroyed. Some allocators
