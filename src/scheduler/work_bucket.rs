@@ -232,6 +232,8 @@ pub enum WorkBucketStage {
     /// Clear the VO bit metadata.  Mainly used by ImmixSpace.
     #[cfg(feature = "vo_bit")]
     ClearVOBits,
+    /// Compute the transtive closure following only strong references, making sure that objects do not move
+    ImmovableClosure,
     /// Compute the transtive closure following only strong references.
     Closure,
     /// Handle Java-style soft references, and potentially expand the transitive closure.

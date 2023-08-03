@@ -108,7 +108,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Schedule all the common work packets
-    pub fn schedule_common_work<C: GCWorkContext<VM = VM> + 'static>(
+    pub fn schedule_common_work<C: GCWorkContext<VM = VM> + 'static + Send>(
         &self,
         plan: &'static C::PlanType,
     ) {
@@ -116,7 +116,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         use crate::scheduler::gc_work::*;
         // Stop & scan mutators (mutator scanning can happen before STW)
         self.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<C::ProcessEdgesWorkType>::new());
+            .add(StopMutators::<C>::new());
 
         // Prepare global/collectors/mutators
         self.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));

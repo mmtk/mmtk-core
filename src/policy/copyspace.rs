@@ -1,5 +1,6 @@
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
+use crate::policy::gc_work::TRACE_KIND_IMMOVABLE;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
@@ -126,6 +127,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        assert!(KIND != TRACE_KIND_IMMOVABLE, "Copyspace does not support immovable trace.");
         self.trace_object(queue, object, copy, worker)
     }
 

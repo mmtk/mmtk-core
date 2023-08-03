@@ -18,11 +18,11 @@ pub const BLOCK_ONLY: bool = false;
 pub const DEFRAG: bool = !cfg!(feature = "immix_non_moving"); // defrag if we are allowed to move.
 
 /// Make every GC a defragment GC. (for debugging)
-pub const STRESS_DEFRAG: bool = false;
+pub const STRESS_DEFRAG: bool = true;
 
 /// Mark every allocated block as defragmentation source before GC. (for debugging)
 /// Set both this and `STRESS_DEFRAG` to true to make Immix move as many objects as possible.
-pub const DEFRAG_EVERY_BLOCK: bool = false;
+pub const DEFRAG_EVERY_BLOCK: bool = true;
 
 /// If Immix is used as a nursery space, do we prefer copy?
 pub const PREFER_COPY_ON_NURSERY_GC: bool = !cfg!(feature = "immix_non_moving"); // copy nursery objects if we are allowed to move.

@@ -1,7 +1,7 @@
 use atomic::Ordering;
 
 use crate::plan::PlanTraceObject;
-use crate::scheduler::{gc_work::*, GCWork, GCWorker};
+use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
 use crate::vm::edge_shape::{Edge, MemorySlice};
 use crate::vm::*;
@@ -25,8 +25,13 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
     type VM = VM;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        bucket: WorkBucketStage,
+    ) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref().unwrap();
         Self { plan, base }
     }
@@ -51,7 +56,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         nodes: Vec<ObjectReference>,
         roots: bool,
     ) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::new(self.plan, nodes, false, roots)
+        PlanScanObjects::new(self.plan, nodes, false, roots, self.bucket)
     }
 }
 
@@ -106,7 +111,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut ScanObjects::<E>::new(modbuf, false, false),
+                &mut ScanObjects::<E>::new(modbuf, false, false, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )
@@ -144,7 +149,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
                 }
             }
             // Forward entries
-            GCWork::do_work(&mut E::new(edges, false, mmtk), worker, mmtk)
+            GCWork::do_work(
+                &mut E::new(edges, false, mmtk, WorkBucketStage::Closure),
+                worker,
+                mmtk,
+            )
         }
     }
 }

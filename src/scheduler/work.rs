@@ -51,4 +51,5 @@ pub trait GCWorkContext {
     // We should use SFTProcessEdges as the default value for this associate type. However, this requires
     // `associated_type_defaults` which has not yet been stablized.
     type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM>;
+    type ImmovableProcessEdges: ProcessEdgesWork<VM = Self::VM>;
 }
