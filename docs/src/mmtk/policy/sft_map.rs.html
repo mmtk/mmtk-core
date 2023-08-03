@@ -528,6 +528,9 @@
 <span id="528">528</span>
 <span id="529">529</span>
 <span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -564,7 +567,7 @@
     /// # Safety
     /// The address must have a valid SFT entry in the map. Usually we know this if the address is from an object reference, or from our space address range.
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
-    </span><span class="kw">unsafe fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>), start: Address, bytes: usize);
+    </span><span class="kw">unsafe fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>), start: Address, bytes: usize);
 
     <span class="doccomment">/// Eagerly initialize the SFT table. For most implementations, it could be the same as update().
     /// However, we need this as a seprate method for SFTDenseChunkMap, as it needs to map side metadata first
@@ -575,7 +578,7 @@
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
     </span><span class="kw">unsafe fn </span>eager_initialize(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
+        space: <span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
         start: Address,
         bytes: usize,
     ) {
@@ -594,11 +597,11 @@
     <span class="macro">cfg_if::cfg_if! </span>{
         <span class="kw">if </span><span class="attribute">#[cfg(all(feature = <span class="string">&quot;malloc_mark_sweep&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))] </span>{
             <span class="comment">// 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
-            </span><span class="kw">return </span>Box::new(dense_chunk_map::SFTDenseChunkMap::&lt;<span class="lifetime">&#39;static</span>&gt;::new());
+            </span>Box::new(dense_chunk_map::SFTDenseChunkMap::new())
         } <span class="kw">else if </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)] </span>{
-            <span class="kw">return </span>Box::new(space_map::SFTSpaceMap::&lt;<span class="lifetime">&#39;static</span>&gt;::new());
+            Box::new(space_map::SFTSpaceMap::new())
         } <span class="kw">else if </span><span class="attribute">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)] </span>{
-            <span class="kw">return </span>Box::new(sparse_chunk_map::SFTSparseChunkMap::&lt;<span class="lifetime">&#39;static</span>&gt;::new());
+            Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
         } <span class="kw">else </span>{
             <span class="macro">compile_err!</span>(<span class="string">&quot;Cannot figure out which SFT map to use.&quot;</span>);
         }
@@ -612,15 +615,16 @@
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::{
         HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
     };
+    <span class="kw">use </span>std::cell::UnsafeCell;
 
     <span class="doccomment">/// Space map is a small table, and it has one entry for each MMTk space.
-    </span><span class="kw">pub struct </span>SFTSpaceMap&lt;<span class="lifetime">&#39;a</span>&gt; {
-        sft: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt;,
+    </span><span class="kw">pub struct </span>SFTSpaceMap {
+        sft: UnsafeCell&lt;Vec&lt;<span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt;&gt;,
     }
 
-    <span class="kw">unsafe impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sync <span class="kw">for </span>SFTSpaceMap&lt;<span class="lifetime">&#39;a</span>&gt; {}
+    <span class="kw">unsafe impl </span>Sync <span class="kw">for </span>SFTSpaceMap {}
 
-    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTMap <span class="kw">for </span>SFTSpaceMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">impl </span>SFTMap <span class="kw">for </span>SFTSpaceMap {
         <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
             <span class="comment">// Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
             // So any address has an SFT entry.
@@ -631,23 +635,27 @@
             <span class="prelude-val">None
         </span>}
 
-        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
+        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
             <span class="comment">// We should be able to map the entire address range to indices in the table.
-            </span><span class="macro">debug_assert!</span>(<span class="self">Self</span>::addr_to_index(address) &lt; <span class="self">self</span>.sft.len());
-            <span class="kw">unsafe </span>{ <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(<span class="self">Self</span>::addr_to_index(address)) }
+            </span><span class="macro">debug_assert!</span>(<span class="self">Self</span>::addr_to_index(address) &lt; <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.sft.get()).len() });
+            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;**</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked(<span class="self">Self</span>::addr_to_index(address)) }
         }
 
-        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
-            <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(<span class="self">Self</span>::addr_to_index(address))
+        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
+            <span class="kw-2">&amp;**</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked(<span class="self">Self</span>::addr_to_index(address))
         }
 
-        <span class="kw">unsafe fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>), start: Address, bytes: usize) {
-            <span class="kw">let </span>mut_self = <span class="self">self</span>.mut_self();
+        <span class="kw">unsafe fn </span>update(
+            <span class="kw-2">&amp;</span><span class="self">self</span>,
+            space: <span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
+            start: Address,
+            bytes: usize,
+        ) {
             <span class="kw">let </span>index = <span class="self">Self</span>::addr_to_index(start);
             <span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
                 <span class="comment">// Make sure we only update from empty to a valid space, or overwrite the space
-                </span><span class="kw">let </span>old = mut_self.sft[index];
-                <span class="macro">assert!</span>(old.name() == EMPTY_SFT_NAME || old.name() == space.name());
+                </span><span class="kw">let </span>old = (<span class="kw-2">*</span><span class="self">self</span>.sft.get())[index];
+                <span class="macro">assert!</span>((<span class="kw-2">*</span>old).name() == EMPTY_SFT_NAME || (<span class="kw-2">*</span>old).name() == (<span class="kw-2">*</span>space).name());
                 <span class="comment">// Make sure the range is in the space
                 </span><span class="kw">let </span>space_start = <span class="self">Self</span>::index_to_space_start(index);
                 <span class="comment">// FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
@@ -658,17 +666,17 @@
                     <span class="macro">assert!</span>(start + bytes &lt;= space_start + MAX_SPACE_EXTENT);
                 }
             }
-            <span class="kw-2">*</span>mut_self.sft.get_unchecked_mut(index) = space;
+
+            <span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked_mut(index) = std::mem::transmute(space);
         }
 
         <span class="kw">unsafe fn </span>clear(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) {
-            <span class="kw">let </span>mut_self = <span class="self">self</span>.mut_self();
             <span class="kw">let </span>index = <span class="self">Self</span>::addr_to_index(addr);
-            <span class="kw-2">*</span>mut_self.sft.get_unchecked_mut(index) = <span class="kw-2">&amp;</span>EMPTY_SPACE_SFT;
+            <span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked_mut(index) = <span class="kw-2">&amp;</span>EMPTY_SPACE_SFT;
         }
     }
 
-    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTSpaceMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">impl </span>SFTSpaceMap {
         <span class="doccomment">/// This mask extracts a few bits from address, and use it as index to the space map table.
         /// This constant is specially picked for the current heap range (HEAP_STRAT/HEAP_END), and the space size (MAX_SPACE_EXTENT).
         /// If any of these changes, the test `test_address_arithmetic()` may fail, and this constant will need to be updated.
@@ -685,16 +693,8 @@
                 <span class="self">Self</span>::TABLE_SIZE &gt;= <span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES
             );
             <span class="self">Self </span>{
-                sft: <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; <span class="self">Self</span>::TABLE_SIZE],
+                sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; <span class="self">Self</span>::TABLE_SIZE]),
             }
-        }
-
-        <span class="comment">// This is a temporary solution to allow unsafe mut reference.
-        // FIXME: We need a safe implementation.
-        </span><span class="attribute">#[allow(clippy::cast_ref_to_mut)]
-        #[allow(clippy::mut_from_ref)]
-        </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
-            <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
         }
 
         <span class="kw">const fn </span>addr_to_index(addr: Address) -&gt; usize {
@@ -764,6 +764,7 @@
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::<span class="kw-2">*</span>;
+    <span class="kw">use </span>std::cell::UnsafeCell;
     <span class="kw">use </span>std::collections::HashMap;
     <span class="kw">use </span>std::sync::atomic::Ordering;
 
@@ -775,22 +776,22 @@
     /// For example, when we use library malloc for mark sweep, we have no control of where the
     /// library malloc may allocate into, so we cannot use the space map. And using a sparse chunk map
     /// will be costly in terms of memory. In this case, the dense chunk map is a good solution.
-    </span><span class="kw">pub struct </span>SFTDenseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    </span><span class="kw">pub struct </span>SFTDenseChunkMap {
         <span class="doccomment">/// The dense table, one entry per space. We use side metadata to store the space index for each chunk.
         /// 0 is EMPTY_SPACE_SFT.
-        </span>sft: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt;,
+        </span>sft: UnsafeCell&lt;Vec&lt;<span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt;&gt;,
         <span class="doccomment">/// A map from space name (assuming they are unique) to their index. We use this to know whether we have
         /// pushed &amp;dyn SFT for a space, and to know its index.
-        </span>index_map: HashMap&lt;String, usize&gt;,
+        </span>index_map: UnsafeCell&lt;HashMap&lt;String, usize&gt;&gt;,
     }
 
-    <span class="kw">unsafe impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sync <span class="kw">for </span>SFTDenseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {}
+    <span class="kw">unsafe impl </span>Sync <span class="kw">for </span>SFTDenseChunkMap {}
 
-    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTMap <span class="kw">for </span>SFTDenseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">impl </span>SFTMap <span class="kw">for </span>SFTDenseChunkMap {
         <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
             <span class="kw">if </span>SFT_DENSE_CHUNK_MAP_INDEX.is_mapped(addr) {
                 <span class="kw">let </span>index = <span class="self">Self</span>::addr_to_index(addr);
-                index &lt; <span class="self">self</span>.sft.len() <span class="kw">as </span>u8
+                index &lt; <span class="self">self</span>.sft().len() <span class="kw">as </span>u8
             } <span class="kw">else </span>{
                 <span class="comment">// We haven&#39;t mapped side metadata for the chunk, so we do not have an SFT entry for the address.
                 </span><span class="bool-val">false
@@ -804,8 +805,8 @@
         <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
             <span class="kw">if </span><span class="self">self</span>.has_sft_entry(address) {
                 <span class="kw">unsafe </span>{
-                    <span class="kw-2">*</span><span class="self">self
-                        </span>.sft
+                    <span class="kw-2">&amp;**</span><span class="self">self
+                        </span>.sft()
                         .get_unchecked(<span class="self">Self</span>::addr_to_index(address) <span class="kw">as </span>usize)
                 }
             } <span class="kw">else </span>{
@@ -814,14 +815,14 @@
         }
 
         <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
-            <span class="kw-2">*</span><span class="self">self
-                </span>.sft
+            <span class="kw-2">&amp;**</span><span class="self">self
+                </span>.sft()
                 .get_unchecked(<span class="self">Self</span>::addr_to_index(address) <span class="kw">as </span>usize)
         }
 
         <span class="kw">unsafe fn </span>eager_initialize(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
-            space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
+            space: <span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
             start: Address,
             bytes: usize,
         ) {
@@ -836,17 +837,19 @@
             <span class="self">self</span>.update(space, start, bytes);
         }
 
-        <span class="kw">unsafe fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>), start: Address, bytes: usize) {
-            <span class="kw">let </span>mut_self = <span class="self">self</span>.mut_self();
-
+        <span class="kw">unsafe fn </span>update(
+            <span class="kw-2">&amp;</span><span class="self">self</span>,
+            space: <span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
+            start: Address,
+            bytes: usize,
+        ) {
             <span class="comment">// Check if we have an entry in self.sft for the space. If so, get the index.
             // If not, push the space pointer to the table and add an entry to the hahs map.
-            </span><span class="kw">let </span>index: u8 = <span class="kw-2">*</span>mut_self
-                .index_map
-                .entry(space.name().to_string())
+            </span><span class="kw">let </span>index: u8 = <span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.index_map.get())
+                .entry((<span class="kw-2">*</span>space).name().to_string())
                 .or_insert_with(|| {
-                    <span class="kw">let </span>count = mut_self.sft.len();
-                    mut_self.sft.push(space);
+                    <span class="kw">let </span>count = <span class="self">self</span>.sft().len();
+                    (<span class="kw-2">*</span><span class="self">self</span>.sft.get()).push(space);
                     count
                 }) <span class="kw">as </span>u8;
 
@@ -878,35 +881,36 @@
         }
     }
 
-    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTDenseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">impl </span>SFTDenseChunkMap {
         <span class="doccomment">/// Empty space is at index 0
         </span><span class="kw">const </span>EMPTY_SFT_INDEX: u8 = <span class="number">0</span>;
 
         <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
             <span class="self">Self </span>{
                 <span class="doccomment">/// Empty space is at index 0
-                </span>sft: <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT],
-                index_map: HashMap::new(),
+                </span>sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT]),
+                index_map: UnsafeCell::new(HashMap::new()),
             }
-        }
-
-        <span class="comment">// This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-        // of the same unsafe code.
-        // FIXME: We need a safe implementation.
-        </span><span class="attribute">#[allow(clippy::cast_ref_to_mut)]
-        #[allow(clippy::mut_from_ref)]
-        </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
-            <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
         }
 
         <span class="kw">pub fn </span>addr_to_index(addr: Address) -&gt; u8 {
             SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::&lt;u8&gt;(addr, Ordering::Relaxed)
+        }
+
+        <span class="kw">fn </span>sft(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Vec&lt;<span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt; {
+            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.sft.get() }
+        }
+
+        <span class="kw">fn </span>index_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>HashMap&lt;String, usize&gt; {
+            <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.index_map.get() }
         }
     }
 }
 
 <span class="attribute">#[allow(dead_code)]
 </span><span class="kw">mod </span>sparse_chunk_map {
+    <span class="kw">use </span>std::cell::UnsafeCell;
+
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
     <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -914,13 +918,13 @@
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 
     <span class="doccomment">/// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
-    </span><span class="kw">pub struct </span>SFTSparseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
-        sft: Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt;,
+    </span><span class="kw">pub struct </span>SFTSparseChunkMap {
+        sft: UnsafeCell&lt;Vec&lt;<span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>)&gt;&gt;,
     }
 
-    <span class="kw">unsafe impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sync <span class="kw">for </span>SFTSparseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {}
+    <span class="kw">unsafe impl </span>Sync <span class="kw">for </span>SFTSparseChunkMap {}
 
-    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTMap <span class="kw">for </span>SFTSparseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">impl </span>SFTMap <span class="kw">for </span>SFTSparseChunkMap {
         <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
             addr.chunk_index() &lt; MAX_CHUNKS
         }
@@ -929,29 +933,34 @@
             <span class="prelude-val">None
         </span>}
 
-        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
+        <span class="kw">fn </span>get_checked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
             <span class="kw">if </span><span class="self">self</span>.has_sft_entry(address) {
-                <span class="kw">unsafe </span>{ <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(address.chunk_index()) }
+                <span class="kw">unsafe </span>{ <span class="kw-2">&amp;**</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked(address.chunk_index()) }
             } <span class="kw">else </span>{
                 <span class="kw-2">&amp;</span>EMPTY_SPACE_SFT
             }
         }
 
-        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>SFT {
-            <span class="kw-2">*</span><span class="self">self</span>.sft.get_unchecked(address.chunk_index())
+        <span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>SFT {
+            <span class="kw-2">&amp;**</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked(address.chunk_index())
         }
 
         <span class="doccomment">/// Update SFT map for the given address range.
         /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
         /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-        </span><span class="kw">unsafe fn </span>update(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>), start: Address, bytes: usize) {
+        </span><span class="kw">unsafe fn </span>update(
+            <span class="kw-2">&amp;</span><span class="self">self</span>,
+            space: <span class="kw-2">*const </span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
+            start: Address,
+            bytes: usize,
+        ) {
             <span class="kw">if </span>DEBUG_SFT {
-                <span class="self">self</span>.log_update(space, start, bytes);
+                <span class="self">self</span>.log_update(<span class="kw-2">&amp;*</span>space, start, bytes);
             }
             <span class="kw">let </span>first = start.chunk_index();
             <span class="kw">let </span>last = conversions::chunk_align_up(start + bytes).chunk_index();
             <span class="kw">for </span>chunk <span class="kw">in </span>first..last {
-                <span class="self">self</span>.set(chunk, space);
+                <span class="self">self</span>.set(chunk, <span class="kw-2">&amp;*</span>space);
             }
             <span class="kw">if </span>DEBUG_SFT {
                 <span class="self">self</span>.trace_sft_map();
@@ -974,19 +983,11 @@
         }
     }
 
-    <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; SFTSparseChunkMap&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">impl </span>SFTSparseChunkMap {
         <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
             SFTSparseChunkMap {
-                sft: <span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; MAX_CHUNKS],
+                sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; MAX_CHUNKS]),
             }
-        }
-        <span class="comment">// This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
-        // of the same unsafe code.
-        // FIXME: We need a safe implementation.
-        </span><span class="attribute">#[allow(clippy::cast_ref_to_mut)]
-        #[allow(clippy::mut_from_ref)]
-        </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
-            <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
         }
 
         <span class="kw">fn </span>log_update(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>), start: Address, bytes: usize) {
@@ -1009,20 +1010,25 @@
             </span><span class="kw">let </span><span class="kw-2">mut </span>res = String::new();
 
             <span class="kw">const </span>SPACE_PER_LINE: usize = <span class="number">10</span>;
-            <span class="kw">for </span>i <span class="kw">in </span>(<span class="number">0</span>..<span class="self">self</span>.sft.len()).step_by(SPACE_PER_LINE) {
-                <span class="kw">let </span>max = <span class="kw">if </span>i + SPACE_PER_LINE &gt; <span class="self">self</span>.sft.len() {
-                    <span class="self">self</span>.sft.len()
-                } <span class="kw">else </span>{
-                    i + SPACE_PER_LINE
-                };
-                <span class="kw">let </span>chunks: Vec&lt;usize&gt; = (i..max).collect();
-                <span class="kw">let </span>space_names: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = chunks.iter().map(|<span class="kw-2">&amp;</span>x| <span class="self">self</span>.sft[x].name()).collect();
-                res.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
-                    <span class="string">&quot;{}: {}&quot;</span>,
-                    chunk_index_to_address(i),
-                    space_names.join(<span class="string">&quot;,&quot;</span>)
-                ));
-                res.push(<span class="string">&#39;\n&#39;</span>);
+            <span class="kw">unsafe </span>{
+                <span class="kw">for </span>i <span class="kw">in </span>(<span class="number">0</span>..(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).len()).step_by(SPACE_PER_LINE) {
+                    <span class="kw">let </span>max = <span class="kw">if </span>i + SPACE_PER_LINE &gt; (<span class="kw-2">*</span><span class="self">self</span>.sft.get()).len() {
+                        (<span class="kw-2">*</span><span class="self">self</span>.sft.get()).len()
+                    } <span class="kw">else </span>{
+                        i + SPACE_PER_LINE
+                    };
+                    <span class="kw">let </span>chunks: Vec&lt;usize&gt; = (i..max).collect();
+                    <span class="kw">let </span>space_names: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = chunks
+                        .iter()
+                        .map(|<span class="kw-2">&amp;</span>x| (<span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get())[x]).name())
+                        .collect();
+                    res.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                        <span class="string">&quot;{}: {}&quot;</span>,
+                        chunk_index_to_address(i),
+                        space_names.join(<span class="string">&quot;,&quot;</span>)
+                    ));
+                    res.push(<span class="string">&#39;\n&#39;</span>);
+                }
             }
 
             res
@@ -1038,10 +1044,10 @@
              * which are reasonable), and in the other case it would either see the
              * old (valid) space or an empty space, both of which are valid.
              */
-            </span><span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-            <span class="comment">// It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
+
+            // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
             </span><span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
-                <span class="kw">let </span>old = self_mut.sft[chunk].name();
+                <span class="kw">let </span>old = <span class="kw">unsafe </span>{ (<span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get())[chunk]).name() };
                 <span class="kw">let </span>new = sft.name();
                 <span class="comment">// Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
                 // in which case, we still set SFT map again.
@@ -1054,7 +1060,7 @@
                     new
                 );
             }
-            <span class="kw">unsafe </span>{ <span class="kw-2">*</span>self_mut.sft.get_unchecked_mut(chunk) = sft };
+            <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="kw-2">*</span><span class="self">self</span>.sft.get()).get_unchecked_mut(chunk) = sft };
         }
     }
 }
