@@ -52,6 +52,11 @@
 <span id="52">52</span>
 <span id="53">53</span>
 <span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -88,6 +93,11 @@
             <span class="kw">let </span><span class="kw-2">mut </span>worker_stat = worker.shared.borrow_stat_mut();
             stat.end_of_work(<span class="kw-2">&amp;mut </span>worker_stat);
         }
+    }
+
+    <span class="doccomment">/// Get the compile-time static type name for the work packet.
+    </span><span class="kw">fn </span>get_type_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        std::any::type_name::&lt;<span class="self">Self</span>&gt;()
     }
 }
 

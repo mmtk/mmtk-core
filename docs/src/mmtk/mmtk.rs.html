@@ -159,7 +159,9 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
-</pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.
+<span id="162">162</span>
+<span id="163">163</span>
+</pre><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
@@ -301,6 +303,7 @@
     }
 
     <span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
+        <span class="macro">probe!</span>(mmtk, harness_begin);
         <span class="self">self</span>.plan.handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="self">self</span>.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
         <span class="self">self</span>.plan.base().stats.start_all();
@@ -310,6 +313,7 @@
     <span class="kw">pub fn </span>harness_end(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) {
         <span class="self">self</span>.plan.base().stats.stop_all(<span class="self">self</span>);
         <span class="self">self</span>.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
+        <span class="macro">probe!</span>(mmtk, harness_end);
     }
 
     <span class="kw">pub fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {

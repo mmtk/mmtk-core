@@ -369,6 +369,21 @@
 <span id="369">369</span>
 <span id="370">370</span>
 <span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
@@ -590,7 +605,7 @@
             } <span class="kw">else </span>{
                 <span class="comment">// If we are not doing precise stress GC, just call the normal alloc_slow_once().
                 // Normal stress test only checks for stress GC in the slowpath.
-                </span><span class="self">self</span>.alloc_slow_once(size, align, offset)
+                </span><span class="self">self</span>.alloc_slow_once_traced(size, align, offset)
             };
 
             <span class="kw">if </span>!is_mutator {
@@ -689,6 +704,21 @@
     /// * `offset` the required offset in bytes.
     </span><span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address;
 
+    <span class="doccomment">/// A wrapper method for [`alloc_slow_once`](Allocator::alloc_slow_once) to insert USDT tracepoints.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    </span><span class="kw">fn </span>alloc_slow_once_traced(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
+        <span class="macro">probe!</span>(mmtk, alloc_slow_once_start);
+        <span class="comment">// probe! expands to an empty block on unsupported platforms
+        </span><span class="attribute">#[allow(clippy::let_and_return)]
+        </span><span class="kw">let </span>ret = <span class="self">self</span>.alloc_slow_once(size, align, offset);
+        <span class="macro">probe!</span>(mmtk, alloc_slow_once_end);
+        ret
+    }
+
     <span class="doccomment">/// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to
     /// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for
     /// allocators that do thread local allocation, they may allocate from their thread local
@@ -729,7 +759,7 @@
         </span><span class="kw">if </span><span class="self">self</span>.does_thread_local_allocation() &amp;&amp; need_poll {
             <span class="macro">warn!</span>(<span class="string">&quot;{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).&quot;</span>, std::any::type_name::&lt;<span class="self">Self</span>&gt;());
         }
-        <span class="self">self</span>.alloc_slow_once(size, align, offset)
+        <span class="self">self</span>.alloc_slow_once_traced(size, align, offset)
     }
 
     <span class="doccomment">/// The [`crate::plan::Mutator`] that includes this allocator is going to be destroyed. Some allocators

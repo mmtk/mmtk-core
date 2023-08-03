@@ -905,6 +905,7 @@
 <span id="905">905</span>
 <span id="906">906</span>
 <span id="907">907</span>
+<span id="908">908</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1381,6 +1382,7 @@
     </span>);
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
     mmtk.plan.base().initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+    <span class="macro">probe!</span>(mmtk, collection_initialized);
 }
 
 <span class="doccomment">/// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().

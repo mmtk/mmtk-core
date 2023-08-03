@@ -137,6 +137,14 @@
 <span id="137">137</span>
 <span id="138">138</span>
 <span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The GC controller thread.
 //!
 //! MMTk has many GC threads.  There are many GC worker threads and one GC controller thread.
@@ -181,6 +189,7 @@
     }
 
     <span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread) {
+        <span class="macro">probe!</span>(mmtk, gccontroller_run);
         <span class="comment">// Initialize the GC worker for coordinator. We are not using the run() method from
         // GCWorker so we manually initialize the worker here.
         </span><span class="self">self</span>.coordinator_worker.tls = tls;
@@ -190,7 +199,7 @@
             <span class="self">self</span>.requester.wait_for_request();
             <span class="macro">debug!</span>(<span class="string">&quot;[STWController: Request recieved.]&quot;</span>);
 
-            <span class="self">self</span>.do_gc_until_completion();
+            <span class="self">self</span>.do_gc_until_completion_traced();
             <span class="macro">debug!</span>(<span class="string">&quot;[STWController: Worker threads complete!]&quot;</span>);
         }
     }
@@ -215,8 +224,15 @@
         </span><span class="bool-val">false
     </span>}
 
+    <span class="doccomment">/// A wrapper method for [`do_gc_until_completion`](GCController::do_gc_until_completion) to insert USDT tracepoints.
+    </span><span class="kw">fn </span>do_gc_until_completion_traced(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="macro">probe!</span>(mmtk, gc_start);
+        <span class="self">self</span>.do_gc_until_completion();
+        <span class="macro">probe!</span>(mmtk, gc_end);
+    }
+
     <span class="doccomment">/// Coordinate workers to perform GC in response to a GC request.
-    </span><span class="kw">pub fn </span>do_gc_until_completion(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    </span><span class="kw">fn </span>do_gc_until_completion(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>gc_start = std::time::Instant::now();
 
         <span class="macro">debug_assert!</span>(

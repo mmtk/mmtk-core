@@ -1028,6 +1028,11 @@
 <span id="1028">1028</span>
 <span id="1029">1029</span>
 <span id="1030">1030</span>
+<span id="1031">1031</span>
+<span id="1032">1032</span>
+<span id="1033">1033</span>
+<span id="1034">1034</span>
+<span id="1035">1035</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1575,6 +1580,10 @@
     </span><span class="kw">pub fn </span>pop_nodes(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Vec&lt;ObjectReference&gt; {
         <span class="self">self</span>.nodes.take()
     }
+
+    <span class="kw">pub fn </span>is_roots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.roots
+    }
 }
 
 <span class="doccomment">/// A short-hand for `&lt;E::VM as VMBinding&gt;::VMEdge`.
@@ -1661,6 +1670,7 @@
     }
 
     <span class="kw">fn </span>process_edges(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="macro">probe!</span>(mmtk, process_edges, <span class="self">self</span>.edges.len(), <span class="self">self</span>.is_roots());
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="self">self</span>.edges.len() {
             <span class="self">self</span>.process_edge(<span class="self">self</span>.edges[i])
         }

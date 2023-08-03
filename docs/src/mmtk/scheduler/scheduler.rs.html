@@ -413,6 +413,7 @@
 <span id="413">413</span>
 <span id="414">414</span>
 <span id="415">415</span>
+<span id="416">416</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
@@ -660,6 +661,7 @@
             <span class="kw">let </span>bucket_opened = bucket.update(<span class="self">self</span>);
             buckets_updated = buckets_updated || bucket_opened;
             <span class="kw">if </span>bucket_opened {
+                <span class="macro">probe!</span>(mmtk, bucket_opened, id);
                 new_packets = new_packets || !bucket.is_drained();
                 <span class="kw">if </span>new_packets {
                     <span class="comment">// Quit the loop. There are already new packets in the newly opened buckets.

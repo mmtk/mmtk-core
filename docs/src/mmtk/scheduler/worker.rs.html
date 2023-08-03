@@ -414,6 +414,20 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -761,12 +775,26 @@
     <span class="doccomment">/// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
     /// Each worker will keep polling and executing work packets in a loop.
     </span><span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">probe!</span>(mmtk, gcworker_run);
         WORKER_ORDINAL.with(|x| x.store(<span class="prelude-val">Some</span>(<span class="self">self</span>.ordinal), Ordering::SeqCst));
         <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
         <span class="self">self</span>.tls = tls;
         <span class="self">self</span>.copy = <span class="kw">crate</span>::plan::create_gc_worker_context(tls, mmtk);
         <span class="kw">loop </span>{
+            <span class="comment">// Instead of having work_start and work_end tracepoints, we have
+            // one tracepoint before polling for more work and one tracepoint
+            // before executing the work.
+            // This allows measuring the distribution of both the time needed
+            // poll work (between work_poll and work), and the time needed to
+            // execute work (between work and next work_poll).
+            // If we have work_start and work_end, we cannot measure the first
+            // poll.
+            </span><span class="macro">probe!</span>(mmtk, work_poll);
             <span class="kw">let </span><span class="kw-2">mut </span>work = <span class="self">self</span>.poll();
+            <span class="comment">// probe! expands to an empty block on unsupported platforms
+            </span><span class="attribute">#[allow(unused_variables)]
+            </span><span class="kw">let </span>typename = work.get_type_name();
+            <span class="macro">probe!</span>(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(<span class="self">self</span>, mmtk);
         }
     }
