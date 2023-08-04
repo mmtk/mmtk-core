@@ -33,20 +33,20 @@ pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: usiz
         result += align;
     }
     let malloc_res_ptr: *mut usize = (result - BYTES_IN_ADDRESS).to_mut_ptr();
-    unsafe { *malloc_res_ptr = address.as_usize() };
+    unsafe { malloc_res_ptr.write_unaligned(address.as_usize()) };
     result
 }
 
 pub fn offset_malloc_usable_size(address: Address) -> usize {
     let malloc_res_ptr: *mut usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
-    let malloc_res = unsafe { *malloc_res_ptr } as *mut libc::c_void;
+    let malloc_res = unsafe { malloc_res_ptr.read_unaligned() } as *mut libc::c_void;
     unsafe { malloc_usable_size(malloc_res) }
 }
 
 /// free an address that is allocated with some offset
 pub fn offset_free(address: Address) {
     let malloc_res_ptr: *mut usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
-    let malloc_res = unsafe { *malloc_res_ptr } as *mut libc::c_void;
+    let malloc_res = unsafe { malloc_res_ptr.read_unaligned() } as *mut libc::c_void;
     unsafe { free(malloc_res) };
 }
 
