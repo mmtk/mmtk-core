@@ -117,13 +117,21 @@ For details, please refer to each VM binding repository.
 
 ## Supported Rust versions
 
-MMTk is closely following the latest releases of the Rust toolchain. The minimum supported Rust
-version (MSRV) is "N-1", that is, one minor version before the latest stable Rust release.  For
-example, if the latest Rust stable release is "1.61.2", the MSRV will be "1.60.0".
+The MMTk team does most of the development and experiment work on a specific Rust version recorded
+in the `rust-toolchain` file.  We update it between releases of mmtk-core to keep it close to the
+latest Rust stable release.  The release cycle of mmtk-core is six weeks, roughly the same as Rust
+itself. 
 
-MMTk has a six-week release cycle, roughly the same as Rust itself.  We bump the MSRV version
-*after* every release of MMTk core.  This gives users (including bindings) a six-week grace period
-to update their supported Rust versions.
+We also run CI tests against the latest stable Rust version for each pull request.  If it fails, we
+will not bump the version in `rust-toolchain` until we fix the issues. 
+
+Our minimum support Rust version (MSRV) policy is "N-1".  That means we also ensure mmtk-core works
+properly with the Rust toolchain that is one minor version before the version specified in
+`rust-toolchain`.  For example, if `rust-toolchain` contains "1.61.2", the MSRV will be "1.60.0".
+The `package.rust-version` field in `Cargo.toml` may sometimes contain an older version, but we may
+bump it to a newer version up to "N-1" whenever we need to make use of new Rust features or a
+dependency crate needs a newer Rust.  Therefore, users are encouraged to keep close to the latest
+Rust toolchain rather than relying on an outdated version of Rust.
 
 Note, however, that we may switch to a more conservative MSRV policy in the future when MMTk reaches
 a stable state.
