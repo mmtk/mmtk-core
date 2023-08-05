@@ -16,9 +16,9 @@ use crate::vm::*;
 pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
     /// Bump pointer
-    cursor: Address,
+    pub(crate) cursor: Address,
     /// Limit for bump pointer
-    limit: Address,
+    pub(crate) limit: Address,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
     /// [`Plan`] instance that this allocator instance is associated with.
@@ -28,9 +28,9 @@ pub struct ImmixAllocator<VM: VMBinding> {
     /// Is this a copy allocator?
     copy: bool,
     /// Bump pointer for large objects
-    large_cursor: Address,
+    pub(crate) large_cursor: Address,
     /// Limit for bump pointer for large objects
-    large_limit: Address,
+    pub(crate) large_limit: Address,
     /// Is the current request for large or small?
     request_for_large: bool,
     /// Hole-searching cursor

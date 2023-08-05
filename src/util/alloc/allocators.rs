@@ -175,3 +175,33 @@ impl Default for AllocatorSelector {
         AllocatorSelector::None
     }
 }
+
+/// This type describes allocator information. It is used to 
+/// generate fast paths for the GC. All offset fields are relative to [Mutator](crate::Mutator).
+#[repr(C, u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum AllocatorInfo {
+    BumpPointer {
+        limit_offset: usize,
+        top_offset: usize,
+    },
+    MarkCompact {
+        limit_offset: usize,
+        top_offset: usize,
+    },
+    Immix {
+        limit_offset: usize,
+        top_offset: usize,
+        large_limit_offset: usize,
+        large_top_offset: usize,
+        /// Maximum bytes allowed until allocating using `large_*` cursors.
+        small_limit: usize,
+    },
+    None,
+}
+
+impl Default for AllocatorInfo {
+    fn default() -> Self {
+        AllocatorInfo::None
+    }
+}

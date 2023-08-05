@@ -18,9 +18,9 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// Current cursor for bump pointer
-    cursor: Address,
+    pub(crate) cursor: Address,
     /// Limit for bump pointer
-    limit: Address,
+    pub(crate) limit: Address,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static dyn Space<VM>,
     /// [`Plan`] instance that this allocator instance is associated with.

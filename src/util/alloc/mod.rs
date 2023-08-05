@@ -10,6 +10,7 @@ pub use allocator::Allocator;
 pub(crate) mod allocators;
 pub use allocators::AllocatorSelector;
 pub use allocators::Allocators;
+pub use allocators::AllocatorInfo;
 
 /// Bump pointer allocator
 mod bumpallocator;

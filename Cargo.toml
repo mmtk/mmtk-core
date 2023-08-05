@@ -19,6 +19,7 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
+memoffset = "0.9"
 atomic = "0.5.1"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.3.0"
