@@ -18,6 +18,7 @@ use crate::plan::{Mutator, MutatorContext};
 use crate::policy::immix::line::Line;
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
+use crate::util::alloc::Allocators;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::AllocatorInfo;
 use crate::util::alloc::BumpAllocator;
@@ -367,7 +368,7 @@ pub fn get_allocator_info<VM: VMBinding>(
 ) -> AllocatorInfo {
     match selector {
         AllocatorSelector::BumpPointer(index) => {
-            let base_offset = offset_of!(Mutator<VM>, allocators) * size_of::<BumpAllocator<VM>>() * index as usize;
+            let base_offset = offset_of!(Mutator<VM>, allocators) + offset_of!(Allocators<VM>, bump_pointer) + size_of::<BumpAllocator<VM>>() * index as usize;
             let limit_offset = base_offset + offset_of!(BumpAllocator<VM>, limit);
             let top_offset = base_offset + offset_of!(BumpAllocator<VM>, cursor);
             
@@ -375,7 +376,7 @@ pub fn get_allocator_info<VM: VMBinding>(
         }
 
         AllocatorSelector::Immix(index) => {
-            let base_offset = offset_of!(Mutator<VM>, allocators) * size_of::<ImmixAllocator<VM>>() * index as usize;
+            let base_offset = offset_of!(Mutator<VM>, allocators) + offset_of!(Allocators<VM>, immix) + size_of::<ImmixAllocator<VM>>() * index as usize;
             let limit_offset = base_offset + offset_of!(ImmixAllocator<VM>, limit);
             let top_offset = base_offset + offset_of!(ImmixAllocator<VM>, cursor);
             let large_limit_offset = base_offset + offset_of!(ImmixAllocator<VM>, large_limit);
@@ -384,7 +385,7 @@ pub fn get_allocator_info<VM: VMBinding>(
         }
 
         AllocatorSelector::MarkCompact(index) => {
-            let base_offset = offset_of!(Mutator<VM>, allocators) * size_of::<MarkCompactAllocator<VM>>() * index as usize;
+            let base_offset = offset_of!(Mutator<VM>, allocators)+ offset_of!(Allocators<VM>, markcompact) + size_of::<MarkCompactAllocator<VM>>() * index as usize;
             let bump_offset = base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
             let limit_offset = bump_offset + offset_of!(BumpAllocator<VM>, limit);
             let top_offset = bump_offset + offset_of!(BumpAllocator<VM>, cursor);
