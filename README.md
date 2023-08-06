@@ -125,7 +125,7 @@ the latest Rust stable release. The release cycle of mmtk-core is six weeks, rou
 
 Our minimum support Rust version (MSRV) policy is "N-1".  That means we also ensure mmtk-core works
 properly with the Rust toolchain that is one minor version before the version specified in
-`rust-toolchain`.  For example, if `rust-toolchain` contains "1.61.2", the MSRV will be "1.60.0".
+`rust-toolchain`.  For example, if `rust-toolchain` contains "1.61.2", the MSRV is guaranteed to be no later than "1.60.0".
 The `package.rust-version` field in `Cargo.toml` may sometimes contain an older version, but we may
 bump it to a newer version up to "N-1" whenever we need to make use of new Rust features or a
 dependency crate needs a newer Rust.  Therefore, users are encouraged to keep close to the latest
