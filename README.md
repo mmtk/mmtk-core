@@ -123,7 +123,7 @@ for development. We update the pinned Rust version between releases of mmtk-core
 the latest Rust stable release. The release cycle of mmtk-core is six weeks, roughly the same as
 Rust itself. 
 
-Our minimum support Rust version (MSRV) policy is "N-1".  That means we also ensure mmtk-core works
+Our minimum support Rust version (MSRV) policy is "N-1" (note that N is *NOT* the current stable Rust release).  That means we also ensure mmtk-core works
 properly with the Rust toolchain that is one minor version before the version specified in
 `rust-toolchain`.  For example, if `rust-toolchain` contains "1.61.2", the MSRV will be guaranteed
 to be no later than "1.60.0".  We may bump MSRV up to "N-1" when we need to make use of new Rust
