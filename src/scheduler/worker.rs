@@ -362,12 +362,26 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+        probe!(mmtk, gcworker_run);
         WORKER_ORDINAL.with(|x| x.store(Some(self.ordinal), Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
         loop {
+            // Instead of having work_start and work_end tracepoints, we have
+            // one tracepoint before polling for more work and one tracepoint
+            // before executing the work.
+            // This allows measuring the distribution of both the time needed
+            // poll work (between work_poll and work), and the time needed to
+            // execute work (between work and next work_poll).
+            // If we have work_start and work_end, we cannot measure the first
+            // poll.
+            probe!(mmtk, work_poll);
             let mut work = self.poll();
+            // probe! expands to an empty block on unsupported platforms
+            #[allow(unused_variables)]
+            let typename = work.get_type_name();
+            probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(self, mmtk);
         }
     }

@@ -1,4 +1,4 @@
-///! Various allocators implementation.
+//! Various allocators implementation.
 
 /// The allocator trait and allocation-related functions.
 pub(crate) mod allocator;
@@ -9,6 +9,7 @@ pub use allocator::Allocator;
 /// A list of all the allocators, embedded in Mutator
 pub(crate) mod allocators;
 pub use allocators::AllocatorSelector;
+pub use allocators::Allocators;
 
 /// Bump pointer allocator
 mod bumpallocator;

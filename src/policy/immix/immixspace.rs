@@ -12,6 +12,8 @@ use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
@@ -67,6 +69,12 @@ pub struct ImmixSpaceArgs {
     /// bit to differentiate them. So we reset all the log bits in major GCs,
     /// and unlogged the objects when they are traced (alive).
     pub reset_log_bit_in_major_gc: bool,
+    /// Whether this ImmixSpace instance contains both young and old objects.
+    /// This affects the updating of valid-object bits.  If some lines or blocks of this ImmixSpace
+    /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
+    /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
+    /// nursery and its VO bits can be cleared in bulk.
+    pub mixed_age: bool,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -89,12 +97,29 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        if super::NEVER_MOVE_OBJECTS {
-            // We won't forward objects.
-            self.is_marked(object)
-        } else {
-            self.is_marked(object) || ForwardingWord::is_forwarded::<VM>(object)
+        // If the mark bit is set, it is live.
+        if self.is_marked(object) {
+            return true;
         }
+
+        // If we never move objects, look no further.
+        if super::NEVER_MOVE_OBJECTS {
+            return false;
+        }
+
+        // If the forwarding bits are on the side,
+        if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
+            // we need to ensure `object` is in a defrag source
+            // because `PrepareBlockState` does not clear forwarding bits
+            // for non-defrag-source blocks.
+            if !Block::containing::<VM>(object).is_defrag_source() {
+                // Objects not in defrag sources cannot be forwarded.
+                return false;
+            }
+        }
+
+        // If the object is forwarded, it is live, too.
+        ForwardingWord::is_forwarded::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
@@ -261,6 +286,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
 
         super::validate_features();
+        #[cfg(feature = "vo_bit")]
+        vo_bit::helper::validate_config::<VM>();
         let vm_map = args.vm_map;
         let scheduler = args.scheduler.clone();
         let common =
@@ -377,6 +404,42 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 }
             }
         }
+
+        #[cfg(feature = "vo_bit")]
+        if vo_bit::helper::need_to_clear_vo_bits_before_tracing::<VM>() {
+            let maybe_scope = if major_gc {
+                // If it is major GC, we always clear all VO bits because we are doing full-heap
+                // tracing.
+                Some(VOBitsClearingScope::FullGC)
+            } else if self.space_args.mixed_age {
+                // StickyImmix nursery GC.
+                // Some lines (or blocks) contain only young objects,
+                // while other lines (or blocks) contain only old objects.
+                if super::BLOCK_ONLY {
+                    // Block only.  Young objects are only allocated into fully empty blocks.
+                    // Only clear unmarked blocks.
+                    Some(VOBitsClearingScope::BlockOnly)
+                } else {
+                    // Young objects are allocated into empty lines.
+                    // Only clear unmarked lines.
+                    let line_mark_state = self.line_mark_state.load(Ordering::SeqCst);
+                    Some(VOBitsClearingScope::Line {
+                        state: line_mark_state,
+                    })
+                }
+            } else {
+                // GenImmix nursery GC.  We do nothing to the ImmixSpace because the nursery is a
+                // separate CopySpace.  It'll clear its own VO bits.
+                None
+            };
+
+            if let Some(scope) = maybe_scope {
+                let work_packets = self
+                    .chunk_map
+                    .generate_tasks(|chunk| Box::new(ClearVOBitsAfterPrepare { chunk, scope }));
+                self.scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
+            }
+        }
     }
 
     /// Release for the immix space. This is called when a GC finished.
@@ -486,11 +549,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
-        debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: VO bit not set",
-            object
-        );
+        vo_bit::helper::on_trace_object::<VM>(object);
+
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -500,6 +560,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
             }
+
+            #[cfg(feature = "vo_bit")]
+            vo_bit::helper::on_object_marked::<VM>(object);
+
             // Visit node
             queue.enqueue(object);
             self.unlog_object_if_needed(object);
@@ -520,12 +584,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
+
         #[cfg(feature = "vo_bit")]
-        debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
-            "{:x}: VO bit not set",
-            object
-        );
+        vo_bit::helper::on_trace_object::<VM>(object);
+
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             // We lost the forwarding race as some other thread has set the forwarding word; wait
@@ -572,16 +634,30 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
+
+                #[cfg(feature = "vo_bit")]
+                vo_bit::helper::on_object_marked::<VM>(object);
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
                 // mark the block. So we do not need to explicitly mark it here.
-                ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
+
+                // Clippy complains if the "vo_bit" feature is not enabled.
+                #[allow(clippy::let_and_return)]
+                let new_object =
+                    ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
+
+                #[cfg(feature = "vo_bit")]
+                vo_bit::helper::on_object_forwarded::<VM>(new_object);
+
+                new_object
             };
             debug_assert_eq!(
                 Block::containing::<VM>(new_object).get_state(),
                 BlockState::Marked
             );
+
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
             self.unlog_object_if_needed(new_object);
@@ -804,10 +880,11 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             debug_assert_ne!(block.get_state(), BlockState::Marked);
             // Clear forwarding bits if necessary.
             if is_defrag_source {
+                // Note that `ImmixSpace::is_live` depends on the fact that we only clear side
+                // forwarding bits for defrag sources.  If we change the code here, we need to
+                // make sure `ImmixSpace::is_live` is fixed, too.
                 if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
                     // Clear on-the-side forwarding bits.
-                    // NOTE: In theory, we only need to clear the forwarding bits of occupied lines of
-                    // blocks that are defrag sources.
                     side.bzero_metadata(block.start(), Block::BYTES);
                 }
             }
@@ -982,5 +1059,53 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
         );
         // Just get the space from either allocator
         self.defrag_allocator.immix_space()
+    }
+}
+
+#[cfg(feature = "vo_bit")]
+#[derive(Clone, Copy)]
+enum VOBitsClearingScope {
+    /// Clear all VO bits in all blocks.
+    FullGC,
+    /// Clear unmarked blocks, only.
+    BlockOnly,
+    /// Clear unmarked lines, only.  (i.e. lines with line mark state **not** equal to `state`).
+    Line { state: u8 },
+}
+
+/// A work packet to clear VO bit metadata after Prepare.
+#[cfg(feature = "vo_bit")]
+struct ClearVOBitsAfterPrepare {
+    chunk: Chunk,
+    scope: VOBitsClearingScope,
+}
+
+#[cfg(feature = "vo_bit")]
+impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        match self.scope {
+            VOBitsClearingScope::FullGC => {
+                vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
+            }
+            VOBitsClearingScope::BlockOnly => {
+                self.clear_blocks(None);
+            }
+            VOBitsClearingScope::Line { state } => {
+                self.clear_blocks(Some(state));
+            }
+        }
+    }
+}
+
+#[cfg(feature = "vo_bit")]
+impl ClearVOBitsAfterPrepare {
+    fn clear_blocks(&mut self, line_mark_state: Option<u8>) {
+        for block in self
+            .chunk
+            .iter_region::<Block>()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            block.clear_vo_bits_for_unmarked_regions(line_mark_state);
+        }
     }
 }

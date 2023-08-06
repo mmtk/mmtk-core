@@ -97,7 +97,8 @@ pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Add
 /// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its
 /// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage
 /// that can be accessed efficiently. A VM may also copy and embed the mutator stucture to a thread-local data
-/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied).
+/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied --
+/// Note that `Mutator` may contain pointers so a binding may drop the box only if they perform a deep copy).
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -135,6 +136,9 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 
 /// Allocate memory for an object. For performance reasons, a VM should
 /// implement the allocation fast-path on their side rather than just calling this function.
+///
+/// If the VM provides a non-zero `offset` parameter, then the returned address will be
+/// such that the `RETURNED_ADDRESS + offset` is aligned to the `align` parameter.
 ///
 /// Arguments:
 /// * `mutator`: The mutator to perform this allocation request.
@@ -470,6 +474,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     );
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    probe!(mmtk, collection_initialized);
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().

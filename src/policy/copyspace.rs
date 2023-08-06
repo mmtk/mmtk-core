@@ -242,6 +242,10 @@ impl<VM: VMBinding> CopySpace<VM> {
                 semantics.unwrap(),
                 worker.get_copy_context_mut(),
             );
+
+            #[cfg(feature = "vo_bit")]
+            crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
+
             trace!("Forwarding pointer");
             queue.enqueue(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
