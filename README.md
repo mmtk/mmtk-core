@@ -117,13 +117,11 @@ For details, please refer to each VM binding repository.
 
 ## Supported Rust versions
 
-The MMTk team does most of the development and experiment work on a specific Rust version recorded
-in the `rust-toolchain` file.  We update it between releases of mmtk-core to keep it close to the
-latest Rust stable release.  The release cycle of mmtk-core is six weeks, roughly the same as Rust
-itself. 
-
-We also run CI tests against the latest stable Rust version for each pull request.  If it fails, we
-will not bump the version in `rust-toolchain` until we fix the issues. 
+MMTk uses a pinned Rust version in the repository (recorded in the `rust-toolchain` file). 
+We run our tests and benchmarks using the pinned Rust version. We recommend 
+using the pinned Rust version for development. We update the pinned Rust version 
+between releases of mmtk-core to keep it close to
+the latest Rust stable release. The release cycle of mmtk-core is six weeks, roughly the same as Rust itself. 
 
 Our minimum support Rust version (MSRV) policy is "N-1".  That means we also ensure mmtk-core works
 properly with the Rust toolchain that is one minor version before the version specified in
