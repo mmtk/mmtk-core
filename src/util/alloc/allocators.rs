@@ -176,7 +176,7 @@ impl Default for AllocatorSelector {
     }
 }
 
-/// This type describes allocator information. It is used to 
+/// This type describes allocator information. It is used to
 /// generate fast paths for the GC. All offset fields are relative to [Mutator](crate::Mutator).
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
