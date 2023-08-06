@@ -1,4 +1,4 @@
-///! Various allocators implementation.
+//! Various allocators implementation.
 
 /// The allocator trait and allocation-related functions.
 pub(crate) mod allocator;
