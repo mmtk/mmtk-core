@@ -18,9 +18,9 @@ use crate::plan::{Mutator, MutatorContext};
 use crate::policy::immix::line::Line;
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
-use crate::util::alloc::Allocators;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc::AllocatorInfo;
+use crate::util::alloc::Allocators;
 use crate::util::alloc::BumpAllocator;
 use crate::util::alloc::ImmixAllocator;
 use crate::util::alloc::MarkCompactAllocator;
@@ -33,9 +33,9 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::edge_shape::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use std::sync::atomic::Ordering;
 use memoffset::offset_of;
 use std::mem::size_of;
+use std::sync::atomic::Ordering;
 /// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
 ///
@@ -360,42 +360,57 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 
 /// Return an AllocatorInfo for the given allocator selector. This method is provided
 /// so that VM compilers may generate allocator fast-path and load fields for the fast-path.
-/// 
+///
 /// Arguments:
 /// * `selector`: The allocator selector to query.
-pub fn get_allocator_info<VM: VMBinding>(
-    selector: AllocatorSelector
-) -> AllocatorInfo {
+pub fn get_allocator_info<VM: VMBinding>(selector: AllocatorSelector) -> AllocatorInfo {
     match selector {
         AllocatorSelector::BumpPointer(index) => {
-            let base_offset = offset_of!(Mutator<VM>, allocators) + offset_of!(Allocators<VM>, bump_pointer) + size_of::<BumpAllocator<VM>>() * index as usize;
+            let base_offset = offset_of!(Mutator<VM>, allocators)
+                + offset_of!(Allocators<VM>, bump_pointer)
+                + size_of::<BumpAllocator<VM>>() * index as usize;
             let limit_offset = base_offset + offset_of!(BumpAllocator<VM>, limit);
             let top_offset = base_offset + offset_of!(BumpAllocator<VM>, cursor);
-            
-            AllocatorInfo::BumpPointer { limit_offset, top_offset }
+
+            AllocatorInfo::BumpPointer {
+                limit_offset,
+                top_offset,
+            }
         }
 
         AllocatorSelector::Immix(index) => {
-            let base_offset = offset_of!(Mutator<VM>, allocators) + offset_of!(Allocators<VM>, immix) + size_of::<ImmixAllocator<VM>>() * index as usize;
+            let base_offset = offset_of!(Mutator<VM>, allocators)
+                + offset_of!(Allocators<VM>, immix)
+                + size_of::<ImmixAllocator<VM>>() * index as usize;
             let limit_offset = base_offset + offset_of!(ImmixAllocator<VM>, limit);
             let top_offset = base_offset + offset_of!(ImmixAllocator<VM>, cursor);
             let large_limit_offset = base_offset + offset_of!(ImmixAllocator<VM>, large_limit);
             let large_top_offset = base_offset + offset_of!(ImmixAllocator<VM>, large_cursor);
-            AllocatorInfo::Immix { limit_offset, top_offset, large_limit_offset, large_top_offset, small_limit: Line::BYTES }
+            AllocatorInfo::Immix {
+                limit_offset,
+                top_offset,
+                large_limit_offset,
+                large_top_offset,
+                small_limit: Line::BYTES,
+            }
         }
 
         AllocatorSelector::MarkCompact(index) => {
-            let base_offset = offset_of!(Mutator<VM>, allocators)+ offset_of!(Allocators<VM>, markcompact) + size_of::<MarkCompactAllocator<VM>>() * index as usize;
+            let base_offset = offset_of!(Mutator<VM>, allocators)
+                + offset_of!(Allocators<VM>, markcompact)
+                + size_of::<MarkCompactAllocator<VM>>() * index as usize;
             let bump_offset = base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
             let limit_offset = bump_offset + offset_of!(BumpAllocator<VM>, limit);
             let top_offset = bump_offset + offset_of!(BumpAllocator<VM>, cursor);
-            AllocatorInfo::MarkCompact { limit_offset, top_offset }
+            AllocatorInfo::MarkCompact {
+                limit_offset,
+                top_offset,
+            }
         }
 
         _ => AllocatorInfo::None,
     }
 }
-
 
 /// The standard malloc. MMTk either uses its own allocator, or forward the call to a
 /// library malloc.
