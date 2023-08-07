@@ -474,6 +474,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     );
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    probe!(mmtk, collection_initialized);
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().

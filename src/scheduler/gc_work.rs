@@ -502,6 +502,10 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
         self.nodes.take()
     }
+
+    pub fn is_roots(&self) -> bool {
+        self.roots
+    }
 }
 
 /// A short-hand for `<E::VM as VMBinding>::VMEdge`.
@@ -588,6 +592,7 @@ pub trait ProcessEdgesWork:
     }
 
     fn process_edges(&mut self) {
+        probe!(mmtk, process_edges, self.edges.len(), self.is_roots());
         for i in 0..self.edges.len() {
             self.process_edge(self.edges[i])
         }
