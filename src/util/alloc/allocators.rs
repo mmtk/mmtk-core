@@ -1,4 +1,7 @@
+use std::mem::size_of;
 use std::mem::MaybeUninit;
+
+use memoffset::offset_of;
 
 use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -10,6 +13,7 @@ use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
+use crate::Mutator;
 
 use super::FreeListAllocator;
 use super::MarkCompactAllocator;
@@ -183,25 +187,68 @@ impl Default for AllocatorSelector {
 pub enum AllocatorInfo {
     BumpPointer {
         limit_offset: usize,
-        top_offset: usize,
+        cursor_offset: usize,
     },
-    MarkCompact {
-        limit_offset: usize,
-        top_offset: usize,
-    },
-    Immix {
-        limit_offset: usize,
-        top_offset: usize,
-        large_limit_offset: usize,
-        large_top_offset: usize,
-        /// Maximum bytes allowed until allocating using `large_*` cursors.
-        small_limit: usize,
-    },
+    // FIXME: Add free-list fast-path
+    Unimplemented,
     None,
 }
 
 impl Default for AllocatorInfo {
     fn default() -> Self {
         AllocatorInfo::None
+    }
+}
+
+impl AllocatorInfo {
+    /// Return an AllocatorInfo for the given allocator selector. This method is provided
+    /// so that VM compilers may generate allocator fast-path and load fields for the fast-path.
+    ///
+    /// Arguments:
+    /// * `selector`: The allocator selector to query.
+    pub fn new<VM: VMBinding>(selector: AllocatorSelector) -> AllocatorInfo {
+        match selector {
+            AllocatorSelector::BumpPointer(index) => {
+                let base_offset = offset_of!(Mutator<VM>, allocators)
+                    + offset_of!(Allocators<VM>, bump_pointer)
+                    + size_of::<BumpAllocator<VM>>() * index as usize;
+                let limit_offset = base_offset + offset_of!(BumpAllocator<VM>, limit);
+                let cursor_offset = base_offset + offset_of!(BumpAllocator<VM>, cursor);
+
+                AllocatorInfo::BumpPointer {
+                    limit_offset,
+                    cursor_offset,
+                }
+            }
+
+            AllocatorSelector::Immix(index) => {
+                let base_offset = offset_of!(Mutator<VM>, allocators)
+                    + offset_of!(Allocators<VM>, immix)
+                    + size_of::<ImmixAllocator<VM>>() * index as usize;
+                let limit_offset = base_offset + offset_of!(ImmixAllocator<VM>, limit);
+                let cursor_offset = base_offset + offset_of!(ImmixAllocator<VM>, cursor);
+                AllocatorInfo::BumpPointer {
+                    limit_offset,
+                    cursor_offset,
+                }
+            }
+
+            AllocatorSelector::MarkCompact(index) => {
+                let base_offset = offset_of!(Mutator<VM>, allocators)
+                    + offset_of!(Allocators<VM>, markcompact)
+                    + size_of::<MarkCompactAllocator<VM>>() * index as usize;
+                let bump_offset =
+                    base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
+                let limit_offset = bump_offset + offset_of!(BumpAllocator<VM>, limit);
+                let cursor_offset = bump_offset + offset_of!(BumpAllocator<VM>, cursor);
+                AllocatorInfo::BumpPointer {
+                    limit_offset,
+                    cursor_offset,
+                }
+            }
+
+            AllocatorSelector::FreeList(_) => AllocatorInfo::Unimplemented,
+            _ => AllocatorInfo::None,
+        }
     }
 }
