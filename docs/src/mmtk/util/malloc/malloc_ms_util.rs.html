@@ -133,20 +133,20 @@
         result += align;
     }
     <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (result - BYTES_IN_ADDRESS).to_mut_ptr();
-    <span class="kw">unsafe </span>{ <span class="kw-2">*</span>malloc_res_ptr = address.as_usize() };
+    <span class="kw">unsafe </span>{ malloc_res_ptr.write_unaligned(address.as_usize()) };
     result
 }
 
 <span class="kw">pub fn </span>offset_malloc_usable_size(address: Address) -&gt; usize {
     <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
-    <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>malloc_res_ptr } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
+    <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ malloc_res_ptr.read_unaligned() } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
     <span class="kw">unsafe </span>{ malloc_usable_size(malloc_res) }
 }
 
 <span class="doccomment">/// free an address that is allocated with some offset
 </span><span class="kw">pub fn </span>offset_free(address: Address) {
     <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
-    <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>malloc_res_ptr } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
+    <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ malloc_res_ptr.read_unaligned() } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
     <span class="kw">unsafe </span>{ free(malloc_res) };
 }
 

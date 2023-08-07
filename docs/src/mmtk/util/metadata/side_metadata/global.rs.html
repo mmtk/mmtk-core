@@ -1695,8 +1695,27 @@
 <span id="1695">1695</span>
 <span id="1696">1696</span>
 <span id="1697">1697</span>
+<span id="1698">1698</span>
+<span id="1699">1699</span>
+<span id="1700">1700</span>
+<span id="1701">1701</span>
+<span id="1702">1702</span>
+<span id="1703">1703</span>
+<span id="1704">1704</span>
+<span id="1705">1705</span>
+<span id="1706">1706</span>
+<span id="1707">1707</span>
+<span id="1708">1708</span>
+<span id="1709">1709</span>
+<span id="1710">1710</span>
+<span id="1711">1711</span>
+<span id="1712">1712</span>
+<span id="1713">1713</span>
+<span id="1714">1714</span>
+<span id="1715">1715</span>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
+<span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
@@ -2661,7 +2680,24 @@
 
     <span class="doccomment">/// Get an offset after a spec. This is used to layout another spec immediately after this one.
     </span><span class="kw">pub const fn </span>layout_after(spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; SideMetadataOffset {
-        spec.upper_bound_offset()
+        <span class="comment">// Some metadata may be so small that its size is not a multiple of byte size.  One example
+        // is `CHUNK_MARK`.  It is one byte per chunk.  However, on 32-bit architectures, we
+        // allocate side metadata per chunk.  In that case, it will only occupy one byte.  If we
+        // do not align the upper bound offset up, subsequent local metadata that need to be
+        // accessed at, for example, word granularity will be misaligned.
+        // TODO: Currently we align metadata to word size so that it is safe to access the metadata
+        // one word at a time.  In the future, we may allow each metadata to specify its own
+        // alignment requirement.
+        </span><span class="kw">let </span>upper_bound_offset = spec.upper_bound_offset();
+        <span class="kw">if </span>spec.is_absolute_offset() {
+            <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ upper_bound_offset.addr };
+            <span class="kw">let </span>aligned_addr = addr.align_up(BYTES_IN_WORD);
+            SideMetadataOffset::addr(aligned_addr)
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>rel_offset = <span class="kw">unsafe </span>{ upper_bound_offset.rel_offset };
+            <span class="kw">let </span>aligned_rel_offset = raw_align_up(rel_offset, BYTES_IN_WORD);
+            SideMetadataOffset::rel(aligned_rel_offset)
+        }
     }
 }
 
