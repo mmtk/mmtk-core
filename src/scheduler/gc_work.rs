@@ -165,8 +165,6 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
 
 /// Stop all mutators
 ///
-/// Schedule a `ScanStackRoots` immediately after a mutator is paused
-///
 /// TODO: Smaller work granularity
 #[derive(Default)]
 pub struct StopMutators<ScanEdges: ProcessEdgesWork>(PhantomData<ScanEdges>);
@@ -184,7 +182,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanMutatorRoots::<E>(mutator));
         });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
@@ -410,11 +409,11 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
     }
 }
 
-pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
+pub struct ScanMutatorRoots<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanMutatorRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
+        trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);

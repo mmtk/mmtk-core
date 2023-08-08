@@ -43,12 +43,9 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         #[cfg(feature = "extreme_assertions")]
         mmtk.edge_logger.reset();
 
-        // TODO investigate why the following will create duplicate edges
-        // scheduler.work_buckets[WorkBucketStage::RefForwarding]
-        //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
         for mutator in VM::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-                .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
+                .add(ScanMutatorRoots::<ForwardingProcessEdges<VM>>(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]

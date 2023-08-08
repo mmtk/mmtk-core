@@ -15,12 +15,12 @@ pub trait Collection<VM: VMBinding> {
     /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
-    /// MMTk provide a callback function and expects the binding to use the callback for each mutator when it
+    /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
     /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the GC controller/coordinator.
-    /// * `mutator_visitor`: A callback for each mutator to notify MMTk when a mutator is ready to be stack scanned.
+    /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
     fn stop_all_mutators<F>(tls: VMWorkerThread, mutator_visitor: F)
     where
         F: FnMut(&'static mut Mutator<VM>);
