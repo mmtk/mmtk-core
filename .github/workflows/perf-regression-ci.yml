@@ -198,6 +198,7 @@ jobs:
           export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-08-03
+          export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
           ./ci-perf-kit/scripts/mutator-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
