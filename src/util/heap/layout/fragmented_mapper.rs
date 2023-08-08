@@ -247,8 +247,7 @@ impl FragmentedMapper {
     }
 
     fn get_or_allocate_slab_table(&self, addr: Address) -> &Slab {
-        self
-            .get_or_optionally_allocate_slab_table(addr, true)
+        self.get_or_optionally_allocate_slab_table(addr, true)
             .unwrap()
     }
 

@@ -70,9 +70,12 @@ impl ReferenceProcessors {
             mmtk.get_plan().constraints().needs_forward_after_liveness,
             "A plan with needs_forward_after_liveness=false does not need a separate forward step"
         );
-        self.soft.forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
-        self.weak.forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
-        self.phantom.forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+        self.soft
+            .forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+        self.weak
+            .forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+        self.phantom
+            .forward::<E>(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
@@ -101,7 +104,8 @@ impl ReferenceProcessors {
         trace: &mut E,
         mmtk: &'static MMTK<E::VM>,
     ) {
-        self.phantom.scan::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+        self.phantom
+            .scan::<E>(trace, is_nursery_gc(mmtk.get_plan()));
     }
 }
 

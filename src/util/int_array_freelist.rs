@@ -62,14 +62,10 @@ impl IntArrayFreeList {
     }
 
     // FIXME: We need a safe implementation
-   
+
     fn table_mut(&mut self) -> &mut Vec<i32> {
         match self.parent {
-            Some(mut p) => {
-                unsafe {
-                    p.as_mut().table_mut()
-                }
-            }
+            Some(mut p) => unsafe { p.as_mut().table_mut() },
             None => self.table.as_mut().unwrap(),
         }
     }

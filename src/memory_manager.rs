@@ -90,7 +90,12 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
 
 #[cfg(feature = "vm_space")]
 pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
-    mmtk.get_plan().base_mut().vm_space.lazy_initialize(start, size);
+    unsafe {
+        mmtk.get_plan_mut()
+            .base_mut()
+            .vm_space
+            .lazy_initialize(start, size);
+    }
 }
 
 /// Request MMTk to create a mutator for the given thread. The ownership
@@ -473,7 +478,10 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.get_plan().base().initialized.store(true, Ordering::SeqCst);
+    mmtk.get_plan()
+        .base()
+        .initialized
+        .store(true, Ordering::SeqCst);
     probe!(mmtk, collection_initialized);
 }
 
@@ -560,7 +568,7 @@ pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 #[cfg(feature = "count_live_bytes_in_gc")]
 pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .live_bytes_in_last_gc
         .load(Ordering::SeqCst)
@@ -592,7 +600,8 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
 pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    mmtk.get_plan().handle_user_collection_request(tls, false, false);
+    mmtk.get_plan()
+        .handle_user_collection_request(tls, false, false);
 }
 
 /// Is the object alive?

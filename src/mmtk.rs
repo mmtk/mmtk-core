@@ -97,7 +97,6 @@ pub struct MMTK<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
 unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
 
-
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         // Initialize SFT first in case we need to use this in the constructor.
@@ -146,7 +145,8 @@ impl<VM: VMBinding> MMTK<VM> {
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.get_plan().handle_user_collection_request(tls, true, true);
+        self.get_plan()
+            .handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.get_plan().base().stats.start_all();
         self.scheduler.enable_stat();
@@ -163,9 +163,9 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     /// Get the plan as mutable reference.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// This is unsafe because the caller must ensure that the plan is not used by other threads.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_plan_mut(&self) -> &mut dyn Plan<VM = VM> {

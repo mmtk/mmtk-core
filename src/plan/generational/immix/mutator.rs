@@ -33,7 +33,10 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
     let genimmix = mmtk.get_plan().downcast_ref::<GenImmix<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
-        space_mapping: Box::new(create_gen_space_mapping(mmtk.get_plan(), &genimmix.gen.nursery)),
+        space_mapping: Box::new(create_gen_space_mapping(
+            mmtk.get_plan(),
+            &genimmix.gen.nursery,
+        )),
         prepare_func: &genimmix_mutator_prepare,
         release_func: &genimmix_mutator_release,
     };

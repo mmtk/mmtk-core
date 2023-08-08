@@ -102,7 +102,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             );
         }
         // scan modbuf only if the current GC is a nursery GC
-        if mmtk.get_plan().generational().unwrap().is_current_gc_nursery() {
+        if mmtk
+            .get_plan()
+            .generational()
+            .unwrap()
+            .is_current_gc_nursery()
+        {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
@@ -135,7 +140,12 @@ impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
-        if mmtk.get_plan().generational().unwrap().is_current_gc_nursery() {
+        if mmtk
+            .get_plan()
+            .generational()
+            .unwrap()
+            .is_current_gc_nursery()
+        {
             // Collect all the entries in all the slices
             let mut edges = vec![];
             for slice in &self.modbuf {

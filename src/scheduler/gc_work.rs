@@ -140,7 +140,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            self.plan
+            mmtk.get_plan()
                 .base()
                 .live_bytes_in_last_gc
                 .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
@@ -246,7 +246,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         #[cfg(feature = "count_live_bytes_in_gc")]
         {
             let live_bytes = mmtk
-                .plan
+                .get_plan()
                 .base()
                 .live_bytes_in_last_gc
                 .load(std::sync::atomic::Ordering::SeqCst);

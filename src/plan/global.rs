@@ -53,7 +53,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk.get_plan())
         }
-        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, mmtk.get_plan()),
+        PlanSelector::Immix => {
+            crate::plan::immix::mutator::create_immix_mutator(tls, mmtk.get_plan())
+        }
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk.get_plan())
         }
@@ -854,9 +856,10 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     #[allow(unused_variables)] // depending on the enabled features, base may not be used.
+    #[allow(clippy::needless_pass_by_ref_mut)] // depending on the enabled features, base may not be used.
     pub(crate) fn verify_side_metadata_sanity(
         &self,
-        side_metadata_sanity_checker: &SideMetadataSanity,
+        side_metadata_sanity_checker: &mut SideMetadataSanity,
     ) {
         #[cfg(feature = "code_space")]
         self.code_space

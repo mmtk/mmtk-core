@@ -121,7 +121,7 @@ impl<VM: VMBinding> NoGC<VM> {
         // side metadata in extreme_assertions.
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base()
-            .verify_side_metadata_sanity(&side_metadata_sanity_checker);
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.nogc_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
 

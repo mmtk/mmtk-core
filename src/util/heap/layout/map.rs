@@ -17,9 +17,9 @@ pub trait VMMap: Sync {
 
     /// Bind a created freelist with the page resource.
     /// This must called after create_freelist() or create_parent_freelist().
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// * `pr` must be a valid pointer to a CommonFreeListPageResource and be alive
     ///  for the duration of the VMMap.
     unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource);

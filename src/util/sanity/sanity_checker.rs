@@ -63,7 +63,7 @@ impl<P: Plan> ScheduleSanityGC<P> {
 impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
-        let plan = &mmtk.plan;
+        let plan = mmtk.get_plan();
 
         scheduler.reset_state();
 
@@ -205,7 +205,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
 
             // Let plan check object
             assert!(
-                self.mmtk().plan.sanity_check_object(object),
+                self.mmtk().get_plan().sanity_check_object(object),
                 "Invalid reference {:?}",
                 object
             );

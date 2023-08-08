@@ -310,7 +310,6 @@ impl Map32 {
             }
             chunks as _
         }
-        
     }
 
     fn get_discontig_freelist_pr_ordinal(&self) -> usize {
