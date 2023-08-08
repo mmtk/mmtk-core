@@ -195,9 +195,13 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The GC thread that is performing the thread scan.
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread);
 
-    /// Scan one mutator for stack roots. MMTk assumes a binding is able to scan
-    /// any given thread for its stack roots. If a binding cannot scan the stack for
-    /// a given thread, it can leave this method empty, and deal with stack
+    /// Scan one mutator for stack roots.
+    ///
+    /// Some VM bindings may not be able to implement this method.
+    /// For example, the VM binding may only be able to enumerate all threads and
+    /// scan them while enumerating, but cannot scan stacks individually when given
+    /// the references of threads.
+    /// In that case, it can leave this method empty, and deal with stack
     /// roots in [`Collection::scan_vm_specific_roots`]. However, in that case, MMTk
     /// does not know those roots are stack roots, and cannot perform any possible
     /// optimization for the stack roots.
