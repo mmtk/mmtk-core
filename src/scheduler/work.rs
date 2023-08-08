@@ -40,6 +40,18 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     fn get_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    /// Get a human-readable size of the work packet if it makes sense.
+    ///
+    /// This method is useful for debug purposes, and is especially useful when visualising the
+    /// work packets during a GC.
+    ///
+    /// The semantics is unspecified.  For work packets that contains a list of work items, such as
+    /// object references or edges, the size should usually be the number of items.  If size does
+    /// not make sense for the work packet, this method may return `None`.
+    fn debug_get_size(&self) -> Option<usize> {
+        None
+    }
 }
 
 use super::gc_work::ProcessEdgesWork;
