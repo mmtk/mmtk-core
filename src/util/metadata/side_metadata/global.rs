@@ -1,5 +1,6 @@
 use super::*;
-use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
+use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
+use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::metadata::metadata_val_traits::*;
@@ -964,7 +965,24 @@ impl SideMetadataOffset {
 
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        spec.upper_bound_offset()
+        // Some metadata may be so small that its size is not a multiple of byte size.  One example
+        // is `CHUNK_MARK`.  It is one byte per chunk.  However, on 32-bit architectures, we
+        // allocate side metadata per chunk.  In that case, it will only occupy one byte.  If we
+        // do not align the upper bound offset up, subsequent local metadata that need to be
+        // accessed at, for example, word granularity will be misaligned.
+        // TODO: Currently we align metadata to word size so that it is safe to access the metadata
+        // one word at a time.  In the future, we may allow each metadata to specify its own
+        // alignment requirement.
+        let upper_bound_offset = spec.upper_bound_offset();
+        if spec.is_absolute_offset() {
+            let addr = unsafe { upper_bound_offset.addr };
+            let aligned_addr = addr.align_up(BYTES_IN_WORD);
+            SideMetadataOffset::addr(aligned_addr)
+        } else {
+            let rel_offset = unsafe { upper_bound_offset.rel_offset };
+            let aligned_rel_offset = raw_align_up(rel_offset, BYTES_IN_WORD);
+            SideMetadataOffset::rel(aligned_rel_offset)
+        }
     }
 }
 
