@@ -906,6 +906,22 @@
 <span id="906">906</span>
 <span id="907">907</span>
 <span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1442,7 +1458,8 @@
     builder.set_options_bulk_by_str(options)
 }
 
-<span class="doccomment">/// Return used memory in bytes.
+<span class="doccomment">/// Return used memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
+/// page granularity.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -1450,12 +1467,27 @@
     mmtk.plan.get_used_pages() &lt;&lt; LOG_BYTES_IN_PAGE
 }
 
-<span class="doccomment">/// Return free memory in bytes.
+<span class="doccomment">/// Return free memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
+/// page granularity.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>free_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
     mmtk.plan.get_free_pages() &lt;&lt; LOG_BYTES_IN_PAGE
+}
+
+<span class="doccomment">/// Return the size of all the live objects in bytes in the last GC. MMTk usually accounts for memory in pages.
+/// This is a special method that we count the size of every live object in a GC, and sum up the total bytes.
+/// We provide this method so users can compare with `used_bytes` (which does page accounting), and know if
+/// the heap is fragmented.
+/// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
+/// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
+</span><span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+</span><span class="kw">pub fn </span>live_bytes_in_last_gc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
+    mmtk.plan
+        .base()
+        .live_bytes_in_last_gc
+        .load(Ordering::SeqCst)
 }
 
 <span class="doccomment">/// Return the starting address of the heap. *Note that currently MMTk uses

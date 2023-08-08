@@ -428,6 +428,33 @@
 <span id="428">428</span>
 <span id="429">429</span>
 <span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -439,6 +466,8 @@
 <span class="kw">use </span>atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 <span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Stealer};
 <span class="kw">use </span>crossbeam::queue::ArrayQueue;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+</span><span class="kw">use </span>std::sync::atomic::AtomicUsize;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
 
@@ -460,6 +489,11 @@
 </span><span class="kw">pub struct </span>GCWorkerShared&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Worker-local statistics data.
     </span>stat: AtomicRefCell&lt;WorkerLocalStat&lt;VM&gt;&gt;,
+    <span class="doccomment">/// Accumulated bytes for live objects in this GC. When each worker scans
+    /// objects, we increase the live bytes. We get this value from each worker
+    /// at the end of a GC, and reset this counter.
+    </span><span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    </span>live_bytes: AtomicUsize,
     <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
     ///
     /// Note: Currently, designated work cannot be added from the GC controller thread, or
@@ -474,9 +508,21 @@
     <span class="kw">pub fn </span>new(stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             stat: Default::default(),
+            <span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+            </span>live_bytes: AtomicUsize::new(<span class="number">0</span>),
             designated_work: ArrayQueue::new(<span class="number">16</span>),
             stealer,
         }
+    }
+
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>, bytes: usize) {
+        <span class="self">self</span>.live_bytes.fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_and_clear_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.live_bytes.swap(<span class="number">0</span>, Ordering::SeqCst)
     }
 }
 
@@ -856,6 +902,14 @@
         <span class="self">self</span>.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
+    }
+
+    <span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    </span><span class="kw">pub fn </span>get_and_clear_worker_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.workers_shared
+            .iter()
+            .map(|w| w.get_and_clear_live_bytes())
+            .sum()
     }
 }
 </code></pre></div>

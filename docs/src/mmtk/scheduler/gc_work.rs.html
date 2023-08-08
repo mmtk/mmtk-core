@@ -1033,6 +1033,47 @@
 <span id="1033">1033</span>
 <span id="1034">1034</span>
 <span id="1035">1035</span>
+<span id="1036">1036</span>
+<span id="1037">1037</span>
+<span id="1038">1038</span>
+<span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
+<span id="1043">1043</span>
+<span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1164,6 +1205,18 @@
             <span class="kw">let </span>result = w.designated_work.push(Box::new(ReleaseCollector));
             <span class="macro">debug_assert!</span>(result.is_ok());
         }
+
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+        </span>{
+            <span class="kw">let </span>live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            <span class="self">self</span>.plan
+                .base()
+                .live_bytes_in_last_gc
+                .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 }
 
@@ -1261,6 +1314,28 @@
             mmtk.plan.get_total_pages(),
             <span class="self">self</span>.elapsed.as_millis()
         );
+
+        <span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+        </span>{
+            <span class="kw">let </span>live_bytes = mmtk
+                .plan
+                .base()
+                .live_bytes_in_last_gc
+                .load(std::sync::atomic::Ordering::SeqCst);
+            <span class="kw">let </span>used_bytes =
+                mmtk.plan.get_used_pages() &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
+            <span class="macro">debug_assert!</span>(
+                live_bytes &lt;= used_bytes,
+                <span class="string">&quot;Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.&quot;</span>,
+                live_bytes, used_bytes
+            );
+            <span class="macro">info!</span>(
+                <span class="string">&quot;Live objects = {} bytes ({:04.1}% of {} used pages)&quot;</span>,
+                live_bytes,
+                live_bytes <span class="kw">as </span>f64 * <span class="number">100.0 </span>/ used_bytes <span class="kw">as </span>f64,
+                mmtk.plan.get_used_pages()
+            );
+        }
 
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
         </span><span class="attribute">#[allow(clippy::cast_ref_to_mut)]
@@ -1850,6 +1925,13 @@
         {
             <span class="kw">let </span><span class="kw-2">mut </span>closure = ObjectsClosure::&lt;<span class="self">Self</span>::E&gt;::new(worker);
             <span class="kw">for </span>object <span class="kw">in </span>objects_to_scan.iter().copied() {
+                <span class="comment">// For any object we need to scan, we count its liv bytes
+                </span><span class="attribute">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+                </span>closure
+                    .worker
+                    .shared
+                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
                 <span class="kw">if </span>&lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::support_edge_enqueuing(tls, object) {
                     <span class="macro">trace!</span>(<span class="string">&quot;Scan object (edge) {}&quot;</span>, object);
                     <span class="comment">// If an object supports edge-enqueuing, we enqueue its edges.
