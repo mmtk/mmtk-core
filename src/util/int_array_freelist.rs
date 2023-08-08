@@ -62,7 +62,7 @@ impl IntArrayFreeList {
     }
 
     // FIXME: We need a safe implementation
-    #[allow(clippy::cast_ref_to_mut)]
+   
     fn table_mut(&mut self) -> &mut Vec<i32> {
         match self.parent {
             Some(mut p) => {

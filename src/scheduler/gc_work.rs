@@ -266,7 +266,6 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         }
 
         // We assume this is the only running work packet that accesses plan at the point of execution
-        #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
         plan_mut.end_of_gc(worker.tls);
 

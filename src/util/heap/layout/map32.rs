@@ -170,7 +170,7 @@ impl VMMap for Map32 {
     fn get_chunk_consumer_count(&self) -> usize {
         self.shared_discontig_fl_count
     }
-
+    #[allow(clippy::while_immutable_condition)]
     fn free_all_chunks(&self, any_chunk: Address) {
         debug!("free_all_chunks: {}", any_chunk);
         let (_sync, self_mut) = self.mut_self_with_sync();
@@ -277,7 +277,6 @@ impl Map32 {
     /// The caller needs to guarantee there is no race condition. Either only one single thread
     /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
     /// In other cases, use mut_self_with_sync().
-    #[allow(clippy::cast_ref_to_mut)]
     #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Map32Inner {
         &mut *self.inner.get()

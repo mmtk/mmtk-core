@@ -856,7 +856,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_variables)] // depending on the enabled features, base may not be used.
     pub(crate) fn verify_side_metadata_sanity(
         &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
+        side_metadata_sanity_checker: &SideMetadataSanity,
     ) {
         #[cfg(feature = "code_space")]
         self.code_space

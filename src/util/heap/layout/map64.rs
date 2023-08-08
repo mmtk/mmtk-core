@@ -234,7 +234,7 @@ impl Map64 {
     /// The caller needs to guarantee there is no race condition. Either only one single thread
     /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
     /// In other cases, use mut_self_with_sync().
-
+    #[allow(clippy::mut_from_ref)]
     unsafe fn mut_self(&self) -> &mut Map64Inner {
         &mut *self.inner.get()
     }

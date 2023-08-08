@@ -255,7 +255,7 @@ impl FragmentedMapper {
     fn inner(&self) -> &InnerFragmentedMapper {
         unsafe { &*self.inner.get() }
     }
-
+    #[allow(clippy::mut_from_ref)]
     fn inner_mut(&self) -> &mut InnerFragmentedMapper {
         unsafe { &mut *self.inner.get() }
     }

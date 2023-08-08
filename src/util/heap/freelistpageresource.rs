@@ -231,7 +231,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     fn inner(&self) -> &FreeListPageResourceInner {
         unsafe { &*self.inner.get() }
     }
-
+    #[allow(clippy::mut_from_ref)]
     unsafe fn inner_mut(&self) -> &mut FreeListPageResourceInner {
         &mut *self.inner.get()
     }
