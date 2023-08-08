@@ -5,6 +5,7 @@ use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
+use std::cell::UnsafeCell;
 use std::fmt;
 use std::io::Result;
 use std::mem::transmute;
@@ -45,6 +46,13 @@ type Slab = [Atomic<MapState>; MMAP_NUM_CHUNKS];
 
 pub struct FragmentedMapper {
     lock: Mutex<()>,
+    inner: UnsafeCell<InnerFragmentedMapper>,
+}
+
+unsafe impl Send for FragmentedMapper {}
+unsafe impl Sync for FragmentedMapper {}
+
+struct InnerFragmentedMapper {
     free_slab_index: usize,
     free_slabs: Vec<Option<Box<Slab>>>,
     slab_table: Vec<Option<Box<Slab>>>,
@@ -209,10 +217,12 @@ impl FragmentedMapper {
     pub fn new() -> Self {
         Self {
             lock: Mutex::new(()),
-            free_slab_index: 0,
-            free_slabs: (0..MAX_SLABS).map(|_| Some(Self::new_slab())).collect(),
-            slab_table: (0..SLAB_TABLE_SIZE).map(|_| None).collect(),
-            slab_map: vec![SENTINEL; SLAB_TABLE_SIZE],
+            inner: UnsafeCell::new(InnerFragmentedMapper {
+                free_slab_index: 0,
+                free_slabs: (0..MAX_SLABS).map(|_| Some(Self::new_slab())).collect(),
+                slab_table: (0..SLAB_TABLE_SIZE).map(|_| None).collect(),
+                slab_map: vec![SENTINEL; SLAB_TABLE_SIZE],
+            }),
         }
     }
 
@@ -233,23 +243,25 @@ impl FragmentedMapper {
     }
 
     fn slab_table(&self, addr: Address) -> Option<&Slab> {
-        unsafe { self.mut_self() }.get_or_optionally_allocate_slab_table(addr, false)
+        self.get_or_optionally_allocate_slab_table(addr, false)
     }
 
     fn get_or_allocate_slab_table(&self, addr: Address) -> &Slab {
-        unsafe { self.mut_self() }
+        self
             .get_or_optionally_allocate_slab_table(addr, true)
             .unwrap()
     }
 
-    #[allow(clippy::cast_ref_to_mut)]
-    #[allow(clippy::mut_from_ref)]
-    unsafe fn mut_self(&self) -> &mut Self {
-        &mut *(self as *const _ as *mut _)
+    fn inner(&self) -> &InnerFragmentedMapper {
+        unsafe { &*self.inner.get() }
+    }
+
+    fn inner_mut(&self) -> &mut InnerFragmentedMapper {
+        unsafe { &mut *self.inner.get() }
     }
 
     fn get_or_optionally_allocate_slab_table(
-        &mut self,
+        &self,
         addr: Address,
         allocate: bool,
     ) -> Option<&Slab> {
@@ -259,25 +271,25 @@ impl FragmentedMapper {
         let mut index = hash; // Use 'index' to iterate over the hash table so that we remember where we started
         loop {
             /* Check for a hash-table hit.  Should be the frequent case. */
-            if base == self.slab_map[index] {
+            if base == self.inner().slab_map[index] {
                 return self.slab_table_for(addr, index);
             }
             let _guard = self.lock.lock().unwrap();
 
             /* Check whether another thread has allocated a slab while we were acquiring the lock */
-            if base == self.slab_map[index] {
+            if base == self.inner().slab_map[index] {
                 // drop(guard);
                 return self.slab_table_for(addr, index);
             }
 
             /* Check for a free slot */
-            if self.slab_map[index] == SENTINEL {
+            if self.inner().slab_map[index] == SENTINEL {
                 if !allocate {
                     // drop(guard);
                     return None;
                 }
-                unsafe { self.mut_self() }.commit_free_slab(index);
-                self.slab_map[index] = base;
+                self.commit_free_slab(index);
+                self.inner_mut().slab_map[index] = base;
                 return self.slab_table_for(addr, index);
             }
             //   lock.release();
@@ -288,8 +300,8 @@ impl FragmentedMapper {
     }
 
     fn slab_table_for(&self, _addr: Address, index: usize) -> Option<&Slab> {
-        debug_assert!(self.slab_table[index].is_some());
-        self.slab_table[index].as_ref().map(|x| x as &Slab)
+        debug_assert!(self.inner().slab_table[index].is_some());
+        self.inner().slab_table[index].as_ref().map(|x| x as &Slab)
     }
 
     /**
@@ -297,18 +309,18 @@ impl FragmentedMapper {
      * at the correct index in the slabTable.
      * @param index slab table index
      */
-    fn commit_free_slab(&mut self, index: usize) {
+    fn commit_free_slab(&self, index: usize) {
         assert!(
-            self.free_slab_index < MAX_SLABS,
+            self.inner().free_slab_index < MAX_SLABS,
             "All free slabs used: virtual address space is exhausled."
         );
-        debug_assert!(self.slab_table[index].is_none());
-        debug_assert!(self.free_slabs[self.free_slab_index].is_some());
+        debug_assert!(self.inner().slab_table[index].is_none());
+        debug_assert!(self.inner().free_slabs[self.inner().free_slab_index].is_some());
         ::std::mem::swap(
-            &mut self.slab_table[index],
-            &mut self.free_slabs[self.free_slab_index],
+            &mut self.inner_mut().slab_table[index],
+            &mut self.inner_mut().free_slabs[self.inner().free_slab_index],
         );
-        self.free_slab_index += 1;
+        self.inner_mut().free_slab_index += 1;
     }
 
     fn chunk_index_to_address(base: Address, chunk: usize) -> Address {

@@ -32,16 +32,16 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
+    let gencopy = mmtk.get_plan().downcast_ref::<GenCopy<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
-        space_mapping: Box::new(create_gen_space_mapping(&*mmtk.plan, &gencopy.gen.nursery)),
+        space_mapping: Box::new(create_gen_space_mapping(mmtk.get_plan(), &gencopy.gen.nursery)),
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk.get_plan(), &config.space_mapping),
         barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
             mmtk, gencopy,
         ))),

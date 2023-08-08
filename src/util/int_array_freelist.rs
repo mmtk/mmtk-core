@@ -1,13 +1,16 @@
 use super::freelist::*;
-use std::mem;
+use std::{mem, ptr::NonNull};
 
 #[derive(Debug)]
 pub struct IntArrayFreeList {
     pub head: i32,
     pub heads: i32,
     pub table: Option<Vec<i32>>,
-    parent: Option<&'static IntArrayFreeList>,
+    parent: Option<NonNull<IntArrayFreeList>>,
 }
+
+unsafe impl Send for IntArrayFreeList {}
+unsafe impl Sync for IntArrayFreeList {}
 
 impl FreeList for IntArrayFreeList {
     fn head(&self) -> i32 {
@@ -53,7 +56,7 @@ impl IntArrayFreeList {
     }
     fn table(&self) -> &Vec<i32> {
         match self.parent {
-            Some(p) => p.table(),
+            Some(p) => unsafe { p.as_ref().table() },
             None => self.table.as_ref().unwrap(),
         }
     }
@@ -62,10 +65,10 @@ impl IntArrayFreeList {
     #[allow(clippy::cast_ref_to_mut)]
     fn table_mut(&mut self) -> &mut Vec<i32> {
         match self.parent {
-            Some(p) => {
-                let parent_mut: &mut Self =
-                    unsafe { &mut *(p as *const IntArrayFreeList as *mut IntArrayFreeList) };
-                parent_mut.table_mut()
+            Some(mut p) => {
+                unsafe {
+                    p.as_mut().table_mut()
+                }
             }
             None => self.table.as_mut().unwrap(),
         }

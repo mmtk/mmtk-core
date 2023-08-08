@@ -14,6 +14,7 @@ use crate::util::reference_processor::ReferenceProcessors;
 use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+use std::cell::UnsafeCell;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -81,7 +82,7 @@ impl Default for MMTKBuilder {
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<Options>,
-    pub(crate) plan: Box<dyn Plan<VM = VM>>,
+    pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
@@ -92,6 +93,10 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) edge_logger: EdgeLogger<VM::VMEdge>,
     inside_harness: AtomicBool,
 }
+
+unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
+unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
+
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
@@ -125,7 +130,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         MMTK {
             options,
-            plan,
+            plan: UnsafeCell::new(plan),
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::<
                 <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
@@ -141,20 +146,24 @@ impl<VM: VMBinding> MMTK<VM> {
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.plan.handle_user_collection_request(tls, true, true);
+        self.get_plan().handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
-        self.plan.base().stats.start_all();
+        self.get_plan().base().stats.start_all();
         self.scheduler.enable_stat();
     }
 
     pub fn harness_end(&'static self) {
-        self.plan.base().stats.stop_all(self);
+        self.get_plan().base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
-        self.plan.as_ref()
+        unsafe { &**(self.plan.get()) }
+    }
+
+    pub unsafe fn get_plan_mut(&self) -> &mut dyn Plan<VM = VM> {
+        &mut **(self.plan.get())
     }
 
     pub fn get_options(&self) -> &Options {

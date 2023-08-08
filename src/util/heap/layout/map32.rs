@@ -8,19 +8,26 @@ use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
+use std::cell::UnsafeCell;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 pub struct Map32 {
+    sync: Mutex<()>,
+    inner: UnsafeCell<Map32Inner>,
+}
+
+#[doc(hidden)]
+pub struct Map32Inner {
     prev_link: Vec<i32>,
     next_link: Vec<i32>,
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    shared_fl_map: Vec<Option<&'static CommonFreeListPageResource>>,
+    shared_fl_map: Vec<Option<NonNull<CommonFreeListPageResource>>>,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
-    sync: Mutex<()>,
     descriptor_map: Vec<SpaceDescriptor>,
 
     // TODO: Is this the right place for this field?
@@ -30,21 +37,34 @@ pub struct Map32 {
     cumulative_committed_pages: AtomicUsize,
 }
 
+unsafe impl Send for Map32 {}
+unsafe impl Sync for Map32 {}
+
 impl Map32 {
     pub fn new() -> Self {
         Map32 {
-            prev_link: vec![0; MAX_CHUNKS],
-            next_link: vec![0; MAX_CHUNKS],
-            region_map: IntArrayFreeList::new(MAX_CHUNKS, MAX_CHUNKS as _, 1),
-            global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
-            shared_discontig_fl_count: 0,
-            shared_fl_map: vec![None; MAX_SPACES],
-            total_available_discontiguous_chunks: 0,
-            finalized: false,
+            inner: UnsafeCell::new(Map32Inner {
+                prev_link: vec![0; MAX_CHUNKS],
+                next_link: vec![0; MAX_CHUNKS],
+                region_map: IntArrayFreeList::new(MAX_CHUNKS, MAX_CHUNKS as _, 1),
+                global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
+                shared_discontig_fl_count: 0,
+                shared_fl_map: vec![None; MAX_SPACES],
+                total_available_discontiguous_chunks: 0,
+                finalized: false,
+                descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
+                cumulative_committed_pages: AtomicUsize::new(0),
+            }),
+
             sync: Mutex::new(()),
-            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
-            cumulative_committed_pages: AtomicUsize::new(0),
         }
+    }
+}
+
+impl std::ops::Deref for Map32 {
+    type Target = Map32Inner;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.inner.get() }
     }
 }
 
@@ -52,7 +72,7 @@ impl VMMap for Map32 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
-        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
         let mut e = 0;
         while e < extent {
             let index = (start + e).chunk_index();
@@ -87,14 +107,14 @@ impl VMMap for Map32 {
         Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
-    fn bind_freelist(&self, pr: &'static CommonFreeListPageResource) {
-        let ordinal: usize = pr
+    unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource) {
+        let ordinal: usize = (*pr)
             .free_list
             .downcast_ref::<IntArrayFreeList>()
             .unwrap()
             .get_ordinal() as usize;
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        self_mut.shared_fl_map[ordinal] = Some(pr);
+        let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
+        self_mut.shared_fl_map[ordinal] = Some(NonNull::new_unchecked(pr as *mut _));
     }
 
     fn allocate_contiguous_chunks(
@@ -159,28 +179,28 @@ impl VMMap for Map32 {
             let chunk = any_chunk.chunk_index();
             while self_mut.next_link[chunk] != 0 {
                 let x = self_mut.next_link[chunk];
-                self_mut.free_contiguous_chunks_no_lock(x);
+                self.free_contiguous_chunks_no_lock(x);
             }
             while self_mut.prev_link[chunk] != 0 {
                 let x = self_mut.prev_link[chunk];
-                self_mut.free_contiguous_chunks_no_lock(x);
+                self.free_contiguous_chunks_no_lock(x);
             }
-            self_mut.free_contiguous_chunks_no_lock(chunk as _);
+            self.free_contiguous_chunks_no_lock(chunk as _);
         }
     }
 
     fn free_contiguous_chunks(&self, start: Address) -> usize {
         debug!("free_contiguous_chunks: {}", start);
-        let (_sync, self_mut) = self.mut_self_with_sync();
+        let (_sync, _) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = start.chunk_index();
-        self_mut.free_contiguous_chunks_no_lock(chunk as _)
+        self.free_contiguous_chunks_no_lock(chunk as _)
     }
 
     fn finalize_static_space_map(&self, from: Address, to: Address) {
         // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
-        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
         let start_address = from;
         let first_chunk = start_address.chunk_index();
@@ -196,13 +216,9 @@ impl VMMap for Map32 {
         // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
         // there is no test to ensure the refactoring will be correct.
         #[allow(clippy::manual_flatten)]
-        for fl in self_mut.shared_fl_map.iter() {
-            if let Some(fl) = fl {
-                #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut CommonFreeListPageResource = unsafe {
-                    &mut *(*fl as *const CommonFreeListPageResource
-                        as *mut CommonFreeListPageResource)
-                };
+        for fl in self_mut.shared_fl_map.iter().copied() {
+            if let Some(mut fl) = fl {
+                let fl_mut = unsafe { fl.as_mut() };
                 fl_mut.resize_freelist(start_address);
             }
         }
@@ -263,41 +279,44 @@ impl Map32 {
     /// In other cases, use mut_self_with_sync().
     #[allow(clippy::cast_ref_to_mut)]
     #[allow(clippy::mut_from_ref)]
-    unsafe fn mut_self(&self) -> &mut Self {
-        &mut *(self as *const _ as *mut _)
+    unsafe fn mut_self(&self) -> &mut Map32Inner {
+        &mut *self.inner.get()
     }
 
-    fn mut_self_with_sync(&self) -> (MutexGuard<()>, &mut Self) {
+    fn mut_self_with_sync(&self) -> (MutexGuard<()>, &mut Map32Inner) {
         let guard = self.sync.lock().unwrap();
         (guard, unsafe { self.mut_self() })
     }
 
-    fn free_contiguous_chunks_no_lock(&mut self, chunk: i32) -> usize {
-        let chunks = self.region_map.free(chunk, false);
-        self.total_available_discontiguous_chunks += chunks as usize;
-        let next = self.next_link[chunk as usize];
-        let prev = self.prev_link[chunk as usize];
-        if next != 0 {
-            self.prev_link[next as usize] = prev
-        };
-        if prev != 0 {
-            self.next_link[prev as usize] = next
-        };
-        self.prev_link[chunk as usize] = 0;
-        self.next_link[chunk as usize] = 0;
-        for offset in 0..chunks {
-            let index = (chunk + offset) as usize;
-            let chunk_start = conversions::chunk_index_to_address(index);
-            debug!("Clear descriptor for Chunk {}", chunk_start);
-            self.descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
-            unsafe { SFT_MAP.clear(chunk_start) };
+    fn free_contiguous_chunks_no_lock(&self, chunk: i32) -> usize {
+        unsafe {
+            let chunks = self.mut_self().region_map.free(chunk, false);
+            self.mut_self().total_available_discontiguous_chunks += chunks as usize;
+            let next = self.next_link[chunk as usize];
+            let prev = self.prev_link[chunk as usize];
+            if next != 0 {
+                self.mut_self().prev_link[next as usize] = prev
+            };
+            if prev != 0 {
+                self.mut_self().next_link[prev as usize] = next
+            };
+            self.mut_self().prev_link[chunk as usize] = 0;
+            self.mut_self().next_link[chunk as usize] = 0;
+            for offset in 0..chunks {
+                let index = (chunk + offset) as usize;
+                let chunk_start = conversions::chunk_index_to_address(index);
+                debug!("Clear descriptor for Chunk {}", chunk_start);
+                self.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
+                SFT_MAP.clear(chunk_start);
+            }
+            chunks as _
         }
-        chunks as _
+        
     }
 
     fn get_discontig_freelist_pr_ordinal(&self) -> usize {
         // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
-        let self_mut: &mut Self = unsafe { self.mut_self() };
+        let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
         self_mut.shared_discontig_fl_count += 1;
         self.shared_discontig_fl_count
     }
