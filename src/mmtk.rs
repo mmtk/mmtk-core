@@ -30,10 +30,10 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     /// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    pub static ref VM_MAP: Box<dyn VMMap> = layout::create_vm_map();
+    pub static ref VM_MAP: Box<dyn VMMap + Send + Sync> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
+    pub static ref MMAPPER: Box<dyn Mmapper + Send + Sync> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
