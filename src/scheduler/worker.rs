@@ -9,6 +9,8 @@ use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -30,6 +32,11 @@ pub fn current_worker_ordinal() -> Option<ThreadId> {
 pub struct GCWorkerShared<VM: VMBinding> {
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
+    /// Accumulated bytes for live objects in this GC. When each worker scans
+    /// objects, we increase the live bytes. We get this value from each worker
+    /// at the end of a GC, and reset this counter.
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    live_bytes: AtomicUsize,
     /// A queue of GCWork that can only be processed by the owned thread.
     ///
     /// Note: Currently, designated work cannot be added from the GC controller thread, or
@@ -44,9 +51,21 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
+            #[cfg(feature = "count_live_bytes_in_gc")]
+            live_bytes: AtomicUsize::new(0),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
+    }
+
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub(crate) fn increase_live_bytes(&self, bytes: usize) {
+        self.live_bytes.fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub(crate) fn get_and_clear_live_bytes(&self) -> usize {
+        self.live_bytes.swap(0, Ordering::SeqCst)
     }
 }
 
@@ -426,5 +445,13 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         self.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
+    }
+
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub fn get_and_clear_worker_live_bytes(&self) -> usize {
+        self.workers_shared
+            .iter()
+            .map(|w| w.get_and_clear_live_bytes())
+            .sum()
     }
 }
