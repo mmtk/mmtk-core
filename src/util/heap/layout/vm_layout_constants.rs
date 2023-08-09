@@ -90,7 +90,7 @@ impl VMLayoutConstants {
     pub const fn max_chunks(&self) -> usize {
         1 << self.log_max_chunks
     }
-    /// Force ontiguous virtual memory for all spaces
+    /// Force contiguous virtual memory for all spaces
     pub fn force_use_contiguous_spaces(&self) -> bool {
         self.log_address_space > 35
     }
