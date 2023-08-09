@@ -725,7 +725,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let data_addr = vm_layout_constants::HEAP_START;
+                    let data_addr = VM_LAYOUT_CONSTANTS.heap_start;
 
                     let log_num_of_bits = 0;
                     let log_bytes_in_region = 3;

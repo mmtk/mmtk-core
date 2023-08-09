@@ -82,7 +82,7 @@ impl VMLayoutConstants {
             heap_start: chunk_align_down(unsafe {
                 Address::from_usize(0x0000_0200_0000_0000usize)
             }),
-            heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2000_0000_0000usize) }),
+            heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) }),
             vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize(),
             log_max_chunks: Self::LOG_ARCH_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK,
             log_space_extent: 41,
@@ -149,7 +149,11 @@ lazy_static! {
     pub static ref VM_LAYOUT_CONSTANTS: VMLayoutConstants = {
         let las = ADDRESS_SPACE_KIND
             .lock()
-            .expect("Address space is not initialized");
+            .unwrap_or(if cfg!(target_pointer_width = "32") {
+                AddressSpaceKind::_32Bits
+            } else {
+                AddressSpaceKind::_64Bits
+            });
         match las {
             AddressSpaceKind::_32Bits => unimplemented!(),
             AddressSpaceKind::_64Bits => VMLayoutConstants::new_64bit(),

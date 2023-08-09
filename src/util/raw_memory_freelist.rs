@@ -258,7 +258,7 @@ mod tests {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
-        let start = unimplemented!();
+        let start = crate::util::test_util::RAW_MEMORY_FREELIST_TEST_REGION.start;
         let extent = BYTES_IN_PAGE;
         let pages_per_block = RawMemoryFreeList::default_block_size(list_size as _, 1);
         assert_eq!(pages_per_block, 1);
