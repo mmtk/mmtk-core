@@ -122,7 +122,7 @@ impl VMMap for Map64 {
 
     unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource) {
         let index = Self::space_index((*pr).get_start()).unwrap();
-        let self_mut = unsafe { self.mut_self() };
+        let self_mut = self.mut_self();
         self_mut.fl_page_resources[index] = Some(NonNull::new_unchecked(pr as _));
     }
 

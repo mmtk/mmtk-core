@@ -113,7 +113,7 @@ impl VMMap for Map32 {
             .downcast_ref::<IntArrayFreeList>()
             .unwrap()
             .get_ordinal() as usize;
-        let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
+        let self_mut: &mut Map32Inner = self.mut_self();
         self_mut.shared_fl_map[ordinal] = Some(NonNull::new_unchecked(pr as *mut _));
     }
 
