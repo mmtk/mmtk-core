@@ -103,7 +103,6 @@ impl VMLayoutConstants {
     }
     /// Normal 64-bit configuration
     pub fn new_64bit() -> Self {
-        println!("VMLayoutConstants: 64bit");
         Self {
             log_address_space: 47,
             heap_start: chunk_align_down(unsafe {
@@ -120,9 +119,8 @@ impl VMLayoutConstants {
     }
     /// 64-bit configuration with compressed pointers
     pub fn new_64bit_with_pointer_compression(heap_size: usize) -> Self {
-        println!("VMLayoutConstants: 64bit (with pointer compression)");
         assert!(
-            heap_size <= (32usize << 30),
+            heap_size <= (32usize << LOG_BYTES_IN_GBYTE),
             "Heap size is larger than 32 GB"
         );
         let start = 0x4000_0000;
