@@ -15,7 +15,12 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// If the feature "work_packet_stats" is not enabled, this call simply forwards the call
     /// to `do_work()`.
     fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        debug!("{}", std::any::type_name::<Self>());
+        debug!(
+            "{} size: {}",
+            std::any::type_name::<Self>(),
+            self.debug_get_size()
+                .map_or_else(|| "unknown".to_string(), |size| size.to_string())
+        );
         debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
 
         #[cfg(feature = "work_packet_stats")]
@@ -49,6 +54,10 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// The semantics is unspecified.  For work packets that contains a list of work items, such as
     /// object references or edges, the size should usually be the number of items.  If size does
     /// not make sense for the work packet, this method may return `None`.
+    ///
+    /// This method will be called before the execution of every work packet, so it must be fast.
+    /// If it is impractical to report the exact size, this method can return approximate size, or
+    /// return `None`.
     fn debug_get_size(&self) -> Option<usize> {
         None
     }
