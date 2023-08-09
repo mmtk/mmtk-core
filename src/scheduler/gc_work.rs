@@ -977,19 +977,6 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
     }
 
     fn post_scan_object(&self, _object: ObjectReference) {
-        // use std::fs::OpenOptions;
-        // use std::io::Write;
-        
-        // let mut file = OpenOptions::new()
-        //                 .write(true)
-        //                 .append(true)
-        //                 .create(true)
-        //                 .open("/home/eduardo/mmtk-julia/scanned_objs.log")
-        //                 .unwrap();
-        
-        // if let Err(e) = writeln!(file, "Processed object {} at bucket {:?}", object, self.bucket) {
-        //     eprintln!("Couldn't write to file: {}", e);
-        // }
         // Do nothing.
     }
 
@@ -1129,19 +1116,6 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
     }
 
     fn post_scan_object(&self, object: ObjectReference) {
-        // use std::fs::OpenOptions;
-        // use std::io::Write;
-
-        // let mut file = OpenOptions::new()
-        //                 .write(true)
-        //                 .append(true)
-        //                 .create(true)
-        //                 .open("/home/eduardo/mmtk-julia/scanned_objs.log")
-        //                 .unwrap();
-        
-        // if let Err(e) = writeln!(file, "Processed object {} at bucket {:?}", object, self.bucket) {
-        //     eprintln!("Couldn't write to file: {}", e);
-        // }
         self.plan.post_scan_object(object);
     }
 
