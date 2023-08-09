@@ -4,13 +4,6 @@ use crate::vm::VMBinding;
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
 
-/// A special kind of work that will execute on the coordinator (i.e. controller) thread
-///
-/// The coordinator thread holds the global monitor lock when executing `CoordinatorWork`s.
-/// So, directly adding new work to any buckets will cause dead lock.
-/// For this case, use `WorkBucket::add_with_priority_unsync` instead.
-pub trait CoordinatorWork<VM: VMBinding>: 'static + Send + GCWork<VM> {}
-
 pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// Define the work for this packet. However, this is not supposed to be called directly.
     /// Usually `do_work_with_stat()` should be used.
@@ -41,6 +34,11 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
             let mut worker_stat = worker.shared.borrow_stat_mut();
             stat.end_of_work(&mut worker_stat);
         }
+    }
+
+    /// Get the compile-time static type name for the work packet.
+    fn get_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 }
 

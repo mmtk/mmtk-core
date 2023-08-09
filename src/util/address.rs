@@ -1,4 +1,5 @@
 use atomic_traits::Atomic;
+
 use std::fmt;
 use std::mem;
 use std::ops::*;
@@ -318,6 +319,12 @@ impl Address {
             MMAPPER.is_mapped_address(self)
         }
     }
+
+    /// Returns the intersection of the two address ranges. The returned range could
+    /// be empty if there is no intersection between the ranges.
+    pub fn range_intersection(r1: &Range<Address>, r2: &Range<Address>) -> Range<Address> {
+        r1.start.max(r2.start)..r1.end.min(r2.end)
+    }
 }
 
 /// allows print Address as upper-case hex value
@@ -345,6 +352,15 @@ impl fmt::Display for Address {
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:#x}", self.0)
+    }
+}
+
+impl std::str::FromStr for Address {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let raw: usize = s.parse()?;
+        Ok(Address(raw))
     }
 }
 
@@ -445,7 +461,7 @@ use crate::vm::VMBinding;
 /// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven't seen a use case for now.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub struct ObjectReference(usize);
 
 impl ObjectReference {

@@ -55,12 +55,16 @@ impl MemorySlice for DummyVMMemorySlice {
         }
     }
 
+    fn object(&self) -> Option<ObjectReference> {
+        None
+    }
+
     fn start(&self) -> Address {
         Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
     }
 
     fn bytes(&self) -> usize {
-        unsafe { (*self.0).len() * std::mem::size_of::<ObjectReference>() }
+        unsafe { std::mem::size_of_val(&*self.0) }
     }
 
     fn copy(src: &Self, tgt: &Self) {

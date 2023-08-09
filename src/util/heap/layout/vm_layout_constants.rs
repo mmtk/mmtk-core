@@ -57,11 +57,7 @@ impl VMLayoutConstants {
         1 << self.log_space_extent
     }
     pub const fn available_start(&self) -> Address {
-        if cfg!(feature = "vm_space") {
-            unsafe { Address::from_usize(self.heap_start.as_usize() + self.vm_space_size) }
-        } else {
-            self.heap_start
-        }
+        self.heap_start
     }
     pub const fn available_end(&self) -> Address {
         self.heap_end

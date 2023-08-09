@@ -43,7 +43,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     // Find a block with free space and allocate to it
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         debug_assert!(
             size <= MAX_BIN_SIZE,
             "Alloc request for {} bytes is too big.",
@@ -79,7 +79,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.alloc_slow(size, align, offset)
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         // Try get a block from the space
         if let Some(block) = self.acquire_global_block(size, align, false) {
             let addr = self.block_alloc(block);
@@ -101,7 +101,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         trace!("allow slow precise stress s={}", size);
@@ -393,9 +393,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         // unset allocation bit
         unsafe {
-            crate::util::alloc_bit::unset_alloc_bit_unsafe::<VM>(ObjectReference::from_raw_address(
-                addr,
-            ))
+            crate::util::metadata::vo_bit::unset_vo_bit_unsafe::<VM>(
+                ObjectReference::from_raw_address(addr),
+            )
         };
     }
 
@@ -428,8 +428,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     fn reset(&mut self) {
         trace!("reset");
         // consumed and available are now unswept
-        let mut bin = 0;
-        while bin < MAX_BIN + 1 {
+        for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
             unswept.lock();
 
@@ -444,7 +443,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             sweep_later(&mut self.consumed_blocks[bin]);
 
             unswept.unlock();
-            bin += 1;
         }
 
         if Self::ABANDON_BLOCKS_IN_RESET {
@@ -456,29 +454,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     fn reset(&mut self) {
         debug!("reset");
         // sweep all blocks and push consumed onto available list
-        let mut bin = 0;
-        while bin < MAX_BIN + 1 {
-            let sweep = |first_block: Option<Block>, used_blocks: bool| {
-                let mut cursor = first_block;
-                while let Some(block) = cursor {
-                    if used_blocks {
-                        block.sweep::<VM>();
-                        cursor = block.load_next_block();
-                    } else {
-                        let next = block.load_next_block();
-                        if !block.attempt_release(self.space) {
-                            block.sweep::<VM>();
-                        }
-                        cursor = next;
-                    }
-                }
-            };
-
-            sweep(self.available_blocks[bin].first, true);
-            sweep(self.available_blocks_stress[bin].first, true);
+        for bin in 0..MI_BIN_FULL {
+            // Sweep available blocks
+            self.available_blocks[bin].sweep_blocks(self.space);
+            self.available_blocks_stress[bin].sweep_blocks(self.space);
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
-            sweep(self.consumed_blocks[bin].first, false);
+            self.consumed_blocks[bin].sweep_blocks(self.space);
             if self.plan.base().is_precise_stress() && self.plan.base().is_stress_test_gc_enabled()
             {
                 debug_assert!(self.plan.base().is_precise_stress());
@@ -487,11 +469,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 self.available_blocks[bin].append(&mut self.consumed_blocks[bin]);
             }
 
-            bin += 1;
-
-            if Self::ABANDON_BLOCKS_IN_RESET {
-                self.abandon_blocks();
-            }
+            // For eager sweeping, we should not have unswept blocks
+            assert!(self.unswept_blocks[bin].is_empty());
         }
 
         if Self::ABANDON_BLOCKS_IN_RESET {
@@ -501,8 +480,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     fn abandon_blocks(&mut self) {
         let mut abandoned = self.space.abandoned.lock().unwrap();
-        let mut i = 0;
-        while i < MI_BIN_FULL {
+        for i in 0..MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
             if !available.is_empty() {
                 abandoned.available[i].append(available);
@@ -522,7 +500,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             if !unswept.is_empty() {
                 abandoned.unswept[i].append(unswept);
             }
-            i += 1;
         }
     }
 }

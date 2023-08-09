@@ -1,4 +1,4 @@
-///! MMTk instance.
+//! MMTk instance.
 use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
@@ -6,6 +6,7 @@ use crate::scheduler::GCWorkScheduler;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
+use crate::util::heap::layout::vm_layout_constants::{AddressSpaceKind, VMLayoutConstants};
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
@@ -95,6 +96,11 @@ pub struct MMTK<VM: VMBinding> {
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
+        if cfg!(target_pointer_width = "32") {
+            VMLayoutConstants::set_address_space(AddressSpaceKind::_32Bits);
+        } else {
+            VMLayoutConstants::set_address_space(AddressSpaceKind::_64Bits);
+        }
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
         SFT_MAP.initialize_once(&create_sft_map);
@@ -140,6 +146,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
+        probe!(mmtk, harness_begin);
         self.plan.handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
@@ -149,6 +156,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn harness_end(&'static self) {
         self.plan.base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
+        probe!(mmtk, harness_end);
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {

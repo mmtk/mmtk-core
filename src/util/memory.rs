@@ -4,6 +4,7 @@ use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
+use sysinfo::{RefreshKind, System, SystemExt};
 
 pub fn result_is_mapped(result: Result<()>) -> bool {
     match result {
@@ -13,8 +14,13 @@ pub fn result_is_mapped(result: Result<()>) -> bool {
 }
 
 pub fn zero(start: Address, len: usize) {
-    let ptr = start.to_mut_ptr();
-    wrap_libc_call(&|| unsafe { libc::memset(ptr, 0, len) }, ptr).unwrap()
+    set(start, 0, len);
+}
+
+pub fn set(start: Address, val: u8, len: usize) {
+    unsafe {
+        std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
+    }
 }
 
 /// Demand-zero mmap:
@@ -187,17 +193,20 @@ pub fn get_process_memory_maps() -> String {
 }
 
 /// Returns the total physical memory for the system in bytes.
-pub(crate) fn get_system_total_memory() -> usize {
-    match sys_info::mem_info() {
-        Ok(mem_info) => mem_info.total as usize,
-        Err(e) => {
-            warn!(
-                "Failed to get sys_info::mem_info: {:?}. Return 1G in get_system_total_memory()",
-                e
-            );
-            1024 * 1024 * 1024
-        }
-    }
+pub(crate) fn get_system_total_memory() -> u64 {
+    // TODO: Note that if we want to get system info somewhere else in the future, we should
+    // refactor this instance into some global struct. sysinfo recommends sharing one instance of
+    // `System` instead of making multiple instances.
+    // See https://docs.rs/sysinfo/0.29.0/sysinfo/index.html#usage for more info
+    //
+    // If we refactor the `System` instance to use it for other purposes, please make sure start-up
+    // time is not affected.  It takes a long time to load all components in sysinfo (e.g. by using
+    // `System::new_all()`).  Some applications, especially short-running scripts, are sensitive to
+    // start-up time.  During start-up, MMTk core only needs the total memory to initialize the
+    // `Options`.  If we only load memory-related components on start-up, it should only take <1ms
+    // to initialize the `System` instance.
+    let sys = System::new_with_specifics(RefreshKind::new().with_memory());
+    sys.total_memory()
 }
 
 #[cfg(test)]

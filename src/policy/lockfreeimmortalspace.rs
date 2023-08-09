@@ -1,19 +1,22 @@
+use atomic::Atomic;
+
+use std::marker::PhantomData;
+use std::sync::atomic::Ordering;
+
 use crate::mmtk::SFT_MAP;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
-use crate::util::heap::PageResource;
-use crate::util::ObjectReference;
 
-use crate::policy::sft::GCWorkerMutRef;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
+use crate::util::heap::PageResource;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::opaque_pointer::*;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -25,10 +28,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     #[allow(unused)]
     name: &'static str,
     /// Heap range start
-    ///
-    /// We use `AtomicUsize` instead of `Address` here to atomically bumping this cursor.
-    /// TODO: Better address type here (Atomic<Address>?)
-    cursor: AtomicUsize,
+    cursor: Atomic<Address>,
     /// Heap range end
     limit: Address,
     /// start of this space
@@ -68,12 +68,12 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         unimplemented!()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -108,7 +108,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
-        let cursor = unsafe { Address::from_usize(self.cursor.load(Ordering::Relaxed)) };
+        let cursor = self.cursor.load(Ordering::Relaxed);
         let data_pages = conversions::bytes_to_pages_up(self.limit - cursor);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
@@ -116,7 +116,12 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 
     fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
         let bytes = conversions::pages_to_bytes(pages);
-        let start = unsafe { Address::from_usize(self.cursor.fetch_add(bytes, Ordering::Relaxed)) };
+        let start = self
+            .cursor
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |addr| {
+                Some(addr.add(bytes))
+            })
+            .expect("update cursor failed");
         if start + bytes > self.limit {
             panic!("OutOfMemory")
         }
@@ -182,7 +187,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // https://github.com/mmtk/mmtk-core/issues/314
         let space = Self {
             name: args.name,
-            cursor: AtomicUsize::new(VM_LAYOUT_CONSTANTS.available_start().as_usize()),
+            cursor: Atomic::new(VM_LAYOUT_CONSTANTS.available_start()),
             limit: VM_LAYOUT_CONSTANTS.available_start() + total_bytes,
             start: VM_LAYOUT_CONSTANTS.available_start(),
             extent: total_bytes,

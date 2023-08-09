@@ -15,10 +15,15 @@ pub struct ScheduleCollection;
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         mmtk.plan.schedule_collection(worker.scheduler());
+
+        // Tell GC trigger that GC started.
+        // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
+        // TODO: Depending on the OS scheduling, other workers can run so fast that they can finish
+        // everything in the `Unconstrained` and the `Prepare` buckets before we execute the next
+        // statement. Consider if there is a better place to call `on_gc_start`.
+        mmtk.plan.base().gc_trigger.policy.on_gc_start(mmtk);
     }
 }
-
-impl<VM: VMBinding> CoordinatorWork<VM> for ScheduleCollection {}
 
 /// The global GC Preparation Work
 /// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and
@@ -124,6 +129,18 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            self.plan
+                .base()
+                .live_bytes_in_last_gc
+                .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 }
 
@@ -174,14 +191,6 @@ impl<ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        // If the VM requires that only the coordinator thread can stop the world,
-        // we delegate the work to the coordinator.
-        if <E::VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
-            mmtk.scheduler
-                .add_coordinator_work(StopMutators::<E>::new(), worker);
-            return;
-        }
-
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
         <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
@@ -216,8 +225,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> CoordinatorWork<E::VM> for StopMutators<E> {}
-
 #[derive(Default)]
 pub struct EndOfGC {
     pub elapsed: std::time::Duration,
@@ -232,6 +239,28 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             self.elapsed.as_millis()
         );
 
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .plan
+                .base()
+                .live_bytes_in_last_gc
+                .load(std::sync::atomic::Ordering::SeqCst);
+            let used_bytes =
+                mmtk.plan.get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+            debug_assert!(
+                live_bytes <= used_bytes,
+                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                live_bytes, used_bytes
+            );
+            info!(
+                "Live objects = {} bytes ({:04.1}% of {} used pages)",
+                live_bytes,
+                live_bytes as f64 * 100.0 / used_bytes as f64,
+                mmtk.plan.get_used_pages()
+            );
+        }
+
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut dyn Plan<VM = VM> = unsafe { &mut *(&*mmtk.plan as *const _ as *mut _) };
@@ -243,11 +272,6 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.edge_logger.reset();
         }
 
-        if <VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW {
-            assert!(worker.is_coordinator(),
-                    "VM only allows coordinator to resume mutators, but the current worker is not the coordinator.");
-        }
-
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
 
         // Reset the triggering information.
@@ -256,8 +280,6 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
-
-impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
 /// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
@@ -456,7 +478,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots(worker.tls, factory);
+        <E::VM as VMBinding>::VMScanning::scan_roots_in_all_mutator_threads(worker.tls, factory);
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
             mutator.flush();
@@ -473,7 +495,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_root(
+        <E::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
             factory,
@@ -556,6 +578,10 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
         self.nodes.take()
+    }
+
+    pub fn is_roots(&self) -> bool {
+        self.roots
     }
 }
 
@@ -643,6 +669,7 @@ pub trait ProcessEdgesWork:
     }
 
     fn process_edges(&mut self) {
+        probe!(mmtk, process_edges, self.edges.len(), self.is_roots());
         for i in 0..self.edges.len() {
             self.process_edge(self.edges[i])
         }
@@ -657,7 +684,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
             self.flush();
         }
         #[cfg(feature = "sanity")]
-        if self.roots {
+        if self.roots && !_mmtk.plan.is_in_sanity() {
             self.cache_roots_for_sanity_gc();
         }
         trace!("ProcessEdgesWork End");
@@ -777,7 +804,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
         #[cfg(feature = "sanity")]
         {
-            if self.roots() {
+            if self.roots() && !mmtk.plan.is_in_sanity() {
                 mmtk.sanity_checker
                     .lock()
                     .unwrap()
@@ -822,6 +849,13 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker);
             for object in objects_to_scan.iter().copied() {
+                // For any object we need to scan, we count its liv bytes
+                #[cfg(feature = "count_live_bytes_in_gc")]
+                closure
+                    .worker
+                    .shared
+                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
                 if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
                     trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.

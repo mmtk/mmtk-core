@@ -19,39 +19,46 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
+atomic = "0.5.1"
+atomic_refcell = "0.1.7"
+atomic-traits = "0.3.0"
+cfg-if = "1.0"
+crossbeam = "0.8.1"
+delegate = "0.9.0"
+downcast-rs = "1.1.1"
+enum-map = "2.4.2"
+env_logger = "0.10.0"
+# We do not use this crate, but env_logger uses it. env_logger uses is_terminal 0.4.0. However, since 0.4.8, is_terminal requires Rust 1.63.
+# So we fix on 0.4.7 here. Once we bump our MSRV, we can remove this.
+is-terminal = "=0.4.7"
+itertools = "0.10.5"
+jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
+lazy_static = "1.1"
+libc = "0.2"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
+mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros
 mmtk-macros = { version = "0.18.0", path = "macros/" }
-
-libc = "0.2"
-jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
-mimalloc-sys = { version = "0.1.6", optional = true }
-lazy_static = "1.1"
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
-crossbeam = "0.8.1"
 num_cpus = "1.8"
-enum-map = "2.4.2"
-downcast-rs = "1.1.1"
-atomic-traits = "0.3.0"
-atomic = "0.5.1"
 num-traits = "0.2"
+pfm = { version = "0.1.0-beta.3", optional = true }
+# Pin to <0.4.0 until we have MSRV >= 1.66, then we can bump to 0.5 (0.4 forces lazy evaluation https://github.com/cuviper/probe-rs/issues/19)
+probe = "0.3"
+regex = "1.7.0"
 spin = "0.9.5"
-env_logger = "0.10.0"
-pfm = { version = "0.1.0-beta.1", optional = true }
-atomic_refcell = "0.1.7"
+static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-cfg-if = "1.0"
-itertools = "0.10.5"
-sys-info = "0.9"
-regex = "1.7.0"
-static_assertions = "1.1.0"
+# Fix on 0.29.5 so we have MSRV 1.61. Remove this when we update MSRV
+sysinfo = "=0.29.5"
 
 [dev-dependencies]
-rand = "0.8.5"
 paste = "1.0.8"
+rand = "0.8.5"
 
 [build-dependencies]
-built = { version = "0.6.0", features = ["git2"] }
+# Fix to 0.6.0. Updating to 0.6.1 requires MSRV 1.64.
+built = { version = "=0.6.0", features = ["git2"] }
 
 [features]
 default = []
@@ -81,11 +88,16 @@ ro_space = []
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
-# metadata
-global_alloc_bit = []
+# Global valid object (VO) bit metadata.
+# The VO bit is set when an object is allocated, and cleared when the GC determines it is dead.
+# See `src/util/metadata/vo_bit/mod.rs`
+#
+# eager_sweeping: VO bits for dead objects must have been cleared by the end of each GC.
+# Native MarkSweep only ensures this in eager sweeping mode.
+vo_bit = ["eager_sweeping"]
 
 # conservative garbage collection support
-is_mmtk_object = ["global_alloc_bit"]
+is_mmtk_object = ["vo_bit"]
 
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []
@@ -123,6 +135,9 @@ work_packet_stats = []
 
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
+
+# Count the size of all live objects in GC
+count_live_bytes_in_gc = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

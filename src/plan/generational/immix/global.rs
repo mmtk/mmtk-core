@@ -178,6 +178,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         &self.gen.common.base
     }
 
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM> {
+        &mut self.gen.common.base
+    }
+
     fn common(&self) -> &CommonPlan<VM> {
         &self.gen.common
     }
@@ -243,6 +247,8 @@ impl<VM: VMBinding> GenImmix<VM> {
                 // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
                 // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
                 unlog_object_when_traced: false,
+                // In GenImmix, young objects are not allocated in ImmixSpace directly.
+                mixed_age: false,
             },
         );
 

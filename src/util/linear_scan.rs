@@ -1,27 +1,30 @@
-use crate::util::alloc_bit;
+use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-/// Iterate over an address range, and find each object by alloc bit.
-/// ATOMIC_LOAD_ALLOC_BIT can be set to false if it is known that loading alloc bit
+// FIXME: MarkCompact uses linear scanning to discover allocated objects in the MarkCompactSpace.
+// It should use a local metadata (specific to the MarkCompactSpace) for that purpose.
+// In the future, we should let MarkCompact do linear scanning using its local metadata instead.
+
+/// Iterate over an address range, and find each object by VO bit.
+/// ATOMIC_LOAD_VO_BIT can be set to false if it is known that loading VO bit
 /// non-atomically is correct (e.g. a single thread is scanning this address range, and
-/// it is the only thread that accesses alloc bit).
-pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool>
-{
+/// it is the only thread that accesses VO bit).
+pub struct ObjectIterator<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> {
     start: Address,
     end: Address,
     cursor: Address,
     _p: PhantomData<(VM, S)>,
 }
 
-impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool>
-    ObjectIterator<VM, S, ATOMIC_LOAD_ALLOC_BIT>
+impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
+    ObjectIterator<VM, S, ATOMIC_LOAD_VO_BIT>
 {
     /// Create an iterator for the address range. The caller must ensure
-    /// that the alloc bit metadata is mapped for the address range.
+    /// that the VO bit metadata is mapped for the address range.
     pub fn new(start: Address, end: Address) -> Self {
         debug_assert!(start < end);
         ObjectIterator {
@@ -33,17 +36,17 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool>
     }
 }
 
-impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> std::iter::Iterator
-    for ObjectIterator<VM, S, ATOMIC_LOAD_ALLOC_BIT>
+impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std::iter::Iterator
+    for ObjectIterator<VM, S, ATOMIC_LOAD_VO_BIT>
 {
     type Item = ObjectReference;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
-            let is_object = if ATOMIC_LOAD_ALLOC_BIT {
-                alloc_bit::is_alloced_object::<VM>(self.cursor)
+            let is_object = if ATOMIC_LOAD_VO_BIT {
+                vo_bit::is_vo_bit_set_for_addr::<VM>(self.cursor)
             } else {
-                unsafe { alloc_bit::is_alloced_object_unsafe::<VM>(self.cursor) }
+                unsafe { vo_bit::is_vo_bit_set_unsafe::<VM>(self.cursor) }
             };
 
             if let Some(object) = is_object {

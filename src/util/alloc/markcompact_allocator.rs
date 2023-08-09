@@ -48,7 +48,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         self.bump_allocator.get_thread_local_buffer_granularity()
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         let rtn = self
             .bump_allocator
             .alloc(size + Self::HEADER_RESERVED_IN_BYTES, align, offset);
@@ -61,7 +61,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         }
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("alloc_slow");
         self.bump_allocator.alloc_slow_once(size, align, offset)
     }
@@ -78,7 +78,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         self.bump_allocator

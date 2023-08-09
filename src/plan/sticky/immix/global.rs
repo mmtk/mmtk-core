@@ -67,6 +67,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.base()
     }
 
+    fn base_mut(&mut self) -> &mut crate::plan::global::BasePlan<Self::VM> {
+        self.immix.base_mut()
+    }
+
     fn generational(
         &self,
     ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
@@ -283,10 +287,6 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                 .trace_object::<Q>(queue, object);
         }
 
-        warn!(
-            "Object {} is not in nursery or in LOS, it is not traced!",
-            object
-        );
         object
     }
 }
@@ -311,6 +311,8 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // In full heap GC, mature objects may die, and their unlogged bit needs to be reset.
                 // Along with the option above, we unlog them again during tracing.
                 reset_log_bit_in_major_gc: true,
+                // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
+                mixed_age: true,
             },
         );
         let full_heap_gc_count = immix.base().stats.new_event_counter("majorGC", true, true);

@@ -8,6 +8,8 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
+#[cfg(feature = "vm_space")]
+use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
@@ -23,7 +25,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
-use crate::util::ObjectReference;
+use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
@@ -176,6 +178,7 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn base(&self) -> &BasePlan<Self::VM>;
+    fn base_mut(&mut self) -> &mut BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
@@ -249,10 +252,28 @@ pub trait Plan: 'static + Sync + Downcast {
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
     // if necessary.
 
-    /// Get the number of pages that are reserved, including used pages and pages that will
-    /// be used (e.g. for copying).
+    /// Get the number of pages that are reserved, including pages used by MMTk spaces, pages that
+    /// will be used (e.g. for copying), and live pages allocated outside MMTk spaces as reported
+    /// by the VM binding.
     fn get_reserved_pages(&self) -> usize {
-        self.get_used_pages() + self.get_collection_reserved_pages()
+        let used_pages = self.get_used_pages();
+        let collection_reserve = self.get_collection_reserved_pages();
+        let vm_live_bytes = <Self::VM as VMBinding>::VMCollection::vm_live_bytes();
+        // Note that `vm_live_bytes` may not be the exact number of bytes in whole pages.  The VM
+        // binding is allowed to return an approximate value if it is expensive or impossible to
+        // compute the exact number of pages occupied.
+        let vm_live_pages = conversions::bytes_to_pages_up(vm_live_bytes);
+        let total = used_pages + collection_reserve + vm_live_pages;
+
+        trace!(
+            "Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}",
+            total,
+            used_pages,
+            collection_reserve,
+            vm_live_pages,
+        );
+
+        total
     }
 
     /// Get the total number of pages for the heap.
@@ -263,6 +284,9 @@ pub trait Plan: 'static + Sync + Downcast {
     /// Get the number of pages that are still available for use. The available pages
     /// should always be positive or 0.
     fn get_available_pages(&self) -> usize {
+        let reserved_pages = self.get_reserved_pages();
+        let total_pages = self.get_total_pages();
+
         // It is possible that the reserved pages is larger than the total pages so we are doing
         // a saturating subtraction to make sure we return a non-negative number.
         // For example,
@@ -271,15 +295,14 @@ pub trait Plan: 'static + Sync + Downcast {
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        let available_pages = total_pages.saturating_sub(reserved_pages);
         trace!(
             "Total pages = {}, reserved pages = {}, available pages = {}",
-            self.get_total_pages(),
-            self.get_reserved_pages(),
-            self.get_reserved_pages()
-                .saturating_sub(self.get_reserved_pages())
+            total_pages,
+            reserved_pages,
+            available_pages,
         );
-        self.get_total_pages()
-            .saturating_sub(self.get_reserved_pages())
+        available_pages
     }
 
     /// Get the number of pages that are reserved for collection. By default, we return 0.
@@ -394,6 +417,9 @@ pub struct BasePlan<VM: VMBinding> {
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     malloc_bytes: AtomicUsize,
+    /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub live_bytes_in_last_gc: AtomicUsize,
     /// Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
@@ -415,7 +441,7 @@ pub struct BasePlan<VM: VMBinding> {
     /// If VM space is present, it has some special interaction with the
     /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
     ///
-    /// -   The `is_mmtk_object` funciton requires the alloc_bit side metadata to identify objects,
+    /// -   The `is_mmtk_object` funciton requires the valid object (VO) bit side metadata to identify objects,
     ///     but currently we do not require the boot image to provide it, so it will not work if the
     ///     address argument is in the VM space.
     ///
@@ -423,29 +449,7 @@ pub struct BasePlan<VM: VMBinding> {
     ///     the VM space.
     #[cfg(feature = "vm_space")]
     #[trace]
-    pub vm_space: ImmortalSpace<VM>,
-}
-
-#[cfg(feature = "vm_space")]
-pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> ImmortalSpace<VM> {
-    use crate::util::constants::LOG_BYTES_IN_MBYTE;
-    let boot_segment_bytes = *args.global_args.options.vm_space_size;
-    debug_assert!(boot_segment_bytes > 0);
-
-    use crate::util::conversions::raw_align_up;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
-
-    let space = ImmortalSpace::new(args.get_space_args(
-        "boot",
-        false,
-        VMRequest::fixed_size(boot_segment_mb),
-    ));
-
-    // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
-    space.ensure_mapped();
-
-    space
+    pub vm_space: VMSpace<VM>,
 }
 
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
@@ -520,7 +524,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: create_vm_space(&mut args),
+            vm_space: VMSpace::new(&mut args),
 
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),
@@ -546,6 +550,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_in_gc")]
+            live_bytes_in_last_gc: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
         }
