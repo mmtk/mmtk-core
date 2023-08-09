@@ -25,10 +25,6 @@
 <span id="25">25</span>
 <span id="26">26</span>
 <span id="27">27</span>
-<span id="28">28</span>
-<span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
 </span><span class="kw">pub mod </span>affinity;
@@ -56,9 +52,5 @@
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>gc_work;
 <span class="kw">pub use </span>gc_work::ProcessEdgesWork;
-<span class="comment">// TODO: We shouldn&#39;t need to expose ScanStackRoot. However, OpenJDK uses it.
-// We should do some refactoring related to Scanning::SCAN_MUTATORS_IN_SAFEPOINT
-// to make sure this type is not exposed to the bindings.
-</span><span class="kw">pub use </span>gc_work::ScanStackRoot;
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.1 (90743e729 2023-01-10)" ></div></body></html>

@@ -326,7 +326,7 @@
         // in openjdk binding before the second round of roots scanning.
         // for mutator in &lt;P::VM as VMBinding&gt;::VMActivePlan::mutators() {
         //     scheduler.work_buckets[WorkBucketStage::Prepare]
-        //         .add(ScanStackRoot::&lt;SanityGCProcessEdges&lt;P::VM&gt;&gt;(mutator));
+        //         .add(ScanMutatorRoots::&lt;SanityGCProcessEdges&lt;P::VM&gt;&gt;(mutator));
         // }
         </span>{
             <span class="kw">let </span>sanity_checker = mmtk.sanity_checker.lock().unwrap();

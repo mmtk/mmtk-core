@@ -305,18 +305,6 @@
 <span id="305">305</span>
 <span id="306">306</span>
 <span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -440,14 +428,6 @@
 
 <span class="doccomment">/// VM-specific methods for scanning roots/objects.
 </span><span class="kw">pub trait </span>Scanning&lt;VM: VMBinding&gt; {
-    <span class="doccomment">/// Scan stack roots after all mutators are paused.
-    </span><span class="kw">const </span>SCAN_MUTATORS_IN_SAFEPOINT: bool = <span class="bool-val">true</span>;
-
-    <span class="doccomment">/// Scan all the mutators within a single work packet.
-    ///
-    /// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled
-    </span><span class="kw">const </span>SINGLE_THREAD_MUTATOR_SCANNING: bool = <span class="bool-val">true</span>;
-
     <span class="doccomment">/// Return true if the given object supports edge enqueuing.
     ///
     /// -   If this returns true, MMTk core will call `scan_object` on the object.
@@ -522,20 +502,16 @@
     /// * `tls`: The GC thread that is performing the thread scan.
     </span><span class="kw">fn </span>notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread);
 
-    <span class="doccomment">/// Scan all the mutators for roots.
+    <span class="doccomment">/// Scan one mutator for stack roots.
     ///
-    /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the &quot;is_mmtk_object&quot; feature is enabled.
-    ///
-    /// Arguments:
-    /// * `tls`: The GC thread that is performing this scanning.
-    /// * `factory`: The VM uses it to create work packets for scanning roots.
-    </span><span class="kw">fn </span>scan_roots_in_all_mutator_threads(
-        tls: VMWorkerThread,
-        factory: <span class="kw">impl </span>RootsWorkFactory&lt;VM::VMEdge&gt;,
-    );
-
-    <span class="doccomment">/// Scan one mutator for roots.
+    /// Some VM bindings may not be able to implement this method.
+    /// For example, the VM binding may only be able to enumerate all threads and
+    /// scan them while enumerating, but cannot scan stacks individually when given
+    /// the references of threads.
+    /// In that case, it can leave this method empty, and deal with stack
+    /// roots in [`Collection::scan_vm_specific_roots`]. However, in that case, MMTk
+    /// does not know those roots are stack roots, and cannot perform any possible
+    /// optimization for the stack roots.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the &quot;is_mmtk_object&quot; feature is enabled.

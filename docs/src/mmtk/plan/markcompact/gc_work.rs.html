@@ -93,9 +93,6 @@
 <span id="93">93</span>
 <span id="94">94</span>
 <span id="95">95</span>
-<span id="96">96</span>
-<span id="97">97</span>
-<span id="98">98</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::global::MarkCompact;
 <span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
@@ -147,12 +144,9 @@
             .worker_group
             .get_and_clear_worker_live_bytes();
 
-        <span class="comment">// TODO investigate why the following will create duplicate edges
-        // scheduler.work_buckets[WorkBucketStage::RefForwarding]
-        //     .add(ScanStackRoots::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;::new());
-        </span><span class="kw">for </span>mutator <span class="kw">in </span>VM::VMActivePlan::mutators() {
+        <span class="kw">for </span>mutator <span class="kw">in </span>VM::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-                .add(ScanStackRoot::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;(mutator));
+                .add(ScanMutatorRoots::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]

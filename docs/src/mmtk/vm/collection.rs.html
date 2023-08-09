@@ -136,18 +136,7 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
-<span id="148">148</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::MutatorContext;
-<span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use crate</span>::{scheduler::<span class="kw-2">*</span>, Mutator};
@@ -164,9 +153,12 @@
     /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
+    /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
+    /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the GC controller/coordinator.
+    /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
     </span><span class="kw">fn </span>stop_all_mutators&lt;F&gt;(tls: VMWorkerThread, mutator_visitor: F)
     <span class="kw">where
         </span>F: FnMut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;);
@@ -201,18 +193,6 @@
     ///     The spawned thread shall call `memory_manager::start_worker`.
     ///   In either case, the `Box` inside should be passed back to the called function.
     </span><span class="kw">fn </span>spawn_gc_thread(tls: VMThread, ctx: GCThreadContext&lt;VM&gt;);
-
-    <span class="doccomment">/// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
-    ///
-    /// Arguments:
-    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
-    /// * `tls_mutator`: The thread pointer for the target mutator thread.
-    /// * `m`: The mutator context for the thread.
-    </span><span class="kw">fn </span>prepare_mutator&lt;T: MutatorContext&lt;VM&gt;&gt;(
-        tls_worker: VMWorkerThread,
-        tls_mutator: VMMutatorThread,
-        m: <span class="kw-2">&amp;</span>T,
-    );
 
     <span class="doccomment">/// Inform the VM of an out-of-memory error. The binding should hook into the VM&#39;s error
     /// routine for OOM. Note that there are two different categories of OOM:
