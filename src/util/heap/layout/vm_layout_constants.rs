@@ -159,7 +159,7 @@ impl VMLayoutConstants {
 pub enum AddressSpaceKind {
     AddressSpace32Bit,
     AddressSpace64Bit,
-    AddressSpace64BitWithPointerCompression { heap_size: usize },
+    AddressSpace64BitWithPointerCompression { max_heap_size: usize },
 }
 
 impl AddressSpaceKind {
@@ -185,8 +185,8 @@ lazy_static! {
         match las {
             AddressSpaceKind::AddressSpace32Bit => unimplemented!(),
             AddressSpaceKind::AddressSpace64Bit => VMLayoutConstants::new_64bit(),
-            AddressSpaceKind::AddressSpace64BitWithPointerCompression { heap_size } => {
-                VMLayoutConstants::new_64bit_with_pointer_compression(heap_size)
+            AddressSpaceKind::AddressSpace64BitWithPointerCompression { max_heap_size } => {
+                VMLayoutConstants::new_64bit_with_pointer_compression(max_heap_size)
             }
         }
     };

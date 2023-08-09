@@ -451,6 +451,15 @@ impl GCTriggerSelector {
     const G: u64 = 1024 * Self::M;
     const T: u64 = 1024 * Self::G;
 
+    /// get max heap size
+    pub(crate) fn max_heap_size(&self) -> usize {
+        match self {
+            Self::FixedHeapSize(s) => *s,
+            Self::DynamicHeapSize(_, s) => *s,
+            _ => unreachable!("Cannot get max heap size"),
+        }
+    }
+
     /// Parse a size representation, which could be a number to represents bytes,
     /// or a number with the suffix K/k/M/m/G/g. Return the byte number if it can be
     /// parsed properly, otherwise return an error string.
@@ -713,7 +722,9 @@ options! {
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     // Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize)
+    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
+    // Enable 35-bit heap address space (normally for compressed pointers)
+    use_35bit_address_space: bool                [env_var: true, command_line: true]  [always_valid] = false
 }
 
 #[cfg(test)]

@@ -98,6 +98,11 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         if cfg!(target_pointer_width = "32") {
             VMLayoutConstants::set_address_space(AddressSpaceKind::AddressSpace32Bit);
+        } else if *options.use_35bit_address_space {
+            let max_heap_size = options.gc_trigger.max_heap_size();
+            VMLayoutConstants::set_address_space(
+                AddressSpaceKind::AddressSpace64BitWithPointerCompression { max_heap_size },
+            );
         } else {
             VMLayoutConstants::set_address_space(AddressSpaceKind::AddressSpace64Bit);
         }
