@@ -129,6 +129,18 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            self.plan
+                .base()
+                .live_bytes_in_last_gc
+                .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 }
 
@@ -226,6 +238,28 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.plan.get_total_pages(),
             self.elapsed.as_millis()
         );
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .plan
+                .base()
+                .live_bytes_in_last_gc
+                .load(std::sync::atomic::Ordering::SeqCst);
+            let used_bytes =
+                mmtk.plan.get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+            debug_assert!(
+                live_bytes <= used_bytes,
+                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                live_bytes, used_bytes
+            );
+            info!(
+                "Live objects = {} bytes ({:04.1}% of {} used pages)",
+                live_bytes,
+                live_bytes as f64 * 100.0 / used_bytes as f64,
+                mmtk.plan.get_used_pages()
+            );
+        }
 
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
@@ -553,6 +587,10 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
         self.nodes.take()
     }
+
+    pub fn is_roots(&self) -> bool {
+        self.roots
+    }
 }
 
 /// A short-hand for `<E::VM as VMBinding>::VMEdge`.
@@ -645,6 +683,7 @@ pub trait ProcessEdgesWork:
     }
 
     fn process_edges(&mut self) {
+        probe!(mmtk, process_edges, self.edges.len(), self.is_roots());
         for i in 0..self.edges.len() {
             self.process_edge(self.edges[i])
         }
@@ -892,6 +931,13 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker, self.get_bucket());
             for object in objects_to_scan.iter().copied() {
+                // For any object we need to scan, we count its liv bytes
+                #[cfg(feature = "count_live_bytes_in_gc")]
+                closure
+                    .worker
+                    .shared
+                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
                 if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
                     trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.

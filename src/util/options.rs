@@ -46,7 +46,7 @@ impl PerfEventOptions {
             .split(';')
             .filter(|e| !e.is_empty())
             .map(|e| {
-                let e: Vec<&str> = e.split(',').into_iter().collect();
+                let e: Vec<&str> = e.split(',').collect();
                 if e.len() != 3 {
                     Err("Please supply (event name, pid, cpu)".into())
                 } else {
@@ -397,7 +397,7 @@ impl NurserySize {
     /// "<NurseryKind>:<size in bytes>". For example, "Fixed:8192" creates a Fixed nursery of size
     /// 8192 bytes.
     pub fn parse(s: &str) -> Result<NurserySize, String> {
-        let ns: Vec<&str> = s.split(':').into_iter().collect();
+        let ns: Vec<&str> = s.split(':').collect();
         let kind = ns[0].parse::<NurseryKind>().map_err(|_| {
             String::from("Please specify one of \"Bounded\" or \"Fixed\" nursery type")
         })?;

@@ -45,6 +45,8 @@ extern crate num_cpus;
 extern crate downcast_rs;
 #[macro_use]
 extern crate static_assertions;
+#[macro_use]
+extern crate probe;
 
 mod mmtk;
 pub use mmtk::MMTKBuilder;

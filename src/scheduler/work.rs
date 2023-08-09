@@ -35,6 +35,11 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
             stat.end_of_work(&mut worker_stat);
         }
     }
+
+    /// Get the compile-time static type name for the work packet.
+    fn get_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 use super::gc_work::ProcessEdgesWork;

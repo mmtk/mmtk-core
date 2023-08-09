@@ -9,6 +9,8 @@ use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
+#[cfg(feature = "count_live_bytes_in_gc")]
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -30,6 +32,11 @@ pub fn current_worker_ordinal() -> Option<ThreadId> {
 pub struct GCWorkerShared<VM: VMBinding> {
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
+    /// Accumulated bytes for live objects in this GC. When each worker scans
+    /// objects, we increase the live bytes. We get this value from each worker
+    /// at the end of a GC, and reset this counter.
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    live_bytes: AtomicUsize,
     /// A queue of GCWork that can only be processed by the owned thread.
     ///
     /// Note: Currently, designated work cannot be added from the GC controller thread, or
@@ -44,9 +51,21 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
+            #[cfg(feature = "count_live_bytes_in_gc")]
+            live_bytes: AtomicUsize::new(0),
             designated_work: ArrayQueue::new(16),
             stealer,
         }
+    }
+
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub(crate) fn increase_live_bytes(&self, bytes: usize) {
+        self.live_bytes.fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub(crate) fn get_and_clear_live_bytes(&self) -> usize {
+        self.live_bytes.swap(0, Ordering::SeqCst)
     }
 }
 
@@ -345,12 +364,26 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+        probe!(mmtk, gcworker_run);
         WORKER_ORDINAL.with(|x| x.store(Some(self.ordinal), Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
         loop {
+            // Instead of having work_start and work_end tracepoints, we have
+            // one tracepoint before polling for more work and one tracepoint
+            // before executing the work.
+            // This allows measuring the distribution of both the time needed
+            // poll work (between work_poll and work), and the time needed to
+            // execute work (between work and next work_poll).
+            // If we have work_start and work_end, we cannot measure the first
+            // poll.
+            probe!(mmtk, work_poll);
             let mut work = self.poll();
+            // probe! expands to an empty block on unsupported platforms
+            #[allow(unused_variables)]
+            let typename = work.get_type_name();
+            probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(self, mmtk);
         }
     }
@@ -412,5 +445,13 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         self.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
+    }
+
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub fn get_and_clear_worker_live_bytes(&self) -> usize {
+        self.workers_shared
+            .iter()
+            .map(|w| w.get_and_clear_live_bytes())
+            .sum()
     }
 }

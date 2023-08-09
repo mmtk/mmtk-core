@@ -1,6 +1,7 @@
+//! Generational plans
+
 use enum_map::EnumMap;
 
-///! Generational plans
 use crate::plan::barriers::BarrierSelector;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::AllocationSemantics;

@@ -245,6 +245,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let bucket_opened = bucket.update(self);
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
+                probe!(mmtk, bucket_opened, id);
                 new_packets = new_packets || !bucket.is_drained();
                 if new_packets {
                     // Quit the loop. There are already new packets in the newly opened buckets.
