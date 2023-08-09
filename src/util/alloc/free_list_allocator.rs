@@ -42,41 +42,22 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.plan
     }
 
-    // Find a block with free space and allocate to it
+    #[cfg(not(feature = "extra_header"))]
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        debug_assert!(
-            size <= MAX_BIN_SIZE,
-            "Alloc request for {} bytes is too big.",
-            size
-        );
-        debug_assert!(align <= VM::MAX_ALIGNMENT);
-        debug_assert!(align >= VM::MIN_ALIGNMENT);
+        self.alloc_impl(size, align, offset)
+    }
 
-        if let Some(block) = self.find_free_block_local(size, align) {
-            let cell = self.block_alloc(block);
-            if !cell.is_zero() {
-                // We succeeded in fastpath alloc, this cannot be precise stress test
-                debug_assert!(
-                    !(*self.plan.options().precise_stress
-                        && self.plan.base().is_stress_test_gc_enabled())
-                );
+    #[cfg(feature = "extra_header")]
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        let rtn = self.alloc_impl(size + VM::EXTRA_HEADER_BYTES, align, offset);
 
-                let res = allocator::align_allocation::<VM>(cell, align, offset);
-                // Make sure that the allocation region is within the cell
-                #[cfg(debug_assertions)]
-                {
-                    let cell_size = block.load_block_cell_size();
-                    debug_assert!(
-                        res + size <= cell + cell_size,
-                        "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
-                        size, align, offset, cell, cell_size, res + size, cell + cell_size
-                    );
-                }
-                return res;
-            }
+        // Check if the result is valid and return the actual object start address
+        // Note that `rtn` can be null in the case of OOM
+        if !rtn.is_zero() {
+            rtn + VM::EXTRA_HEADER_BYTES
+        } else {
+            rtn
         }
-
-        self.alloc_slow(size, align, offset)
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
@@ -139,6 +120,43 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             unswept_blocks: new_empty_block_lists(),
             consumed_blocks: new_empty_block_lists(),
         }
+    }
+
+    // Find a block with free space and allocate to it
+    fn alloc_impl(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        debug_assert!(
+            size <= MAX_BIN_SIZE,
+            "Alloc request for {} bytes is too big.",
+            size
+        );
+        debug_assert!(align <= VM::MAX_ALIGNMENT);
+        debug_assert!(align >= VM::MIN_ALIGNMENT);
+
+        if let Some(block) = self.find_free_block_local(size, align) {
+            let cell = self.block_alloc(block);
+            if !cell.is_zero() {
+                // We succeeded in fastpath alloc, this cannot be precise stress test
+                debug_assert!(
+                    !(*self.plan.options().precise_stress
+                        && self.plan.base().is_stress_test_gc_enabled())
+                );
+
+                let res = allocator::align_allocation::<VM>(cell, align, offset);
+                // Make sure that the allocation region is within the cell
+                #[cfg(debug_assertions)]
+                {
+                    let cell_size = block.load_block_cell_size();
+                    debug_assert!(
+                        res + size <= cell + cell_size,
+                        "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
+                        size, align, offset, cell, cell_size, res + size, cell + cell_size
+                    );
+                }
+                return res;
+            }
+        }
+
+        self.alloc_slow(size, align, offset)
     }
 
     // Find a free cell within a given block

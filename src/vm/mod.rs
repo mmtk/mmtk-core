@@ -71,4 +71,13 @@ where
     /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
     /// it merely asserts with this constant.
     const ALLOC_END_ALIGNMENT: usize = 1;
+
+    #[cfg(feature = "extra_header")]
+    const EXTRA_HEADER_BYTES: usize =
+        if Self::MAX_ALIGNMENT > crate::util::constants::BYTES_IN_WORD {
+            Self::MAX_ALIGNMENT
+        } else {
+            crate::util::constants::BYTES_IN_WORD
+        }
+        .next_power_of_two();
 }

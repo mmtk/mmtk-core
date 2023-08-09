@@ -285,9 +285,12 @@ impl Block {
         let mut cell = self.start();
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= self.start() + Block::BYTES {
+            #[cfg(not(feature = "extra_header"))]
             // The invariants we checked earlier ensures that we can use cell and object reference interchangably
             // We may not really have an object in this cell, but if we do, this object reference is correct.
             let potential_object = ObjectReference::from_raw_address(cell);
+            #[cfg(feature = "extra_header")]
+            let potential_object = ObjectReference::from_raw_address(cell + VM::EXTRA_HEADER_BYTES);
 
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)

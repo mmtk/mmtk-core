@@ -34,13 +34,18 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         false
     }
 
+    #[cfg(not(feature = "extra_header"))]
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        let cell: Address = self.alloc_slow(size, align, offset);
-        // We may get a null ptr from alloc due to the VM being OOM
-        if !cell.is_zero() {
-            allocator::align_allocation::<VM>(cell, align, offset)
+        self.alloc_impl(size, align, offset)
+    }
+
+    #[cfg(feature = "extra_header")]
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        let rtn = self.alloc_impl(size + VM::EXTRA_HEADER_BYTES, align, offset);
+        if !rtn.is_zero() {
+            rtn + VM::EXTRA_HEADER_BYTES
         } else {
-            cell
+            rtn
         }
     }
 
@@ -64,5 +69,15 @@ impl<VM: VMBinding> LargeObjectAllocator<VM> {
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
         LargeObjectAllocator { tls, space, plan }
+    }
+
+    fn alloc_impl(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        let cell: Address = self.alloc_slow(size, align, offset);
+        // We may get a null ptr from alloc due to the VM being OOM
+        if !cell.is_zero() {
+            allocator::align_allocation::<VM>(cell, align, offset)
+        } else {
+            cell
+        }
     }
 }
