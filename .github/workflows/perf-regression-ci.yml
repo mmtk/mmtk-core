@@ -69,6 +69,8 @@ jobs:
           export FROM_DATE=2020-07-10
           export PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH
           export JAVA_HOME=/opt/jdk1.6.0_45/
+          # To workaround "javax.net.ssl.SSLException: Received fatal alert: protocol_version"
+          export JAVA_TOOL_OPTIONS="-Dhttps.protocols=TLSv1.2"
           ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
