@@ -94,7 +94,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
-        if VM_LAYOUT_CONSTANTS.log_address_space <= 35 {
+        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
             debug_assert!(self.is_contiguous());
 
             let descriptor = self.0;
@@ -119,7 +119,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_extent(self) -> usize {
-        if VM_LAYOUT_CONSTANTS.log_address_space <= 35 {
+        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
             debug_assert!(self.is_contiguous());
             let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
             chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK

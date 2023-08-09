@@ -97,9 +97,9 @@ pub struct MMTK<VM: VMBinding> {
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         if cfg!(target_pointer_width = "32") {
-            VMLayoutConstants::set_address_space(AddressSpaceKind::_32Bits);
+            VMLayoutConstants::set_address_space(AddressSpaceKind::AddressSpace32Bit);
         } else {
-            VMLayoutConstants::set_address_space(AddressSpaceKind::_64Bits);
+            VMLayoutConstants::set_address_space(AddressSpaceKind::AddressSpace64Bit);
         }
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.

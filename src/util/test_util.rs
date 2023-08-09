@@ -26,10 +26,18 @@ impl MmapTestRegion {
 }
 
 // Make sure we use the address range before our heap start so we won't conflict with our heap range.
-// const_assert!(
-//     TEST_ADDRESS.as_usize()
-//         <= crate::util::heap::layout::vm_layout_constants::HEAP_START.as_usize()
-// );
+#[cfg(test)]
+mod test {
+    #[test]
+    fn verify_test_address() {
+        assert!(
+            super::TEST_ADDRESS.as_usize()
+                <= crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS
+                    .heap_start
+                    .as_usize()
+        );
+    }
+}
 
 // Test with an address that works for 32bits.
 #[cfg(target_os = "linux")]
