@@ -48,6 +48,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
+
+        // If the required pages are larger than the heap size, we cannot satisfy the allocation. Simply return out of memory
+        let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
+        if pages > max_pages {
+            VM::VMCollection::out_of_memory(
+                tls,
+                crate::util::alloc::AllocationError::HeapOutOfMemory,
+            );
+            panic!("{} pages are requested, but the total heap size is {} pages. We cannot satisfy the allocation, and the binding returns from Collection::out_of_memory(). We cannot proceed.", pages, max_pages);
+        }
+
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.

@@ -4,7 +4,8 @@
 //
 // One way to avoid re-initialization is to have only one #[test] per module.
 // There are also helpers for creating fixtures in `fixture/mod.rs`.
-mod issue139;
+mod issue139_allocate_unaligned_object_size;
+mod issue867_allocate_unrealistically_large_object;
 mod handle_mmap_oom;
 #[cfg(target_os = "linux")]
 mod handle_mmap_conflict;
