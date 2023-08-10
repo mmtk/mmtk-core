@@ -307,27 +307,26 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             .common
             .grow_discontiguous_space(space_descriptor, required_chunks);
 
-        unsafe {
-            if !region.is_zero() {
-                let region_start = conversions::bytes_to_pages(region - self.start);
-                let region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - 1;
-                self.inner_mut()
-                    .free_list
-                    .set_uncoalescable(region_start as _);
-                self.inner_mut()
-                    .free_list
-                    .set_uncoalescable(region_end as i32 + 1);
-                for p in (region_start..region_end).step_by(PAGES_IN_CHUNK) {
-                    if p != region_start {
-                        self.inner_mut().free_list.clear_uncoalescable(p as _);
-                    }
-                    let liberated = self.inner_mut().free_list.free(p as _, true); // add chunk to our free list
-                    debug_assert!(liberated as usize == PAGES_IN_CHUNK + (p - region_start));
-                    sync.pages_currently_on_freelist += PAGES_IN_CHUNK;
+        if !region.is_zero() {
+            let region_start = conversions::bytes_to_pages(region - self.start);
+            let region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - 1;
+            self.inner_mut()
+                .free_list
+                .set_uncoalescable(region_start as _);
+            self.inner_mut()
+                .free_list
+                .set_uncoalescable(region_end as i32 + 1);
+            for p in (region_start..region_end).step_by(PAGES_IN_CHUNK) {
+                if p != region_start {
+                    self.inner_mut().free_list.clear_uncoalescable(p as _);
                 }
-                rtn = self.inner_mut().free_list.alloc(pages as _); // re-do the request which triggered this call
+                let liberated = self.inner_mut().free_list.free(p as _, true); // add chunk to our free list
+                debug_assert!(liberated as usize == PAGES_IN_CHUNK + (p - region_start));
+                sync.pages_currently_on_freelist += PAGES_IN_CHUNK;
             }
+            rtn = self.inner_mut().free_list.alloc(pages as _); // re-do the request which triggered this call
         }
+
         rtn
     }
 
@@ -337,24 +336,21 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let mut chunk_start = conversions::bytes_to_pages(chunk - self.start);
         let chunk_end = chunk_start + (num_chunks * PAGES_IN_CHUNK);
         while chunk_start < chunk_end {
-            unsafe {
-                self.inner_mut()
-                    .free_list
-                    .set_uncoalescable(chunk_start as _);
-                let tmp = self
-                    .inner_mut()
-                    .free_list
-                    .alloc_from_unit(PAGES_IN_CHUNK as _, chunk_start as _)
-                    as usize; // then alloc the entire chunk
-                debug_assert!(tmp == chunk_start);
-                chunk_start += PAGES_IN_CHUNK;
-                sync.pages_currently_on_freelist -= PAGES_IN_CHUNK;
-            }
+            self.inner_mut()
+                .free_list
+                .set_uncoalescable(chunk_start as _);
+            let tmp = self
+                .inner_mut()
+                .free_list
+                .alloc_from_unit(PAGES_IN_CHUNK as _, chunk_start as _)
+                as usize; // then alloc the entire chunk
+            debug_assert!(tmp == chunk_start);
+            chunk_start += PAGES_IN_CHUNK;
+            sync.pages_currently_on_freelist -= PAGES_IN_CHUNK;
         }
         /* now return the address space associated with the chunk for global reuse */
-        unsafe {
-            self.inner_mut().common.release_discontiguous_chunks(chunk);
-        }
+
+        self.inner_mut().common.release_discontiguous_chunks(chunk);
     }
 
     pub fn release_pages(&self, first: Address) {

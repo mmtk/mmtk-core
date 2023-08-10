@@ -127,7 +127,7 @@ impl VMMap for Map32 {
         let chunk = self_mut.region_map.alloc(chunks as _);
         debug_assert!(chunk != 0);
         if chunk == -1 {
-            return unsafe { Address::zero() };
+            return Address::zero();
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
         let rtn = conversions::chunk_index_to_address(chunk as _);

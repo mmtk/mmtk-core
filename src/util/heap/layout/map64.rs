@@ -138,7 +138,7 @@ impl VMMap for Map64 {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
-        let self_mut = unsafe { self.mut_self() };
+        let self_mut = self.mut_self();
 
         let index = descriptor.get_index();
         let rtn = self.inner().high_water[index];
@@ -148,7 +148,7 @@ impl VMMap for Map64 {
         /* Grow the free list to accommodate the new chunks */
         let free_list = self.inner().fl_map[Self::space_index(descriptor.get_start()).unwrap()];
         if let Some(mut free_list) = free_list {
-            let free_list = unsafe { free_list.as_mut() };
+            let free_list = free_list.as_mut();
             free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
             let base_page = conversions::bytes_to_pages(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
