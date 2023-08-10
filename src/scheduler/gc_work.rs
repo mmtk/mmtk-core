@@ -1108,7 +1108,7 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
                 mmtk.sanity_checker
                     .lock()
                     .unwrap()
-                    .add_root_nodes(self.roots.copied());
+                    .add_root_nodes(self.roots.clone());
             }
         }
 

@@ -74,7 +74,7 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     }
 
     fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
-        ScanObjects::<Self>::new(nodes, false, roots)
+        ScanObjects::<Self>::new(nodes, false, roots, self.bucket)
     }
 }
 // ANCHOR_END: mygc_process_edges_impl
