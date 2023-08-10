@@ -83,7 +83,7 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         // in openjdk binding before the second round of roots scanning.
         // for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
         //     scheduler.work_buckets[WorkBucketStage::Prepare]
-        //         .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));
+        //         .add(ScanMutatorRoots::<SanityGCProcessEdges<P::VM>>(mutator));
         // }
         {
             let sanity_checker = mmtk.sanity_checker.lock().unwrap();

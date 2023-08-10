@@ -10,9 +10,6 @@ use mmtk::Mutator;
 pub struct VMScanning {}
 
 impl Scanning<DummyVM> for VMScanning {
-    fn scan_roots_in_all_mutator_threads(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<DummyVMEdge>) {
-        unimplemented!()
-    }
     fn scan_roots_in_mutator_thread(
         _tls: VMWorkerThread,
         _mutator: &'static mut Mutator<DummyVM>,
