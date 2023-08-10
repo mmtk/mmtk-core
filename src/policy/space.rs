@@ -13,7 +13,7 @@ use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
-use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
@@ -46,18 +46,41 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
     fn initialize_sft(&self);
 
-    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
-        trace!("Space.acquire, tls={:?}", tls);
-
-        // If the required pages are larger than the heap size, we cannot satisfy the allocation. Simply return out of memory
+    /// Precheck for obvious out-of-memory cases: if the requested size is larger than
+    /// the heap size, it is definitely an OOM. We would like to identify that, and
+    /// allows the binding to deal with OOM. Without this precheck, we will attempt
+    /// to allocate from the page resource. If the requested size is unrealistically large
+    /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
+    /// page resource, vm map, etc. The precheck prevents that, and allows us to
+    /// handle the OOM case.
+    /// Each allocator that may request an arbitrary size should call this method before
+    /// acquring memory from the space. For example, bump pointer allocator and large object
+    /// allocator need to call this method. On the other hand, allocators that only allocate
+    /// memory in fixed size blocks do not need to call this method.
+    fn oom_pre_check(&self, tls: VMThread, size: usize) {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
-        if pages > max_pages {
+        let requested_pages = size >> LOG_BYTES_IN_PAGE;
+        if requested_pages > max_pages {
             VM::VMCollection::out_of_memory(
                 tls,
                 crate::util::alloc::AllocationError::HeapOutOfMemory,
             );
-            panic!("{} pages are requested, but the total heap size is {} pages. We cannot satisfy the allocation, and the binding returns from Collection::out_of_memory(). We cannot proceed.", pages, max_pages);
+            panic!(
+                "{} pages are requested, but the total heap size is {} pages. We cannot satisfy the allocation.
+                And the binding returns from Collection::out_of_memory(). We cannot proceed.",
+                requested_pages,
+                max_pages,
+            );
         }
+    }
+
+    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
+        trace!("Space.acquire, tls={:?}", tls);
+
+        debug_assert!(
+            pages <= self.get_gc_trigger().policy.get_max_heap_size_in_pages(),
+            "The requested pages is larger than the max heap size. Is oom_pre_check used before acquring memory?"
+        );
 
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.

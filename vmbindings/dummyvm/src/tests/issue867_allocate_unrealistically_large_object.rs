@@ -10,7 +10,6 @@ lazy_static! {
 
 #[test]
 #[should_panic(expected = "Out of memory with HeapOutOfMemory!")]
-#[ignore]
 pub fn allocate_max_size_object() {
     let (size, align) = (usize::MAX, 8);
 
