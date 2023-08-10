@@ -70,11 +70,11 @@ impl RootsWorkFactory<Address> for MockFactory {
         unimplemented!();
     }
 
-    fn create_immovable_process_edge_roots_work(&mut self, edges: Vec<Address>) {
+    fn create_immovable_process_edge_roots_work(&mut self, _edges: Vec<Address>) {
         unimplemented!();
     }
 
-    fn create_immovable_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_immovable_process_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }
 }
