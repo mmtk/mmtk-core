@@ -69,6 +69,14 @@ impl RootsWorkFactory<Address> for MockFactory {
     fn create_process_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }
+
+    fn create_immovable_process_edge_roots_work(&mut self, edges: Vec<Address>) {
+        unimplemented!();
+    }
+
+    fn create_immovable_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        unimplemented!();
+    }
 }
 
 #[test]

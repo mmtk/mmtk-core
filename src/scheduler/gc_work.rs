@@ -531,8 +531,11 @@ impl<C: GCWorkContext> ScanVMSpecificRoots<C> {
 impl<C: GCWorkContext + Send + 'static> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanStaticRoots");
-        let factory // = ProcessEdgesWorkRootsWorkFactory::<C::ProcessEdgesWorkType>::new(mmtk);
-        = ProcessEdgesWorkRootsWorkFactory::<C::VM, C::ProcessEdgesWorkType, C::ImmovableProcessEdges>::new(mmtk);
+        let factory = ProcessEdgesWorkRootsWorkFactory::<
+            C::VM,
+            C::ProcessEdgesWorkType,
+            C::ImmovableProcessEdges,
+        >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
