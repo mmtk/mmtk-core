@@ -57,7 +57,7 @@ impl<T: FixtureContent> SerialFixture<T> {
     }
 
     pub fn with_fixture<F: Fn(&T)>(&self, func: F) {
-        let mut c = self.content.lock().unwrap();
+        let mut c = self.content.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if c.is_none() {
             *c = Some(Box::new(T::create()));
         }
