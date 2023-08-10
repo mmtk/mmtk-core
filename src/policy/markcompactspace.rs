@@ -128,7 +128,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        assert!(KIND != TRACE_KIND_IMMOVABLE, "MarkCompact does not support immovable trace.");
+        assert!(
+            KIND != TRACE_KIND_IMMOVABLE,
+            "MarkCompact does not support immovable trace."
+        );
         if KIND == TRACE_KIND_MARK {
             self.trace_mark_object(queue, object)
         } else if KIND == TRACE_KIND_FORWARD {

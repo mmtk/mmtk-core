@@ -1,8 +1,8 @@
-use super::gc_work::MarkCompactGCWorkContext;
 use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
+use super::gc_work::{MarkCompactForwardingGCWorkContext, MarkCompactGCWorkContext};
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
@@ -97,7 +97,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MarkingProcessEdges<VM>>::new());
+            .add(StopMutators::<MarkCompactForwardingGCWorkContext<VM>>::new());
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]

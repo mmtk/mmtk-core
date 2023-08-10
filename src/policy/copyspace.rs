@@ -127,7 +127,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        assert!(KIND != TRACE_KIND_IMMOVABLE, "Copyspace does not support immovable trace.");
+        assert!(
+            KIND != TRACE_KIND_IMMOVABLE,
+            "Copyspace does not support immovable trace."
+        );
         self.trace_object(queue, object, copy, worker)
     }
 

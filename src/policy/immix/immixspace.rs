@@ -228,7 +228,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
-        } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_IMMOVABLE{
+        } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_IMMOVABLE {
             false
         } else {
             unreachable!()
