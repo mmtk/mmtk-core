@@ -177,8 +177,6 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
 
 /// Stop all mutators
 ///
-/// Schedule a `ScanStackRoots` immediately after a mutator is paused
-///
 /// TODO: Smaller work granularity
 #[derive(Default)]
 pub struct StopMutators<C: GCWorkContext>(PhantomData<C>);
@@ -194,33 +192,13 @@ impl<C: GCWorkContext + Send + 'static> GCWork<C::VM> for StopMutators<C> {
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<C>(mutator));
+            // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+            // Should we push to Unconstrained instead?
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanMutatorRoots::<C>(mutator));
         });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
-        if <C::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
-            // Prepare mutators if necessary
-            // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-            if !mmtk.plan.base().stacks_prepared() {
-                for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-                    <C::VM as VMBinding>::VMCollection::prepare_mutator(
-                        worker.tls,
-                        mutator.get_tls(),
-                        mutator,
-                    );
-                }
-            }
-            // Scan mutators
-            if <C::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                    .add(ScanStackRoots::<C>::new());
-            } else {
-                for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                        .add(ScanStackRoot::<C>(mutator));
-                }
-            }
-        }
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<C>::new());
     }
 }
@@ -465,37 +443,11 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
     }
 }
 
-#[derive(Default)]
-pub struct ScanStackRoots<C: GCWorkContext>(PhantomData<C>);
+pub struct ScanMutatorRoots<C : GCWorkContext>(pub &'static mut Mutator<C::VM>);
 
-impl<C: GCWorkContext> ScanStackRoots<C> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<C: GCWorkContext + 'static + Send> GCWork<C::VM> for ScanStackRoots<C> {
+impl<C : GCWorkContext + 'static> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("ScanStackRoots");
-        let factory = ProcessEdgesWorkRootsWorkFactory::<
-            C::VM,
-            C::ProcessEdgesWorkType,
-            C::ImmovableProcessEdges,
-        >::new(mmtk);
-        <C::VM as VMBinding>::VMScanning::scan_roots_in_all_mutator_threads(worker.tls, factory);
-        <C::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
-        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-            mutator.flush();
-        }
-        mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
-    }
-}
-
-pub struct ScanStackRoot<C: GCWorkContext>(pub &'static mut Mutator<C::VM>);
-
-impl<C: GCWorkContext + Send + 'static> GCWork<C::VM> for ScanStackRoot<C> {
-    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
-        trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
+        trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
