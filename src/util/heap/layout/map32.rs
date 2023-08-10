@@ -117,7 +117,7 @@ impl VMMap for Map32 {
         self_mut.shared_fl_map[ordinal] = Some(NonNull::new_unchecked(pr as *mut _));
     }
 
-    fn allocate_contiguous_chunks(
+    unsafe fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -189,7 +189,7 @@ impl VMMap for Map32 {
         }
     }
 
-    fn free_contiguous_chunks(&self, start: Address) -> usize {
+    unsafe fn free_contiguous_chunks(&self, start: Address) -> usize {
         debug!("free_contiguous_chunks: {}", start);
         let (_sync, _) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));

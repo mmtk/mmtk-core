@@ -287,7 +287,9 @@ impl FragmentedMapper {
                     // drop(guard);
                     return None;
                 }
-                self.commit_free_slab(index);
+                unsafe {
+                    self.commit_free_slab(index);
+                }
                 self.inner_mut().slab_map[index] = base;
                 return self.slab_table_for(addr, index);
             }
@@ -308,7 +310,10 @@ impl FragmentedMapper {
      * at the correct index in the slabTable.
      * @param index slab table index
      */
-    fn commit_free_slab(&self, index: usize) {
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this function at a time.
+    unsafe fn commit_free_slab(&self, index: usize) {
         assert!(
             self.inner().free_slab_index < MAX_SLABS,
             "All free slabs used: virtual address space is exhausled."

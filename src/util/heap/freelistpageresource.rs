@@ -124,8 +124,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let mut new_chunk = false;
         let mut page_offset = self_mut.free_list.alloc(required_pages as _);
         if page_offset == freelist::FAILURE && self.inner().common.growable {
-            page_offset =
-                self.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);
+            page_offset = unsafe {
+                self.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync)
+            };
             new_chunk = true;
         }
 
@@ -274,7 +275,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // FIXME: We need a safe implementation
         let mut sync = self.sync.lock().unwrap();
         let page_offset =
-            self.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, &mut sync);
+            unsafe { self.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, &mut sync) };
 
         if page_offset == freelist::FAILURE {
             return Result::Err(PRAllocFail);
@@ -293,7 +294,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         })
     }
 
-    fn allocate_contiguous_chunks(
+    unsafe fn allocate_contiguous_chunks(
         &self,
         space_descriptor: SpaceDescriptor,
         pages: usize,
@@ -330,7 +331,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         rtn
     }
 
-    fn free_contiguous_chunk(&self, chunk: Address, sync: &mut FreeListPageResourceSync) {
+    unsafe fn free_contiguous_chunk(&self, chunk: Address, sync: &mut FreeListPageResourceSync) {
         let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
         let mut chunk_start = conversions::bytes_to_pages(chunk - self.start);
@@ -407,7 +408,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             debug_assert!(next_region_start < freelist::MAX_UNITS as usize);
             if pages_freed == next_region_start - region_start {
                 let start = self.start;
-                self.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start), sync);
+                unsafe {
+                    self.free_contiguous_chunk(
+                        start + conversions::pages_to_bytes(region_start),
+                        sync,
+                    );
+                }
             }
         }
     }

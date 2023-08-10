@@ -24,7 +24,10 @@ pub trait VMMap: Sync {
     ///  for the duration of the VMMap.
     unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource);
 
-    fn allocate_contiguous_chunks(
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    unsafe fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -47,7 +50,10 @@ pub trait VMMap: Sync {
 
     fn free_all_chunks(&self, any_chunk: Address);
 
-    fn free_contiguous_chunks(&self, start: Address) -> usize;
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    unsafe fn free_contiguous_chunks(&self, start: Address) -> usize;
 
     fn boot(&self) {}
 
