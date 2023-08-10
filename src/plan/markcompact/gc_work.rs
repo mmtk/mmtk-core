@@ -50,8 +50,9 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
             .get_and_clear_worker_live_bytes();
 
         for mutator in VM::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-                .add(ScanMutatorRoots::<MarkCompactForwardingGCWorkContext<VM>>(mutator));
+            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
+                MarkCompactForwardingGCWorkContext<VM>,
+            >(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]

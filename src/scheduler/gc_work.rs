@@ -443,9 +443,9 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
     }
 }
 
-pub struct ScanMutatorRoots<C : GCWorkContext>(pub &'static mut Mutator<C::VM>);
+pub struct ScanMutatorRoots<C: GCWorkContext>(pub &'static mut Mutator<C::VM>);
 
-impl<C : GCWorkContext + 'static> GCWork<C::VM> for ScanMutatorRoots<C> {
+impl<C: GCWorkContext + 'static> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();

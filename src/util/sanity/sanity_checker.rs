@@ -89,14 +89,22 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
             let sanity_checker = mmtk.sanity_checker.lock().unwrap();
             for roots in &sanity_checker.root_edges {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(
-                    SanityGCProcessEdges::<P::VM>::new(roots.clone(), true, mmtk, WorkBucketStage::Closure),
+                    SanityGCProcessEdges::<P::VM>::new(
+                        roots.clone(),
+                        true,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    ),
                 );
             }
             for roots in &sanity_checker.root_nodes {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(ScanObjects::<
                     SanityGCProcessEdges<P::VM>,
                 >::new(
-                    roots.clone(), false, true, WorkBucketStage::Closure
+                    roots.clone(),
+                    false,
+                    true,
+                    WorkBucketStage::Closure,
                 ));
             }
         }
@@ -187,7 +195,12 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     const OVERWRITE_REFERENCE: bool = false;
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>, bucket: WorkBucketStage) -> Self {
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        bucket: WorkBucketStage,
+    ) -> Self {
         Self {
             base: ProcessEdgesBase::new(edges, roots, mmtk, bucket),
             // ..Default::default()
