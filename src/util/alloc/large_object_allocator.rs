@@ -45,7 +45,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        self.space.oom_pre_check(self.tls, size);
+        self.space.oom_size_check(self.tls, size);
         let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
         self.space.allocate_pages(self.tls, pages)

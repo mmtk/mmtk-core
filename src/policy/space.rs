@@ -46,18 +46,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
     fn initialize_sft(&self);
 
-    /// Precheck for obvious out-of-memory cases: if the requested size is larger than
+    /// A check for the obvious out-of-memory case: if the requested size is larger than
     /// the heap size, it is definitely an OOM. We would like to identify that, and
-    /// allows the binding to deal with OOM. Without this precheck, we will attempt
+    /// allows the binding to deal with OOM. Without this check, we will attempt
     /// to allocate from the page resource. If the requested size is unrealistically large
     /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
-    /// page resource, vm map, etc. The precheck prevents that, and allows us to
+    /// page resource, vm map, etc. This check prevents that, and allows us to
     /// handle the OOM case.
     /// Each allocator that may request an arbitrary size should call this method before
     /// acquring memory from the space. For example, bump pointer allocator and large object
     /// allocator need to call this method. On the other hand, allocators that only allocate
     /// memory in fixed size blocks do not need to call this method.
-    fn oom_pre_check(&self, tls: VMThread, size: usize) {
+    fn oom_size_check(&self, tls: VMThread, size: usize) {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
         if requested_pages > max_pages {
@@ -79,7 +79,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         debug_assert!(
             pages <= self.get_gc_trigger().policy.get_max_heap_size_in_pages(),
-            "The requested pages is larger than the max heap size. Is oom_pre_check used before acquring memory?"
+            "The requested pages is larger than the max heap size. Is oom_size_check used before acquring memory?"
         );
 
         // Should we poll to attempt to GC?
