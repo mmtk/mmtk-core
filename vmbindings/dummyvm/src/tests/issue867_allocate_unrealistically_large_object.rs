@@ -10,11 +10,21 @@ lazy_static! {
 
 #[test]
 #[should_panic(expected = "Out of memory with HeapOutOfMemory!")]
+#[ignore]
+pub fn allocate_max_size_object() {
+    let (size, align) = (usize::MAX, 8);
+
+    MUTATOR.with_fixture(|fixture| {
+        api::mmtk_alloc(fixture.mutator, size, align, 0, AllocationSemantics::Default);
+    })
+}
+
+#[test]
+#[should_panic(expected = "Out of memory with HeapOutOfMemory!")]
 pub fn allocate_unrealistically_large_object() {
-    #[cfg(target_pointer_width = "64")]
-    let (size, align) = (2251799813685249 * 4096, 8);
-    #[cfg(target_pointer_width = "32")]
-    let (size, align) = (mmtk::util::conversions::raw_align_down(usize::MAX, 4096), 4);
+    const CHUNK: usize = 4 * 1024 * 1024; // 4MB
+    // Leave some room, so we won't have arithmetic overflow when we compute size and do alignment.
+    let (size, align) = (mmtk::util::conversions::raw_align_down(usize::MAX - CHUNK, 4096), 8);
 
     MUTATOR.with_fixture(|fixture| {
         api::mmtk_alloc(fixture.mutator, size, align, 0, AllocationSemantics::Default);
