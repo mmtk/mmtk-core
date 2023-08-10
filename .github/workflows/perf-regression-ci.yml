@@ -60,11 +60,6 @@ jobs:
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
         run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
-      # JDK1.6 does not support TLS1.2, and repo.maven.org does not support TLS1.0
-      - name: Workaround dependency SSL issue
-        run: |
-          mkdir -p mmtk-jikesrvm/repos/jikesrvm/components/asm/3.0/asm-3.0/
-          wget https://repo1.maven.org/maven2/asm/asm/3.0/asm-3.0.jar -o mmtk-jikesrvm/repos/jikesrvm/components/asm/3.0/asm-3.0/asm.jar
       # run
       - name: Performance Run
         run: |
@@ -72,9 +67,7 @@ jobs:
           export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
-          export PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH
-          export JAVA_HOME=/opt/jdk1.6.0_45/
-          ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
+          JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
