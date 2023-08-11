@@ -1,11 +1,14 @@
 # MMTk performace tracing
 
 ## Notes for MMTk developers
-Please open pull requests if you develop new tools that others might find useful. When you add new tools, please update this documentation.
-If you change MMTk internals that the tracing tools depend on (such as the definition of `enum WorkBucketStage`), please update the scripts accordingly.
+Please open pull requests if you develop new tools that others might find useful.
+When you add new tools, please update this documentation.
+If you change MMTk internals that the tracing tools depend on (such as the
+definition of `enum WorkBucketStage`), please update the scripts accordingly.
 
 ## Notes for MMTk users
-Since some of the tools depend on the MMTk internals, please use the tools shipped with the MMTk release you use.
+Since some of the tools depend on the MMTk internals, please use the tools
+shipped with the MMTk release you use.
 
 ## Tracepoints
 Currently, the core provides the following tracepoints.
@@ -16,10 +19,15 @@ Currently, the core provides the following tracepoints.
 - `mmtk:gcworker_run()`: a GC worker thread enters its work loop
 - `mmtk:gc_start()`: a collection epoch starts
 - `mmtk:gc_end()`: a collection epoch ends
-- `mmtk:process_edges(num_edges: int, is_roots: bool)`: a invocation of the `process_edges` method. The first argument is the number of edges to be processed, and the second argument is whether these edges are root edges.
-- `mmtk:bucket_opened(id: int)`: a work bucket opened. The first argument is the numerical representation of `enum WorkBucketStage`.
+- `mmtk:process_edges(num_edges: int, is_roots: bool)`: a invocation of the
+`process_edges` method. The first argument is the number of edges to be processed,
+and the second argument is whether these edges are root edges.
+- `mmtk:bucket_opened(id: int)`: a work bucket opened. The first argument is the
+numerical representation of `enum WorkBucketStage`.
 - `mmtk:work_poll()`: a work packet is to be polled.
-- `mmtk:work(type_name: char *, type_name_len: int)`: a work packet was just executed. The first argument is points to the string of the Rust type name of the work packet, and the second argument is the length of the string.
+- `mmtk:work(type_name: char *, type_name_len: int)`: a work packet was just
+executed. The first argument is points to the string of the Rust type name of
+the work packet, and the second argument is the length of the string.
 - `mmtk:alloc_slow_once_start()`: the allocation slow path starts.
 - `mmtk:alloc_slow_once_end()`: the allocation slow path ends.
 
@@ -42,18 +50,37 @@ optional arguments:
                         bpftrace output format
 ```
 
-- `-b`: the path to the `bpftrace` executable. By default, it uses `bpftrace` executable in your `PATH`. We strongly recommend you use the latest statically complied `bpftrace` from [upstream](https://github.com/iovisor/bpftrace/releases). You need to be able to have sudo permission for whichever `bpftrace` you want to use.
-- `-m`: the path to a MMTk binary that contains the tracepoints. This depends on the binding you use. For the OpenJDK binding, it should be `jdk/lib/server/libmmtk_openjdk.so` under your build folder. To check whether the binary contains tracepoints, you can use `readelf -n`. You should see a bunch of `stapsdt` notes with `mmtk` as the provider.
-- `-H`: pass this flag is you want to only measure the timing iteration of a benchmark. By default, the tracing tools will measure the entire execution.
-- `-p`: print the entire tracing script before execution. This is mainly for debugging use.
-- `-f`: change the bpftrace output format. By default, it uses human-readable plain text output (`text`). You can set this to `json` for easy parsing.
+- `-b`: the path to the `bpftrace` executable. By default, it uses `bpftrace`
+executable in your `PATH`. We strongly recommend you use the latest statically
+complied `bpftrace` from [upstream](https://github.com/iovisor/bpftrace/releases).
+You need to be able to have sudo permission for whichever `bpftrace` you want to use.
+- `-m`: the path to a MMTk binary that contains the tracepoints.
+This depends on the binding you use.
+For the OpenJDK binding, it should be `jdk/lib/server/libmmtk_openjdk.so` under
+your build folder.
+To check whether the binary contains tracepoints, you can use `readelf -n`.
+You should see a bunch of `stapsdt` notes with `mmtk` as the provider.
+- `-H`: pass this flag is you want to only measure the timing iteration of a
+benchmark.
+By default, the tracing tools will measure the entire execution.
+- `-p`: print the entire tracing script before execution.
+This is mainly for debugging use.
+- `-f`: change the bpftrace output format.
+By default, it uses human-readable plain text output (`text`).
+You can set this to `json` for easy parsing.
 
-Please run the tracing tools **before** running the workload. If you use `-H`, the tracing tools will automatically end with `harness_end` is called. Otherwise, you will need to terminate the tools manually with `Ctrl-C`. These tools also have a timeout of 1200 seconds so not to stall unattended benchmark execution. 
+Please run the tracing tools **before** running the workload.
+If you use `-H`, the tracing tools will automatically end with `harness_end` is
+called.
+Otherwise, you will need to terminate the tools manually with `Ctrl-C`.
+These tools also have a timeout of 1200 seconds so not to stall unattended
+benchmark execution. 
 
 ## Tracing tools
 ### Measuring the time spend in allocation slow path (`alloc_slow`)
 This tool measures the distribution of the allocation slow path time.
-The time unit is ns / 400, so that we use the histogram bins with higher fidelity better.
+The time unit is ns / 400, so that we use the histogram bins with higher
+fidelity better.
 
 Sample output:
 ```
@@ -76,10 +103,13 @@ Sample output:
 [128K, 256K)           1 |                                                    |
 ```
 
-In the above output, we can see that most allocation slow paths finish between 3.2us and 6.4us. However, there is a long tail, presumably due to GC pauses.
+In the above output, we can see that most allocation slow paths finish between
+3.2us and 6.4us.
+However, there is a long tail, presumably due to GC pauses.
 
 ### Measuring the time spend in different GC stages (`gc_stages`)
-This tool measures the time spent in different stages of GC: before `Closure`, during `Closure`, and after `Closure`.
+This tool measures the time spent in different stages of GC: before `Closure`,
+during `Closure`, and after `Closure`.
 The time unit is ns.
 
 Sample output:
@@ -89,10 +119,15 @@ Sample output:
 @pre_closure_time: 103886118
 ```
 
-In the above output, overall, the execution spends 1.4s in the main transitive closure, 103ms before that, and 81ms after that (a total of around 1.5s).
+In the above output, overall, the execution spends 1.4s in the main transitive
+closure, 103ms before that, and 81ms after that (a total of around 1.5s).
 
 ### Measuring the time spend in lock contended state for Rust `Mutex` (`lock_contend`)
-This tools measures the time spent in the lock contended state for Rust `Mutex`s. The Rust standard library implements `Mutex` using the fast-slow-path paradigm. Most lock operations take place in inlined fast paths, when there's no contention. However, when there's contention, `std::sys::unix::locks::futex_mutex::Mutex::lock_contended` is called.
+This tools measures the time spent in the lock contended state for Rust `Mutex`s.
+The Rust standard library implements `Mutex` using the fast-slow-path paradigm.
+Most lock operations take place in inlined fast paths, when there's no contention.
+However, when there's contention,
+`std::sys::unix::locks::futex_mutex::Mutex::lock_contended` is called.
 
 ```rust
 #[inline]
@@ -109,7 +144,8 @@ fn lock_contended(&self) {
 ```
 
 
-MMTk uses Rust `Mutex`, e.g., in allocation slow paths for synchronization, and this tool can be useful to measure the contention in these parts of code.
+MMTk uses Rust `Mutex`, e.g., in allocation slow paths for synchronization,
+and this tool can be useful to measure the contention in these parts of code.
 
 The time unit is ns / 256.
 
@@ -130,12 +166,20 @@ Sample output:
 [2K, 4K)              15 |                                                    |
 ```
 
-In the above output, we can see that the lock instance (140637228007056, or 0x7fe8a8047e90) roughly has a bimodal distribution in terms of the time spent in lock contended code path. The first peak is around 512ns\~1024ns, and the second peak is around 66us\~131us.
-If you can't tell which lock instance is for which lock in MMTk, you can trace the allocation of the Mutex and record the stack trace (note that you might want to compile MMTk with `force-frame-pointers` to obtain better stack traces).
+In the above output, we can see that the lock instance (140637228007056, or 0x7fe8a8047e90)
+roughly has a bimodal distribution in terms of the time spent in lock contended
+code path.
+The first peak is around 512ns\~1024ns, and the second peak is around 66us\~131us.
+
+If you can't tell which lock instance is for which lock in MMTk, you can trace
+the allocation of the Mutex and record the stack trace (note that you might want
+to compile MMTk with `force-frame-pointers` to obtain better stack traces).
 
 ### Measuring the distribution of `process_edges` packet sizes (`packet_size`)
-Most of the GC time is spend in the transitive closure for tracing-based GCs, and MMTk performs transitive closure via work packets that calls the `process_edges` method.
-This tool measures the distribution of the sizes of these work packets, and also count root edges separately.
+Most of the GC time is spend in the transitive closure for tracing-based GCs,
+and MMTk performs transitive closure via work packets that calls the `process_edges` method.
+This tool measures the distribution of the sizes of these work packets, and also
+count root edges separately.
 
 Sample output:
 ```
@@ -174,10 +218,14 @@ Sample output:
 [16K, 32K)             3 |                                                    |
 ```
 
-In the above output, we can see that overall, the sizes of the `process_edges` has a unimodal distribution with a peak around 16\~32 edges per packet. However, if we focus on root edges, the distribution is roughly bimodal, with a first peak around 8\~16 and a second peak around 4096\~8192.
+In the above output, we can see that overall, the sizes of the `process_edges`
+has a unimodal distribution with a peak around 16\~32 edges per packet.
+However, if we focus on root edges, the distribution is roughly bimodal, with a
+first peak around 8\~16 and a second peak around 4096\~8192.
 
 ## Attribution
-If used for research, please cite the following publication (the `BibTeX` record will be updated once a DOI is assigned).
+If used for research, please cite the following publication (the `BibTeX` record
+will be updated once a DOI is assigned).
 ```bibtex
 @inproceedings{conf/mplr/Huang23,
   author       = {Claire Huang and
