@@ -36,21 +36,27 @@ def main():
         sys.exit(1)
     prologue_file = here / \
         "prologue_with_harness.bt.fragment" if args.harness else "prologue_without_harness.bt.fragment"
-    with prologue_file.open() as fd:
-        prologue = fd.read()
-    with (here / "epilogue.bt.fragment").open() as fd:
-        epilogue = fd.read()
-    with bpftrace_script.open() as fd:
-        template = Template(prologue + fd.read() + epilogue)
-        with tempfile.NamedTemporaryFile(mode="w+t") as tmp:
-            content = template.safe_substitute(
-                MMTK=mmtk_bin, TMP_FILE=tmp.name)
-            if args.print_script:
-                print(content)
-            tmp.write(content)
-            tmp.flush()
-            os.execvp("sudo", ["sudo", args.bpftrace,
-                      "--unsafe", "-f", args.format, tmp.name])
+    prologue = prologue_file.read_text()
+    epilogue = (here / "epilogue.bt.fragment").read_text()
+    template = Template(prologue + bpftrace_script.read_text() + epilogue)
+    with tempfile.NamedTemporaryFile(mode="w+t") as tmp:
+        content = template.safe_substitute(
+            MMTK=mmtk_bin, TMP_FILE=tmp.name)
+        if args.print_script:
+            print(content)
+        tmp.write(content)
+        tmp.flush()
+        # We use execvp to replace the current process instead of creating
+        # a subprocess (or sh -c). This is so that when users invoke this from
+        # the command line, Ctrl-C will be captured by bpftrace instead of the
+        # outer Python script. The temporary file can then be cleaned up by
+        # the END probe in bpftrace.
+        # 
+        # In theory, you can implement this via pty, but it is very finicky
+        # and doesn't work reliably.
+        # See also https://github.com/anupli/running-ng/commit/b74e3a13f56dd97f73432d8a391e1d6cd9db8663
+        os.execvp("sudo", ["sudo", args.bpftrace,
+                           "--unsafe", "-f", args.format, tmp.name])
 
 
 if __name__ == "__main__":
