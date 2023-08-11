@@ -3,7 +3,6 @@ use mmtk::util::opaque_pointer::*;
 use mmtk::vm::Collection;
 use mmtk::vm::GCThreadContext;
 use mmtk::Mutator;
-use mmtk::MutatorContext;
 
 pub struct VMCollection {}
 
@@ -24,12 +23,4 @@ impl Collection<DummyVM> for VMCollection {
     }
 
     fn spawn_gc_thread(_tls: VMThread, _ctx: GCThreadContext<DummyVM>) {}
-
-    fn prepare_mutator<T: MutatorContext<DummyVM>>(
-        _tls_w: VMWorkerThread,
-        _tls_m: VMMutatorThread,
-        _mutator: &T,
-    ) {
-        unimplemented!()
-    }
 }
