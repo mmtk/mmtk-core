@@ -79,7 +79,7 @@ benchmark execution.
 ## Tracing tools
 ### Measuring the time spend in allocation slow path (`alloc_slow`)
 This tool measures the distribution of the allocation slow path time.
-The time unit is ns / 400, so that we use the histogram bins with higher
+The time unit is 400ns, so that we use the histogram bins with higher
 fidelity better.
 
 Sample output:
@@ -147,7 +147,7 @@ fn lock_contended(&self) {
 MMTk uses Rust `Mutex`, e.g., in allocation slow paths for synchronization,
 and this tool can be useful to measure the contention in these parts of code.
 
-The time unit is ns / 256.
+The time unit is 256ns.
 
 Sample output:
 ```
