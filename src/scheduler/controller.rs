@@ -42,6 +42,7 @@ impl<VM: VMBinding> GCController<VM> {
     }
 
     pub fn run(&mut self, tls: VMWorkerThread) {
+        probe!(mmtk, gccontroller_run);
         // Initialize the GC worker for coordinator. We are not using the run() method from
         // GCWorker so we manually initialize the worker here.
         self.coordinator_worker.tls = tls;
@@ -51,7 +52,7 @@ impl<VM: VMBinding> GCController<VM> {
             self.requester.wait_for_request();
             debug!("[STWController: Request recieved.]");
 
-            self.do_gc_until_completion();
+            self.do_gc_until_completion_traced();
             debug!("[STWController: Worker threads complete!]");
         }
     }
@@ -76,8 +77,15 @@ impl<VM: VMBinding> GCController<VM> {
         false
     }
 
+    /// A wrapper method for [`do_gc_until_completion`](GCController::do_gc_until_completion) to insert USDT tracepoints.
+    fn do_gc_until_completion_traced(&mut self) {
+        probe!(mmtk, gc_start);
+        self.do_gc_until_completion();
+        probe!(mmtk, gc_end);
+    }
+
     /// Coordinate workers to perform GC in response to a GC request.
-    pub fn do_gc_until_completion(&mut self) {
+    fn do_gc_until_completion(&mut self) {
         let gc_start = std::time::Instant::now();
 
         debug_assert!(

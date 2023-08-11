@@ -74,7 +74,7 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 /// A transitive closure visitor to collect all the edges of an object.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<EdgeOf<E>>,
-    worker: &'a mut GCWorker<E::VM>,
+    pub(crate) worker: &'a mut GCWorker<E::VM>,
 }
 
 impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
