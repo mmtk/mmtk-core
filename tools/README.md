@@ -130,7 +130,7 @@ Sample output:
 [2K, 4K)              15 |                                                    |
 ```
 
-In the above output, we can see that the lock instance (140637228007056, or 0x7fe8a8047e90) roughly has a bimodal distribution in terms of the time spent in lock contended code path. The first peak is around 512ns~1024ns, and the second peak is around 66us~131us.
+In the above output, we can see that the lock instance (140637228007056, or 0x7fe8a8047e90) roughly has a bimodal distribution in terms of the time spent in lock contended code path. The first peak is around 512ns\~1024ns, and the second peak is around 66us\~131us.
 If you can't tell which lock instance is for which lock in MMTk, you can trace the allocation of the Mutex and record the stack trace (note that you might want to compile MMTk with `force-frame-pointers` to obtain better stack traces).
 
 ### Measuring the distribution of `process_edges` packet sizes (`packet_size`)
@@ -174,7 +174,7 @@ Sample output:
 [16K, 32K)             3 |                                                    |
 ```
 
-In the above output, we can see that overall, the sizes of the `process_edges` has a unimodal distribution with a peak around 16~32 edges per packet. However, if we focus on root edges, the distribution is roughly bimodal, with a first peak around 8~16 and a second peak around 4096~8192.
+In the above output, we can see that overall, the sizes of the `process_edges` has a unimodal distribution with a peak around 16\~32 edges per packet. However, if we focus on root edges, the distribution is roughly bimodal, with a first peak around 8\~16 and a second peak around 4096\~8192.
 
 ## Attribution
 If used for research, please cite the following publication (the `BibTeX` record will be updated once a DOI is assigned).
