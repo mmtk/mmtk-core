@@ -32,21 +32,18 @@ pub struct Map32 {
 
 impl Map32 {
     pub fn new() -> Self {
+        let max_chunks = VM_LAYOUT_CONSTANTS.max_chunks();
         Map32 {
-            prev_link: vec![0; VM_LAYOUT_CONSTANTS.max_chunks()],
-            next_link: vec![0; VM_LAYOUT_CONSTANTS.max_chunks()],
-            region_map: IntArrayFreeList::new(
-                VM_LAYOUT_CONSTANTS.max_chunks(),
-                VM_LAYOUT_CONSTANTS.max_chunks() as _,
-                1,
-            ),
+            prev_link: vec![0; max_chunks],
+            next_link: vec![0; max_chunks],
+            region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
             global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
             shared_discontig_fl_count: 0,
             shared_fl_map: vec![None; MAX_SPACES],
             total_available_discontiguous_chunks: 0,
             finalized: false,
             sync: Mutex::new(()),
-            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; VM_LAYOUT_CONSTANTS.max_chunks()],
+            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
             cumulative_committed_pages: AtomicUsize::new(0),
         }
     }

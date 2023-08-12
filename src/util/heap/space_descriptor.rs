@@ -95,12 +95,8 @@ impl SpaceDescriptor {
     #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
         if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
-            debug_assert!(self.is_contiguous());
-
-            let descriptor = self.0;
-            let mantissa = descriptor >> MANTISSA_SHIFT;
-            let exponent = (descriptor & EXPONENT_MASK) >> EXPONENT_SHIFT;
-            unsafe { Address::from_usize(mantissa << (BASE_EXPONENT + exponent)) }
+            // For 64-bit discontiguous space, use 32-bit start address
+            self.get_start_32()
         } else {
             use crate::util::heap::layout::heap_parameters;
             unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
@@ -109,6 +105,10 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "32")]
     pub fn get_start(self) -> Address {
+        self.get_start_32()
+    }
+
+    fn get_start_32(self) -> Address {
         debug_assert!(self.is_contiguous());
 
         let descriptor = self.0;
@@ -120,9 +120,8 @@ impl SpaceDescriptor {
     #[cfg(target_pointer_width = "64")]
     pub fn get_extent(self) -> usize {
         if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
-            debug_assert!(self.is_contiguous());
-            let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
-            chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
+            // For 64-bit discontiguous space, use 32-bit extent
+            self.get_extent_32()
         } else {
             VM_LAYOUT_CONSTANTS.space_size_64
         }
@@ -130,12 +129,15 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "32")]
     pub fn get_extent(self) -> usize {
+        self.get_extent_32()
+    }
+
+    fn get_extent_32(self) -> usize {
         debug_assert!(self.is_contiguous());
         let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
         chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
     }
 
-    // #[cfg(target_pointer_width = "64")]
     pub fn get_index(self) -> usize {
         (self.0 & INDEX_MASK) >> INDEX_SHIFT
     }
