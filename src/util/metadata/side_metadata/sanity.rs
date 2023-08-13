@@ -89,7 +89,7 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     for spec in l_specs {
         if super::metadata_address_range_size(spec)
             > 1usize
-                << (VM_LAYOUT_CONSTANTS.log_address_space
+                << (VMLayoutConstants::LOG_ARCH_ADDRESS_SPACE
                     - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
         {
             return Err(Error::new(
