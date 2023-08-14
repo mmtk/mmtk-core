@@ -4,7 +4,7 @@ uprobe:$MMTK:_ZN3std3sys4unix5locks11futex_mutex5Mutex14lock_contended17he467d89
     }
 }
 
-uretprobe:$MMTK:_ZN3std3sys4unix5locks11futex_mutex5Mutex14lock_contended17he467d89501d7157aE {
+uretprobe:$MMTK:_ZN3std3sys4unix5locks11futex_mutex5Mutex14lock_contended* {
     if (@stats_enabled) {
         @lock_dist[@lock_nsecs[tid].0] = hist((nsecs - @lock_nsecs[tid].1)/256);
     }
