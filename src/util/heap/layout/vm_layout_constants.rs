@@ -190,14 +190,14 @@ static ADDRESS_SPACE_KIND: Mutex<Option<AddressSpaceKind>> = Mutex::new(None);
 
 lazy_static! {
     pub static ref VM_LAYOUT_CONSTANTS: VMLayoutConstants = {
-        let las = ADDRESS_SPACE_KIND
+        let address_space = ADDRESS_SPACE_KIND
             .lock()
             .unwrap_or(if cfg!(target_pointer_width = "32") {
                 AddressSpaceKind::AddressSpace32Bit
             } else {
                 AddressSpaceKind::AddressSpace64Bit
             });
-        match las {
+        match address_space {
             AddressSpaceKind::AddressSpace32Bit => VMLayoutConstants::new_32bit(),
             AddressSpaceKind::AddressSpace64Bit => VMLayoutConstants::new_64bit(),
             AddressSpaceKind::AddressSpace64BitWithPointerCompression { max_heap_size } => {
