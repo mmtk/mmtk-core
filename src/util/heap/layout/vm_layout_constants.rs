@@ -91,6 +91,8 @@ impl VMLayoutConstants {
         1 << self.log_max_chunks
     }
     /// Force contiguous virtual memory for all spaces
+    /// This should be enabled for normal 64-bit heap setup, as it unconditionally uses contiguous spaces.
+    /// For 64-bit heap with compressed pointers, this should be disabled and mmtk shoud use discoutiguous spaces.
     pub fn force_use_contiguous_spaces(&self) -> bool {
         self.log_address_space > 35
     }
