@@ -7,9 +7,11 @@ use super::constants::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
+use crate::util::heap::layout::vm_layout_constants::VMLayoutConstants;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
-use crate::util::heap::layout::vm_layout_constants::{VMLayoutConstants, VM_LAYOUT_CONSTANTS};
+#[cfg(target_pointer_width = "64")]
+use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
 
 /// An internal enum to enhance code style for add/sub
 #[cfg(feature = "extreme_assertions")]
