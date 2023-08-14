@@ -1,0 +1,4 @@
+BEGIN {
+    //always collect data
+    @stats_enabled = 1;
+}
