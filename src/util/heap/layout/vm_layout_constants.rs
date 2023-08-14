@@ -99,9 +99,24 @@ impl VMLayoutConstants {
 impl VMLayoutConstants {
     /// Normal 32-bit configuration
     pub const fn new_32bit() -> Self {
-        unimplemented!()
+        Self {
+            log_address_space: 32,
+            heap_start: chunk_align_down(unsafe { Address::from_usize(0x8000_0000) }),
+            heap_end: chunk_align_up(unsafe { Address::from_usize(0xd000_0000) }),
+            vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000 ) }).as_usize(),
+            log_max_chunks: Self::LOG_ARCH_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK,
+            log_space_extent: 31,
+            space_shift_64: 0,
+            space_mask_64: 0,
+            space_size_64: 1 << 31,
+        }
     }
     /// Normal 64-bit configuration
+    #[cfg(target_pointer_width = "32")]
+    pub fn new_64bit() -> Self {
+        unimplemented!("64-bit heap constants do not work with 32-bit builds")
+    }
+    #[cfg(target_pointer_width = "64")]
     pub fn new_64bit() -> Self {
         Self {
             log_address_space: 47,
@@ -183,7 +198,7 @@ lazy_static! {
                 AddressSpaceKind::AddressSpace64Bit
             });
         match las {
-            AddressSpaceKind::AddressSpace32Bit => unimplemented!(),
+            AddressSpaceKind::AddressSpace32Bit => VMLayoutConstants::new_32bit(),
             AddressSpaceKind::AddressSpace64Bit => VMLayoutConstants::new_64bit(),
             AddressSpaceKind::AddressSpace64BitWithPointerCompression { max_heap_size } => {
                 VMLayoutConstants::new_64bit_with_pointer_compression(max_heap_size)
