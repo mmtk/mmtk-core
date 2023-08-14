@@ -20,7 +20,7 @@ jobs:
       pull_request: ${{ github.event.pull_request.number }}
 
   v8-binding-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
