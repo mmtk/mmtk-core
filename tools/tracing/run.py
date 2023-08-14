@@ -35,7 +35,7 @@ def main():
         print(f"MMTk binary {str(mmtk_bin)} not found.")
         sys.exit(1)
     prologue_file = here / \
-        "prologue_with_harness.bt.fragment" if args.harness else "prologue_without_harness.bt.fragment"
+        ("prologue_with_harness.bt.fragment" if args.harness else "prologue_without_harness.bt.fragment")
     prologue = prologue_file.read_text()
     epilogue = (here / "epilogue.bt.fragment").read_text()
     template = Template(prologue + bpftrace_script.read_text() + epilogue)
