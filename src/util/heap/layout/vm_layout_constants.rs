@@ -105,7 +105,7 @@ impl VMLayoutConstants {
             log_address_space: 32,
             heap_start: chunk_align_down(unsafe { Address::from_usize(0x8000_0000) }),
             heap_end: chunk_align_up(unsafe { Address::from_usize(0xd000_0000) }),
-            vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000 ) }).as_usize(),
+            vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize(),
             log_max_chunks: Self::LOG_ARCH_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK,
             log_space_extent: 31,
             space_shift_64: 0,
@@ -181,10 +181,7 @@ pub enum AddressSpaceKind {
 
 impl AddressSpaceKind {
     pub const fn pointer_compression(&self) -> bool {
-        match self {
-            Self::AddressSpace64BitWithPointerCompression { .. } => true,
-            _ => false,
-        }
+        matches!(self, Self::AddressSpace64BitWithPointerCompression { .. })
     }
 }
 
