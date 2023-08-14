@@ -1,4 +1,4 @@
-uprobe:$MMTK:_ZN3std3sys4unix5locks11futex_mutex5Mutex14lock_contended17he467d89501d7157aE {
+uprobe:$MMTK:_ZN3std3sys4unix5locks11futex_mutex5Mutex14lock_contended* {
     if (@stats_enabled) {
         @lock_nsecs[tid] = (arg0, nsecs);
     }
