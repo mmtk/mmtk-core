@@ -92,7 +92,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
-        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
+        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit start address
             self.get_start_32()
         } else {
@@ -117,7 +117,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_extent(self) -> usize {
-        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
+        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit extent
             self.get_extent_32()
         } else {

@@ -63,6 +63,10 @@ pub struct VMLayoutConstants {
     /// conditional definition.
     /// FIXME: When Compiling for 32 bits this expression makes no sense
     pub space_size_64: usize,
+    /// Should mmtk enable contiguous spaces and virtual memory for all spaces?
+    /// For normal 64-bit config, this should be set to true. Each space should own a contiguous piece of virtual memory.
+    /// FOr 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
+    pub force_use_contiguous_spaces: bool,
 }
 
 impl VMLayoutConstants {
@@ -91,12 +95,6 @@ impl VMLayoutConstants {
     pub const fn max_chunks(&self) -> usize {
         1 << self.log_max_chunks
     }
-    /// Force contiguous virtual memory for all spaces
-    /// This should be enabled for normal 64-bit heap setup, as it unconditionally uses contiguous spaces.
-    /// For 64-bit heap with compressed pointers, this should be disabled and mmtk shoud use discoutiguous spaces.
-    pub fn force_use_contiguous_spaces(&self) -> bool {
-        self.log_address_space > 35
-    }
 }
 
 impl VMLayoutConstants {
@@ -112,6 +110,7 @@ impl VMLayoutConstants {
             space_shift_64: 0,
             space_mask_64: 0,
             space_size_64: 1 << 31,
+            force_use_contiguous_spaces: false,
         }
     }
     /// Normal 64-bit configuration
@@ -133,6 +132,7 @@ impl VMLayoutConstants {
             space_shift_64: 41,
             space_mask_64: ((1 << 4) - 1) << 41,
             space_size_64: 1 << 41,
+            force_use_contiguous_spaces: true,
         }
     }
 

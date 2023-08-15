@@ -67,7 +67,7 @@ pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
             Box::new(dense_chunk_map::SFTDenseChunkMap::new())
         } else if #[cfg(target_pointer_width = "64")] {
             use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
-            if VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
+            if VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces {
                 Box::new(space_map::SFTSpaceMap::new())
             } else {
                 Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
