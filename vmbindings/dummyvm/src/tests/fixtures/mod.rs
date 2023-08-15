@@ -57,11 +57,29 @@ impl<T: FixtureContent> SerialFixture<T> {
     }
 
     pub fn with_fixture<F: Fn(&T)>(&self, func: F) {
-        let mut c = self.content.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut c = self.content.lock().unwrap();
         if c.is_none() {
             *c = Some(Box::new(T::create()));
         }
         func(c.as_ref().unwrap())
+    }
+
+    pub fn with_fixture_expect_benign_panic<F: Fn(&T) + std::panic::UnwindSafe + std::panic::RefUnwindSafe>(&self, func: F) {
+        let res = {
+            // The lock will be dropped at the end of the block. So panic won't poison the lock.
+            let mut c = self.content.lock().unwrap();
+            if c.is_none() {
+                *c = Some(Box::new(T::create()));
+            }
+
+            std::panic::catch_unwind(|| {
+                func(c.as_ref().unwrap())
+            })
+        };
+        // We do not hold the lock now. It is safe to resume now.
+        if let Err(e) = res {
+            std::panic::resume_unwind(e);
+        }
     }
 }
 

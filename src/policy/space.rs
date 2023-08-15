@@ -57,7 +57,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// acquring memory from the space. For example, bump pointer allocator and large object
     /// allocator need to call this method. On the other hand, allocators that only allocate
     /// memory in fixed size blocks do not need to call this method.
-    fn oom_size_check(&self, tls: VMThread, size: usize) {
+    /// An allocator should call this method before doing any computation on the size to
+    /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
+    /// overflow happens there, there is nothing we can do about it.
+    /// Return a boolean to indicate if we will be out of memory, determined by the check.
+    fn will_go_oom_on_acquire(&self, tls: VMThread, size: usize) -> bool {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
         if requested_pages > max_pages {
@@ -65,21 +69,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 tls,
                 crate::util::alloc::AllocationError::HeapOutOfMemory,
             );
-            panic!(
-                "{} pages are requested, but the total heap size is {} pages. We cannot satisfy the allocation.
-                And the binding returns from Collection::out_of_memory(). We cannot proceed.",
-                requested_pages,
-                max_pages,
-            );
+            return true;
         }
+        false
     }
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
 
         debug_assert!(
-            pages <= self.get_gc_trigger().policy.get_max_heap_size_in_pages(),
-            "The requested pages is larger than the max heap size. Is oom_size_check used before acquring memory?"
+            !self.will_go_oom_on_acquire(tls, pages << LOG_BYTES_IN_PAGE),
+            "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         );
 
         // Should we poll to attempt to GC?
