@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use spin::Mutex;
 
 use super::heap_parameters::*;
 use crate::util::constants::*;
@@ -139,7 +139,7 @@ impl VMLayoutConstants {
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
     /// This function must be called before MMTk::new()
     pub fn set_custom_vm_layout_constants(constants: VMLayoutConstants) {
-        let mut guard = CUSTOM_CONSTANTS.lock().unwrap();
+        let mut guard = CUSTOM_CONSTANTS.lock();
         assert!(
             guard.is_none(),
             "Custom VM_LAYOUT_CONSTANTS can only be set once"
@@ -152,7 +152,7 @@ static CUSTOM_CONSTANTS: Mutex<Option<VMLayoutConstants>> = Mutex::new(None);
 
 lazy_static! {
     pub static ref VM_LAYOUT_CONSTANTS: VMLayoutConstants = {
-        if let Some(constants) = CUSTOM_CONSTANTS.lock().unwrap().as_ref() {
+        if let Some(constants) = CUSTOM_CONSTANTS.lock().as_ref() {
             constants.clone()
         } else if cfg!(target_pointer_width = "32") {
             VMLayoutConstants::new_32bit()
