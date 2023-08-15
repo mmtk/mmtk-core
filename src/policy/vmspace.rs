@@ -171,12 +171,10 @@ impl<VM: VMBinding> VMSpace<VM> {
     }
 
     pub fn add_external_pages(&self, start: Address, size: usize) {
-        let start = start.align_down(BYTES_IN_PAGE);
-        let end = (start + size).align_up(BYTES_IN_PAGE);
-        let size = end - start;
-
-        assert!(!start.is_zero());
         assert!(size > 0);
+        assert!(!start.is_zero());
+
+        let end = start + size;
 
         let chunk_start = start.align_down(BYTES_IN_CHUNK);
         let chunk_end = end.align_up(BYTES_IN_CHUNK);
@@ -210,7 +208,10 @@ impl<VM: VMBinding> VMSpace<VM> {
             SFT_MAP.eager_initialize(self.as_sft(), chunk_start, chunk_size);
         }
 
-        self.pr.add_new_external_pages(ExternalPages { start, end });
+        self.pr.add_new_external_pages(ExternalPages {
+            start: start.align_down(BYTES_IN_PAGE),
+            end: end.align_up(BYTES_IN_PAGE),
+        });
     }
 
     pub fn prepare(&mut self) {
