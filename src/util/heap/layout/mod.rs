@@ -21,8 +21,7 @@ pub fn create_vm_map() -> Box<dyn VMMap> {
 
 #[cfg(target_pointer_width = "64")]
 pub fn create_vm_map() -> Box<dyn VMMap> {
-    use self::vm_layout_constants::VMLayoutConstants;
-    if VMLayoutConstants::get_address_space().pointer_compression() {
+    if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces() {
         Box::new(map32::Map32::new())
     } else {
         Box::new(map64::Map64::new())
