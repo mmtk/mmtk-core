@@ -153,7 +153,7 @@ static CUSTOM_CONSTANTS: Mutex<Option<VMLayoutConstants>> = Mutex::new(None);
 lazy_static! {
     pub static ref VM_LAYOUT_CONSTANTS: VMLayoutConstants = {
         if let Some(constants) = CUSTOM_CONSTANTS.lock().unwrap().as_ref() {
-            return constants.clone();
+            constants.clone()
         } else if cfg!(target_pointer_width = "32") {
             VMLayoutConstants::new_32bit()
         } else {
