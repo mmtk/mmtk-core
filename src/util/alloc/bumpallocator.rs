@@ -158,7 +158,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         offset: usize,
         stress_test: bool,
     ) -> Address {
-        if self.space.will_go_oom_on_acquire(self.tls, size) {
+        if self.space.will_oom_on_acquire(self.tls, size) {
             return Address::ZERO;
         }
 
