@@ -417,6 +417,9 @@ pub struct BasePlan<VM: VMBinding> {
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     malloc_bytes: AtomicUsize,
+    /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
+    #[cfg(feature = "count_live_bytes_in_gc")]
+    pub live_bytes_in_last_gc: AtomicUsize,
     /// Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
@@ -551,6 +554,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_in_gc")]
+            live_bytes_in_last_gc: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
         }

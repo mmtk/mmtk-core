@@ -64,7 +64,7 @@ impl MemorySlice for DummyVMMemorySlice {
     }
 
     fn bytes(&self) -> usize {
-        unsafe { (*self.0).len() * std::mem::size_of::<ObjectReference>() }
+        unsafe { std::mem::size_of_val(&*self.0) }
     }
 
     fn copy(src: &Self, tgt: &Self) {

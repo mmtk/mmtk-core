@@ -42,12 +42,15 @@ mmtk-macros = { version = "0.18.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.0-beta.3", optional = true }
+# Pin to <0.4.0 until we have MSRV >= 1.66, then we can bump to 0.5 (0.4 forces lazy evaluation https://github.com/cuviper/probe-rs/issues/19)
+probe = "0.3"
 regex = "1.7.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
 strum = "0.24"
 strum_macros = "0.24"
-sysinfo = "0.29"
+# Fix on 0.29.5 so we have MSRV 1.61. Remove this when we update MSRV
+sysinfo = "=0.29.5"
 
 [dev-dependencies]
 paste = "1.0.8"
@@ -132,6 +135,9 @@ work_packet_stats = []
 
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
+
+# Count the size of all live objects in GC
+count_live_bytes_in_gc = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
