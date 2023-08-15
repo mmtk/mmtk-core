@@ -65,7 +65,7 @@ pub struct VMLayoutConstants {
     pub space_size_64: usize,
     /// Should mmtk enable contiguous spaces and virtual memory for all spaces?
     /// For normal 64-bit config, this should be set to true. Each space should own a contiguous piece of virtual memory.
-    /// FOr 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
+    /// For 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
     pub force_use_contiguous_spaces: bool,
 }
 
