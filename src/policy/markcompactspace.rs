@@ -148,6 +148,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
 }
 
 impl<VM: VMBinding> MarkCompactSpace<VM> {
+    #[cfg(not(feature = "extra_header"))]
     /// We need one extra header word for each object. Considering the alignment requirement, this is
     /// the actual bytes we need to reserve for each allocation.
     pub const HEADER_RESERVED_IN_BYTES: usize = if VM::MAX_ALIGNMENT > GC_EXTRA_HEADER_BYTES {
@@ -156,6 +157,18 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         GC_EXTRA_HEADER_BYTES
     }
     .next_power_of_two();
+
+    #[cfg(feature = "extra_header")]
+    /// We need one extra header word for each object. Considering the alignment requirement, this is
+    /// the actual bytes we need to reserve for each allocation.
+    pub const HEADER_RESERVED_IN_BYTES: usize = if VM::MAX_ALIGNMENT > GC_EXTRA_HEADER_BYTES {
+        VM::MAX_ALIGNMENT + VM::EXTRA_HEADER_BYTES
+    } else {
+        GC_EXTRA_HEADER_BYTES + VM::EXTRA_HEADER_BYTES
+    }
+    .next_power_of_two();
+
+    pub const GC_EXTRA_HEADER_OFFSET: usize = Self::HEADER_RESERVED_IN_BYTES;
 
     // The following are a few functions for manipulating header forwarding poiner.
     // Basically for each allocation request, we allocate extra bytes of [`HEADER_RESERVED_IN_BYTES`].
@@ -166,7 +179,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     /// Get the address for header forwarding pointer
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
-        object.to_object_start::<VM>() - GC_EXTRA_HEADER_BYTES
+        object.to_object_start::<VM>() - Self::GC_EXTRA_HEADER_OFFSET
     }
 
     /// Get header forwarding pointer for an object

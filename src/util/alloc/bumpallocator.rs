@@ -61,25 +61,21 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         BLOCK_SIZE
     }
 
+    #[cfg(not(feature = "extra_header"))]
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        trace!("alloc");
-        let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
-        let new_cursor = result + size;
+        self.alloc_impl(size, align, offset)
+    }
 
-        if new_cursor > self.limit {
-            trace!("Thread local buffer used up, go to alloc slow path");
-            self.alloc_slow(size, align, offset)
+    #[cfg(feature = "extra_header")]
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        let rtn = self.alloc_impl(size + VM::EXTRA_HEADER_BYTES, align, offset);
+
+        // Check if the result is valid and return the actual object start address
+        // Note that `rtn` can be null in the case of OOM
+        if !rtn.is_zero() {
+            rtn + VM::EXTRA_HEADER_BYTES
         } else {
-            fill_alignment_gap::<VM>(self.cursor, result);
-            self.cursor = new_cursor;
-            trace!(
-                "Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
-                size,
-                result,
-                self.cursor,
-                self.limit
-            );
-            result
+            rtn
         }
     }
 
@@ -148,6 +144,28 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             limit: unsafe { Address::zero() },
             space,
             plan,
+        }
+    }
+
+    fn alloc_impl(&mut self, size: usize, align: usize, offset: usize) -> Address {
+        trace!("alloc");
+        let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
+        let new_cursor = result + size;
+
+        if new_cursor > self.limit {
+            trace!("Thread local buffer used up, go to alloc slow path");
+            self.alloc_slow(size, align, offset)
+        } else {
+            fill_alignment_gap::<VM>(self.cursor, result);
+            self.cursor = new_cursor;
+            trace!(
+                "Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
+                size,
+                result,
+                self.cursor,
+                self.limit
+            );
+            result
         }
     }
 

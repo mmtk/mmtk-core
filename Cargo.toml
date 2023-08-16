@@ -102,6 +102,9 @@ is_mmtk_object = ["vo_bit"]
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
 object_pinning = []
 
+# Enable allocate extra header of each individual object
+extra_header = []
+
 # The following two features are useful for using Immix for VMs that do not support moving GC.
 
 # Disable any object copying in Immix. This makes Immix a non-moving policy.
