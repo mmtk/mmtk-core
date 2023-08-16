@@ -452,7 +452,7 @@ impl GCTriggerSelector {
     const T: u64 = 1024 * Self::G;
 
     /// get max heap size
-    pub(crate) fn max_heap_size(&self) -> usize {
+    pub fn max_heap_size(&self) -> usize {
         match self {
             Self::FixedHeapSize(s) => *s,
             Self::DynamicHeapSize(_, s) => *s,

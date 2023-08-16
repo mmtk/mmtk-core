@@ -15,7 +15,7 @@ pub(crate) use self::accounting::PageAccounting;
 pub(crate) use self::blockpageresource::BlockPageResource;
 pub(crate) use self::freelistpageresource::FreeListPageResource;
 pub(crate) use self::heap_meta::HeapMeta;
-pub use self::layout::vm_layout_constants::VMLayoutConstants;
+pub use self::layout::vm_layout_constants;
 pub(crate) use self::monotonepageresource::MonotonePageResource;
 pub(crate) use self::pageresource::PageResource;
 pub(crate) use self::vmrequest::VMRequest;
