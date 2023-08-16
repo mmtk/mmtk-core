@@ -164,6 +164,12 @@ impl ByteMapMmapper {
     }
 }
 
+impl Default for ByteMapMmapper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::ByteMapMmapper;
