@@ -123,6 +123,10 @@ impl<VM: VMBinding> MMTK<VM> {
             plan.base().heap.get_discontig_end(),
         );
 
+        if *options.transparent_hugepages {
+            MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
+        }
+
         MMTK {
             options,
             plan,

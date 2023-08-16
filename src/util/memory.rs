@@ -33,10 +33,10 @@ pub fn set(start: Address, val: u8, len: usize) {
 /// the memory has been reserved by mmtk (e.g. after the use of mmap_noreserve()). Otherwise using this function
 /// may corrupt others' data.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
-pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
+pub unsafe fn dzmmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-    let ret = mmap_fixed(start, size, prot, flags);
+    let ret = mmap_fixed(start, size, prot, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
@@ -52,14 +52,25 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 // MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
 
+/// Strategy for performing mmap
+///
+/// This currently supports switching between different huge page allocation
+/// methods. However, this can later be refactored to reduce other code
+/// repetition.
+#[derive(Debug, Copy, Clone)]
+pub enum MmapStrategy {
+    Normal,
+    TransparentHugePages,
+}
+
 /// Demand-zero mmap (no replace):
 /// This function mmaps the memory and guarantees to zero all mapped memory.
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
-pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
+pub fn dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     let flags = MMAP_FLAGS;
-    let ret = mmap_fixed(start, size, prot, flags);
+    let ret = mmap_fixed(start, size, prot, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
@@ -72,10 +83,10 @@ pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
 /// This function does not reserve swap space for this mapping, which means there is no guarantee that writes to the
 /// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
-pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
+pub fn mmap_noreserve(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
     let prot = PROT_NONE;
     let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
-    mmap_fixed(start, size, prot, flags)
+    mmap_fixed(start, size, prot, flags, strategy)
 }
 
 pub fn mmap_fixed(
@@ -83,12 +94,20 @@ pub fn mmap_fixed(
     size: usize,
     prot: libc::c_int,
     flags: libc::c_int,
+    strategy: MmapStrategy,
 ) -> Result<()> {
     let ptr = start.to_mut_ptr();
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
-    )
+    )?;
+    match strategy {
+        MmapStrategy::Normal => Ok(()),
+        MmapStrategy::TransparentHugePages => wrap_libc_call(
+            &|| unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
+            0,
+        ),
+    }
 }
 
 pub fn munmap(start: Address, size: usize) -> Result<()> {
@@ -135,7 +154,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 pub fn panic_if_unmapped(start: Address, size: usize) {
     let prot = PROT_READ | PROT_WRITE;
     let flags = MMAP_FLAGS;
-    match mmap_fixed(start, size, prot, flags) {
+    match mmap_fixed(start, size, prot, flags, MmapStrategy::Normal) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
         Err(e) => {
             assert!(

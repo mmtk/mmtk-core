@@ -5,6 +5,7 @@ use crate::util::Address;
 use crate::util::constants::*;
 use crate::util::conversions::pages_to_bytes;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::memory::MmapStrategy;
 use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -23,6 +24,7 @@ pub const VERBOSE: bool = true;
 pub struct ByteMapMmapper {
     lock: Mutex<()>,
     mapped: [Atomic<MapState>; MMAP_NUM_CHUNKS],
+    strategy: Atomic<MmapStrategy>,
 }
 
 impl fmt::Debug for ByteMapMmapper {
@@ -32,6 +34,10 @@ impl fmt::Debug for ByteMapMmapper {
 }
 
 impl Mmapper for ByteMapMmapper {
+    fn set_mmap_strategy(&self, strategy: MmapStrategy) {
+        self.strategy.store(strategy, Ordering::Relaxed);
+    }
+
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {
         unimplemented!()
     }
@@ -62,7 +68,12 @@ impl Mmapper for ByteMapMmapper {
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let _guard = self.lock.lock().unwrap();
-            MapState::transition_to_mapped(&self.mapped[chunk], mmap_start).unwrap();
+            MapState::transition_to_mapped(
+                &self.mapped[chunk],
+                mmap_start,
+                self.strategy.load(Ordering::Relaxed),
+            )
+            .unwrap();
         }
 
         Ok(())
@@ -86,7 +97,12 @@ impl Mmapper for ByteMapMmapper {
 
             let mmap_start = Self::mmap_chunks_to_address(chunk);
             let _guard = self.lock.lock().unwrap();
-            MapState::transition_to_quarantined(&self.mapped[chunk], mmap_start).unwrap();
+            MapState::transition_to_quarantined(
+                &self.mapped[chunk],
+                mmap_start,
+                self.strategy.load(Ordering::Relaxed),
+            )
+            .unwrap();
         }
 
         Ok(())
@@ -123,6 +139,7 @@ impl ByteMapMmapper {
         ByteMapMmapper {
             lock: Mutex::new(()),
             mapped: unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) },
+            strategy: Atomic::new(MmapStrategy::Normal),
         }
     }
 
@@ -144,12 +161,6 @@ impl ByteMapMmapper {
 
     fn address_to_mmap_chunks_up(addr: Address) -> usize {
         (addr + MMAP_CHUNK_BYTES - 1) >> LOG_MMAP_CHUNK_BYTES
-    }
-}
-
-impl Default for ByteMapMmapper {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

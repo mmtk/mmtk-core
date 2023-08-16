@@ -3,6 +3,7 @@ use super::Mmapper;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::memory::MmapStrategy;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::fmt;
@@ -49,6 +50,7 @@ pub struct FragmentedMapper {
     free_slabs: Vec<Option<Box<Slab>>>,
     slab_table: Vec<Option<Box<Slab>>>,
     slab_map: Vec<Address>,
+    strategy: Atomic<MmapStrategy>,
 }
 
 impl fmt::Debug for FragmentedMapper {
@@ -58,6 +60,10 @@ impl fmt::Debug for FragmentedMapper {
 }
 
 impl Mmapper for FragmentedMapper {
+    fn set_mmap_strategy(&self, strategy: MmapStrategy) {
+        self.strategy.store(strategy, Ordering::Relaxed);
+    }
+
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {}
 
     fn mark_as_mapped(&self, mut start: Address, bytes: usize) {
@@ -123,7 +129,11 @@ impl Mmapper for FragmentedMapper {
         // Transition the chunks in bulk.
         {
             let _guard = self.lock.lock().unwrap();
-            MapState::bulk_transition_to_quarantined(state_slices.as_slice(), mmap_start)?;
+            MapState::bulk_transition_to_quarantined(
+                state_slices.as_slice(),
+                mmap_start,
+                self.strategy.load(Ordering::Relaxed),
+            )?;
         }
 
         Ok(())
@@ -154,7 +164,11 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                MapState::transition_to_mapped(entry, mmap_start)?;
+                MapState::transition_to_mapped(
+                    entry,
+                    mmap_start,
+                    self.strategy.load(Ordering::Relaxed),
+                )?;
             }
             start = high;
         }
@@ -213,6 +227,7 @@ impl FragmentedMapper {
             free_slabs: (0..MAX_SLABS).map(|_| Some(Self::new_slab())).collect(),
             slab_table: (0..SLAB_TABLE_SIZE).map(|_| None).collect(),
             slab_map: vec![SENTINEL; SLAB_TABLE_SIZE],
+            strategy: Atomic::new(MmapStrategy::Normal),
         }
     }
 
@@ -339,12 +354,6 @@ impl FragmentedMapper {
     fn chunk_index(slab: Address, addr: Address) -> usize {
         let delta = addr - slab;
         delta >> LOG_MMAP_CHUNK_BYTES
-    }
-}
-
-impl Default for FragmentedMapper {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
