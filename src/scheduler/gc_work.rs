@@ -1125,7 +1125,8 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
         // objects which are traced for the first time and we create work for scanning those roots.
         let scanned_root_objects = {
             // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = E1::new(vec![], true, mmtk, WorkBucketStage::NodeRootsTrace);
+            let mut process_edges_work =
+                E1::new(vec![], true, mmtk, WorkBucketStage::NodeRootsTrace);
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {
