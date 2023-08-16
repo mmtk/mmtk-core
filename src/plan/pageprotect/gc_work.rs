@@ -8,5 +8,5 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for PPGCWorkContext<VM> {
     type VM = VM;
     type PlanType = PageProtect<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, PageProtect<VM>, DEFAULT_TRACE>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }

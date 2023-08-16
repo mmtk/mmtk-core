@@ -232,8 +232,11 @@ pub enum WorkBucketStage {
     /// Clear the VO bit metadata.  Mainly used by ImmixSpace.
     #[cfg(feature = "vo_bit")]
     ClearVOBits,
-    /// Compute the transtive closure following only strong references, making sure that objects do not move
-    ImmovableClosure,
+    /// Compute the transtive closure starting from roots following only strong references, transitively pinning (TP) objects.
+    /// No objects in this closure are allow to move.
+    TPClosure,
+    /// Trace node roots. Node roots must not move, but their children may. To ensure correctness, these must be processed after TPClosure
+    NodeRootsTrace,
     /// Compute the transtive closure following only strong references.
     Closure,
     /// Handle Java-style soft references, and potentially expand the transitive closure.

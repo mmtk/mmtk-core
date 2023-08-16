@@ -93,7 +93,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext
     type VM = VM;
     type PlanType = MarkCompact<VM>;
     type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }
 
 pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
@@ -101,5 +101,5 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCW
     type VM = VM;
     type PlanType = MarkCompact<VM>;
     type ProcessEdgesWorkType = ForwardingProcessEdges<VM>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }

@@ -453,7 +453,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for ScanMutatorRoots<C> {
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
             C::ProcessEdgesWorkType,
-            C::ImmovableProcessEdges,
+            C::TPProcessEdges,
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
@@ -486,7 +486,7 @@ impl<C: GCWorkContext + Send + 'static> GCWork<C::VM> for ScanVMSpecificRoots<C>
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
             C::ProcessEdgesWorkType,
-            C::ImmovableProcessEdges,
+            C::TPProcessEdges,
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
@@ -744,26 +744,28 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
     }
 
     fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+        // Will process roots within the NodeRootsTrace bucket
+        // And put work in the Closure bucket
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::Closure,
+            WorkBucketStage::NodeRootsTrace,
             ProcessRootNode::<VM, I, E>::new(nodes, WorkBucketStage::Closure),
         );
     }
 
-    fn create_immovable_process_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
+    fn create_process_tp_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::ImmovableClosure,
-            I::new(edges, true, self.mmtk, WorkBucketStage::ImmovableClosure),
+            WorkBucketStage::TPClosure,
+            I::new(edges, true, self.mmtk, WorkBucketStage::TPClosure),
         );
     }
 
-    fn create_immovable_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_process_tp_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::ImmovableClosure,
-            ProcessRootNode::<VM, I, I>::new(nodes, WorkBucketStage::ImmovableClosure),
+            WorkBucketStage::TPClosure,
+            ProcessRootNode::<VM, I, I>::new(nodes, WorkBucketStage::TPClosure),
         );
     }
 }
@@ -1123,7 +1125,7 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
         // objects which are traced for the first time and we create work for scanning those roots.
         let scanned_root_objects = {
             // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = E1::new(vec![], true, mmtk, self.bucket);
+            let mut process_edges_work = E1::new(vec![], true, mmtk, WorkBucketStage::NodeRootsTrace);
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {

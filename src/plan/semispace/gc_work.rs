@@ -8,5 +8,5 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for SSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = SemiSpace<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, SemiSpace<VM>, DEFAULT_TRACE>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }

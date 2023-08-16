@@ -10,7 +10,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyNurseryGCWorkCont
     type VM = VM;
     type PlanType = GenCopy<VM>;
     type ProcessEdgesWorkType = GenNurseryProcessEdges<Self::VM, Self::PlanType>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }
 
 pub struct GenCopyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
@@ -18,5 +18,5 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyGCWorkContext<VM>
     type VM = VM;
     type PlanType = GenCopy<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, GenCopy<VM>, DEFAULT_TRACE>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }

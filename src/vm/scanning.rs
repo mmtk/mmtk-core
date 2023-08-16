@@ -124,7 +124,7 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     ///
     /// Arguments:
     /// * `edges`: A vector of edges.
-    fn create_immovable_process_edge_roots_work(&mut self, edges: Vec<ES>);
+    fn create_process_tp_edge_roots_work(&mut self, edges: Vec<ES>);
 
     /// Create work packets to handle nodes pointed by root edges.
     ///
@@ -133,7 +133,7 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by root edges.
-    fn create_immovable_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
+    fn create_process_tp_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
 /// VM-specific methods for scanning roots/objects.

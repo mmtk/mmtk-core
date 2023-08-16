@@ -1,7 +1,7 @@
 use super::sft::SFT;
 use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
-use crate::policy::gc_work::{TraceKind, TRACE_KIND_IMMOVABLE};
+use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
@@ -129,8 +129,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         assert!(
-            KIND != TRACE_KIND_IMMOVABLE,
-            "MarkCompact does not support immovable trace."
+            KIND != TRACE_KIND_TRANSITIVE_PIN,
+            "MarkCompact does not support transitive pin trace."
         );
         if KIND == TRACE_KIND_MARK {
             self.trace_mark_object(queue, object)

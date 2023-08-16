@@ -11,7 +11,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = SFTProcessEdges<Self::VM>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR_END: workcontext_sft
 
@@ -23,7 +23,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR: workcontext_plan
 
@@ -107,6 +107,6 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext3<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = MyGCProcessEdges<Self::VM>;
-    type ImmovableProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR: workcontext_mygc
