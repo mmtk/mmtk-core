@@ -273,6 +273,7 @@ mod tests {
             list_size as _,
             grain,
             1,
+            MmapStrategy::Normal
         );
         // Grow the free-list to do the actual memory-mapping.
         l.grow_freelist(list_size as _);
