@@ -103,10 +103,19 @@ pub fn mmap_fixed(
     )?;
     match strategy {
         MmapStrategy::Normal => Ok(()),
-        MmapStrategy::TransparentHugePages => wrap_libc_call(
-            &|| unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
-            0,
-        ),
+        MmapStrategy::TransparentHugePages => {
+            #[cfg(target_os = "linux")]
+            {
+                wrap_libc_call(
+                    &|| unsafe { libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
+                    0,
+                )
+            }
+            // Setting the transparent hugepage option to true will not pass
+            // the validation on non-Linux OSes
+            #[cfg(not(target_os = "linux"))]
+            unreachable!()
+        }
     }
 }
 
