@@ -1087,6 +1087,17 @@
 <span id="1087">1087</span>
 <span id="1088">1088</span>
 <span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -2140,6 +2151,17 @@
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
             <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">&quot;no_finalizer=true stress_factor=42&quot;</span>);
+            <span class="macro">assert!</span>(success);
+            <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">42</span>);
+        })
+    }
+
+    <span class="attribute">#[test]
+    </span><span class="kw">fn </span>test_process_bulk_comma_separated_valid() {
+        serial_test(|| {
+            <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">&quot;no_finalizer=true,stress_factor=42&quot;</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">42</span>);
