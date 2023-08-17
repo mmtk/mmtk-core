@@ -713,7 +713,9 @@ options! {
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     // Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize)
+    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
+    // Enable transparent hugepage support via madvise (only Linux is supported)
+    transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
 
 #[cfg(test)]
