@@ -37,7 +37,7 @@ impl SpaceDescriptor {
             let space_index = if start > VM_LAYOUT_CONSTANTS.heap_end {
                 ::std::usize::MAX
             } else {
-                start >> VM_LAYOUT_CONSTANTS.space_shift_64
+                start >> VM_LAYOUT_CONSTANTS.space_shift_64()
             };
             return SpaceDescriptor(
                 space_index << INDEX_SHIFT
@@ -121,7 +121,7 @@ impl SpaceDescriptor {
             // For 64-bit discontiguous space, use 32-bit extent
             self.get_extent_32()
         } else {
-            VM_LAYOUT_CONSTANTS.space_size_64
+            VM_LAYOUT_CONSTANTS.space_size_64()
         }
     }
 
@@ -172,7 +172,7 @@ mod tests {
         assert!(!d.is_contiguous_hi());
         assert_eq!(d.get_start(), VM_LAYOUT_CONSTANTS.heap_start);
         if cfg!(target_pointer_width = "64") {
-            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64);
+            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64());
         } else {
             assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
         }
@@ -189,7 +189,7 @@ mod tests {
         assert!(!d.is_contiguous_hi());
         if cfg!(target_pointer_width = "64") {
             assert_eq!(d.get_start(), VM_LAYOUT_CONSTANTS.heap_start);
-            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64);
+            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64());
         } else {
             assert_eq!(
                 d.get_start(),
@@ -211,9 +211,9 @@ mod tests {
         if cfg!(target_pointer_width = "64") {
             assert_eq!(
                 d.get_start(),
-                VM_LAYOUT_CONSTANTS.heap_end - VM_LAYOUT_CONSTANTS.space_size_64
+                VM_LAYOUT_CONSTANTS.heap_end - VM_LAYOUT_CONSTANTS.space_size_64()
             );
-            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64);
+            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64());
         } else {
             assert_eq!(
                 d.get_start(),
