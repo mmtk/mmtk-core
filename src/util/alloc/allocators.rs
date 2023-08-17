@@ -160,6 +160,7 @@ impl<VM: VMBinding> Allocators<VM> {
 // }
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Default)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
@@ -167,11 +168,8 @@ pub enum AllocatorSelector {
     Immix(u8),
     MarkCompact(u8),
     FreeList(u8),
+    #[default]
     None,
 }
 
-impl Default for AllocatorSelector {
-    fn default() -> Self {
-        AllocatorSelector::None
-    }
-}
+
