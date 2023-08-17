@@ -1,3 +1,7 @@
+use std::sync::atomic::AtomicBool;
+
+use atomic::Ordering;
+
 use super::heap_parameters::*;
 use crate::util::constants::*;
 use crate::util::Address;
@@ -135,6 +139,12 @@ impl VMLayout {
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
     /// This function must be called before MMTk::new()
     pub fn set_custom_vm_layout(constants: VMLayout) {
+        if cfg!(debug_assertions) {
+            assert!(
+                !VM_LAYOUT_FETCHED.load(Ordering::SeqCst),
+                "vm_layout is already been used before setup"
+            );
+        }
         unsafe {
             VM_LAYOUT = constants;
         }
@@ -146,6 +156,11 @@ static mut VM_LAYOUT: VMLayout = VMLayout::new_32bit();
 #[cfg(target_pointer_width = "64")]
 static mut VM_LAYOUT: VMLayout = VMLayout::new_64bit();
 
+static VM_LAYOUT_FETCHED: AtomicBool = AtomicBool::new(false);
+
 pub fn vm_layout() -> &'static VMLayout {
+    if cfg!(debug_assertions) {
+        VM_LAYOUT_FETCHED.store(true, Ordering::SeqCst);
+    }
     unsafe { &VM_LAYOUT }
 }
