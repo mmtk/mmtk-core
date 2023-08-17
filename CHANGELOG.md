@@ -1,3 +1,75 @@
+0.19.0 (2023-08-18)
+===
+
+## What's Changed
+
+### Plan
+* Remove a warning in sticky immix trace_object_nursery by @qinsoon in https://github.com/mmtk/mmtk-core/pull/815
+* Change default plan to GenImmix by @qinsoon in https://github.com/mmtk/mmtk-core/pull/819
+
+### Policy
+* Remove redundant clear_nursery() by @tianleq in https://github.com/mmtk/mmtk-core/pull/799
+* Introduce VMSpace, and allow VMSpace to be set lazily by @qinsoon in https://github.com/mmtk/mmtk-core/pull/802
+* Fix an issue that the aligned VM space may not match the original location by @qinsoon in https://github.com/mmtk/mmtk-core/pull/809
+* Remove some uses of mem::transmute in marksweep block by @qinsoon in https://github.com/mmtk/mmtk-core/pull/826
+* Fix `is_live` for ImmixSpace by @wks in https://github.com/mmtk/mmtk-core/pull/842
+* Sweep abandoned blocks in eager sweeping by @qinsoon in https://github.com/mmtk/mmtk-core/pull/830
+* Fix VO bits for Immix by @wks in https://github.com/mmtk/mmtk-core/pull/849
+* Fix unaligned access by @wks in https://github.com/mmtk/mmtk-core/pull/887
+
+### Scheduler
+* Let the coordinator thread open buckets by @wks in https://github.com/mmtk/mmtk-core/pull/782
+* No coordinator work by @wks in https://github.com/mmtk/mmtk-core/pull/794
+
+### Misc
+* Rename "alloc bit" to "valid-object bit" (VO bit), the second attempt. by @wks in https://github.com/mmtk/mmtk-core/pull/791
+* Add MarkState. Use MarkState for ImmortalSpace. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/796
+* Change info logging to debug in ImmortalSpace by @qinsoon in https://github.com/mmtk/mmtk-core/pull/801
+* Reset nursery_index in finalizable processor if we remove objects from candidates by @qinsoon in https://github.com/mmtk/mmtk-core/pull/807
+* Allow bulk set side metadata by @qinsoon in https://github.com/mmtk/mmtk-core/pull/808
+* Some fixes for sanity GC by @qinsoon in https://github.com/mmtk/mmtk-core/pull/806
+* Use extreme assertion for metadata mapped assert by @wks in https://github.com/mmtk/mmtk-core/pull/812
+* Install the missing deps for i686 CI tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/816
+* Use min nursery as mem balancer's extra memory by @qinsoon in https://github.com/mmtk/mmtk-core/pull/820
+* Sort dependencies in alphabetical order by @k-sareen in https://github.com/mmtk/mmtk-core/pull/822
+* Use sysinfo instead of sys-info-rs by @k-sareen in https://github.com/mmtk/mmtk-core/pull/827
+* Let sysinfo only load memory-related info by @wks in https://github.com/mmtk/mmtk-core/pull/836
+* Add extreme assertion for barrier slow path calls by @ArberSephirotheca in https://github.com/mmtk/mmtk-core/pull/833
+* Refactor: Use `Atomic<Address>` where appropriate by @ClSlaid in https://github.com/mmtk/mmtk-core/pull/843
+* Update porting guide by @k-sareen in https://github.com/mmtk/mmtk-core/pull/857
+* Fix typo in doc comment by @k-sareen in https://github.com/mmtk/mmtk-core/pull/859
+* Replace debug_assert in side_after with assert by @qinsoon in https://github.com/mmtk/mmtk-core/pull/873
+* Work around stack overflow in array_from_fn by @wks in https://github.com/mmtk/mmtk-core/pull/876
+* Let ObjectReference implement Ord by @wks in https://github.com/mmtk/mmtk-core/pull/870
+* Add USDT tracepoints for key GC activities by @caizixian in https://github.com/mmtk/mmtk-core/pull/883
+* Fix UB in SFTMap implementations by @playXE in https://github.com/mmtk/mmtk-core/pull/879
+* Run CI build/unit test with latest stable Rust toolchain by @qinsoon in https://github.com/mmtk/mmtk-core/pull/885
+* Document MSRV policy by @wks in https://github.com/mmtk/mmtk-core/pull/881
+* Fix performance regression test scripts by @qinsoon in https://github.com/mmtk/mmtk-core/pull/892
+* Run V8 binding tests on GitHub hosted runner by @caizixian in https://github.com/mmtk/mmtk-core/pull/900
+* Add tracing tools and documentation by @caizixian in https://github.com/mmtk/mmtk-core/pull/898
+* Run benchmarks for more plans on OpenJDK by @qinsoon in https://github.com/mmtk/mmtk-core/pull/901
+
+### API
+* Add object() in MemorySlice by @qinsoon in https://github.com/mmtk/mmtk-core/pull/798
+* Remove Collection::COORDINATOR_ONLY_STW by @ArberSephirotheca in https://github.com/mmtk/mmtk-core/pull/814
+* Refactor: Change `ActivePlan::mutators()`'s return type by @ArberSephirotheca in https://github.com/mmtk/mmtk-core/pull/817
+* Replace alloc-related `offset` type to `usize` instead `isize` by @fepicture in https://github.com/mmtk/mmtk-core/pull/838
+* Rename ambiguous `scan_thread_root{,s}` functions by @k-sareen in https://github.com/mmtk/mmtk-core/pull/846
+* Update comments on bind_mutator by @qinsoon in https://github.com/mmtk/mmtk-core/pull/854
+* Counting VM-allocated pages into heap size. by @wks in https://github.com/mmtk/mmtk-core/pull/866
+* Expose Allocators type to public API by @playXE in https://github.com/mmtk/mmtk-core/pull/880
+* Collect live bytes during GC by @qinsoon in https://github.com/mmtk/mmtk-core/pull/768
+* Tidy up mutator scan API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/875
+
+## New Contributors
+* @ArberSephirotheca made their first contribution in https://github.com/mmtk/mmtk-core/pull/814
+* @fepicture made their first contribution in https://github.com/mmtk/mmtk-core/pull/838
+* @ClSlaid made their first contribution in https://github.com/mmtk/mmtk-core/pull/843
+* @playXE made their first contribution in https://github.com/mmtk/mmtk-core/pull/880
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.18.0...v0.19.0
+
 0.18.0 (2023-04-03)
 ===
 
