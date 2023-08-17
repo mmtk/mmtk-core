@@ -24,19 +24,15 @@ jobs:
       - name: Generate rustdoc
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
-        # docs/ is the root for github pages.
-        # The generated docs are put to docs/ (i.e. root for github pages)
-        # mmtk public doc: docs/public-doc
-        # mmtk full doc: docs/full-doc
-        # porting guide: docs/portingguide
-        # tutorial: docs/tutorial
+        # docs.mmtk.io is the root for github pages.
+        # mmtk public doc: /api/public-doc
+        # mmtk full doc: /api/full-doc
         run: |
-          mkdir -p to_publish/docs
-          cp -r target/mmtk-full/doc/* to_publish/docs/
-          mv to_publish/docs/mmtk to_publish/docs/full-doc
-          cp -r target/mmtk-public/doc/mmtk to_publish/docs/public-doc
-          cp -r docs/portingguide/book to_publish/docs/portingguide
-          cp -r docs/tutorial/book to_publish/docs/tutorial
+          cp -r docs/userguide/book to_publish
+          mkdir -p to_publish/api
+          cp -r target/mmtk-full/doc/* to_publish/api/
+          mv to_publish/api/mmtk to_publish/api/full-doc
+          cp -r target/mmtk-public/doc/mmtk to_publish/api/public-doc
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
