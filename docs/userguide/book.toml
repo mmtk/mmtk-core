@@ -1,0 +1,8 @@
+[book]
+title = "MMTk User Guide"
+description = "The guide describes the usage of MMTk for GC and language runtime developers."
+authors = []
+language = "en"
+
+[rust]
+edition = "2021"
