@@ -7,10 +7,9 @@
 export RUSTFLAGS="-D warnings"
 
 # Check cargo doc
-# We generate two versions of docs: one with only public items for binding developers for our API, and
-# the other with both public and private items for MMTk developers (GC implementers).
-cargo doc --features $non_exclusive_features --no-deps --target-dir target/mmtk-public
-cargo doc --features $non_exclusive_features --no-deps --document-private-items --target-dir target/mmtk-full
+# We document public and private items for MMTk developers (GC implementers).
+# Private items are annotated with padlock emojis by rustdoc
+cargo doc --features $non_exclusive_features --no-deps --document-private-items
 
 # Check tutorial code
 tutorial_code_dir=$project_root/docs/userguide/src/tutorial/code/mygc_semispace

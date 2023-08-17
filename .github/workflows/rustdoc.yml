@@ -25,14 +25,10 @@ jobs:
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
         # docs.mmtk.io is the root for github pages.
-        # mmtk public doc: /api/public-doc
-        # mmtk full doc: /api/full-doc
+        # mmtk full doc: /api
         run: |
           cp -r docs/userguide/book to_publish
-          mkdir -p to_publish/api
-          cp -r target/mmtk-full/doc/* to_publish/api/
-          mv to_publish/api/mmtk to_publish/api/full-doc
-          cp -r target/mmtk-public/doc/mmtk to_publish/api/public-doc
+          cp -r target/doc to_publish/api
       - name: Deploy to Github Page
         uses: peaceiris/actions-gh-pages@v3
         with:
