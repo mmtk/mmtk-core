@@ -253,8 +253,7 @@ impl CopySemantics {
 }
 
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum CopySelector {
     CopySpace(u8),
     Immix(u8),
@@ -262,5 +261,3 @@ pub enum CopySelector {
     #[default]
     Unused,
 }
-
-

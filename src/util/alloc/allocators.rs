@@ -159,8 +159,7 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
@@ -171,5 +170,3 @@ pub enum AllocatorSelector {
     #[default]
     None,
 }
-
-
