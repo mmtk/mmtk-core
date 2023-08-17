@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: 'Wait for status checks'
         id: waitforstatuschecks
-        uses: "WyriHaximus/github-action-wait-for-status@v2"
+        uses: "WyriHaximus/github-action-wait-for-status@v1.7.0"
         with:
           ignoreActions: "check-public-api-changes,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable"
           checkInterval: 300
