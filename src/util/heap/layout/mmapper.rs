@@ -7,6 +7,9 @@ use std::io::Result;
 
 /// Generic mmap and protection functionality
 pub trait Mmapper: Sync {
+    /// Set mmap strategy
+    fn set_mmap_strategy(&self, strategy: MmapStrategy);
+
     /// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///
@@ -81,6 +84,7 @@ impl MapState {
     pub(super) fn transition_to_mapped(
         state: &Atomic<MapState>,
         mmap_start: Address,
+        strategy: MmapStrategy,
     ) -> Result<()> {
         trace!(
             "Trying to map {} - {}",
@@ -88,9 +92,9 @@ impl MapState {
             mmap_start + MMAP_CHUNK_BYTES
         );
         let res = match state.load(Ordering::Relaxed) {
-            MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES),
+            MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy),
             MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES),
-            MapState::Quarantined => unsafe { dzmmap(mmap_start, MMAP_CHUNK_BYTES) },
+            MapState::Quarantined => unsafe { dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy) },
             // might have become MapState::Mapped here
             MapState::Mapped => Ok(()),
         };
@@ -105,6 +109,7 @@ impl MapState {
     pub(super) fn transition_to_quarantined(
         state: &Atomic<MapState>,
         mmap_start: Address,
+        strategy: MmapStrategy,
     ) -> Result<()> {
         trace!(
             "Trying to quarantine {} - {}",
@@ -112,7 +117,7 @@ impl MapState {
             mmap_start + MMAP_CHUNK_BYTES
         );
         let res = match state.load(Ordering::Relaxed) {
-            MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES),
+            MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy),
             MapState::Quarantined => Ok(()),
             MapState::Mapped => {
                 // If a chunk is mapped by us and we try to quanrantine it, we simply don't do anything.
@@ -148,6 +153,7 @@ impl MapState {
     pub(super) fn bulk_transition_to_quarantined(
         state_slices: &[&[Atomic<MapState>]],
         mmap_start: Address,
+        strategy: MmapStrategy,
     ) -> Result<()> {
         trace!(
             "Trying to bulk-quarantine {} - {}",
@@ -170,7 +176,7 @@ impl MapState {
             match group.key {
                 MapState::Unmapped => {
                     trace!("Trying to quarantine {} - {}", start_addr, end_addr);
-                    mmap_noreserve(start_addr, end_addr - start_addr)?;
+                    mmap_noreserve(start_addr, end_addr - start_addr, strategy)?;
 
                     for state in group {
                         state.store(MapState::Quarantined, Ordering::Relaxed);
