@@ -1,0 +1,18 @@
+name: Merge Check
+on:
+  pull_request:
+    branches:
+      master
+
+jobs:
+  ready-to-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Wait for status checks'
+        id: waitforstatuschecks
+        uses: "WyriHaximus/github-action-wait-for-status@v2"
+        with:
+          ignoreActions: "check-public-api-changes,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable"
+          checkInterval: 300
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
