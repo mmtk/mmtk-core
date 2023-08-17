@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
-use super::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
+use super::layout::vm_layout::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
 use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
@@ -11,7 +11,7 @@ use crate::util::alloc::embedded_meta_data::*;
 use crate::util::conversions;
 use crate::util::freelist;
 use crate::util::freelist::FreeList;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory;
@@ -177,7 +177,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
 
     pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
         let common_flpr = {
-            let start = VM_LAYOUT_CONSTANTS.available_start();
+            let start = vm_layout().available_start();
             let common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: vm_map.create_freelist(start),
                 start,

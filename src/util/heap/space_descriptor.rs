@@ -1,5 +1,5 @@
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout_constants::{self, VM_LAYOUT_CONSTANTS};
+use crate::util::heap::layout::vm_layout::{self, vm_layout};
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -32,12 +32,12 @@ impl SpaceDescriptor {
     pub const UNINITIALIZED: Self = SpaceDescriptor(0);
 
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
-        let top = end == VM_LAYOUT_CONSTANTS.heap_end;
+        let top = end == vm_layout().heap_end;
         if cfg!(target_pointer_width = "64") {
-            let space_index = if start > VM_LAYOUT_CONSTANTS.heap_end {
+            let space_index = if start > vm_layout().heap_end {
                 ::std::usize::MAX
             } else {
-                start >> VM_LAYOUT_CONSTANTS.space_shift_64()
+                start >> vm_layout().space_shift_64()
             };
             return SpaceDescriptor(
                 space_index << INDEX_SHIFT
@@ -48,7 +48,7 @@ impl SpaceDescriptor {
                     }),
             );
         }
-        let chunks = (end - start) >> vm_layout_constants::LOG_BYTES_IN_CHUNK;
+        let chunks = (end - start) >> vm_layout::LOG_BYTES_IN_CHUNK;
         debug_assert!(!start.is_zero() && chunks > 0 && chunks < (1 << SIZE_BITS));
         let mut tmp = start >> BASE_EXPONENT;
         let mut exponent = 0;
@@ -92,7 +92,7 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
-        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces {
+        if !vm_layout().force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit start address
             self.get_start_32()
         } else {
@@ -117,11 +117,11 @@ impl SpaceDescriptor {
 
     #[cfg(target_pointer_width = "64")]
     pub fn get_extent(self) -> usize {
-        if !VM_LAYOUT_CONSTANTS.force_use_contiguous_spaces {
+        if !vm_layout().force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit extent
             self.get_extent_32()
         } else {
-            VM_LAYOUT_CONSTANTS.space_size_64()
+            vm_layout().space_size_64()
         }
     }
 
@@ -133,7 +133,7 @@ impl SpaceDescriptor {
     fn get_extent_32(self) -> usize {
         debug_assert!(self.is_contiguous());
         let chunks = (self.0 & SIZE_MASK) >> SIZE_SHIFT;
-        chunks << vm_layout_constants::LOG_BYTES_IN_CHUNK
+        chunks << vm_layout::LOG_BYTES_IN_CHUNK
     }
 
     pub fn get_index(self) -> usize {
@@ -144,7 +144,7 @@ impl SpaceDescriptor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::heap::layout::vm_layout_constants::*;
+    use crate::util::heap::layout::vm_layout::*;
 
     #[test]
     fn create_discontiguous_descriptor() {
@@ -164,15 +164,15 @@ mod tests {
     #[test]
     fn create_contiguous_descriptor_at_heap_start() {
         let d = SpaceDescriptor::create_descriptor_from_heap_range(
-            VM_LAYOUT_CONSTANTS.heap_start,
-            VM_LAYOUT_CONSTANTS.heap_start + TEST_SPACE_SIZE,
+            vm_layout().heap_start,
+            vm_layout().heap_start + TEST_SPACE_SIZE,
         );
         assert!(!d.is_empty());
         assert!(d.is_contiguous());
         assert!(!d.is_contiguous_hi());
-        assert_eq!(d.get_start(), VM_LAYOUT_CONSTANTS.heap_start);
+        assert_eq!(d.get_start(), vm_layout().heap_start);
         if cfg!(target_pointer_width = "64") {
-            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64());
+            assert_eq!(d.get_extent(), vm_layout().space_size_64());
         } else {
             assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
         }
@@ -181,20 +181,17 @@ mod tests {
     #[test]
     fn create_contiguous_descriptor_in_heap() {
         let d = SpaceDescriptor::create_descriptor_from_heap_range(
-            VM_LAYOUT_CONSTANTS.heap_start + TEST_SPACE_SIZE,
-            VM_LAYOUT_CONSTANTS.heap_start + TEST_SPACE_SIZE * 2,
+            vm_layout().heap_start + TEST_SPACE_SIZE,
+            vm_layout().heap_start + TEST_SPACE_SIZE * 2,
         );
         assert!(!d.is_empty());
         assert!(d.is_contiguous());
         assert!(!d.is_contiguous_hi());
         if cfg!(target_pointer_width = "64") {
-            assert_eq!(d.get_start(), VM_LAYOUT_CONSTANTS.heap_start);
-            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64());
+            assert_eq!(d.get_start(), vm_layout().heap_start);
+            assert_eq!(d.get_extent(), vm_layout().space_size_64());
         } else {
-            assert_eq!(
-                d.get_start(),
-                VM_LAYOUT_CONSTANTS.heap_start + TEST_SPACE_SIZE
-            );
+            assert_eq!(d.get_start(), vm_layout().heap_start + TEST_SPACE_SIZE);
             assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
         }
     }
@@ -202,8 +199,8 @@ mod tests {
     #[test]
     fn create_contiguous_descriptor_at_heap_end() {
         let d = SpaceDescriptor::create_descriptor_from_heap_range(
-            VM_LAYOUT_CONSTANTS.heap_end - TEST_SPACE_SIZE,
-            VM_LAYOUT_CONSTANTS.heap_end,
+            vm_layout().heap_end - TEST_SPACE_SIZE,
+            vm_layout().heap_end,
         );
         assert!(!d.is_empty());
         assert!(d.is_contiguous());
@@ -211,14 +208,11 @@ mod tests {
         if cfg!(target_pointer_width = "64") {
             assert_eq!(
                 d.get_start(),
-                VM_LAYOUT_CONSTANTS.heap_end - VM_LAYOUT_CONSTANTS.space_size_64()
+                vm_layout().heap_end - vm_layout().space_size_64()
             );
-            assert_eq!(d.get_extent(), VM_LAYOUT_CONSTANTS.space_size_64());
+            assert_eq!(d.get_extent(), vm_layout().space_size_64());
         } else {
-            assert_eq!(
-                d.get_start(),
-                VM_LAYOUT_CONSTANTS.heap_end - TEST_SPACE_SIZE
-            );
+            assert_eq!(d.get_start(), vm_layout().heap_end - TEST_SPACE_SIZE);
             assert_eq!(d.get_extent(), TEST_SPACE_SIZE);
         }
     }

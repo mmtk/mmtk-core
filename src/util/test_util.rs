@@ -1,5 +1,5 @@
 use crate::util::address::{Address, ByteSize};
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use std::panic;
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -32,7 +32,7 @@ mod test {
     fn verify_test_address() {
         assert!(
             super::TEST_ADDRESS.as_usize()
-                <= crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS
+                <= crate::util::heap::layout::vm_layout::vm_layout()
                     .heap_start
                     .as_usize()
         );

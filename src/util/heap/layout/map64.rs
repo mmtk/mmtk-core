@@ -4,7 +4,7 @@ use crate::util::conversions;
 use crate::util::freelist::FreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
@@ -45,9 +45,7 @@ impl Map64 {
             // elide the storing of 0 for each of the element.  Using standard vector creation,
             // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
             // slowdown during start-up.
-            descriptor_map: unsafe {
-                new_zeroed_vec::<SpaceDescriptor>(VM_LAYOUT_CONSTANTS.max_chunks())
-            },
+            descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks()) },
             high_water,
             base_address,
             fl_page_resources: vec![None; MAX_SPACES],
@@ -61,7 +59,7 @@ impl Map64 {
 impl VMMap for Map64 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         debug_assert!(Self::is_space_start(start));
-        debug_assert!(extent <= VM_LAYOUT_CONSTANTS.space_size_64());
+        debug_assert!(extent <= vm_layout().space_size_64());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
         let self_mut = unsafe { self.mut_self() };
@@ -70,7 +68,7 @@ impl VMMap for Map64 {
     }
 
     fn create_freelist(&self, start: Address) -> Box<dyn FreeList> {
-        let units = VM_LAYOUT_CONSTANTS.space_size_64() >> LOG_BYTES_IN_PAGE;
+        let units = vm_layout().space_size_64() >> LOG_BYTES_IN_PAGE;
         self.create_parent_freelist(start, units, units as _)
     }
 
@@ -234,14 +232,14 @@ impl Map64 {
     }
 
     fn space_index(addr: Address) -> Option<usize> {
-        if addr > VM_LAYOUT_CONSTANTS.heap_end {
+        if addr > vm_layout().heap_end {
             return None;
         }
-        Some(addr >> VM_LAYOUT_CONSTANTS.space_shift_64())
+        Some(addr >> vm_layout().space_shift_64())
     }
 
     fn is_space_start(base: Address) -> bool {
-        (base & !VM_LAYOUT_CONSTANTS.space_mask_64()) == 0
+        (base & !vm_layout().space_mask_64()) == 0
     }
 }
 

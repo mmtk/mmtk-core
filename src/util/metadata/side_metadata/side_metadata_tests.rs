@@ -3,8 +3,8 @@ mod tests {
     use atomic::Ordering;
 
     use crate::util::constants;
-    use crate::util::heap::layout::vm_layout_constants;
-    use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
+    use crate::util::heap::layout::vm_layout;
+    use crate::util::heap::layout::vm_layout::vm_layout;
     use crate::util::metadata::side_metadata::SideMetadataContext;
     use crate::util::metadata::side_metadata::SideMetadataSpec;
     use crate::util::metadata::side_metadata::*;
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_side_metadata_try_mmap_metadata() {
-        let heap_start = VM_LAYOUT_CONSTANTS.heap_start;
+        let heap_start = vm_layout().heap_start;
         serial_test(|| {
             with_cleanup(
                 || {
@@ -257,23 +257,19 @@ mod tests {
 
                     assert!(metadata
                         .try_map_metadata_space(
-                            heap_start + vm_layout_constants::BYTES_IN_CHUNK,
-                            vm_layout_constants::BYTES_IN_CHUNK,
+                            heap_start + vm_layout::BYTES_IN_CHUNK,
+                            vm_layout::BYTES_IN_CHUNK,
                         )
                         .is_ok());
 
-                    gspec.assert_metadata_mapped(heap_start + vm_layout_constants::BYTES_IN_CHUNK);
-                    lspec.assert_metadata_mapped(heap_start + vm_layout_constants::BYTES_IN_CHUNK);
-                    gspec.assert_metadata_mapped(
-                        heap_start + vm_layout_constants::BYTES_IN_CHUNK * 2 - 8,
-                    );
-                    lspec.assert_metadata_mapped(
-                        heap_start + vm_layout_constants::BYTES_IN_CHUNK * 2 - 16,
-                    );
+                    gspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK);
+                    lspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK);
+                    gspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK * 2 - 8);
+                    lspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK * 2 - 16);
 
                     metadata.ensure_unmap_metadata_space(
-                        heap_start + vm_layout_constants::BYTES_IN_CHUNK,
-                        vm_layout_constants::BYTES_IN_CHUNK,
+                        heap_start + vm_layout::BYTES_IN_CHUNK,
+                        vm_layout::BYTES_IN_CHUNK,
                     );
                 },
                 || {
@@ -290,7 +286,7 @@ mod tests {
                 || {
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    let data_addr = VM_LAYOUT_CONSTANTS.heap_start;
+                    let data_addr = vm_layout().heap_start;
 
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
@@ -365,8 +361,7 @@ mod tests {
                 || {
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    let data_addr = VM_LAYOUT_CONSTANTS.heap_start
-                        + (vm_layout_constants::BYTES_IN_CHUNK << 1) * 2;
+                    let data_addr = vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK << 1) * 2;
 
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
@@ -422,8 +417,8 @@ mod tests {
                 || {
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    let data_addr = vm_layout_constants::VM_LAYOUT_CONSTANTS.heap_start
-                        + (vm_layout_constants::BYTES_IN_CHUNK << 1);
+                    let data_addr =
+                        vm_layout::vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK << 1);
 
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
@@ -479,8 +474,7 @@ mod tests {
                 || {
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    let data_addr =
-                        VM_LAYOUT_CONSTANTS.heap_start + (vm_layout_constants::BYTES_IN_CHUNK << 2);
+                    let data_addr = vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK << 2);
 
                     #[cfg(target_pointer_width = "64")]
                     let metadata_1_spec = SideMetadataSpec {
@@ -572,7 +566,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let data_addr = vm_layout_constants::VM_LAYOUT_CONSTANTS.heap_start;
+                    let data_addr = vm_layout::vm_layout().heap_start;
 
                     // 1 bit per 8 bytes
                     let spec = SideMetadataSpec {
@@ -629,7 +623,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let data_addr = vm_layout_constants::VM_LAYOUT_CONSTANTS.heap_start;
+                    let data_addr = vm_layout::vm_layout().heap_start;
 
                     // 1 bit per 8 bytes
                     let spec = SideMetadataSpec {
@@ -725,7 +719,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let data_addr = VM_LAYOUT_CONSTANTS.heap_start;
+                    let data_addr = vm_layout().heap_start;
 
                     let log_num_of_bits = 0;
                     let log_bytes_in_region = 3;

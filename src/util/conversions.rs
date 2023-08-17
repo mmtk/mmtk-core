@@ -1,5 +1,5 @@
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::Address;
 
 /* Alignment */

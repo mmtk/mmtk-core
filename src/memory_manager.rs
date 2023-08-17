@@ -19,7 +19,7 @@ use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
-use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
+use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::edge_shape::MemorySlice;
@@ -568,13 +568,13 @@ pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Return the starting address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 pub fn starting_heap_address() -> Address {
-    VM_LAYOUT_CONSTANTS.heap_start
+    vm_layout().heap_start
 }
 
 /// Return the ending address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 pub fn last_heap_address() -> Address {
-    VM_LAYOUT_CONSTANTS.heap_end
+    vm_layout().heap_end
 }
 
 /// Return the total memory in bytes.

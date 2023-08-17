@@ -1,5 +1,3 @@
-use spin::Mutex;
-
 use super::heap_parameters::*;
 use crate::util::constants::*;
 use crate::util::Address;
@@ -36,7 +34,7 @@ pub const PAGES_IN_SPACE64: usize = 1 << LOG_PAGES_IN_SPACE64;
 
 /// Runtime-initialized virtual memory constants
 #[derive(Clone)]
-pub struct VMLayoutConstants {
+pub struct VMLayout {
     /// log_2 of the addressable heap virtual space.
     pub log_address_space: usize,
     /// FIXME: HEAP_START, HEAP_END are VM-dependent
@@ -53,7 +51,7 @@ pub struct VMLayoutConstants {
     pub force_use_contiguous_spaces: bool,
 }
 
-impl VMLayoutConstants {
+impl VMLayout {
     #[cfg(target_pointer_width = "32")]
     pub const LOG_ARCH_ADDRESS_SPACE: usize = 32;
     #[cfg(target_pointer_width = "64")]
@@ -103,7 +101,7 @@ impl VMLayoutConstants {
     }
 }
 
-impl VMLayoutConstants {
+impl VMLayout {
     /// Normal 32-bit configuration
     pub const fn new_32bit() -> Self {
         Self {
@@ -116,11 +114,11 @@ impl VMLayoutConstants {
     }
     /// Normal 64-bit configuration
     #[cfg(target_pointer_width = "32")]
-    pub fn new_64bit() -> Self {
+    pub const fn new_64bit() -> Self {
         unimplemented!("64-bit heap constants do not work with 32-bit builds")
     }
     #[cfg(target_pointer_width = "64")]
-    pub fn new_64bit() -> Self {
+    pub const fn new_64bit() -> Self {
         Self {
             log_address_space: 47,
             heap_start: chunk_align_down(unsafe {
@@ -134,26 +132,18 @@ impl VMLayoutConstants {
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
     /// This function must be called before MMTk::new()
-    pub fn set_custom_vm_layout_constants(constants: VMLayoutConstants) {
-        let mut guard = CUSTOM_CONSTANTS.lock();
-        assert!(
-            guard.is_none(),
-            "Custom VM_LAYOUT_CONSTANTS can only be set once"
-        );
-        *guard = Some(constants);
+    pub fn set_custom_vm_layout(constants: VMLayout) {
+        unsafe {
+            VM_LAYOUT = constants;
+        }
     }
 }
 
-static CUSTOM_CONSTANTS: Mutex<Option<VMLayoutConstants>> = Mutex::new(None);
+#[cfg(target_pointer_width = "32")]
+static mut VM_LAYOUT: VMLayout = VMLayout::new_32bit();
+#[cfg(target_pointer_width = "64")]
+static mut VM_LAYOUT: VMLayout = VMLayout::new_64bit();
 
-lazy_static! {
-    pub static ref VM_LAYOUT_CONSTANTS: VMLayoutConstants = {
-        if let Some(constants) = CUSTOM_CONSTANTS.lock().as_ref() {
-            constants.clone()
-        } else if cfg!(target_pointer_width = "32") {
-            VMLayoutConstants::new_32bit()
-        } else {
-            VMLayoutConstants::new_64bit()
-        }
-    };
+pub fn vm_layout() -> &'static VMLayout {
+    unsafe { &VM_LAYOUT }
 }

@@ -1,4 +1,4 @@
-use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
+use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::Address;
 
 pub struct HeapMeta {
@@ -9,8 +9,8 @@ pub struct HeapMeta {
 impl HeapMeta {
     pub fn new() -> Self {
         HeapMeta {
-            heap_cursor: VM_LAYOUT_CONSTANTS.heap_start,
-            heap_limit: VM_LAYOUT_CONSTANTS.heap_end,
+            heap_cursor: vm_layout().heap_start,
+            heap_limit: vm_layout().heap_end,
         }
     }
 

@@ -4,7 +4,7 @@ use crate::util::conversions;
 use crate::util::freelist::FreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
@@ -32,7 +32,7 @@ pub struct Map32 {
 
 impl Map32 {
     pub fn new() -> Self {
-        let max_chunks = VM_LAYOUT_CONSTANTS.max_chunks();
+        let max_chunks = vm_layout().max_chunks();
         Map32 {
             prev_link: vec![0; max_chunks],
             next_link: vec![0; max_chunks],
@@ -187,7 +187,7 @@ impl VMMap for Map32 {
         let first_chunk = start_address.chunk_index();
         let last_chunk = to.chunk_index();
         let unavail_start_chunk = last_chunk + 1;
-        let trailing_chunks = VM_LAYOUT_CONSTANTS.max_chunks() - unavail_start_chunk;
+        let trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
