@@ -1,17 +1,17 @@
 extern crate proc_macro;
+extern crate syn;
 extern crate proc_macro_error;
 extern crate quote;
-extern crate syn;
 
 use proc_macro::TokenStream;
-use proc_macro_error::abort_call_site;
 use proc_macro_error::proc_macro_error;
+use syn::{parse_macro_input};
+use proc_macro_error::abort_call_site;
 use quote::quote;
-use syn::parse_macro_input;
 use syn::DeriveInput;
 
-mod plan_trace_object_impl;
 mod util;
+mod plan_trace_object_impl;
 
 const DEBUG_MACRO_OUTPUT: bool = false;
 
@@ -37,22 +37,15 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     let output = if let syn::Data::Struct(syn::DataStruct {
         fields: syn::Fields::Named(ref fields),
         ..
-    }) = input.data
-    {
+    }) = input.data {
         let spaces = util::get_fields_with_attribute(fields, "trace");
         let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
-        let trace_object_function =
-            plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
-        let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(
-            &post_scan_spaces,
-            &fallback,
-            &ty_generics,
-        );
-        let may_move_objects_function =
-            plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
-        quote! {
+        let trace_object_function = plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
+        let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(&post_scan_spaces, &fallback, &ty_generics);
+        let may_move_objects_function = plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
+        quote!{
             impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
                 #trace_object_function
 
