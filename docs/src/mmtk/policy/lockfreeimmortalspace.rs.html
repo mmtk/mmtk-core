@@ -213,6 +213,12 @@
 <span id="213">213</span>
 <span id="214">214</span>
 <span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span>std::marker::PhantomData;
@@ -227,6 +233,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::PageResource;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -415,7 +422,12 @@
         };
 
         <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)
-        </span><span class="kw">crate</span>::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
+        </span><span class="kw">let </span>strategy = <span class="kw">if </span><span class="kw-2">*</span>args.options.transparent_hugepages {
+            MmapStrategy::TransparentHugePages
+        } <span class="kw">else </span>{
+            MmapStrategy::Normal
+        };
+        <span class="kw">crate</span>::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes, strategy).unwrap();
         <span class="kw">if </span>space
             .metadata
             .try_map_metadata_space(AVAILABLE_START, total_bytes)

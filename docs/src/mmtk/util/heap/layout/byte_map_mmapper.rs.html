@@ -369,6 +369,23 @@
 <span id="369">369</span>
 <span id="370">370</span>
 <span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -376,6 +393,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::pages_to_bytes;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::Mutex;
@@ -394,6 +412,7 @@
 <span class="kw">pub struct </span>ByteMapMmapper {
     lock: Mutex&lt;()&gt;,
     mapped: [Atomic&lt;MapState&gt;; MMAP_NUM_CHUNKS],
+    strategy: Atomic&lt;MmapStrategy&gt;,
 }
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ByteMapMmapper {
@@ -403,6 +422,10 @@
 }
 
 <span class="kw">impl </span>Mmapper <span class="kw">for </span>ByteMapMmapper {
+    <span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy) {
+        <span class="self">self</span>.strategy.store(strategy, Ordering::Relaxed);
+    }
+
     <span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]) {
         <span class="macro">unimplemented!</span>()
     }
@@ -433,7 +456,12 @@
 
             <span class="kw">let </span>mmap_start = <span class="self">Self</span>::mmap_chunks_to_address(chunk);
             <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-            MapState::transition_to_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk], mmap_start).unwrap();
+            MapState::transition_to_mapped(
+                <span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk],
+                mmap_start,
+                <span class="self">self</span>.strategy.load(Ordering::Relaxed),
+            )
+            .unwrap();
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -457,7 +485,12 @@
 
             <span class="kw">let </span>mmap_start = <span class="self">Self</span>::mmap_chunks_to_address(chunk);
             <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-            MapState::transition_to_quarantined(<span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk], mmap_start).unwrap();
+            MapState::transition_to_quarantined(
+                <span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk],
+                mmap_start,
+                <span class="self">self</span>.strategy.load(Ordering::Relaxed),
+            )
+            .unwrap();
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -494,6 +527,7 @@
         </span>ByteMapMmapper {
             lock: Mutex::new(()),
             mapped: <span class="kw">unsafe </span>{ transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) },
+            strategy: Atomic::new(MmapStrategy::Normal),
         }
     }
 

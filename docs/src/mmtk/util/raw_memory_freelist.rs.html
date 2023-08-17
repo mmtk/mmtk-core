@@ -547,7 +547,13 @@
 <span id="547">547</span>
 <span id="548">548</span>
 <span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::freelist::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">super</span>::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -572,6 +578,7 @@
     grain: i32,
     current_units: i32,
     pages_per_block: i32,
+    strategy: MmapStrategy,
 }
 
 <span class="kw">impl </span>FreeList <span class="kw">for </span>RawMemoryFreeList {
@@ -641,6 +648,7 @@
         units: i32,
         grain: i32,
         heads: i32,
+        strategy: MmapStrategy,
     ) -&gt; <span class="self">Self </span>{
         <span class="macro">debug_assert!</span>(units &lt;= MAX_UNITS &amp;&amp; heads &lt;= MAX_HEADS);
         <span class="macro">debug_assert!</span>(
@@ -656,6 +664,7 @@
             grain,
             current_units: <span class="number">0</span>,
             pages_per_block,
+            strategy,
         }
     }
 
@@ -743,7 +752,7 @@
     }
 
     <span class="kw">fn </span>mmap(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, bytes: usize) {
-        <span class="kw">let </span>res = <span class="kw">super</span>::memory::dzmmap_noreplace(start, bytes);
+        <span class="kw">let </span>res = <span class="kw">super</span>::memory::dzmmap_noreplace(start, bytes, <span class="self">self</span>.strategy);
         <span class="macro">assert!</span>(res.is_ok(), <span class="string">&quot;Can&#39;t get more space with mmap()&quot;</span>);
     }
     <span class="kw">pub fn </span>get_limit(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
@@ -818,6 +827,7 @@
             list_size <span class="kw">as _</span>,
             grain,
             <span class="number">1</span>,
+            MmapStrategy::Normal,
         );
         <span class="comment">// Grow the free-list to do the actual memory-mapping.
         </span>l.grow_freelist(list_size <span class="kw">as _</span>);

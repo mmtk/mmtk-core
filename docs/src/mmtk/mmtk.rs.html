@@ -161,6 +161,10 @@
 <span id="161">161</span>
 <span id="162">162</span>
 <span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
@@ -285,6 +289,10 @@
             plan.base().heap.get_discontig_start(),
             plan.base().heap.get_discontig_end(),
         );
+
+        <span class="kw">if </span><span class="kw-2">*</span>options.transparent_hugepages {
+            MMAPPER.set_mmap_strategy(<span class="kw">crate</span>::util::memory::MmapStrategy::TransparentHugePages);
+        }
 
         MMTK {
             options,

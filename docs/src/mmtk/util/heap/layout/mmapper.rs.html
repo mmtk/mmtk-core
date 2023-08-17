@@ -210,6 +210,12 @@
 <span id="210">210</span>
 <span id="211">211</span>
 <span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::rev_group::RevisitableGroupByForIterator;
@@ -219,6 +225,9 @@
 
 <span class="doccomment">/// Generic mmap and protection functionality
 </span><span class="kw">pub trait </span>Mmapper: Sync {
+    <span class="doccomment">/// Set mmap strategy
+    </span><span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy);
+
     <span class="doccomment">/// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///
@@ -293,6 +302,7 @@
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>transition_to_mapped(
         state: <span class="kw-2">&amp;</span>Atomic&lt;MapState&gt;,
         mmap_start: Address,
+        strategy: MmapStrategy,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">trace!</span>(
             <span class="string">&quot;Trying to map {} - {}&quot;</span>,
@@ -300,9 +310,9 @@
             mmap_start + MMAP_CHUNK_BYTES
         );
         <span class="kw">let </span>res = <span class="kw">match </span>state.load(Ordering::Relaxed) {
-            MapState::Unmapped =&gt; dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES),
+            MapState::Unmapped =&gt; dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy),
             MapState::Protected =&gt; munprotect(mmap_start, MMAP_CHUNK_BYTES),
-            MapState::Quarantined =&gt; <span class="kw">unsafe </span>{ dzmmap(mmap_start, MMAP_CHUNK_BYTES) },
+            MapState::Quarantined =&gt; <span class="kw">unsafe </span>{ dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy) },
             <span class="comment">// might have become MapState::Mapped here
             </span>MapState::Mapped =&gt; <span class="prelude-val">Ok</span>(()),
         };
@@ -317,6 +327,7 @@
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>transition_to_quarantined(
         state: <span class="kw-2">&amp;</span>Atomic&lt;MapState&gt;,
         mmap_start: Address,
+        strategy: MmapStrategy,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">trace!</span>(
             <span class="string">&quot;Trying to quarantine {} - {}&quot;</span>,
@@ -324,7 +335,7 @@
             mmap_start + MMAP_CHUNK_BYTES
         );
         <span class="kw">let </span>res = <span class="kw">match </span>state.load(Ordering::Relaxed) {
-            MapState::Unmapped =&gt; mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES),
+            MapState::Unmapped =&gt; mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy),
             MapState::Quarantined =&gt; <span class="prelude-val">Ok</span>(()),
             MapState::Mapped =&gt; {
                 <span class="comment">// If a chunk is mapped by us and we try to quanrantine it, we simply don&#39;t do anything.
@@ -360,6 +371,7 @@
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>bulk_transition_to_quarantined(
         state_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[Atomic&lt;MapState&gt;]],
         mmap_start: Address,
+        strategy: MmapStrategy,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">trace!</span>(
             <span class="string">&quot;Trying to bulk-quarantine {} - {}&quot;</span>,
@@ -382,7 +394,7 @@
             <span class="kw">match </span>group.key {
                 MapState::Unmapped =&gt; {
                     <span class="macro">trace!</span>(<span class="string">&quot;Trying to quarantine {} - {}&quot;</span>, start_addr, end_addr);
-                    mmap_noreserve(start_addr, end_addr - start_addr)<span class="question-mark">?</span>;
+                    mmap_noreserve(start_addr, end_addr - start_addr, strategy)<span class="question-mark">?</span>;
 
                     <span class="kw">for </span>state <span class="kw">in </span>group {
                         state.store(MapState::Quarantined, Ordering::Relaxed);

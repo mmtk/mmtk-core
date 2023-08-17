@@ -551,11 +551,27 @@
 <span id="551">551</span>
 <span id="552">552</span>
 <span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
 <span class="kw">use </span>std::fmt;
@@ -602,6 +618,7 @@
     free_slabs: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
     slab_table: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
     slab_map: Vec&lt;Address&gt;,
+    strategy: Atomic&lt;MmapStrategy&gt;,
 }
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FragmentedMapper {
@@ -611,6 +628,10 @@
 }
 
 <span class="kw">impl </span>Mmapper <span class="kw">for </span>FragmentedMapper {
+    <span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy) {
+        <span class="self">self</span>.strategy.store(strategy, Ordering::Relaxed);
+    }
+
     <span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]) {}
 
     <span class="kw">fn </span>mark_as_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>start: Address, bytes: usize) {
@@ -676,7 +697,11 @@
         <span class="comment">// Transition the chunks in bulk.
         </span>{
             <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-            MapState::bulk_transition_to_quarantined(state_slices.as_slice(), mmap_start)<span class="question-mark">?</span>;
+            MapState::bulk_transition_to_quarantined(
+                state_slices.as_slice(),
+                mmap_start,
+                <span class="self">self</span>.strategy.load(Ordering::Relaxed),
+            )<span class="question-mark">?</span>;
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -707,7 +732,11 @@
 
                 <span class="kw">let </span>mmap_start = <span class="self">Self</span>::chunk_index_to_address(base, chunk);
                 <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-                MapState::transition_to_mapped(entry, mmap_start)<span class="question-mark">?</span>;
+                MapState::transition_to_mapped(
+                    entry,
+                    mmap_start,
+                    <span class="self">self</span>.strategy.load(Ordering::Relaxed),
+                )<span class="question-mark">?</span>;
             }
             start = high;
         }
@@ -766,6 +795,7 @@
             free_slabs: (<span class="number">0</span>..MAX_SLABS).map(|<span class="kw">_</span>| <span class="prelude-val">Some</span>(<span class="self">Self</span>::new_slab())).collect(),
             slab_table: (<span class="number">0</span>..SLAB_TABLE_SIZE).map(|<span class="kw">_</span>| <span class="prelude-val">None</span>).collect(),
             slab_map: <span class="macro">vec!</span>[SENTINEL; SLAB_TABLE_SIZE],
+            strategy: Atomic::new(MmapStrategy::Normal),
         }
     }
 

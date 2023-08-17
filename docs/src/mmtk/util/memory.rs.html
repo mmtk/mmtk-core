@@ -372,6 +372,34 @@
 <span id="372">372</span>
 <span id="373">373</span>
 <span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -407,10 +435,10 @@
 /// the memory has been reserved by mmtk (e.g. after the use of mmap_noreserve()). Otherwise using this function
 /// may corrupt others&#39; data.
 </span><span class="attribute">#[allow(clippy::let_and_return)] </span><span class="comment">// Zeroing is not neceesary for some OS/s
-</span><span class="kw">pub unsafe fn </span>dzmmap(start: Address, size: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+</span><span class="kw">pub unsafe fn </span>dzmmap(start: Address, size: usize, strategy: MmapStrategy) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     <span class="kw">let </span>flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-    <span class="kw">let </span>ret = mmap_fixed(start, size, prot, flags);
+    <span class="kw">let </span>ret = mmap_fixed(start, size, prot, flags, strategy);
     <span class="comment">// We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     </span><span class="attribute">#[cfg(not(target_os = <span class="string">&quot;linux&quot;</span>))]
     </span><span class="kw">if </span>ret.is_ok() {
@@ -426,14 +454,25 @@
 </span><span class="comment">// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 </span><span class="kw">const </span>MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
 
+<span class="doccomment">/// Strategy for performing mmap
+///
+/// This currently supports switching between different huge page allocation
+/// methods. However, this can later be refactored to reduce other code
+/// repetition.
+</span><span class="attribute">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub enum </span>MmapStrategy {
+    Normal,
+    TransparentHugePages,
+}
+
 <span class="doccomment">/// Demand-zero mmap (no replace):
 /// This function mmaps the memory and guarantees to zero all mapped memory.
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 </span><span class="attribute">#[allow(clippy::let_and_return)] </span><span class="comment">// Zeroing is not neceesary for some OS/s
-</span><span class="kw">pub fn </span>dzmmap_noreplace(start: Address, size: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+</span><span class="kw">pub fn </span>dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     <span class="kw">let </span>flags = MMAP_FLAGS;
-    <span class="kw">let </span>ret = mmap_fixed(start, size, prot, flags);
+    <span class="kw">let </span>ret = mmap_fixed(start, size, prot, flags, strategy);
     <span class="comment">// We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     </span><span class="attribute">#[cfg(not(target_os = <span class="string">&quot;linux&quot;</span>))]
     </span><span class="kw">if </span>ret.is_ok() {
@@ -446,10 +485,10 @@
 /// This function does not reserve swap space for this mapping, which means there is no guarantee that writes to the
 /// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
-</span><span class="kw">pub fn </span>mmap_noreserve(start: Address, size: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+</span><span class="kw">pub fn </span>mmap_noreserve(start: Address, size: usize, strategy: MmapStrategy) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>prot = PROT_NONE;
     <span class="kw">let </span>flags = MMAP_FLAGS | libc::MAP_NORESERVE;
-    mmap_fixed(start, size, prot, flags)
+    mmap_fixed(start, size, prot, flags, strategy)
 }
 
 <span class="kw">pub fn </span>mmap_fixed(
@@ -457,12 +496,29 @@
     size: usize,
     prot: libc::c_int,
     flags: libc::c_int,
+    strategy: MmapStrategy,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>ptr = start.to_mut_ptr();
     wrap_libc_call(
         <span class="kw-2">&amp;</span>|| <span class="kw">unsafe </span>{ libc::mmap(start.to_mut_ptr(), size, prot, flags, -<span class="number">1</span>, <span class="number">0</span>) },
         ptr,
-    )
+    )<span class="question-mark">?</span>;
+    <span class="kw">match </span>strategy {
+        MmapStrategy::Normal =&gt; <span class="prelude-val">Ok</span>(()),
+        MmapStrategy::TransparentHugePages =&gt; {
+            <span class="attribute">#[cfg(target_os = <span class="string">&quot;linux&quot;</span>)]
+            </span>{
+                wrap_libc_call(
+                    <span class="kw-2">&amp;</span>|| <span class="kw">unsafe </span>{ libc::madvise(start.to_mut_ptr(), size, libc::MADV_HUGEPAGE) },
+                    <span class="number">0</span>,
+                )
+            }
+            <span class="comment">// Setting the transparent hugepage option to true will not pass
+            // the validation on non-Linux OSes
+            </span><span class="attribute">#[cfg(not(target_os = <span class="string">&quot;linux&quot;</span>))]
+            </span><span class="macro">unreachable!</span>()
+        }
+    }
 }
 
 <span class="kw">pub fn </span>munmap(start: Address, size: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -509,7 +565,7 @@
 </span><span class="kw">pub fn </span>panic_if_unmapped(start: Address, size: usize) {
     <span class="kw">let </span>prot = PROT_READ | PROT_WRITE;
     <span class="kw">let </span>flags = MMAP_FLAGS;
-    <span class="kw">match </span>mmap_fixed(start, size, prot, flags) {
+    <span class="kw">match </span>mmap_fixed(start, size, prot, flags, MmapStrategy::Normal) {
         <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">&quot;{} of size {} is not mapped&quot;</span>, start, size),
         <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">assert!</span>(
@@ -598,10 +654,10 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE) };
+                    <span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
                     <span class="macro">assert!</span>(res.is_ok());
                     <span class="comment">// We can overwrite with dzmmap
-                    </span><span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE) };
+                    </span><span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
                     <span class="macro">assert!</span>(res.is_ok());
                 },
                 || {
@@ -616,7 +672,7 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="kw">let </span>res = dzmmap_noreplace(START, BYTES_IN_PAGE);
+                    <span class="kw">let </span>res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal);
                     <span class="macro">assert!</span>(res.is_ok());
                     <span class="kw">let </span>res = munmap(START, BYTES_IN_PAGE);
                     <span class="macro">assert!</span>(res.is_ok());
@@ -635,10 +691,10 @@
             with_cleanup(
                 || {
                     <span class="comment">// Make sure we mmapped the memory
-                    </span><span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE) };
+                    </span><span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
                     <span class="macro">assert!</span>(res.is_ok());
                     <span class="comment">// Use dzmmap_noreplace will fail
-                    </span><span class="kw">let </span>res = dzmmap_noreplace(START, BYTES_IN_PAGE);
+                    </span><span class="kw">let </span>res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal);
                     <span class="macro">assert!</span>(res.is_err());
                 },
                 || {
@@ -653,10 +709,10 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="kw">let </span>res = mmap_noreserve(START, BYTES_IN_PAGE);
+                    <span class="kw">let </span>res = mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::Normal);
                     <span class="macro">assert!</span>(res.is_ok());
                     <span class="comment">// Try reserve it
-                    </span><span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE) };
+                    </span><span class="kw">let </span>res = <span class="kw">unsafe </span>{ dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
                     <span class="macro">assert!</span>(res.is_ok());
                 },
                 || {
@@ -688,7 +744,7 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="macro">assert!</span>(dzmmap_noreplace(START, BYTES_IN_PAGE).is_ok());
+                    <span class="macro">assert!</span>(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal).is_ok());
                     panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
@@ -706,7 +762,7 @@
             with_cleanup(
                 || {
                     <span class="comment">// map 1 page from START
-                    </span><span class="macro">assert!</span>(dzmmap_noreplace(START, BYTES_IN_PAGE).is_ok());
+                    </span><span class="macro">assert!</span>(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal).is_ok());
 
                     <span class="comment">// check if the next page is mapped - which should panic
                     </span>panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE);
@@ -728,7 +784,7 @@
             with_cleanup(
                 || {
                     <span class="comment">// map 1 page from START
-                    </span><span class="macro">assert!</span>(dzmmap_noreplace(START, BYTES_IN_PAGE).is_ok());
+                    </span><span class="macro">assert!</span>(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal).is_ok());
 
                     <span class="comment">// check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
                     </span>panic_if_unmapped(START, BYTES_IN_PAGE * <span class="number">2</span>);
