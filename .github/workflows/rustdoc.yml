@@ -43,3 +43,4 @@ jobs:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           publish_dir: to_publish
           publish_branch: gh-pages
+          cname: docs.mmtk.io
