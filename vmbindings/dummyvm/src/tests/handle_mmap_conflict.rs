@@ -7,11 +7,11 @@ use crate::DummyVM;
 pub fn test_handle_mmap_conflict() {
     let start = unsafe { Address::from_usize(0x100_0000 )};
     let one_megabyte = 1000000;
-    let mmap1_res = memory::dzmmap_noreplace(start, one_megabyte);
+    let mmap1_res = memory::dzmmap_noreplace(start, one_megabyte, memory::MmapStrategy::Normal);
     assert!(mmap1_res.is_ok());
 
     let panic_res = std::panic::catch_unwind(|| {
-        let mmap2_res = memory::dzmmap_noreplace(start, one_megabyte);
+        let mmap2_res = memory::dzmmap_noreplace(start, one_megabyte, memory::MmapStrategy::Normal);
         assert!(mmap2_res.is_err());
         memory::handle_mmap_error::<DummyVM>(mmap2_res.err().unwrap(), VMThread::UNINITIALIZED);
     });
