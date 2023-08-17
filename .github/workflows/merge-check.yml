@@ -10,9 +10,14 @@ jobs:
     steps:
       - name: 'Wait for status checks'
         id: waitforstatuschecks
+        timeout-minutes: 120
         uses: "WyriHaximus/github-action-wait-for-status@v1.7.0"
         with:
-          ignoreActions: "check-public-api-changes,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable"
-          checkInterval: 300
+          ignoreActions: "ready-to-merge,check-public-api-changes,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable"
+          # This action uses API. We have a quota of 1000 per day.
+          # We normally run tests within 1 hours (excluding binding tests).
+          # If we check every 10 mins, we use roughly 6 API calls per trigger.
+          # We can handle ~160 triggers.
+          checkInterval: 600
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
