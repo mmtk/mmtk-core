@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":[["get_total_num_cpus","Return the total number of cores allocated to the program."]],"type":[["CoreId","Represents the ID of a logical CPU on a system."]]};

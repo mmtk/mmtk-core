@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":[["HeaderMetadataSpec","This struct stores the specification of a header metadata bit-set. It supports either bits metadata of 1-7 bits in the same byte, or u8/u16/u32/u64 at an offset of their natural alignment."]]};

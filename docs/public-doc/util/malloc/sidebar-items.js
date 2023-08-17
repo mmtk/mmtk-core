@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":[["calloc",""],["counted_calloc",""],["counted_malloc",""],["free",""],["free_with_size",""],["malloc",""],["realloc",""],["realloc_with_old_size",""]],"mod":[["malloc_ms_util","Using malloc as mark sweep free-list allocator"]]};
