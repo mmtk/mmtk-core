@@ -6,3 +6,8 @@ language = "en"
 
 [rust]
 edition = "2021"
+
+[output.html]
+git-repository-url = "https://github.com/mmtk/mmtk-core/tree/master/docs/userguide"
+git-repository-icon = "fa-github"
+edit-url-template = "https://github.com/mmtk/mmtk-core/edit/master/docs/userguide/{path}"
