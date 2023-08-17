@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
-use super::layout::vm_layout::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
+use super::layout::vm_layout::PAGES_IN_CHUNK;
 use super::layout::VMMap;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
@@ -82,7 +82,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
                 .saturating_sub(self.common.vm_map.get_chunk_consumer_count());
             rtn += chunks * PAGES_IN_CHUNK;
         } else if self.common.growable && cfg!(target_pointer_width = "64") {
-            rtn = PAGES_IN_SPACE64 - self.reserved_pages();
+            rtn = vm_layout().pages_in_space64() - self.reserved_pages();
         }
 
         rtn

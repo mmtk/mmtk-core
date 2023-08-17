@@ -96,8 +96,7 @@ impl SpaceDescriptor {
             // For 64-bit discontiguous space, use 32-bit start address
             self.get_start_32()
         } else {
-            use crate::util::heap::layout::heap_parameters;
-            unsafe { Address::from_usize(self.get_index() << heap_parameters::LOG_SPACE_SIZE_64) }
+            unsafe { Address::from_usize(self.get_index() << vm_layout().log_space_extent) }
         }
     }
 

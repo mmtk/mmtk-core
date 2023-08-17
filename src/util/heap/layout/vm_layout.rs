@@ -26,12 +26,6 @@ pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
 
 pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 
-/** log_2 of the number of pages in a 64-bit space */
-pub const LOG_PAGES_IN_SPACE64: usize = LOG_SPACE_SIZE_64 - LOG_BYTES_IN_PAGE as usize;
-
-/** The number of pages in a 64-bit space */
-pub const PAGES_IN_SPACE64: usize = 1 << LOG_PAGES_IN_SPACE64;
-
 /// Runtime-initialized virtual memory constants
 #[derive(Clone)]
 pub struct VMLayout {
@@ -98,6 +92,14 @@ impl VMLayout {
     /// FIXME: When Compiling for 32 bits this expression makes no sense
     pub(crate) fn space_size_64(&self) -> usize {
         self.max_space_extent()
+    }
+    /// log_2 of the number of pages in a 64-bit space
+    pub(crate) fn log_pages_in_space64(&self) -> usize {
+        self.log_space_extent - LOG_BYTES_IN_PAGE as usize
+    }
+    /// The number of pages in a 64-bit space
+    pub(crate) fn pages_in_space64(&self) -> usize {
+        1 << self.log_pages_in_space64()
     }
 }
 
