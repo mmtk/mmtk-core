@@ -1058,6 +1058,17 @@ mod tests {
     }
 
     #[test]
+    fn test_process_bulk_comma_separated_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_bulk_from_command_line("no_finalizer=true,stress_factor=42");
+            assert!(success);
+            assert!(*options.no_finalizer);
+            assert_eq!(*options.stress_factor, 42);
+        })
+    }
+
+    #[test]
     fn test_process_bulk_invalid() {
         serial_test(|| {
             let mut options = Options::default();
