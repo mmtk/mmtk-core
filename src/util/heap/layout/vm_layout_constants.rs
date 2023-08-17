@@ -44,25 +44,11 @@ pub struct VMLayoutConstants {
     pub heap_start: Address,
     /// Highest virtual address used by the virtual machine
     pub heap_end: Address,
-    /// log_2 of the maximum number of chunks we need to track.  Only used in 32-bit layout.
-    pub log_max_chunks: usize,
     /// An upper bound on the extent of any space in the
     /// current memory layout
     pub log_space_extent: usize,
     /// vm-sapce size (currently only used by jikesrvm)
     pub vm_space_size: usize,
-    /// Number of bits to shift a space index into/out of a virtual address.
-    /// In a 32-bit model, use a dummy value so that the compiler doesn't barf.
-    pub space_shift_64: usize,
-    /// Bitwise mask to isolate a space index in a virtual address.
-    /// We can't express this constant in a 32-bit environment, hence the
-    /// conditional definition.
-    pub space_mask_64: usize,
-    /// Size of each space in the 64-bit memory layout
-    /// We can't express this constant in a 32-bit environment, hence the
-    /// conditional definition.
-    /// FIXME: When Compiling for 32 bits this expression makes no sense
-    pub space_size_64: usize,
     /// Should mmtk enable contiguous spaces and virtual memory for all spaces?
     /// For normal 64-bit config, this should be set to true. Each space should own a contiguous piece of virtual memory.
     /// For 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
@@ -93,7 +79,29 @@ impl VMLayoutConstants {
     }
     /// Maximum number of chunks we need to track.  Only used in 32-bit layout.
     pub const fn max_chunks(&self) -> usize {
-        1 << self.log_max_chunks
+        1 << self.log_max_chunks()
+    }
+    /// log_2 of the maximum number of chunks we need to track.  Only used in 32-bit layout.
+    pub const fn log_max_chunks(&self) -> usize {
+        Self::LOG_ARCH_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK
+    }
+    /// Number of bits to shift a space index into/out of a virtual address.
+    /// In a 32-bit model, use a dummy value so that the compiler doesn't barf.
+    pub(crate) fn space_shift_64(&self) -> usize {
+        self.log_space_extent
+    }
+    /// Bitwise mask to isolate a space index in a virtual address.
+    /// We can't express this constant in a 32-bit environment, hence the
+    /// conditional definition.
+    pub(crate) fn space_mask_64(&self) -> usize {
+        ((1 << LOG_MAX_SPACES) - 1) << self.space_shift_64()
+    }
+    /// Size of each space in the 64-bit memory layout
+    /// We can't express this constant in a 32-bit environment, hence the
+    /// conditional definition.
+    /// FIXME: When Compiling for 32 bits this expression makes no sense
+    pub(crate) fn space_size_64(&self) -> usize {
+        self.max_space_extent()
     }
 }
 
@@ -105,11 +113,7 @@ impl VMLayoutConstants {
             heap_start: chunk_align_down(unsafe { Address::from_usize(0x8000_0000) }),
             heap_end: chunk_align_up(unsafe { Address::from_usize(0xd000_0000) }),
             vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize(),
-            log_max_chunks: Self::LOG_ARCH_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK,
             log_space_extent: 31,
-            space_shift_64: 0,
-            space_mask_64: 0,
-            space_size_64: 1 << 31,
             force_use_contiguous_spaces: false,
         }
     }
@@ -127,11 +131,7 @@ impl VMLayoutConstants {
             }),
             heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) }),
             vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize(),
-            log_max_chunks: Self::LOG_ARCH_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK,
             log_space_extent: 41,
-            space_shift_64: 41,
-            space_mask_64: ((1 << 4) - 1) << 41,
-            space_size_64: 1 << 41,
             force_use_contiguous_spaces: true,
         }
     }
