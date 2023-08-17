@@ -36,7 +36,7 @@ jobs:
           - { os: macos-12, triple: x86_64-apple-darwin }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
-    name: pre-code-review-check/${{ matrix.target.triple }}/${{ matrix.rust }}
+    name: pre-code-review-checks/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
 
     steps:
