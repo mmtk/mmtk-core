@@ -65,8 +65,8 @@ MMTk does not run standalone. You would need to integrate MMTk with a language i
 You can either try out one of the VM bindings we have been working on, or implement your own binding in your VM for MMTk.
 You can also implement your own GC algorithm in MMTk, and run it with supported VMs.
 You can find up-to-date API documentation for mmtk-core here:
-* If you are trying to port MMTk to your language, check our public documentation: https://www.mmtk.io/mmtk-core/public-doc
-* If you are trying to develop in MMTk (e.g. a new GC algorithm), check our full documentation: https://www.mmtk.io/mmtk-core/full-doc
+* If you are trying to port MMTk to your language, check our public documentation: https://docs.mmtk.io/public-doc
+* If you are trying to develop in MMTk (e.g. a new GC algorithm), check our full documentation: https://docs.mmtk.io/full-doc
 
 ### Try out our current bindings
 
@@ -88,12 +88,12 @@ MMTk provides a bi-directional interface with the language VM.
 To integrate MMTk with your language implementation, you need to provide an implementation of `VMBinding`, and
 you can optionally call MMTk's API for your needs.
 
-For more information, you can refer to our [user guide](https://www.mmtk.io/mmtk-core/userguide) for VM implementors.
+For more information, you can refer to our [user guide](https://docs.mmtk.io/userguide) for VM implementors.
 
 ### Implement your GC
 
 MMTk is a suite of various GC algorithms (known as plans in MMTk). MMTk provides reusable components that make it easy
-to construct your own GC based on those components. For more information, you can refer to our [user guide](https://www.mmtk.io/mmtk-core/userguide)
+to construct your own GC based on those components. For more information, you can refer to our [user guide](https://docs.mmtk.io/userguide)
 for GC implementors.
 
 ## Tests

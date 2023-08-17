@@ -44,7 +44,7 @@ method `schedule_common_work()` that will add common work packets for you.
 To use `schedule_common_work()`, first we need to create a type `MyGCWorkContext`
 and implement the trait `GCWorkContext` for it. We create `gc_work.rs` and add the
 following implementation. Note that we will use the default
-[`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html),
+[`SFTProcessEdges`](https://docs.mmtk.io/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html),
 which is a general work packet that a plan can use to trace objects. For plans
 like semispace, `SFTProcessEdges` is sufficient. For more complex GC plans,
 one can create and write their own work packet that implements the `ProcessEdgesWork` trait.
@@ -152,7 +152,7 @@ release functions that you have now added, so it is now dead code.
 
 ## ProcessEdgesWork for MyGC
 
-[`ProcessEdgesWork`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html)
+[`ProcessEdgesWork`](https://docs.mmtk.io/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html)
 is the key work packet for tracing objects in a GC. A `ProcessEdgesWork` implementation
 defines how to trace objects, and how to generate more work packets based on the current tracing
 to finish the object closure.
@@ -164,8 +164,8 @@ are.
 
 ### Approach 1: Use `SFTProcessEdges`
 
-[`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html) dispatches
-the tracing of objects to their respective spaces through [Space Function Table (SFT)](https://www.mmtk.io/mmtk-core/mmtk/policy/space/trait.SFT.html).
+[`SFTProcessEdges`](https://docs.mmtk.io/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html) dispatches
+the tracing of objects to their respective spaces through [Space Function Table (SFT)](https://docs.mmtk.io/mmtk/policy/space/trait.SFT.html).
 As long as all the policies in a plan provide an implementation of `sft_trace_object()` in their SFT implementations,
 the plan can use `SFTProcessEdges`. Currently most policies provide an implementation for `sft_trace_object()`, except
 mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
@@ -176,7 +176,7 @@ multiple `sft_trace_object()` for a policy.
 ### Approach 2: Derive `PlanTraceObject` and use `PlanProcessEdges`
 
 `PlanProcessEdges` is another general `ProcessEdgesWork` implementation that can be used by most plans. When a plan
-implements the [`PlanTraceObject`](https://www.mmtk.io/mmtk-core/mmtk/plan/transitive_closure/trait.PlanTraceObject.html),
+implements the [`PlanTraceObject`](https://docs.mmtk.io/mmtk/plan/transitive_closure/trait.PlanTraceObject.html),
 it can use `PlanProcessEdges`.
 
 You can manually provide an implementation of `PlanTraceObject` for `MyGC`. But you can also use the derive macro MMTK provides,
