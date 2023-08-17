@@ -47,8 +47,6 @@ pub struct VMLayoutConstants {
     /// An upper bound on the extent of any space in the
     /// current memory layout
     pub log_space_extent: usize,
-    /// vm-sapce size (currently only used by jikesrvm)
-    pub vm_space_size: usize,
     /// Should mmtk enable contiguous spaces and virtual memory for all spaces?
     /// For normal 64-bit config, this should be set to true. Each space should own a contiguous piece of virtual memory.
     /// For 32-bit or 64-bit compressed heap, we don't have enough virtual memory, so this should be set to false.
@@ -112,7 +110,6 @@ impl VMLayoutConstants {
             log_address_space: 32,
             heap_start: chunk_align_down(unsafe { Address::from_usize(0x8000_0000) }),
             heap_end: chunk_align_up(unsafe { Address::from_usize(0xd000_0000) }),
-            vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize(),
             log_space_extent: 31,
             force_use_contiguous_spaces: false,
         }
@@ -130,7 +127,6 @@ impl VMLayoutConstants {
                 Address::from_usize(0x0000_0200_0000_0000usize)
             }),
             heap_end: chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) }),
-            vm_space_size: chunk_align_up(unsafe { Address::from_usize(0xdc0_0000) }).as_usize(),
             log_space_extent: 41,
             force_use_contiguous_spaces: true,
         }

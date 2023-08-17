@@ -694,7 +694,7 @@ options! {
     // The start of vmspace.
     vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
     // The size of vmspace.
-    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = usize::MAX,
+    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0xdc0_0000,
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
