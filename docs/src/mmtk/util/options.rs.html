@@ -1086,6 +1086,7 @@
 <span id="1086">1086</span>
 <span id="1087">1087</span>
 <span id="1088">1088</span>
+<span id="1089">1089</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -1284,9 +1285,10 @@
             /// This method returns false if the option string is invalid, or if it includes any invalid option.
             ///
             /// Arguments:
-            /// * `options`: a string that is key value pairs separated by white spaces, e.g. &quot;threads=1 stress_factor=4096&quot;
+            /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
+            /// or `threads=1,stress_factor=4096`
             </span><span class="kw">pub fn </span>set_bulk_from_command_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
-                <span class="kw">for </span>opt <span class="kw">in </span>options.split_ascii_whitespace() {
+                <span class="kw">for </span>opt <span class="kw">in </span>options.replace(<span class="string">&quot;,&quot;</span>, <span class="string">&quot; &quot;</span>).split_ascii_whitespace() {
                     <span class="kw">let </span>kv_pair: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = opt.split(<span class="string">&#39;=&#39;</span>).collect();
                     <span class="kw">if </span>kv_pair.len() != <span class="number">2 </span>{
                         <span class="kw">return </span><span class="bool-val">false</span>;
