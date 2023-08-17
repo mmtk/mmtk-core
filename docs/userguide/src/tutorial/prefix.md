@@ -9,7 +9,7 @@ generational copying garbage collector.
 This tutorial is aimed at GC implementors who would like to implement 
 new GC algorithms/plans with MMTk. If you are a language implementor 
 interested in *porting* your runtime to MMTk, you should refer to the 
-[porting guide](https://docs.mmtk.io/portingguide/) instead.
+[porting guide](../portingguide/prefix.md) instead.
 
 This tutorial is a work in progress. Some sections may be rough, and others may 
 be missing information (especially about import statements). If something is 

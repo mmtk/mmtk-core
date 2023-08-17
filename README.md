@@ -88,12 +88,12 @@ MMTk provides a bi-directional interface with the language VM.
 To integrate MMTk with your language implementation, you need to provide an implementation of `VMBinding`, and
 you can optionally call MMTk's API for your needs.
 
-For more information, you can refer to our [user guide](https://docs.mmtk.io/userguide) for VM implementors.
+For more information, you can refer to our [porting guide](https://docs.mmtk.io/userguide/prefix.html) for VM implementors.
 
 ### Implement your GC
 
 MMTk is a suite of various GC algorithms (known as plans in MMTk). MMTk provides reusable components that make it easy
-to construct your own GC based on those components. For more information, you can refer to our [user guide](https://docs.mmtk.io/userguide)
+to construct your own GC based on those components. For more information, you can refer to our [tutorial](https://docs.mmtk.io/tutorial/prefix.html)
 for GC implementors.
 
 ## Tests
