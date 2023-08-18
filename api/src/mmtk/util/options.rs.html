@@ -1494,8 +1494,8 @@
         }
     }
 
-    <span class="doccomment">/// Returns a NurserySize or String containing error. Expects nursery size to be formatted as
-    /// &quot;&lt;NurseryKind&gt;:&lt;size in bytes&gt;&quot;. For example, &quot;Fixed:8192&quot; creates a Fixed nursery of size
+    <span class="doccomment">/// Returns a [`NurserySize`] or [`String`] containing error. Expects nursery size to be formatted as
+    /// `&lt;NurseryKind&gt;:&lt;size in bytes&gt;`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
     /// 8192 bytes.
     </span><span class="kw">pub fn </span>parse(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;NurserySize, String&gt; {
         <span class="kw">let </span>ns: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = s.split(<span class="string">&#39;:&#39;</span>).collect();

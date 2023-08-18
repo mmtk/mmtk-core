@@ -746,7 +746,7 @@
     <span class="doccomment">/// creates a null Address (0)
     /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
-    /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).
+    /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use `Option&lt;Address&gt;`).
     </span><span class="kw">pub const unsafe fn </span>zero() -&gt; Address {
         Address(<span class="number">0</span>)
     }
@@ -754,7 +754,7 @@
     <span class="doccomment">/// creates an Address of (usize::MAX)
     /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
-    /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option&lt;Address&gt;).
+    /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use `Option&lt;Address&gt;`).
     </span><span class="kw">pub unsafe fn </span>max() -&gt; Address {
         <span class="kw">use </span>std::usize;
         Address(usize::MAX)

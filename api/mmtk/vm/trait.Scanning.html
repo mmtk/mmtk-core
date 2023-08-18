@@ -40,7 +40,7 @@ For example, the VM binding may only be able to enumerate all threads and
 scan them while enumerating, but cannot scan stacks individually when given
 the references of threads.
 In that case, it can leave this method empty, and deal with stack
-roots in [<code>Collection::scan_vm_specific_roots</code>]. However, in that case, MMTk
+roots in <a href="scanning/trait.Scanning.html#tymethod.scan_vm_specific_roots" title="Scanning::scan_vm_specific_roots"><code>Scanning::scan_vm_specific_roots</code></a>. However, in that case, MMTk
 does not know those roots are stack roots, and cannot perform any possible
 optimization for the stack roots.</p>
 <p>The <code>memory_manager::is_mmtk_object</code> function can be used in this function if</p>

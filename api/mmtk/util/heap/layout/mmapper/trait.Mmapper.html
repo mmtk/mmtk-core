@@ -33,10 +33,12 @@ we can use if needed. Quarantined memory needs to be mapped before it can be use
 </ul>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="tymethod.ensure_mapped" class="method has-srclink"><a class="srclink rightside" href="../../../../../src/mmtk/util/heap/layout/mmapper.rs.html#49">source</a><h4 class="code-header">fn <a href="#tymethod.ensure_mapped" class="fnname">ensure_mapped</a>(&amp;self, start: <a class="struct" href="../../../address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>, pages: <a class="primitive" href="https://doc.rust-lang.org/1.66.1/std/primitive.usize.html">usize</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.66.1/std/io/error/type.Result.html" title="type std::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.66.1/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Ensure that a range of pages is mmapped (or equivalent).  If the
 pages are not yet mapped, demand-zero map them. Note that mapping
-occurs at chunk granularity, not page granularity.<p></p>
-<p>Argumetns:
-<code>start</code>: The start of the range to be mapped.
-<code>pages</code>: The size of the range to be mapped, in pages</p>
+occurs at chunk granularity, not page granularity.</p>
+<p>Arguments:</p>
+<ul>
+<li><code>start</code>: The start of the range to be mapped.</li>
+<li><code>pages</code>: The size of the range to be mapped, in pages</li>
+</ul>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="tymethod.is_mapped_address" class="method has-srclink"><a class="srclink rightside" href="../../../../../src/mmtk/util/heap/layout/mmapper.rs.html#56">source</a><h4 class="code-header">fn <a href="#tymethod.is_mapped_address" class="fnname">is_mapped_address</a>(&amp;self, addr: <a class="struct" href="../../../address/struct.Address.html" title="struct mmtk::util::address::Address">Address</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.66.1/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Is the page pointed to by this address mapped? Returns true if
 the page at the given address is mapped.</p>
 <p>Arguments:</p>

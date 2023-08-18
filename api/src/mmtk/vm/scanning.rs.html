@@ -509,7 +509,7 @@
     /// scan them while enumerating, but cannot scan stacks individually when given
     /// the references of threads.
     /// In that case, it can leave this method empty, and deal with stack
-    /// roots in [`Collection::scan_vm_specific_roots`]. However, in that case, MMTk
+    /// roots in [`Scanning::scan_vm_specific_roots`]. However, in that case, MMTk
     /// does not know those roots are stack roots, and cannot perform any possible
     /// optimization for the stack roots.
     ///

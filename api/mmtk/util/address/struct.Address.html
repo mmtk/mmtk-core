@@ -8,11 +8,11 @@ High-level Low-level Programming (VEE09) and JikesRVM.</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.zero" class="method has-srclink"><a class="srclink rightside" href="../../../src/mmtk/util/address.rs.html#153-155">source</a><h4 class="code-header">pub const unsafe fn <a href="#method.zero" class="fnname">zero</a>() -&gt; <a class="struct" href="struct.Address.html" title="struct mmtk::util::address::Address">Address</a></h4></section></summary><div class="docblock"><p>creates a null Address (0)</p>
 <h5 id="safety"><a href="#safety">Safety</a></h5>
 <p>It is unsafe and the user needs to be aware that they are creating an invalid address.
-The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option<Address>).</p>
+The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use <code>Option&lt;Address&gt;</code>).</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.max" class="method has-srclink"><a class="srclink rightside" href="../../../src/mmtk/util/address.rs.html#161-164">source</a><h4 class="code-header">pub unsafe fn <a href="#method.max" class="fnname">max</a>() -&gt; <a class="struct" href="struct.Address.html" title="struct mmtk::util::address::Address">Address</a></h4></section></summary><div class="docblock"><p>creates an Address of (usize::MAX)</p>
 <h5 id="safety-1"><a href="#safety-1">Safety</a></h5>
 <p>It is unsafe and the user needs to be aware that they are creating an invalid address.
-The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option<Address>).</p>
+The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use <code>Option&lt;Address&gt;</code>).</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.from_usize" class="method has-srclink"><a class="srclink rightside" href="../../../src/mmtk/util/address.rs.html#171-173">source</a><h4 class="code-header">pub const unsafe fn <a href="#method.from_usize" class="fnname">from_usize</a>(raw: <a class="primitive" href="https://doc.rust-lang.org/1.66.1/std/primitive.usize.html">usize</a>) -&gt; <a class="struct" href="struct.Address.html" title="struct mmtk::util::address::Address">Address</a></h4></section></summary><div class="docblock"><p>creates an arbitrary Address</p>
 <h5 id="safety-2"><a href="#safety-2">Safety</a></h5>
 <p>It is unsafe and the user needs to be aware that they may create an invalid address.
