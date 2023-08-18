@@ -189,32 +189,32 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
-          path: ./git/mmtk-ruby
+          path: mmtk-ruby
           ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
 
       - name: Checkout Ruby
         uses: actions/checkout@v3
         with:
           repository: mmtk/ruby
-          path: ./git/ruby
+          path: ruby
           ref: mmtk
 
       - name: Override mmtk-core dependency for binding
         run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml .
-        working-directory: ./git/mmtk-core
+        working-directory: mmtk-core
 
       - name: Setup environment
         run: ./.github/scripts/ci-setup.sh
-        working-directory: ./git/mmtk-ruby
+        working-directory: mmtk-ruby
 
       - name: Build MMTk Ruby ${{ matrix.debug-level }}
         run: ./.github/scripts/ci-build.sh
-        working-directory: ./git/mmtk-ruby
+        working-directory: mmtk-ruby
 
       - name: Run bootstrap tests (btest)
         run: ./.github/scripts/ci-btest.sh
-        working-directory: ./git/mmtk-ruby
+        working-directory: mmtk-ruby
 
       - name: Run all tests (test-all)
         run: ./.github/scripts/ci-test-all.sh
-        working-directory: ./git/mmtk-ruby
+        working-directory: mmtk-ruby
