@@ -1,6 +1,0 @@
-[book]
-authors = ["Rouane Bannister"]
-language = "en"
-multilingual = false
-src = "src"
-title = "MMTk Tutorial"

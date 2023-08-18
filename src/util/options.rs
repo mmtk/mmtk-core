@@ -196,9 +196,10 @@ macro_rules! options {
             /// This method returns false if the option string is invalid, or if it includes any invalid option.
             ///
             /// Arguments:
-            /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+            /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
+            /// or `threads=1,stress_factor=4096`
             pub fn set_bulk_from_command_line(&mut self, options: &str) -> bool {
-                for opt in options.split_ascii_whitespace() {
+                for opt in options.replace(",", " ").split_ascii_whitespace() {
                     let kv_pair: Vec<&str> = opt.split('=').collect();
                     if kv_pair.len() != 2 {
                         return false;
@@ -393,8 +394,8 @@ impl NurserySize {
         }
     }
 
-    /// Returns a NurserySize or String containing error. Expects nursery size to be formatted as
-    /// "<NurseryKind>:<size in bytes>". For example, "Fixed:8192" creates a Fixed nursery of size
+    /// Returns a [`NurserySize`] or [`String`] containing error. Expects nursery size to be formatted as
+    /// `<NurseryKind>:<size in bytes>`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
     /// 8192 bytes.
     pub fn parse(s: &str) -> Result<NurserySize, String> {
         let ns: Vec<&str> = s.split(':').collect();
@@ -1061,6 +1062,17 @@ mod tests {
         serial_test(|| {
             let mut options = Options::default();
             let success = options.set_bulk_from_command_line("no_finalizer=true stress_factor=42");
+            assert!(success);
+            assert!(*options.no_finalizer);
+            assert_eq!(*options.stress_factor, 42);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_comma_separated_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_bulk_from_command_line("no_finalizer=true,stress_factor=42");
             assert!(success);
             assert!(*options.no_finalizer);
             assert_eq!(*options.stress_factor, 42);

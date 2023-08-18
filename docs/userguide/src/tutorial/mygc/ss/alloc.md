@@ -22,7 +22,7 @@ We will make the following changes:
 
 Finished code (step 1-3):
 ```
-{{#include ../../../code/mygc_semispace/global.rs:constraints}}
+{{#include ../../code/mygc_semispace/global.rs:constraints}}
 ```
 
 ## Change the plan implementation
@@ -46,7 +46,7 @@ To the import statement block:
 
 Finished code (step 1):
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:imports_no_gc_work}}
+{{#include ../../code/mygc_semispace/global.rs:imports_no_gc_work}}
 ```
 
 ### Struct MyGC
@@ -63,7 +63,7 @@ Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
 
 Finished code (step 2):
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_def}}
+{{#include ../../code/mygc_semispace/global.rs:plan_def}}
 ```
 
 Note that we have attributes on some fields. These attributes tell MMTk's macros on
@@ -86,7 +86,7 @@ that you just defined.
    Instead, we will define the two copyspaces here.
    2. Define one of the copyspaces by adding the following code: 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:copyspace_new}}
+{{#include ../../code/mygc_semispace/global.rs:copyspace_new}}
 ```
 
    3. Create another copyspace, called `copyspace1`, defining it as a fromspace 
@@ -94,7 +94,7 @@ that you just defined.
    copyspaces are in `src/policy/copyspace.rs`.) 
    4. Finally, replace the old MyGC initializer.
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_new}}
+{{#include ../../code/mygc_semispace/global.rs:plan_new}}
 ```
 
 ### Access MyGC spaces
@@ -117,7 +117,7 @@ and `fromspace_mut(&mut self)`. Those will be used later when we implement
 collection for our GC plan.
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_space_access}}
+{{#include ../../code/mygc_semispace/global.rs:plan_space_access}}
 ```
 
 #### Other methods in the Plan trait
@@ -126,14 +126,14 @@ The trait `Plan` requires a `common()` method that should return a
 reference to the common plan. Implement this method now.
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_common}}
+{{#include ../../code/mygc_semispace/global.rs:plan_common}}
 ```
 
 Find the helper method `base` and change it so that it calls the 
 base plan *through* the common plan.
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_base}}
+{{#include ../../code/mygc_semispace/global.rs:plan_base}}
 ```
 
 The trait `Plan` requires `collection_required()` method to know when
@@ -141,7 +141,7 @@ we should trigger a collection. We can just use the implementation
 in the `BasePlan`.
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:collection_required}}
+{{#include ../../code/mygc_semispace/global.rs:collection_required}}
 ```
 
 Find the method `get_pages_used`. Replace the current body with 
@@ -150,13 +150,13 @@ correctly count the pages contained in the tospace and the common plan
 spaces (which will be explained later).
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_get_used_pages}}
+{{#include ../../code/mygc_semispace/global.rs:plan_get_used_pages}}
 ```
 
 Add and override the following helper function:
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_get_collection_reserve}}
+{{#include ../../code/mygc_semispace/global.rs:plan_get_collection_reserve}}
 ```
 
 ## Change the mutator definition
@@ -172,7 +172,7 @@ Change the following import statements:
    3. Delete `use crate::plan::mygc::MyGC;`.
 
 ```rust
-{{#include ../../../code/mygc_semispace/mutator.rs:imports}}
+{{#include ../../code/mygc_semispace/mutator.rs:imports}}
 ```
 
 ### Allocator mapping
@@ -186,7 +186,7 @@ For example, for `Default`, we allocate using the first bump pointer allocator
    3. Map `Default` to `BumpPointer(0)`.
 
 ```rust
-{{#include ../../../code/mygc_semispace/mutator.rs:allocator_mapping}}
+{{#include ../../code/mygc_semispace/mutator.rs:allocator_mapping}}
 ```
 
 ### Space mapping
@@ -200,7 +200,7 @@ Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in
 `MyGC`.
 
 ```rust
-{{#include ../../../code/mygc_semispace/mutator.rs:plan_downcast}}
+{{#include ../../code/mygc_semispace/mutator.rs:plan_downcast}}
 ```
 
 Then, use `mygc` to access the spaces in `MyGC`.
@@ -211,7 +211,7 @@ Then, use `mygc` to access the spaces in `MyGC`.
    the `&` prefix).
 
 ```rust
-{{#include ../../../code/mygc_semispace/mutator.rs:space_mapping}}
+{{#include ../../code/mygc_semispace/mutator.rs:space_mapping}}
 ```
      
 The `create_space_mapping` and `create_allocator_mapping` call that have appeared all

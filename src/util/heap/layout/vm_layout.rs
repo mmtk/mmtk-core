@@ -10,7 +10,7 @@ use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
 /**
  * log_2 of the coarsest unit of address space allocation.
- * <p>
+ *
  * In the 32-bit VM layout, this determines the granularity of
  * allocation in a discontigouous space.  In the 64-bit layout,
  * this determines the growth factor of the large contiguous spaces
