@@ -18,7 +18,8 @@ mod fixtures;
 mod handle_mmap_conflict;
 mod handle_mmap_oom;
 mod is_in_mmtk_spaces;
-mod issue139;
+mod issue139_allocate_unaligned_object_size;
+mod issue867_allocate_unrealistically_large_object;
 #[cfg(not(feature = "malloc_counted_size"))]
 mod malloc_api;
 #[cfg(feature = "malloc_counted_size")]
