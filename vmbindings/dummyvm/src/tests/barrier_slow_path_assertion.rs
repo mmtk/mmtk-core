@@ -4,12 +4,12 @@
 // Run the test with any plan that uses object barrier, and we also need both VO bit and extreme assertions.
 
 use crate::object_model::OBJECT_REF_OFFSET;
-use crate::{api::*, edges};
-use crate::tests::fixtures::MMTKSingleton;
 use crate::tests::fixtures::FixtureContent;
+use crate::tests::fixtures::MMTKSingleton;
+use crate::{api::*, edges};
 use atomic::Atomic;
 use mmtk::util::{Address, ObjectReference};
-use mmtk::util::{VMThread, VMMutatorThread};
+use mmtk::util::{VMMutatorThread, VMThread};
 use mmtk::vm::edge_shape::SimpleEdge;
 use mmtk::AllocationSemantics;
 
@@ -35,8 +35,11 @@ fn test_assertion_barrier_invalid_ref() {
     let invalid_objref = ObjectReference::from_raw_address(objref.to_raw_address() + 8usize);
     unsafe {
         let mu = &mut *mutator;
-        mu.barrier
-            .object_reference_write_slow(invalid_objref, edges::DummyVMEdge::Simple(edge), objref);
+        mu.barrier.object_reference_write_slow(
+            invalid_objref,
+            edges::DummyVMEdge::Simple(edge),
+            objref,
+        );
     }
 }
 
