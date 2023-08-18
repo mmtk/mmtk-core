@@ -2,12 +2,12 @@
 #![allow(dead_code)]
 
 use atomic_refcell::AtomicRefCell;
-use std::sync::Once;
 use std::sync::Mutex;
+use std::sync::Once;
 
+use mmtk::util::{ObjectReference, VMMutatorThread, VMThread};
 use mmtk::AllocationSemantics;
 use mmtk::MMTK;
-use mmtk::util::{ObjectReference, VMThread, VMMutatorThread};
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
@@ -16,7 +16,6 @@ use crate::DummyVM;
 pub trait FixtureContent {
     fn create() -> Self;
 }
-
 
 pub struct Fixture<T: FixtureContent> {
     content: AtomicRefCell<Option<Box<T>>>,
@@ -46,13 +45,13 @@ impl<T: FixtureContent> Fixture<T> {
 
 /// SerialFixture ensures all `with_fixture()` calls will be executed serially.
 pub struct SerialFixture<T: FixtureContent> {
-    content: Mutex<Option<Box<T>>>
+    content: Mutex<Option<Box<T>>>,
 }
 
 impl<T: FixtureContent> SerialFixture<T> {
     pub fn new() -> Self {
         Self {
-            content: Mutex::new(None)
+            content: Mutex::new(None),
         }
     }
 
@@ -94,7 +93,7 @@ impl FixtureContent for SingleObject {
 }
 
 pub struct MMTKSingleton {
-    pub mmtk: &'static MMTK<DummyVM>
+    pub mmtk: &'static MMTK<DummyVM>,
 }
 
 impl FixtureContent for MMTKSingleton {
