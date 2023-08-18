@@ -1,7 +1,7 @@
 // GITHUB-CI: MMTK_PLAN=all
 
-use crate::tests::fixtures::{Fixture, SingleObject};
 use crate::api::mmtk_is_in_mmtk_spaces as is_in_mmtk_spaces;
+use crate::tests::fixtures::{Fixture, SingleObject};
 use mmtk::util::*;
 
 lazy_static! {
@@ -43,7 +43,12 @@ pub fn large_offsets_aligned() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for log_offset in 12usize..(usize::BITS as usize) {
             let offset = 1usize << log_offset;
-            let addr = match fixture.objref.to_raw_address().as_usize().checked_add(offset) {
+            let addr = match fixture
+                .objref
+                .to_raw_address()
+                .as_usize()
+                .checked_add(offset)
+            {
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };
@@ -59,7 +64,12 @@ pub fn negative_offsets() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for log_offset in 1usize..(usize::BITS as usize) {
             let offset = 1usize << log_offset;
-            let addr = match fixture.objref.to_raw_address().as_usize().checked_sub(offset) {
+            let addr = match fixture
+                .objref
+                .to_raw_address()
+                .as_usize()
+                .checked_sub(offset)
+            {
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };

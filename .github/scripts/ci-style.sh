@@ -2,6 +2,8 @@
 
 export RUSTFLAGS="-D warnings"
 
+# --- Check main crate ---
+
 # check base
 cargo clippy
 # check all features
@@ -18,8 +20,10 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo clippy --tests --features perf_counter
 fi
 
+# --- Check auxiliary crate ---
+
 style_check_auxiliary_crate() {
-    crate_path = $1
+    crate_path=$1
 
     cargo clippy --manifest-path=$crate_path/Cargo.toml
     cargo fmt --manifest-path=$crate_path/Cargo.toml -- --check

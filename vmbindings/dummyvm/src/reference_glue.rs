@@ -1,7 +1,7 @@
-use mmtk::vm::ReferenceGlue;
-use mmtk::util::ObjectReference;
-use mmtk::util::opaque_pointer::VMWorkerThread;
 use crate::DummyVM;
+use mmtk::util::opaque_pointer::VMWorkerThread;
+use mmtk::util::ObjectReference;
+use mmtk::vm::ReferenceGlue;
 
 pub struct VMReferenceGlue {}
 

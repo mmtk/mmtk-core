@@ -4,23 +4,23 @@
 //
 // One way to avoid re-initialization is to have only one #[test] per module.
 // There are also helpers for creating fixtures in `fixture/mod.rs`.
-mod issue139;
-mod handle_mmap_oom;
+mod allocate_align_offset;
+mod allocate_with_disable_collection;
+mod allocate_with_initialize_collection;
+mod allocate_with_re_enable_collection;
+mod allocate_without_initialize_collection;
+mod barrier_slow_path_assertion;
+#[cfg(feature = "is_mmtk_object")]
+mod conservatism;
+mod edges_test;
+mod fixtures;
 #[cfg(target_os = "linux")]
 mod handle_mmap_conflict;
-mod allocate_align_offset;
-mod allocate_without_initialize_collection;
-mod allocate_with_initialize_collection;
-mod allocate_with_disable_collection;
-mod allocate_with_re_enable_collection;
+mod handle_mmap_oom;
+mod is_in_mmtk_spaces;
+mod issue139;
 #[cfg(not(feature = "malloc_counted_size"))]
 mod malloc_api;
 #[cfg(feature = "malloc_counted_size")]
 mod malloc_counted;
 mod malloc_ms;
-#[cfg(feature = "is_mmtk_object")]
-mod conservatism;
-mod is_in_mmtk_spaces;
-mod fixtures;
-mod edges_test;
-mod barrier_slow_path_assertion;

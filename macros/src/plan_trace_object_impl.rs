@@ -12,7 +12,7 @@ pub(crate) fn generate_trace_object<'a>(
     // Generate a check with early return for each space
     let space_field_handler = space_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
-        let ref f_ty = f.ty;
+        let f_ty = &f.ty;
 
         // Figure out copy
         let trace_attr = util::get_field_attribute(f, "trace").unwrap();
@@ -42,7 +42,7 @@ pub(crate) fn generate_trace_object<'a>(
     // Generate a fallback to the parent plan
     let parent_field_delegator = if let Some(f) = parent_field {
         let f_ident = f.ident.as_ref().unwrap();
-        let ref f_ty = f.ty;
+        let f_ty = &f.ty;
         quote! {
             <#f_ty as PlanTraceObject #ty_generics>::trace_object::<Q, KIND>(&self.#f_ident, __mmtk_queue, __mmtk_objref, __mmtk_worker)
         }
@@ -70,7 +70,7 @@ pub(crate) fn generate_post_scan_object<'a>(
 ) -> TokenStream2 {
     let scan_field_handler = post_scan_object_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
-        let ref f_ty = f.ty;
+        let f_ty = &f.ty;
 
         quote! {
             if self.#f_ident.in_space(__mmtk_objref) {
@@ -84,7 +84,7 @@ pub(crate) fn generate_post_scan_object<'a>(
     // Generate a fallback to the parent plan
     let parent_field_delegator = if let Some(f) = parent_field {
         let f_ident = f.ident.as_ref().unwrap();
-        let ref f_ty = f.ty;
+        let f_ty = &f.ty;
         quote! {
             <#f_ty as PlanTraceObject #ty_generics>::post_scan_object(&self.#f_ident, __mmtk_objref)
         }
@@ -110,7 +110,7 @@ pub(crate) fn generate_may_move_objects<'a>(
 ) -> TokenStream2 {
     // If any space or the parent may move objects, the plan may move objects
     let space_handlers = space_fields.iter().map(|f| {
-        let ref f_ty = f.ty;
+        let f_ty = &f.ty;
 
         quote! {
             || <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
@@ -118,7 +118,7 @@ pub(crate) fn generate_may_move_objects<'a>(
     });
 
     let parent_handler = if let Some(p) = parent_field {
-        let ref p_ty = p.ty;
+        let p_ty = &p.ty;
 
         quote! {
             || <#p_ty as PlanTraceObject #ty_generics>::may_move_objects::<KIND>()
