@@ -67,4 +67,3 @@ pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;
 pub use semispace::SS_CONSTRAINTS;
 pub use sticky::immix::STICKY_IMMIX_CONSTRAINTS;
-pub mod mygc;
