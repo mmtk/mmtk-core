@@ -394,8 +394,8 @@ impl NurserySize {
         }
     }
 
-    /// Returns a NurserySize or String containing error. Expects nursery size to be formatted as
-    /// "<NurseryKind>:<size in bytes>". For example, "Fixed:8192" creates a Fixed nursery of size
+    /// Returns a [`NurserySize`] or [`String`] containing error. Expects nursery size to be formatted as
+    /// `<NurseryKind>:<size in bytes>`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
     /// 8192 bytes.
     pub fn parse(s: &str) -> Result<NurserySize, String> {
         let ns: Vec<&str> = s.split(':').collect();

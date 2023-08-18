@@ -64,7 +64,7 @@ example of how to make a PGO build.
 MMTk does not run standalone. You would need to integrate MMTk with a language implementation.
 You can either try out one of the VM bindings we have been working on, or implement your own binding in your VM for MMTk.
 You can also implement your own GC algorithm in MMTk, and run it with supported VMs.
-You can find up-to-date full API documentation for mmtk-core [here](https://docs.mmtk.io/api).
+You can find up-to-date full API documentation for mmtk-core [here](https://docs.mmtk.io/api/mmtk).
 
 ### Try out our current bindings
 
@@ -86,7 +86,7 @@ MMTk provides a bi-directional interface with the language VM.
 To integrate MMTk with your language implementation, you need to provide an implementation of `VMBinding`, and
 you can optionally call MMTk's API for your needs.
 
-For more information, you can refer to our [porting guide](https://docs.mmtk.io/userguide/prefix.html) for VM implementors.
+For more information, you can refer to our [porting guide](https://docs.mmtk.io/portingguide/prefix.html) for VM implementors.
 
 ### Implement your GC
 
