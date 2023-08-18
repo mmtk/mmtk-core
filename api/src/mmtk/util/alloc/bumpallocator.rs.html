@@ -186,6 +186,10 @@
 <span id="186">186</span>
 <span id="187">187</span>
 <span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap};
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -346,6 +350,10 @@
         offset: usize,
         stress_test: bool,
     ) -&gt; Address {
+        <span class="kw">if </span><span class="self">self</span>.space.will_oom_on_acquire(<span class="self">self</span>.tls, size) {
+            <span class="kw">return </span>Address::ZERO;
+        }
+
         <span class="kw">let </span>block_size = (size + BLOCK_MASK) &amp; (!BLOCK_MASK);
         <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(<span class="self">self</span>.tls, bytes_to_pages(block_size));
         <span class="kw">if </span>acquired_start.is_zero() {

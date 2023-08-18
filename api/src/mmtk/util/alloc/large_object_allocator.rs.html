@@ -64,8 +64,6 @@
 <span id="64">64</span>
 <span id="65">65</span>
 <span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
@@ -113,15 +111,13 @@
     }
 
     <span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, _offset: usize) -&gt; Address {
-        <span class="kw">let </span>header = <span class="number">0</span>; <span class="comment">// HashSet is used instead of DoublyLinkedList
-        </span><span class="kw">let </span>maxbytes = allocator::get_maximum_aligned_size::&lt;VM&gt;(size + header, align);
-        <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(maxbytes);
-        <span class="kw">let </span>sp = <span class="self">self</span>.space.allocate_pages(<span class="self">self</span>.tls, pages);
-        <span class="kw">if </span>sp.is_zero() {
-            sp
-        } <span class="kw">else </span>{
-            sp + header
+        <span class="kw">if </span><span class="self">self</span>.space.will_oom_on_acquire(<span class="self">self</span>.tls, size) {
+            <span class="kw">return </span>Address::ZERO;
         }
+
+        <span class="kw">let </span>maxbytes = allocator::get_maximum_aligned_size::&lt;VM&gt;(size, align);
+        <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(maxbytes);
+        <span class="self">self</span>.space.allocate_pages(<span class="self">self</span>.tls, pages)
     }
 }
 

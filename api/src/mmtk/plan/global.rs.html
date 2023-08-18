@@ -1068,6 +1068,9 @@
 <span id="1068">1068</span>
 <span id="1069">1069</span>
 <span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1348,7 +1351,10 @@
 
     <span class="doccomment">/// Get the total number of pages for the heap.
     </span><span class="kw">fn </span>get_total_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.base().gc_trigger.policy.get_heap_size_in_pages()
+        <span class="self">self</span>.base()
+            .gc_trigger
+            .policy
+            .get_current_heap_size_in_pages()
     }
 
     <span class="doccomment">/// Get the number of pages that are still available for use. The available pages

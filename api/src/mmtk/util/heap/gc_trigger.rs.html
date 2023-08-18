@@ -515,6 +515,16 @@
 <span id="515">515</span>
 <span id="516">516</span>
 <span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
 </pre><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -622,7 +632,9 @@
     <span class="doccomment">/// Is current heap full?
     </span><span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool;
     <span class="doccomment">/// Return the current heap size (in pages)
-    </span><span class="kw">fn </span>get_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
+    </span><span class="kw">fn </span>get_current_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
+    <span class="doccomment">/// Return the upper bound of heap size
+    </span><span class="kw">fn </span>get_max_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
     <span class="doccomment">/// Can the heap size grow?
     </span><span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 }
@@ -647,7 +659,11 @@
         </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.total_pages
     }
 
-    <span class="kw">fn </span>get_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="kw">fn </span>get_current_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.total_pages
+    }
+
+    <span class="kw">fn </span>get_max_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.total_pages
     }
 
@@ -911,8 +927,12 @@
         </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
     }
 
-    <span class="kw">fn </span>get_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="kw">fn </span>get_current_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
+    }
+
+    <span class="kw">fn </span>get_max_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.max_heap_pages
     }
 
     <span class="kw">fn </span>can_heap_size_grow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
