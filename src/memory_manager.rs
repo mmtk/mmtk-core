@@ -533,7 +533,8 @@ pub fn process_bulk(builder: &mut MMTKBuilder, options: &str) -> bool {
     builder.set_options_bulk_by_str(options)
 }
 
-/// Return used memory in bytes.
+/// Return used memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
+/// page granularity.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -541,12 +542,27 @@ pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.plan.get_used_pages() << LOG_BYTES_IN_PAGE
 }
 
-/// Return free memory in bytes.
+/// Return free memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
+/// page granularity.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.plan.get_free_pages() << LOG_BYTES_IN_PAGE
+}
+
+/// Return the size of all the live objects in bytes in the last GC. MMTk usually accounts for memory in pages.
+/// This is a special method that we count the size of every live object in a GC, and sum up the total bytes.
+/// We provide this method so users can compare with `used_bytes` (which does page accounting), and know if
+/// the heap is fragmented.
+/// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
+/// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
+#[cfg(feature = "count_live_bytes_in_gc")]
+pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
+    mmtk.plan
+        .base()
+        .live_bytes_in_last_gc
+        .load(Ordering::SeqCst)
 }
 
 /// Return the starting address of the heap. *Note that currently MMTk uses

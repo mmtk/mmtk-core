@@ -1,6 +1,6 @@
 # Further Reading
 
-- [MMTk Crate Documentation](https://www.mmtk.io/mmtk-core/mmtk/index.html)
+- [MMTk Crate Documentation](https://docs.rs/crate/mmtk/latest)
 - Original MMTk papers:
   - [*Oil and Water? High Performance Garbage Collection in Java with MMTk*](https://www.mmtk.io/assets/pubs/mmtk-icse-2004.pdf) (Blackburn, Cheng, McKinley, 2004)
   - [*Myths and realities: The performance impact of garbage collection*](https://www.mmtk.io/assets/pubs/mmtk-sigmetrics-2004.pdf) (Blackburn, Cheng, McKinley, 2004)

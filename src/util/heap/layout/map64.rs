@@ -6,6 +6,7 @@ use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::memory::MmapStrategy;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
@@ -95,6 +96,7 @@ impl VMMap for Map64 {
             units as _,
             grain,
             heads,
+            MmapStrategy::Normal,
         ));
 
         self_mut.fl_map[index] =

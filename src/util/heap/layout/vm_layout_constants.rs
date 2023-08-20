@@ -14,7 +14,7 @@ pub const LOG_ADDRESS_SPACE: usize = 47;
 pub const LOG_ADDRESS_SPACE: usize = 32;
 /**
  * log_2 of the coarsest unit of address space allocation.
- * <p>
+ *
  * In the 32-bit VM layout, this determines the granularity of
  * allocation in a discontigouous space.  In the 64-bit layout,
  * this determines the growth factor of the large contiguous spaces

@@ -121,14 +121,6 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
 
 /// VM-specific methods for scanning roots/objects.
 pub trait Scanning<VM: VMBinding> {
-    /// Scan stack roots after all mutators are paused.
-    const SCAN_MUTATORS_IN_SAFEPOINT: bool = true;
-
-    /// Scan all the mutators within a single work packet.
-    ///
-    /// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled
-    const SINGLE_THREAD_MUTATOR_SCANNING: bool = true;
-
     /// Return true if the given object supports edge enqueuing.
     ///
     /// -   If this returns true, MMTk core will call `scan_object` on the object.
@@ -203,20 +195,16 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The GC thread that is performing the thread scan.
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread);
 
-    /// Scan all the mutators for roots.
+    /// Scan one mutator for stack roots.
     ///
-    /// The `memory_manager::is_mmtk_object` function can be used in this function if
-    /// -   the "is_mmtk_object" feature is enabled.
-    ///
-    /// Arguments:
-    /// * `tls`: The GC thread that is performing this scanning.
-    /// * `factory`: The VM uses it to create work packets for scanning roots.
-    fn scan_roots_in_all_mutator_threads(
-        tls: VMWorkerThread,
-        factory: impl RootsWorkFactory<VM::VMEdge>,
-    );
-
-    /// Scan one mutator for roots.
+    /// Some VM bindings may not be able to implement this method.
+    /// For example, the VM binding may only be able to enumerate all threads and
+    /// scan them while enumerating, but cannot scan stacks individually when given
+    /// the references of threads.
+    /// In that case, it can leave this method empty, and deal with stack
+    /// roots in [`Scanning::scan_vm_specific_roots`]. However, in that case, MMTk
+    /// does not know those roots are stack roots, and cannot perform any possible
+    /// optimization for the stack roots.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the "is_mmtk_object" feature is enabled.

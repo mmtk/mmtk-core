@@ -129,6 +129,18 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .scheduler
+                .worker_group
+                .get_and_clear_worker_live_bytes();
+            self.plan
+                .base()
+                .live_bytes_in_last_gc
+                .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 }
 
@@ -165,8 +177,6 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
 
 /// Stop all mutators
 ///
-/// Schedule a `ScanStackRoots` immediately after a mutator is paused
-///
 /// TODO: Smaller work granularity
 #[derive(Default)]
 pub struct StopMutators<ScanEdges: ProcessEdgesWork>(PhantomData<ScanEdges>);
@@ -182,33 +192,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
         <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
+            // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+            // Should we push to Unconstrained instead?
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanMutatorRoots::<E>(mutator));
         });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
-        if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
-            // Prepare mutators if necessary
-            // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-            if !mmtk.plan.base().stacks_prepared() {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                    <E::VM as VMBinding>::VMCollection::prepare_mutator(
-                        worker.tls,
-                        mutator.get_tls(),
-                        mutator,
-                    );
-                }
-            }
-            // Scan mutators
-            if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                    .add(ScanStackRoots::<E>::new());
-            } else {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                        .add(ScanStackRoot::<E>(mutator));
-                }
-            }
-        }
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
     }
 }
@@ -226,6 +216,28 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.plan.get_total_pages(),
             self.elapsed.as_millis()
         );
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk
+                .plan
+                .base()
+                .live_bytes_in_last_gc
+                .load(std::sync::atomic::Ordering::SeqCst);
+            let used_bytes =
+                mmtk.plan.get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+            debug_assert!(
+                live_bytes <= used_bytes,
+                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                live_bytes, used_bytes
+            );
+            info!(
+                "Live objects = {} bytes ({:04.1}% of {} used pages)",
+                live_bytes,
+                live_bytes as f64 * 100.0 / used_bytes as f64,
+                mmtk.plan.get_used_pages()
+            );
+        }
 
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
@@ -431,33 +443,11 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
     }
 }
 
-#[derive(Default)]
-pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
+pub struct ScanMutatorRoots<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
 
-impl<E: ProcessEdgesWork> ScanStackRoots<E> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanMutatorRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanStackRoots");
-        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_roots_in_all_mutator_threads(worker.tls, factory);
-        <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
-        for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-            mutator.flush();
-        }
-        mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
-    }
-}
-
-pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges::VM>);
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
+        trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
@@ -815,6 +805,13 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker);
             for object in objects_to_scan.iter().copied() {
+                // For any object we need to scan, we count its liv bytes
+                #[cfg(feature = "count_live_bytes_in_gc")]
+                closure
+                    .worker
+                    .shared
+                    .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
                 if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
                     trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.

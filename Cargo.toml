@@ -137,6 +137,9 @@ work_packet_stats = []
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
 
+# Count the size of all live objects in GC
+count_live_bytes_in_gc = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.
