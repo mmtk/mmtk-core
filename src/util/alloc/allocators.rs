@@ -185,10 +185,7 @@ impl Default for AllocatorSelector {
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AllocatorInfo {
-    BumpPointer {
-        limit_offset: usize,
-        cursor_offset: usize,
-    },
+    BumpPointer { bump_pointer_offset: usize },
     // FIXME: Add free-list fast-path
     Unimplemented,
     None,
@@ -212,12 +209,10 @@ impl AllocatorInfo {
                 let base_offset = offset_of!(Mutator<VM>, allocators)
                     + offset_of!(Allocators<VM>, bump_pointer)
                     + size_of::<BumpAllocator<VM>>() * index as usize;
-                let limit_offset = base_offset + offset_of!(BumpAllocator<VM>, limit);
-                let cursor_offset = base_offset + offset_of!(BumpAllocator<VM>, cursor);
+                let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
-                    limit_offset,
-                    cursor_offset,
+                    bump_pointer_offset: base_offset + bump_pointer_offset,
                 }
             }
 
@@ -225,11 +220,10 @@ impl AllocatorInfo {
                 let base_offset = offset_of!(Mutator<VM>, allocators)
                     + offset_of!(Allocators<VM>, immix)
                     + size_of::<ImmixAllocator<VM>>() * index as usize;
-                let limit_offset = base_offset + offset_of!(ImmixAllocator<VM>, limit);
-                let cursor_offset = base_offset + offset_of!(ImmixAllocator<VM>, cursor);
+                let bump_pointer_offset = offset_of!(ImmixAllocator<VM>, bump_pointer);
+
                 AllocatorInfo::BumpPointer {
-                    limit_offset,
-                    cursor_offset,
+                    bump_pointer_offset: base_offset + bump_pointer_offset,
                 }
             }
 
@@ -239,11 +233,10 @@ impl AllocatorInfo {
                     + size_of::<MarkCompactAllocator<VM>>() * index as usize;
                 let bump_offset =
                     base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
-                let limit_offset = bump_offset + offset_of!(BumpAllocator<VM>, limit);
-                let cursor_offset = bump_offset + offset_of!(BumpAllocator<VM>, cursor);
+                let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
+
                 AllocatorInfo::BumpPointer {
-                    limit_offset,
-                    cursor_offset,
+                    bump_pointer_offset: bump_offset + bump_pointer_offset,
                 }
             }
 

@@ -15,6 +15,9 @@ pub use allocators::AllocatorSelector;
 mod bumpallocator;
 pub use bumpallocator::BumpAllocator;
 
+pub mod bumppointer;
+pub use bumppointer::BumpPointer;
+
 mod large_object_allocator;
 pub use large_object_allocator::LargeObjectAllocator;
 
