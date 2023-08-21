@@ -1,7 +1,7 @@
+use crate::DummyVM;
 use mmtk::util::copy::{CopySemantics, GCWorkerCopyContext};
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::*;
-use crate::DummyVM;
 
 pub struct VMObjectModel {}
 
@@ -11,10 +11,13 @@ pub const OBJECT_REF_OFFSET: usize = 4;
 
 impl ObjectModel<DummyVM> for VMObjectModel {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
-    const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec = VMLocalForwardingPointerSpec::in_header(0);
-    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = VMLocalForwardingBitsSpec::in_header(0);
+    const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
+        VMLocalForwardingPointerSpec::in_header(0);
+    const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
+        VMLocalForwardingBitsSpec::in_header(0);
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
-    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec = VMLocalLOSMarkNurserySpec::in_header(0);
+    const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
+        VMLocalLOSMarkNurserySpec::in_header(0);
 
     const OBJECT_REF_OFFSET_LOWER_BOUND: isize = OBJECT_REF_OFFSET as isize;
 

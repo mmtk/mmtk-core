@@ -158,6 +158,10 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         offset: usize,
         stress_test: bool,
     ) -> Address {
+        if self.space.will_oom_on_acquire(self.tls, size) {
+            return Address::ZERO;
+        }
+
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
         let acquired_start = self.space.acquire(self.tls, bytes_to_pages(block_size));
         if acquired_start.is_zero() {
