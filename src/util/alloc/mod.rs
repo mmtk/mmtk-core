@@ -16,12 +16,6 @@ mod bumpallocator;
 pub use bumpallocator::BumpAllocator;
 pub use bumpallocator::BumpPointer;
 
-use crate::util::Address;
-use crate::vm::VMBinding;
-pub fn bump_alloc_check<VM: VMBinding>(allocator: &mut BumpAllocator<VM>, size: usize, align: usize, offset: usize) -> Address {
-    allocator.alloc(size, align, offset)
-}
-
 mod large_object_allocator;
 pub use large_object_allocator::LargeObjectAllocator;
 
