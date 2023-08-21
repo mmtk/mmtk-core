@@ -33,7 +33,7 @@ impl SpaceDescriptor {
 
     pub fn create_descriptor_from_heap_range(start: Address, end: Address) -> SpaceDescriptor {
         let top = end == vm_layout().heap_end;
-        if cfg!(target_pointer_width = "64") {
+        if vm_layout().force_use_contiguous_spaces {
             let space_index = if start > vm_layout().heap_end {
                 ::std::usize::MAX
             } else {
