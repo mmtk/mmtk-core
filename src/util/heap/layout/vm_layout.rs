@@ -119,10 +119,6 @@ impl VMLayout {
         }
     }
     /// Normal 64-bit configuration
-    #[cfg(target_pointer_width = "32")]
-    pub const fn new_64bit() -> Self {
-        unimplemented!("64-bit heap constants do not work with 32-bit builds")
-    }
     #[cfg(target_pointer_width = "64")]
     pub const fn new_64bit() -> Self {
         Self {
