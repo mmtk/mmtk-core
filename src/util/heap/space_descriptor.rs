@@ -90,7 +90,6 @@ impl SpaceDescriptor {
         (self.0 & TYPE_MASK) == TYPE_CONTIGUOUS_HI
     }
 
-    #[cfg(target_pointer_width = "64")]
     pub fn get_start(self) -> Address {
         if !vm_layout().force_use_contiguous_spaces {
             // For 64-bit discontiguous space, use 32-bit start address
@@ -98,11 +97,6 @@ impl SpaceDescriptor {
         } else {
             unsafe { Address::from_usize(self.get_index() << vm_layout().log_space_extent) }
         }
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    pub fn get_start(self) -> Address {
-        self.get_start_32()
     }
 
     fn get_start_32(self) -> Address {
