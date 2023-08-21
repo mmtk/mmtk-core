@@ -16,7 +16,7 @@ use crate::vm::*;
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
-    pub bump_pointer: BumpPointer<VM>,
+    pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
     /// [`Plan`] instance that this allocator instance is associated with.
@@ -26,9 +26,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     /// Is this a copy allocator?
     copy: bool,
     /// Bump pointer for large objects
-    pub(crate) large_cursor: Address,
-    /// Limit for bump pointer for large objects
-    pub(crate) large_limit: Address,
+    pub(crate) large_bump_pointer: BumpPointer,
     /// Is the current request for large or small?
     request_for_large: bool,
     /// Hole-searching cursor
@@ -38,8 +36,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
 impl<VM: VMBinding> ImmixAllocator<VM> {
     pub fn reset(&mut self) {
         self.bump_pointer.reset(Address::ZERO, Address::ZERO);
-        self.large_cursor = Address::ZERO;
-        self.large_limit = Address::ZERO;
+        self.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
         self.request_for_large = false;
         self.line = None;
     }
@@ -70,9 +67,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             crate::policy::immix::MAX_IMMIX_OBJECT_SIZE
         );
 
-        let result = self.bump_pointer.alloc(size, align, offset);
+        let result = align_allocation_no_fill::<VM>(self.bump_pointer.cursor, align, offset);
+        let new_cursor = result + size;
 
-        if result.is_zero() {
+        if new_cursor > self.bump_pointer.limit {
             trace!(
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls
@@ -86,6 +84,8 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             }
         } else {
             // Simple bump allocation.
+            fill_alignment_gap::<VM>(self.bump_pointer.cursor, result);
+            self.bump_pointer.cursor = new_cursor;
             trace!(
                 "{:?}: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
                 self.tls,
@@ -177,8 +177,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
             hot: false,
             copy,
-            large_cursor: Address::ZERO,
-            large_limit: Address::ZERO,
+            large_bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
             request_for_large: false,
             line: None,
         }
@@ -191,16 +190,16 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     /// Large-object (larger than a line) bump allocation.
     fn overflow_alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("{:?}: overflow_alloc", self.tls);
-        let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
+        let start = align_allocation_no_fill::<VM>(self.large_bump_pointer.cursor, align, offset);
         let end = start + size;
-        if end > self.large_limit {
+        if end > self.large_bump_pointer.limit {
             self.request_for_large = true;
             let rtn = self.alloc_slow_inline(size, align, offset);
             self.request_for_large = false;
             rtn
         } else {
-            fill_alignment_gap::<VM>(self.large_cursor, start);
-            self.large_cursor = end;
+            fill_alignment_gap::<VM>(self.large_bump_pointer.cursor, start);
+            self.large_bump_pointer.cursor = end;
             start
         }
     }
@@ -298,8 +297,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.end()
                 );
                 if self.request_for_large {
-                    self.large_cursor = block.start();
-                    self.large_limit = block.end();
+                    self.large_bump_pointer.cursor = block.start();
+                    self.large_bump_pointer.limit = block.end();
                 } else {
                     self.bump_pointer.cursor = block.start();
                     self.bump_pointer.limit = block.end();
@@ -322,9 +321,9 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
         // to service the allocation request
         if insufficient_space && get_maximum_aligned_size::<VM>(size, align) > Line::BYTES {
-            let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
+            let start = align_allocation_no_fill::<VM>(self.large_bump_pointer.cursor, align, offset);
             let end = start + size;
-            end > self.large_limit
+            end > self.large_bump_pointer.limit
         } else {
             // We try to acquire recyclable lines here just like `alloc_slow_hot()`
             insufficient_space && !self.acquire_recyclable_lines(size, align, offset)
@@ -349,14 +348,14 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             );
         }
 
-        if self.large_cursor < self.large_limit {
-            let old_lg_limit = self.large_limit;
-            let new_lg_limit = unsafe { Address::from_usize(self.large_limit - self.large_cursor) };
-            self.large_limit = new_lg_limit;
+        if self.large_bump_pointer.cursor < self.large_bump_pointer.limit {
+            let old_lg_limit = self.large_bump_pointer.limit;
+            let new_lg_limit = unsafe { Address::from_usize(self.large_bump_pointer.limit - self.large_bump_pointer.cursor) };
+            self.large_bump_pointer.limit = new_lg_limit;
             trace!(
                 "{:?}: set_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
-                self.large_cursor,
+                self.large_bump_pointer.cursor,
                 old_lg_limit,
                 new_lg_limit,
             );
@@ -381,14 +380,14 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             );
         }
 
-        if self.large_limit < self.large_cursor {
-            let old_lg_limit = self.large_limit;
-            let new_lg_limit = self.large_cursor + self.large_limit.as_usize();
-            self.large_limit = new_lg_limit;
+        if self.large_bump_pointer.limit < self.large_bump_pointer.cursor {
+            let old_lg_limit = self.large_bump_pointer.limit;
+            let new_lg_limit = self.large_bump_pointer.cursor + self.large_bump_pointer.limit.as_usize();
+            self.large_bump_pointer.limit = new_lg_limit;
             trace!(
                 "{:?}: restore_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
-                self.large_cursor,
+                self.large_bump_pointer.cursor,
                 old_lg_limit,
                 new_lg_limit,
             );

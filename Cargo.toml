@@ -19,7 +19,6 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
-memoffset = "0.9"
 atomic = "0.5.1"
 atomic_refcell = "0.1.7"
 atomic-traits = "0.3.0"
@@ -37,6 +36,7 @@ jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], opt
 lazy_static = "1.1"
 libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
+memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros
 mmtk-macros = { version = "0.18.0", path = "macros/" }
