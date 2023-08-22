@@ -196,13 +196,9 @@ pub struct VMLayoutFixture {
 
 impl VMLayoutFixture {
     pub fn create_with_layout(layout: Option<VMLayout>) -> Self {
-        if let Some(layout) = layout {
-            VMLayout::set_custom_vm_layout(layout);
-        }
-
         const MB: usize = 1024 * 1024;
         // 1MB heap
-        mmtk_init(MB);
+        mmtk_init_with_layout(MB, layout);
         mmtk_initialize_collection(VMThread::UNINITIALIZED);
         // Make sure GC does not run during test.
         mmtk_disable_collection();
