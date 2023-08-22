@@ -171,14 +171,9 @@ mod space_map {
             if i == 0 {
                 panic!("Invalid index: there is no space for index 0")
             } else {
-                (
-                    vm_layout()
-                        .heap_start
-                        .add((i - 1) << vm_layout().log_space_extent),
-                    vm_layout()
-                        .heap_start
-                        .add(i << vm_layout().log_space_extent),
-                )
+                let start = Address::ZERO.add(i << vm_layout().log_space_extent);
+                let extent = 1 << vm_layout().log_space_extent;
+                (start, start.add(extent))
             }
         }
     }

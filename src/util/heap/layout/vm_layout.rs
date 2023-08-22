@@ -119,6 +119,7 @@ impl VMLayout {
         assert!(self.log_space_extent <= self.log_address_space);
         if self.force_use_contiguous_spaces {
             assert!(self.log_space_extent <= (self.log_address_space - LOG_MAX_SPACES));
+            assert!(self.heap_start.is_aligned_to(self.max_space_extent()));
         }
     }
 }

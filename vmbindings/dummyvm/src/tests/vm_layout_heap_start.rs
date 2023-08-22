@@ -8,15 +8,16 @@ use mmtk::util::Address;
 fn test_vm_layout_heap_start() {
     let default = VMLayout::default();
 
-    // Test with an address that is smaller than the default heap size
+    // Test with an start address that is different to the default heap start
     #[cfg(target_pointer_width = "32")]
-    let before_default_heap_start = unsafe { Address::from_usize(0x7000_0000) };
+    let heap_start = unsafe { Address::from_usize(0x7000_0000) };
     #[cfg(target_pointer_width = "64")]
-    let before_default_heap_start = unsafe { Address::from_usize(0x0000_0100_0000_0000usize) };
-    assert!(before_default_heap_start < default.heap_start);
+    let heap_start = unsafe { Address::from_usize(0x0000_0400_0000_0000usize) };
+    #[cfg(target_pointer_width = "64")]
+    assert!(heap_start.is_aligned_to(default.max_space_extent()));
 
     let layout = VMLayout {
-        heap_start: before_default_heap_start,
+        heap_start,
         // Use default for the rest.
         ..default
     };
