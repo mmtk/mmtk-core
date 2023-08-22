@@ -31,7 +31,7 @@ pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
 pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 
 /// Runtime-initialized virtual memory constants
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VMLayout {
     /// log_2 of the addressable heap virtual space.
     pub log_address_space: usize,
@@ -154,7 +154,7 @@ impl VMLayout {
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
     /// This function must be called before MMTk::new()
-    pub fn set_custom_vm_layout(constants: VMLayout) {
+    pub(crate) fn set_custom_vm_layout(constants: VMLayout) {
         if cfg!(debug_assertions) {
             assert!(
                 !VM_LAYOUT_FETCHED.load(Ordering::SeqCst),
