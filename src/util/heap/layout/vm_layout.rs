@@ -108,7 +108,7 @@ impl VMLayout {
     /// This mask extracts a few bits from address, and use it as index to the space map table.
     /// When masked with this constant, the index is 1 to 16. If we mask any arbitrary address with this mask, we will get 0 to 31 (32 entries).
     pub(crate) fn address_mask(&self) -> usize {
-        0xff << self.log_space_extent
+        0x1f << self.log_space_extent
     }
 
     const fn validate(&self) {
