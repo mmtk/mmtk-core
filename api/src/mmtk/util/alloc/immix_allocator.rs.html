@@ -396,7 +396,10 @@
 <span id="396">396</span>
 <span id="397">397</span>
 <span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap};
+<span class="kw">use </span><span class="kw">super</span>::BumpPointer;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::line::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
@@ -413,10 +416,7 @@
 </span><span class="attribute">#[repr(C)]
 </span><span class="kw">pub struct </span>ImmixAllocator&lt;VM: VMBinding&gt; {
     <span class="kw">pub </span>tls: VMThread,
-    <span class="doccomment">/// Bump pointer
-    </span>cursor: Address,
-    <span class="doccomment">/// Limit for bump pointer
-    </span>limit: Address,
+    <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::util::alloc) bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt;,
     <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.
@@ -426,9 +426,7 @@
     <span class="doccomment">/// Is this a copy allocator?
     </span>copy: bool,
     <span class="doccomment">/// Bump pointer for large objects
-    </span>large_cursor: Address,
-    <span class="doccomment">/// Limit for bump pointer for large objects
-    </span>large_limit: Address,
+    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::util::alloc) large_bump_pointer: BumpPointer,
     <span class="doccomment">/// Is the current request for large or small?
     </span>request_for_large: bool,
     <span class="doccomment">/// Hole-searching cursor
@@ -437,10 +435,8 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmixAllocator&lt;VM&gt; {
     <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.cursor = Address::ZERO;
-        <span class="self">self</span>.limit = Address::ZERO;
-        <span class="self">self</span>.large_cursor = Address::ZERO;
-        <span class="self">self</span>.large_limit = Address::ZERO;
+        <span class="self">self</span>.bump_pointer.reset(Address::ZERO, Address::ZERO);
+        <span class="self">self</span>.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
         <span class="self">self</span>.request_for_large = <span class="bool-val">false</span>;
         <span class="self">self</span>.line = <span class="prelude-val">None</span>;
     }
@@ -470,10 +466,11 @@
             size,
             <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE
         );
-        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.cursor, align, offset);
+
+        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset);
         <span class="kw">let </span>new_cursor = result + size;
 
-        <span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.limit {
+        <span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.bump_pointer.limit {
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: Thread local buffer used up, go to alloc slow path&quot;</span>,
                 <span class="self">self</span>.tls
@@ -487,15 +484,15 @@
             }
         } <span class="kw">else </span>{
             <span class="comment">// Simple bump allocation.
-            </span>fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.cursor, result);
-            <span class="self">self</span>.cursor = new_cursor;
+            </span>fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, result);
+            <span class="self">self</span>.bump_pointer.cursor = new_cursor;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}&quot;</span>,
                 <span class="self">self</span>.tls,
                 size,
                 result,
-                <span class="self">self</span>.cursor,
-                <span class="self">self</span>.limit
+                <span class="self">self</span>.bump_pointer.cursor,
+                <span class="self">self</span>.bump_pointer.limit
             );
             result
         }
@@ -577,12 +574,10 @@
             tls,
             space: space.unwrap().downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
             plan,
-            cursor: Address::ZERO,
-            limit: Address::ZERO,
+            bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
             hot: <span class="bool-val">false</span>,
             copy,
-            large_cursor: Address::ZERO,
-            large_limit: Address::ZERO,
+            large_bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
             request_for_large: <span class="bool-val">false</span>,
             line: <span class="prelude-val">None</span>,
         }
@@ -595,16 +590,16 @@
     <span class="doccomment">/// Large-object (larger than a line) bump allocation.
     </span><span class="kw">fn </span>overflow_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: overflow_alloc&quot;</span>, <span class="self">self</span>.tls);
-        <span class="kw">let </span>start = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_cursor, align, offset);
+        <span class="kw">let </span>start = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_bump_pointer.cursor, align, offset);
         <span class="kw">let </span>end = start + size;
-        <span class="kw">if </span>end &gt; <span class="self">self</span>.large_limit {
+        <span class="kw">if </span>end &gt; <span class="self">self</span>.large_bump_pointer.limit {
             <span class="self">self</span>.request_for_large = <span class="bool-val">true</span>;
             <span class="kw">let </span>rtn = <span class="self">self</span>.alloc_slow_inline(size, align, offset);
             <span class="self">self</span>.request_for_large = <span class="bool-val">false</span>;
             rtn
         } <span class="kw">else </span>{
-            fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.large_cursor, start);
-            <span class="self">self</span>.large_cursor = end;
+            fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.large_bump_pointer.cursor, start);
+            <span class="self">self</span>.large_bump_pointer.cursor = end;
             start
         }
     }
@@ -642,8 +637,8 @@
             <span class="kw">if let </span><span class="prelude-val">Some</span>((start_line, end_line)) = <span class="self">self</span>.immix_space().get_next_available_lines(line)
             {
                 <span class="comment">// Find recyclable lines. Update the bump allocation cursor and limit.
-                </span><span class="self">self</span>.cursor = start_line.start();
-                <span class="self">self</span>.limit = end_line.start();
+                </span><span class="self">self</span>.bump_pointer.cursor = start_line.start();
+                <span class="self">self</span>.bump_pointer.limit = end_line.start();
                 <span class="macro">trace!</span>(
                     <span class="string">&quot;{:?}: acquire_recyclable_lines -&gt; {:?} [{:?}, {:?}) {:?}&quot;</span>,
                     <span class="self">self</span>.tls,
@@ -652,9 +647,13 @@
                     end_line,
                     <span class="self">self</span>.tls
                 );
-                <span class="kw">crate</span>::util::memory::zero(<span class="self">self</span>.cursor, <span class="self">self</span>.limit - <span class="self">self</span>.cursor);
+                <span class="kw">crate</span>::util::memory::zero(
+                    <span class="self">self</span>.bump_pointer.cursor,
+                    <span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor,
+                );
                 <span class="macro">debug_assert!</span>(
-                    align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.cursor, align, offset) + size &lt;= <span class="self">self</span>.limit
+                    align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset) + size
+                        &lt;= <span class="self">self</span>.bump_pointer.limit
                 );
                 <span class="kw">let </span>block = line.block();
                 <span class="self">self</span>.line = <span class="kw">if </span>end_line == block.end_line() {
@@ -698,11 +697,11 @@
                     block.end()
                 );
                 <span class="kw">if </span><span class="self">self</span>.request_for_large {
-                    <span class="self">self</span>.large_cursor = block.start();
-                    <span class="self">self</span>.large_limit = block.end();
+                    <span class="self">self</span>.large_bump_pointer.cursor = block.start();
+                    <span class="self">self</span>.large_bump_pointer.limit = block.end();
                 } <span class="kw">else </span>{
-                    <span class="self">self</span>.cursor = block.start();
-                    <span class="self">self</span>.limit = block.end();
+                    <span class="self">self</span>.bump_pointer.cursor = block.start();
+                    <span class="self">self</span>.bump_pointer.limit = block.end();
                 }
                 <span class="self">self</span>.alloc(size, align, offset)
             }
@@ -713,18 +712,19 @@
     /// the buffer limits have been restored using [`ImmixAllocator::restore_limit_for_stress`].
     /// Note that this function may implicitly change the limits of the allocator.
     </span><span class="kw">fn </span>require_new_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; bool {
-        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.cursor, align, offset);
+        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset);
         <span class="kw">let </span>new_cursor = result + size;
-        <span class="kw">let </span>insufficient_space = new_cursor &gt; <span class="self">self</span>.limit;
+        <span class="kw">let </span>insufficient_space = new_cursor &gt; <span class="self">self</span>.bump_pointer.limit;
 
         <span class="comment">// We want this function to behave as if `alloc()` has been called. Hence, we perform a
         // size check and then return the conditions where `alloc_slow_inline()` would be called
         // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
         // to service the allocation request
         </span><span class="kw">if </span>insufficient_space &amp;&amp; get_maximum_aligned_size::&lt;VM&gt;(size, align) &gt; Line::BYTES {
-            <span class="kw">let </span>start = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_cursor, align, offset);
+            <span class="kw">let </span>start =
+                align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_bump_pointer.cursor, align, offset);
             <span class="kw">let </span>end = start + size;
-            end &gt; <span class="self">self</span>.large_limit
+            end &gt; <span class="self">self</span>.large_bump_pointer.limit
         } <span class="kw">else </span>{
             <span class="comment">// We try to acquire recyclable lines here just like `alloc_slow_hot()`
             </span>insufficient_space &amp;&amp; !<span class="self">self</span>.acquire_recyclable_lines(size, align, offset)
@@ -735,27 +735,30 @@
     /// thread local buffer size, which should be always smaller than the bump cursor. This method
     /// may be reentrant. We need to check before setting the values.
     </span><span class="kw">fn </span>set_limit_for_stress(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="kw">if </span><span class="self">self</span>.cursor &lt; <span class="self">self</span>.limit {
-            <span class="kw">let </span>old_limit = <span class="self">self</span>.limit;
-            <span class="kw">let </span>new_limit = <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.limit - <span class="self">self</span>.cursor) };
-            <span class="self">self</span>.limit = new_limit;
+        <span class="kw">if </span><span class="self">self</span>.bump_pointer.cursor &lt; <span class="self">self</span>.bump_pointer.limit {
+            <span class="kw">let </span>old_limit = <span class="self">self</span>.bump_pointer.limit;
+            <span class="kw">let </span>new_limit =
+                <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor) };
+            <span class="self">self</span>.bump_pointer.limit = new_limit;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: set_limit_for_stress. normal c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.tls,
-                <span class="self">self</span>.cursor,
+                <span class="self">self</span>.bump_pointer.cursor,
                 old_limit,
                 new_limit,
             );
         }
 
-        <span class="kw">if </span><span class="self">self</span>.large_cursor &lt; <span class="self">self</span>.large_limit {
-            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_limit;
-            <span class="kw">let </span>new_lg_limit = <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.large_limit - <span class="self">self</span>.large_cursor) };
-            <span class="self">self</span>.large_limit = new_lg_limit;
+        <span class="kw">if </span><span class="self">self</span>.large_bump_pointer.cursor &lt; <span class="self">self</span>.large_bump_pointer.limit {
+            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_bump_pointer.limit;
+            <span class="kw">let </span>new_lg_limit = <span class="kw">unsafe </span>{
+                Address::from_usize(<span class="self">self</span>.large_bump_pointer.limit - <span class="self">self</span>.large_bump_pointer.cursor)
+            };
+            <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: set_limit_for_stress. large c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.tls,
-                <span class="self">self</span>.large_cursor,
+                <span class="self">self</span>.large_bump_pointer.cursor,
                 old_lg_limit,
                 new_lg_limit,
             );
@@ -767,27 +770,28 @@
     /// actual limit from the size and the cursor. This method may be reentrant. We need to check
     /// before setting the values.
     </span><span class="kw">fn </span>restore_limit_for_stress(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="kw">if </span><span class="self">self</span>.limit &lt; <span class="self">self</span>.cursor {
-            <span class="kw">let </span>old_limit = <span class="self">self</span>.limit;
-            <span class="kw">let </span>new_limit = <span class="self">self</span>.cursor + <span class="self">self</span>.limit.as_usize();
-            <span class="self">self</span>.limit = new_limit;
+        <span class="kw">if </span><span class="self">self</span>.bump_pointer.limit &lt; <span class="self">self</span>.bump_pointer.cursor {
+            <span class="kw">let </span>old_limit = <span class="self">self</span>.bump_pointer.limit;
+            <span class="kw">let </span>new_limit = <span class="self">self</span>.bump_pointer.cursor + <span class="self">self</span>.bump_pointer.limit.as_usize();
+            <span class="self">self</span>.bump_pointer.limit = new_limit;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: restore_limit_for_stress. normal c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.tls,
-                <span class="self">self</span>.cursor,
+                <span class="self">self</span>.bump_pointer.cursor,
                 old_limit,
                 new_limit,
             );
         }
 
-        <span class="kw">if </span><span class="self">self</span>.large_limit &lt; <span class="self">self</span>.large_cursor {
-            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_limit;
-            <span class="kw">let </span>new_lg_limit = <span class="self">self</span>.large_cursor + <span class="self">self</span>.large_limit.as_usize();
-            <span class="self">self</span>.large_limit = new_lg_limit;
+        <span class="kw">if </span><span class="self">self</span>.large_bump_pointer.limit &lt; <span class="self">self</span>.large_bump_pointer.cursor {
+            <span class="kw">let </span>old_lg_limit = <span class="self">self</span>.large_bump_pointer.limit;
+            <span class="kw">let </span>new_lg_limit =
+                <span class="self">self</span>.large_bump_pointer.cursor + <span class="self">self</span>.large_bump_pointer.limit.as_usize();
+            <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;{:?}: restore_limit_for_stress. large c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.tls,
-                <span class="self">self</span>.large_cursor,
+                <span class="self">self</span>.large_bump_pointer.cursor,
                 old_lg_limit,
                 new_lg_limit,
             );

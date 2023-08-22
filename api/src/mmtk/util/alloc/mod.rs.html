@@ -36,6 +36,7 @@
 <span id="36">36</span>
 <span id="37">37</span>
 <span id="38">38</span>
+<span id="39">39</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Various allocators implementation.
 
 /// The allocator trait and allocation-related functions.
@@ -46,12 +47,13 @@
 
 <span class="doccomment">/// A list of all the allocators, embedded in Mutator
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>allocators;
+<span class="kw">pub use </span>allocators::AllocatorInfo;
 <span class="kw">pub use </span>allocators::AllocatorSelector;
-<span class="kw">pub use </span>allocators::Allocators;
 
 <span class="doccomment">/// Bump pointer allocator
 </span><span class="kw">mod </span>bumpallocator;
 <span class="kw">pub use </span>bumpallocator::BumpAllocator;
+<span class="kw">pub use </span>bumpallocator::BumpPointer;
 
 <span class="kw">mod </span>large_object_allocator;
 <span class="kw">pub use </span>large_object_allocator::LargeObjectAllocator;

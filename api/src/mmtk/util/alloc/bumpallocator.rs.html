@@ -190,8 +190,27 @@
 <span id="190">190</span>
 <span id="191">191</span>
 <span id="192">192</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap};
-<span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 
@@ -209,25 +228,44 @@
 </span><span class="kw">pub struct </span>BumpAllocator&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// [`VMThread`] associated with this allocator instance
     </span><span class="kw">pub </span>tls: VMThread,
-    <span class="doccomment">/// Current cursor for bump pointer
-    </span>cursor: Address,
-    <span class="doccomment">/// Limit for bump pointer
-    </span>limit: Address,
+    <span class="doccomment">/// Bump-pointer itself.
+    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::util::alloc) bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;,
     <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.
     </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
 }
 
+<span class="doccomment">/// A common fast-path bump-pointer allocator shared across different allocator implementations
+/// that use bump-pointer allocation.
+</span><span class="attribute">#[repr(C)]
+</span><span class="kw">pub struct </span>BumpPointer {
+    <span class="kw">pub </span>cursor: Address,
+    <span class="kw">pub </span>limit: Address,
+}
+
+<span class="kw">impl </span>BumpPointer {
+    <span class="kw">pub const fn </span>new(start: Address, end: Address) -&gt; <span class="self">Self </span>{
+        BumpPointer {
+            cursor: start,
+            limit: end,
+        }
+    }
+
+    <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, end: Address) {
+        <span class="self">self</span>.cursor = start;
+        <span class="self">self</span>.limit = end;
+    }
+}
+
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; BumpAllocator&lt;VM&gt; {
     <span class="kw">pub fn </span>set_limit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, limit: Address) {
-        <span class="self">self</span>.cursor = start;
-        <span class="self">self</span>.limit = limit;
+        <span class="self">self</span>.bump_pointer.reset(start, limit);
     }
 
     <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.cursor = <span class="kw">unsafe </span>{ Address::zero() };
-        <span class="self">self</span>.limit = <span class="kw">unsafe </span>{ Address::zero() };
+        <span class="kw">let </span>zero = <span class="kw">unsafe </span>{ Address::zero() };
+        <span class="self">self</span>.bump_pointer.reset(zero, zero);
     }
 
     <span class="kw">pub fn </span>rebind(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;) {
@@ -235,6 +273,9 @@
         <span class="self">self</span>.space = space;
     }
 }
+
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::fill_alignment_gap;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Allocator&lt;VM&gt; <span class="kw">for </span>BumpAllocator&lt;VM&gt; {
     <span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt; {
@@ -255,21 +296,21 @@
 
     <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">trace!</span>(<span class="string">&quot;alloc&quot;</span>);
-        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.cursor, align, offset);
+        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset);
         <span class="kw">let </span>new_cursor = result + size;
 
-        <span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.limit {
+        <span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.bump_pointer.limit {
             <span class="macro">trace!</span>(<span class="string">&quot;Thread local buffer used up, go to alloc slow path&quot;</span>);
             <span class="self">self</span>.alloc_slow(size, align, offset)
         } <span class="kw">else </span>{
-            fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.cursor, result);
-            <span class="self">self</span>.cursor = new_cursor;
+            fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, result);
+            <span class="self">self</span>.bump_pointer.cursor = new_cursor;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}&quot;</span>,
                 size,
                 result,
-                <span class="self">self</span>.cursor,
-                <span class="self">self</span>.limit
+                <span class="self">self</span>.bump_pointer.cursor,
+                <span class="self">self</span>.bump_pointer.limit
             );
             result
         }
@@ -300,24 +341,24 @@
         }
 
         <span class="macro">trace!</span>(<span class="string">&quot;alloc_slow stress_test&quot;</span>);
-        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.cursor, align, offset);
+        <span class="kw">let </span>result = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, align, offset);
         <span class="kw">let </span>new_cursor = result + size;
 
         <span class="comment">// For stress test, limit is [0, block_size) to artificially make the
         // check in the fastpath (alloc()) fail. The real limit is recovered by
         // adding it to the current cursor.
-        </span><span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.cursor + <span class="self">self</span>.limit.as_usize() {
+        </span><span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.bump_pointer.cursor + <span class="self">self</span>.bump_pointer.limit.as_usize() {
             <span class="self">self</span>.acquire_block(size, align, offset, <span class="bool-val">true</span>)
         } <span class="kw">else </span>{
-            fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.cursor, result);
-            <span class="self">self</span>.limit -= new_cursor - <span class="self">self</span>.cursor;
-            <span class="self">self</span>.cursor = new_cursor;
+            fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, result);
+            <span class="self">self</span>.bump_pointer.limit -= new_cursor - <span class="self">self</span>.bump_pointer.cursor;
+            <span class="self">self</span>.bump_pointer.cursor = new_cursor;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}&quot;</span>,
                 size,
                 result,
-                <span class="self">self</span>.cursor,
-                <span class="self">self</span>.limit
+                <span class="self">self</span>.bump_pointer.cursor,
+                <span class="self">self</span>.bump_pointer.limit
             );
             result
         }
@@ -336,8 +377,7 @@
     ) -&gt; <span class="self">Self </span>{
         BumpAllocator {
             tls,
-            cursor: <span class="kw">unsafe </span>{ Address::zero() },
-            limit: <span class="kw">unsafe </span>{ Address::zero() },
+            bump_pointer: <span class="kw">unsafe </span>{ BumpPointer::new(Address::zero(), Address::zero()) },
             space,
             plan,
         }

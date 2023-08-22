@@ -111,7 +111,7 @@
 /// reserve extra bytes when allocating
 </span><span class="attribute">#[repr(C)]
 </span><span class="kw">pub struct </span>MarkCompactAllocator&lt;VM: VMBinding&gt; {
-    bump_allocator: BumpAllocator&lt;VM&gt;,
+    <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::util::alloc) bump_allocator: BumpAllocator&lt;VM&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompactAllocator&lt;VM&gt; {

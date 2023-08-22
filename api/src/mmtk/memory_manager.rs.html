@@ -921,7 +921,6 @@
 <span id="921">921</span>
 <span id="922">922</span>
 <span id="923">923</span>
-<span id="924">924</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -951,7 +950,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::ReferenceGlue;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>std::sync::atomic::Ordering;
-
 <span class="doccomment">/// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
 ///
