@@ -68,7 +68,7 @@ impl MMTKBuilder {
 
     /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
     /// This function must be called before MMTk::new()
-    pub fn set_custom_vm_layout(&mut self, constants: VMLayout) {
+    pub fn set_vm_layout(&mut self, constants: VMLayout) {
         VMLayout::set_custom_vm_layout(constants)
     }
 
