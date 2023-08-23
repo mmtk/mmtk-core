@@ -97,10 +97,14 @@ pub fn mmap_fixed(
     strategy: MmapStrategy,
 ) -> Result<()> {
     let ptr = start.to_mut_ptr();
-    wrap_libc_call(
+    let result = wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
-    )?;
+    );
+    if result.is_err() {
+        eprintln!("ERROR failed to map memory: {:?}..{:?}", start, start + size);
+    }
+    result?;
     match strategy {
         MmapStrategy::Normal => Ok(()),
         MmapStrategy::TransparentHugePages => {
