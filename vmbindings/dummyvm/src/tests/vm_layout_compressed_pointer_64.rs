@@ -10,12 +10,17 @@ use crate::tests::vm_layout_default::test_with_vm_layout;
 
 #[test]
 fn test_vm_layout_compressed_pointer() {
-    let start = 0x4000_0000;
+    let start = if cfg!(target_os = "macos") {
+        // Impossible to map 0x4000_0000 on maocOS. SO choose a different address.
+        0x40_0000_0000
+    } else {
+        0x4000_0000
+    };
     let heap_size = 1024 * 1024;
     let end = match start + heap_size {
         end if end <= (4usize << 30) => 4usize << 30,
         end if end <= (32usize << 30) => 32usize << 30,
-        _ => 0x4000_0000 + (32usize << 30),
+        _ => start + (32usize << 30),
     };
     let layout = VMLayout {
         log_address_space: 35,
