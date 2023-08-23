@@ -57,7 +57,8 @@ mod only_64_bit {
         // Note: We cannot guarantee GC will allocate an object in the low address region.
         // So we make up addresses just for testing the bit operations of compressed OOP edges.
         let compressed1 = (COMPRESSABLE_ADDR1 >> 3) as u32;
-        let objref1 = ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR1) });
+        let objref1 =
+            ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR1) });
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
@@ -73,7 +74,8 @@ mod only_64_bit {
         // So we make up addresses just for testing the bit operations of compressed OOP edges.
         let compressed1 = (COMPRESSABLE_ADDR1 >> 3) as u32;
         let compressed2 = (COMPRESSABLE_ADDR2 >> 3) as u32;
-        let objref2 = ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR2) });
+        let objref2 =
+            ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR2) });
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
@@ -123,8 +125,10 @@ const TAG2: usize = 0b10;
 #[test]
 pub fn load_tagged() {
     FIXTURE.with_fixture(|fixture| {
-        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG1);
-        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
+        let mut slot1: Atomic<usize> =
+            Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG1);
+        let mut slot2: Atomic<usize> =
+            Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
 
         let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
         let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
@@ -140,8 +144,10 @@ pub fn load_tagged() {
 #[test]
 pub fn store_tagged() {
     FIXTURE.with_fixture(|fixture| {
-        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG1);
-        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
+        let mut slot1: Atomic<usize> =
+            Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG1);
+        let mut slot2: Atomic<usize> =
+            Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
 
         let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
         let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));

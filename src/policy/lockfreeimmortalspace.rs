@@ -12,6 +12,7 @@ use crate::util::address::Address;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
 use crate::util::heap::PageResource;
+use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::opaque_pointer::*;
@@ -200,7 +201,12 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
+        let strategy = if *args.options.transparent_hugepages {
+            MmapStrategy::TransparentHugePages
+        } else {
+            MmapStrategy::Normal
+        };
+        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes, strategy).unwrap();
         if space
             .metadata
             .try_map_metadata_space(AVAILABLE_START, total_bytes)
