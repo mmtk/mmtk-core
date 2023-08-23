@@ -4,7 +4,7 @@
 # If the output path is changed in this script, we need to update rustdoc.yml as well.
 
 # deny warnings for rustdoc
-export RUSTFLAGS="-D warnings"
+export RUSTDOCFLAGS="-D warnings"
 
 # Check cargo doc
 # We document public and private items for MMTk developers (GC implementers).
@@ -22,6 +22,6 @@ if ! cat $project_root/src/plan/mod.rs | grep -q "pub mod mygc;"; then
 fi
 cargo build
 
-# Install mdbook using the stable toolchain (mdbook uses scoped-tls which requires rust 1.59.0)
+# Install mdbook using the stable toolchain
 cargo +stable install mdbook
 mdbook build $project_root/docs/userguide
