@@ -49,6 +49,11 @@
 * Run V8 binding tests on GitHub hosted runner by @caizixian in https://github.com/mmtk/mmtk-core/pull/900
 * Add tracing tools and documentation by @caizixian in https://github.com/mmtk/mmtk-core/pull/898
 * Run benchmarks for more plans on OpenJDK by @qinsoon in https://github.com/mmtk/mmtk-core/pull/901
+* Apply style check on auxiliary crates (macros and dummyvm) by @caizixian in https://github.com/mmtk/mmtk-core/pull/913
+* Call Collection::out_of_memory if the allocation size is larger than max heap size by @qinsoon in https://github.com/mmtk/mmtk-core/pull/896
+* Add a unit test for comma-separated bulk option parsing by @caizixian in https://github.com/mmtk/mmtk-core/pull/911
+* Merge tutorial and porting guide into user guide by @qinsoon in https://github.com/mmtk/mmtk-core/pull/907
+* Fix broken links in README and cargo doc warnings by @caizixian in https://github.com/mmtk/mmtk-core/pull/912
 
 ### API
 * Add object() in MemorySlice by @qinsoon in https://github.com/mmtk/mmtk-core/pull/798
@@ -61,6 +66,9 @@
 * Expose Allocators type to public API by @playXE in https://github.com/mmtk/mmtk-core/pull/880
 * Collect live bytes during GC by @qinsoon in https://github.com/mmtk/mmtk-core/pull/768
 * Tidy up mutator scan API by @qinsoon in https://github.com/mmtk/mmtk-core/pull/875
+* Implement transparent hugepage support by @caizixian in https://github.com/mmtk/mmtk-core/pull/905
+* Implement AllocatorInfo by @playXE in https://github.com/mmtk/mmtk-core/pull/889
+* Add comma as an alternative options string separator by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/909
 
 ## New Contributors
 * @ArberSephirotheca made their first contribution in https://github.com/mmtk/mmtk-core/pull/814
