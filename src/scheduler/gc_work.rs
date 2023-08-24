@@ -42,7 +42,7 @@ impl<C: GCWorkContext> Prepare<C> {
     }
 }
 
-impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
+impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
@@ -110,7 +110,7 @@ impl<C: GCWorkContext> Release<C> {
     }
 }
 
-impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
+impl<C: GCWorkContext> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
 
@@ -187,7 +187,7 @@ impl<C: GCWorkContext> StopMutators<C> {
     }
 }
 
-impl<C: GCWorkContext + Send + 'static> GCWork<C::VM> for StopMutators<C> {
+impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
@@ -445,7 +445,7 @@ impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
 
 pub struct ScanMutatorRoots<C: GCWorkContext>(pub &'static mut Mutator<C::VM>);
 
-impl<C: GCWorkContext + 'static> GCWork<C::VM> for ScanMutatorRoots<C> {
+impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
@@ -480,7 +480,7 @@ impl<C: GCWorkContext> ScanVMSpecificRoots<C> {
     }
 }
 
-impl<C: GCWorkContext + Send + 'static> GCWork<C::VM> for ScanVMSpecificRoots<C> {
+impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<
