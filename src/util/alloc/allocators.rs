@@ -163,7 +163,7 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
@@ -171,30 +171,20 @@ pub enum AllocatorSelector {
     Immix(u8),
     MarkCompact(u8),
     FreeList(u8),
+    #[default]
     None,
-}
-
-impl Default for AllocatorSelector {
-    fn default() -> Self {
-        AllocatorSelector::None
-    }
 }
 
 /// This type describes allocator information. It is used to
 /// generate fast paths for the GC. All offset fields are relative to [`Mutator`](crate::Mutator).
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorInfo {
     BumpPointer { bump_pointer_offset: usize },
     // FIXME: Add free-list fast-path
     Unimplemented,
+    #[default]
     None,
-}
-
-impl Default for AllocatorInfo {
-    fn default() -> Self {
-        AllocatorInfo::None
-    }
 }
 
 impl AllocatorInfo {
