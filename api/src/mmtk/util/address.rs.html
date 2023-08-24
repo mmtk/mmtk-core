@@ -874,7 +874,7 @@
     }
 
     <span class="doccomment">/// is this address aligned to the given alignment
-    </span><span class="kw">pub fn </span>is_aligned_to(<span class="self">self</span>, align: usize) -&gt; bool {
+    </span><span class="kw">pub const fn </span>is_aligned_to(<span class="self">self</span>, align: usize) -&gt; bool {
         <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
         conversions::raw_is_aligned(<span class="self">self</span>.<span class="number">0</span>, align)
     }

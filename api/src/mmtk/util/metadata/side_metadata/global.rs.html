@@ -1716,7 +1716,7 @@
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
@@ -3007,7 +3007,7 @@
         <span class="macro">assert_eq!</span>(side_metadata.calculate_reserved_pages(<span class="number">1024</span>), <span class="number">16 </span>+ <span class="number">1</span>);
     }
 
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout;
     <span class="kw">use </span><span class="kw">crate</span>::util::test_util::{serial_test, with_cleanup};
     <span class="kw">use </span>paste::paste;
 
@@ -3030,7 +3030,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>sanity = SideMetadataSanity::new();
             sanity.verify_metadata_context(<span class="string">&quot;TestPolicy&quot;</span>, <span class="kw-2">&amp;</span>context);
 
-            <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+            <span class="kw">let </span>data_addr = vm_layout::vm_layout().heap_start;
             <span class="kw">let </span>meta_addr = address_to_meta_address(<span class="kw-2">&amp;</span>spec, data_addr);
             with_cleanup(
                 || {

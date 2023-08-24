@@ -84,9 +84,9 @@
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
-</pre></div><pre class="rust"><code><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
+<span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataOffset;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -136,7 +136,7 @@
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">1</span>;
 
 <span class="kw">pub const </span>LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
-    LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
+    VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
 <span class="comment">// TODO - we should check this limit somewhere
 // pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =
 //     1 &lt;&lt; (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO);

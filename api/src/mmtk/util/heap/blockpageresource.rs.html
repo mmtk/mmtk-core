@@ -395,12 +395,11 @@
 <a href="#395" id="395">395</a>
 <a href="#396" id="396">396</a>
 <a href="#397" id="397">397</a>
-<a href="#398" id="398">398</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use super</span>::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
@@ -559,7 +558,6 @@
     }
 
     <span class="kw">pub fn </span>release_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.common().contiguous);
         <span class="kw">let </span>pages = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_PAGES;
         <span class="macro">debug_assert!</span>(pages <span class="kw">as </span>usize &lt;= <span class="self">self</span>.common().accounting.get_committed_pages());
         <span class="self">self</span>.common().accounting.release(pages <span class="kw">as _</span>);

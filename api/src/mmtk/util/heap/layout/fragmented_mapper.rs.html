@@ -570,7 +570,7 @@
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
@@ -935,7 +935,7 @@
 </span><span class="kw">mod </span>tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::MMAP_CHUNK_BYTES;
     <span class="kw">use </span><span class="kw">crate</span>::util::memory;
     <span class="kw">use </span><span class="kw">crate</span>::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
     <span class="kw">use </span><span class="kw">crate</span>::util::test_util::{serial_test, with_cleanup};

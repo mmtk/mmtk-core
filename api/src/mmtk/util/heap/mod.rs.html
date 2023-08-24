@@ -18,24 +18,26 @@
 <a href="#18" id="18">18</a>
 <a href="#19" id="19">19</a>
 <a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>accounting;
 <span class="attr">#[macro_use]
-</span><span class="kw">pub mod </span>layout;
-<span class="kw">pub mod </span>blockpageresource;
-<span class="kw">pub mod </span>chunk_map;
-<span class="kw">pub mod </span>freelistpageresource;
-<span class="kw">pub mod </span>gc_trigger;
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>layout;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>blockpageresource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>chunk_map;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>freelistpageresource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>gc_trigger;
 <span class="kw">mod </span>heap_meta;
-<span class="kw">pub mod </span>monotonepageresource;
-<span class="kw">pub mod </span>pageresource;
-<span class="kw">pub mod </span>space_descriptor;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>monotonepageresource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>pageresource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>space_descriptor;
 <span class="kw">mod </span>vmrequest;
 
-<span class="kw">pub use </span><span class="self">self</span>::accounting::PageAccounting;
-<span class="kw">pub use </span><span class="self">self</span>::blockpageresource::BlockPageResource;
-<span class="kw">pub use </span><span class="self">self</span>::freelistpageresource::FreeListPageResource;
-<span class="kw">pub use </span><span class="self">self</span>::heap_meta::HeapMeta;
-<span class="kw">pub use </span><span class="self">self</span>::monotonepageresource::MonotonePageResource;
-<span class="kw">pub use </span><span class="self">self</span>::pageresource::PageResource;
-<span class="kw">pub use </span><span class="self">self</span>::vmrequest::VMRequest;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::accounting::PageAccounting;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::blockpageresource::BlockPageResource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::freelistpageresource::FreeListPageResource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::heap_meta::HeapMeta;
+<span class="kw">pub use </span><span class="self">self</span>::layout::vm_layout;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::monotonepageresource::MonotonePageResource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::pageresource::PageResource;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span><span class="self">self</span>::vmrequest::VMRequest;
 </code></pre></div></section></main></body></html>

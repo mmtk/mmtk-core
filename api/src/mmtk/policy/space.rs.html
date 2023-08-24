@@ -628,7 +628,6 @@
 <a href="#628" id="628">628</a>
 <a href="#629" id="629">629</a>
 <a href="#630" id="630">630</a>
-<a href="#631" id="631">631</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -638,8 +637,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::{vm_layout, LOG_BYTES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{PageResource, VMRequest};
 <span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{ActivePlan, Collection};
@@ -654,7 +652,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
@@ -1244,10 +1242,10 @@
 }
 
 <span class="kw">fn </span>get_frac_available(frac: f32) -&gt; usize {
-    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_START={}&quot;</span>, AVAILABLE_START);
-    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_END={}&quot;</span>, AVAILABLE_END);
-    <span class="kw">let </span>bytes = (frac * AVAILABLE_BYTES <span class="kw">as </span>f32) <span class="kw">as </span>usize;
-    <span class="macro">trace!</span>(<span class="string">&quot;bytes={}*{}={}&quot;</span>, frac, AVAILABLE_BYTES, bytes);
+    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_START={}&quot;</span>, vm_layout().available_start());
+    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_END={}&quot;</span>, vm_layout().available_end());
+    <span class="kw">let </span>bytes = (frac * vm_layout().available_bytes() <span class="kw">as </span>f32) <span class="kw">as </span>usize;
+    <span class="macro">trace!</span>(<span class="string">&quot;bytes={}*{}={}&quot;</span>, frac, vm_layout().available_bytes(), bytes);
     <span class="kw">let </span>mb = bytes &gt;&gt; LOG_BYTES_IN_MBYTE;
     <span class="kw">let </span>rtn = mb &lt;&lt; LOG_BYTES_IN_MBYTE;
     <span class="macro">trace!</span>(<span class="string">&quot;rtn={}&quot;</span>, rtn);

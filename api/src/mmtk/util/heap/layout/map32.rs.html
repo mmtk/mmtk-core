@@ -308,13 +308,14 @@
 <a href="#308" id="308">308</a>
 <a href="#309" id="309">309</a>
 <a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::int_array_freelist::IntArrayFreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -342,17 +343,18 @@
 
 <span class="kw">impl </span>Map32 {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>max_chunks = vm_layout().max_chunks();
         Map32 {
-            prev_link: <span class="macro">vec!</span>[<span class="number">0</span>; MAX_CHUNKS],
-            next_link: <span class="macro">vec!</span>[<span class="number">0</span>; MAX_CHUNKS],
-            region_map: IntArrayFreeList::new(MAX_CHUNKS, MAX_CHUNKS <span class="kw">as _</span>, <span class="number">1</span>),
+            prev_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
+            next_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
+            region_map: IntArrayFreeList::new(max_chunks, max_chunks <span class="kw">as _</span>, <span class="number">1</span>),
             global_page_map: IntArrayFreeList::new(<span class="number">1</span>, <span class="number">1</span>, MAX_SPACES),
             shared_discontig_fl_count: <span class="number">0</span>,
             shared_fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
             total_available_discontiguous_chunks: <span class="number">0</span>,
             finalized: <span class="bool-val">false</span>,
             sync: Mutex::new(()),
-            descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
+            descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; max_chunks],
             cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
         }
     }
@@ -496,7 +498,7 @@
         <span class="kw">let </span>first_chunk = start_address.chunk_index();
         <span class="kw">let </span>last_chunk = to.chunk_index();
         <span class="kw">let </span>unavail_start_chunk = last_chunk + <span class="number">1</span>;
-        <span class="kw">let </span>trailing_chunks = MAX_CHUNKS - unavail_start_chunk;
+        <span class="kw">let </span>trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
         <span class="kw">let </span>pages = (<span class="number">1 </span>+ last_chunk - first_chunk) * PAGES_IN_CHUNK;
         <span class="comment">// start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912

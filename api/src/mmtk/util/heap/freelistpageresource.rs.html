@@ -370,7 +370,7 @@
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::ops::{Deref, DerefMut};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
-<span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
+<span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::PAGES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">super</span>::layout::VMMap;
 <span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use </span><span class="kw">super</span>::PageResource;
@@ -380,7 +380,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist;
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory;
@@ -451,7 +451,7 @@
                 .saturating_sub(<span class="self">self</span>.common.vm_map.get_chunk_consumer_count());
             rtn += chunks * PAGES_IN_CHUNK;
         } <span class="kw">else if </span><span class="self">self</span>.common.growable &amp;&amp; <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
-            rtn = PAGES_IN_SPACE64 - <span class="self">self</span>.reserved_pages();
+            rtn = vm_layout().pages_in_space64() - <span class="self">self</span>.reserved_pages();
         }
 
         rtn
@@ -546,7 +546,7 @@
 
     <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>common_flpr = {
-            <span class="kw">let </span>start = AVAILABLE_START;
+            <span class="kw">let </span>start = vm_layout().available_start();
             <span class="kw">let </span>common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: vm_map.create_freelist(start),
                 start,

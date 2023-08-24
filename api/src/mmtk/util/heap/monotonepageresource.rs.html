@@ -344,14 +344,14 @@
 <a href="#344" id="344">344</a>
 <a href="#345" id="345">345</a>
 <a href="#346" id="346">346</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::embedded_meta_data::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::pageresource::CommonPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 

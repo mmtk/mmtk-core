@@ -819,32 +819,13 @@
 <a href="#819" id="819">819</a>
 <a href="#820" id="820">820</a>
 <a href="#821" id="821">821</a>
-<a href="#822" id="822">822</a>
-<a href="#823" id="823">823</a>
-<a href="#824" id="824">824</a>
-<a href="#825" id="825">825</a>
-<a href="#826" id="826">826</a>
-<a href="#827" id="827">827</a>
-<a href="#828" id="828">828</a>
-<a href="#829" id="829">829</a>
-<a href="#830" id="830">830</a>
-<a href="#831" id="831">831</a>
-<a href="#832" id="832">832</a>
-<a href="#833" id="833">833</a>
-<a href="#834" id="834">834</a>
-<a href="#835" id="835">835</a>
-<a href="#836" id="836">836</a>
-<a href="#837" id="837">837</a>
-<a href="#838" id="838">838</a>
-<a href="#839" id="839">839</a>
-<a href="#840" id="840">840</a>
-<a href="#841" id="841">841</a>
 </pre></div><pre class="rust"><code><span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use </span>atomic::Ordering;
 
     <span class="kw">use </span><span class="kw">crate</span>::util::constants;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::<span class="kw-2">*</span>;
@@ -1031,6 +1012,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_side_metadata_try_mmap_metadata() {
+        <span class="kw">let </span>heap_start = vm_layout().heap_start;
         serial_test(|| {
             with_cleanup(
                 || {
@@ -1069,25 +1051,15 @@
                     metadata_sanity.verify_metadata_context(<span class="string">&quot;NoPolicy&quot;</span>, <span class="kw-2">&amp;</span>metadata);
 
                     <span class="macro">assert!</span>(metadata
-                        .try_map_metadata_space(
-                            vm_layout_constants::HEAP_START,
-                            constants::BYTES_IN_PAGE,
-                        )
+                        .try_map_metadata_space(heap_start, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    gspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
-                    lspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
-                    gspec.assert_metadata_mapped(
-                        vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - <span class="number">1</span>,
-                    );
-                    lspec.assert_metadata_mapped(
-                        vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - <span class="number">1</span>,
-                    );
+                    gspec.assert_metadata_mapped(heap_start);
+                    lspec.assert_metadata_mapped(heap_start);
+                    gspec.assert_metadata_mapped(heap_start + constants::BYTES_IN_PAGE - <span class="number">1</span>);
+                    lspec.assert_metadata_mapped(heap_start + constants::BYTES_IN_PAGE - <span class="number">1</span>);
 
-                    metadata.ensure_unmap_metadata_space(
-                        vm_layout_constants::HEAP_START,
-                        constants::BYTES_IN_PAGE,
-                    );
+                    metadata.ensure_unmap_metadata_space(heap_start, constants::BYTES_IN_PAGE);
 
                     gspec.log_bytes_in_region = <span class="number">4</span>;
                     gspec.log_num_of_bits = <span class="number">4</span>;
@@ -1106,29 +1078,19 @@
 
                     <span class="macro">assert!</span>(metadata
                         .try_map_metadata_space(
-                            vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
-                            vm_layout_constants::BYTES_IN_CHUNK,
+                            heap_start + vm_layout::BYTES_IN_CHUNK,
+                            vm_layout::BYTES_IN_CHUNK,
                         )
                         .is_ok());
 
-                    gspec.assert_metadata_mapped(
-                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
-                    );
-                    lspec.assert_metadata_mapped(
-                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
-                    );
-                    gspec.assert_metadata_mapped(
-                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * <span class="number">2
-                            </span>- <span class="number">8</span>,
-                    );
-                    lspec.assert_metadata_mapped(
-                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * <span class="number">2
-                            </span>- <span class="number">16</span>,
-                    );
+                    gspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK);
+                    lspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK);
+                    gspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK * <span class="number">2 </span>- <span class="number">8</span>);
+                    lspec.assert_metadata_mapped(heap_start + vm_layout::BYTES_IN_CHUNK * <span class="number">2 </span>- <span class="number">16</span>);
 
                     metadata.ensure_unmap_metadata_space(
-                        vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
-                        vm_layout_constants::BYTES_IN_CHUNK,
+                        heap_start + vm_layout::BYTES_IN_CHUNK,
+                        vm_layout::BYTES_IN_CHUNK,
                     );
                 },
                 || {
@@ -1145,7 +1107,7 @@
                 || {
                     <span class="comment">// We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+                    </span><span class="kw">let </span>data_addr = vm_layout().heap_start;
 
                     <span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
                         name: <span class="string">&quot;metadata_1_spec&quot;</span>,
@@ -1220,8 +1182,7 @@
                 || {
                     <span class="comment">// We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START
-                        + (vm_layout_constants::BYTES_IN_CHUNK &lt;&lt; <span class="number">1</span>) * <span class="number">2</span>;
+                    </span><span class="kw">let </span>data_addr = vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK &lt;&lt; <span class="number">1</span>) * <span class="number">2</span>;
 
                     <span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
                         name: <span class="string">&quot;metadata_1_spec&quot;</span>,
@@ -1277,8 +1238,8 @@
                 || {
                     <span class="comment">// We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START
-                        + (vm_layout_constants::BYTES_IN_CHUNK &lt;&lt; <span class="number">1</span>);
+                    </span><span class="kw">let </span>data_addr =
+                        vm_layout::vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK &lt;&lt; <span class="number">1</span>);
 
                     <span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
                         name: <span class="string">&quot;metadata_1_spec&quot;</span>,
@@ -1334,8 +1295,7 @@
                 || {
                     <span class="comment">// We need to do this because of the static NO_METADATA
                     // sanity::reset();
-                    </span><span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START
-                        + (vm_layout_constants::BYTES_IN_CHUNK &lt;&lt; <span class="number">2</span>);
+                    </span><span class="kw">let </span>data_addr = vm_layout().heap_start + (vm_layout::BYTES_IN_CHUNK &lt;&lt; <span class="number">2</span>);
 
                     <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
                     </span><span class="kw">let </span>metadata_1_spec = SideMetadataSpec {
@@ -1427,7 +1387,7 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+                    <span class="kw">let </span>data_addr = vm_layout::vm_layout().heap_start;
 
                     <span class="comment">// 1 bit per 8 bytes
                     </span><span class="kw">let </span>spec = SideMetadataSpec {
@@ -1484,7 +1444,7 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+                    <span class="kw">let </span>data_addr = vm_layout::vm_layout().heap_start;
 
                     <span class="comment">// 1 bit per 8 bytes
                     </span><span class="kw">let </span>spec = SideMetadataSpec {
@@ -1580,7 +1540,7 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="kw">let </span>data_addr = vm_layout_constants::HEAP_START;
+                    <span class="kw">let </span>data_addr = vm_layout().heap_start;
 
                     <span class="kw">let </span>log_num_of_bits = <span class="number">0</span>;
                     <span class="kw">let </span>log_bytes_in_region = <span class="number">3</span>;

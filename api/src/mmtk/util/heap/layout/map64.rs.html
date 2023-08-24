@@ -256,7 +256,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::raw_memory_freelist::RawMemoryFreeList;
@@ -287,7 +287,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>base_address = <span class="macro">vec!</span>[Address::ZERO; MAX_SPACES];
 
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..MAX_SPACES {
-            <span class="kw">let </span>base = <span class="kw">unsafe </span>{ Address::from_usize(i &lt;&lt; LOG_SPACE_SIZE_64) };
+            <span class="kw">let </span>base = <span class="kw">unsafe </span>{ Address::from_usize(i &lt;&lt; vm_layout().log_space_extent) };
             high_water[i] = base;
             base_address[i] = base;
         }
@@ -298,7 +298,7 @@
             // elide the storing of 0 for each of the element.  Using standard vector creation,
             // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
             // slowdown during start-up.
-            </span>descriptor_map: <span class="kw">unsafe </span>{ new_zeroed_vec::&lt;SpaceDescriptor&gt;(MAX_CHUNKS) },
+            </span>descriptor_map: <span class="kw">unsafe </span>{ new_zeroed_vec::&lt;SpaceDescriptor&gt;(vm_layout().max_chunks()) },
             high_water,
             base_address,
             fl_page_resources: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
@@ -312,7 +312,7 @@
 <span class="kw">impl </span>VMMap <span class="kw">for </span>Map64 {
     <span class="kw">fn </span>insert(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         <span class="macro">debug_assert!</span>(<span class="self">Self</span>::is_space_start(start));
-        <span class="macro">debug_assert!</span>(extent &lt;= SPACE_SIZE_64);
+        <span class="macro">debug_assert!</span>(extent &lt;= vm_layout().space_size_64());
         <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
         </span><span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
@@ -321,7 +321,7 @@
     }
 
     <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
-        <span class="kw">let </span>units = SPACE_SIZE_64 &gt;&gt; LOG_BYTES_IN_PAGE;
+        <span class="kw">let </span>units = vm_layout().space_size_64() &gt;&gt; LOG_BYTES_IN_PAGE;
         <span class="self">self</span>.create_parent_freelist(start, units, units <span class="kw">as _</span>)
     }
 
@@ -486,14 +486,14 @@
     }
 
     <span class="kw">fn </span>space_index(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
-        <span class="kw">if </span>addr &gt; HEAP_END {
+        <span class="kw">if </span>addr &gt; vm_layout().heap_end {
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-        <span class="prelude-val">Some</span>(addr &gt;&gt; SPACE_SHIFT_64)
+        <span class="prelude-val">Some</span>(addr &gt;&gt; vm_layout().space_shift_64())
     }
 
     <span class="kw">fn </span>is_space_start(base: Address) -&gt; bool {
-        (base &amp; !SPACE_MASK_64) == <span class="number">0
+        (base &amp; !vm_layout().space_mask_64()) == <span class="number">0
     </span>}
 }
 

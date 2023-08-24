@@ -51,8 +51,12 @@
 <a href="#51" id="51">51</a>
 <a href="#52" id="52">52</a>
 <a href="#53" id="53">53</a>
+<a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
 </pre></div><pre class="rust"><code><span class="kw">pub mod </span>heap_parameters;
-<span class="kw">pub mod </span>vm_layout_constants;
+<span class="kw">pub mod </span>vm_layout;
 
 <span class="kw">mod </span>mmapper;
 <span class="kw">pub use </span><span class="self">self</span>::mmapper::Mmapper;
@@ -62,6 +66,7 @@
 
 <span class="kw">mod </span>map;
 <span class="kw">pub use </span><span class="self">self</span>::map::VMMap;
+<span class="kw">use </span><span class="self">self</span>::vm_layout::vm_layout;
 <span class="kw">mod </span>map32;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
 </span><span class="kw">mod </span>map64;
@@ -73,8 +78,11 @@
 
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
 </span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap&gt; {
-    <span class="comment">// TODO: Map32 for compressed pointers
-    </span>Box::new(map64::Map64::new())
+    <span class="kw">if </span>!vm_layout().force_use_contiguous_spaces {
+        Box::new(map32::Map32::new())
+    } <span class="kw">else </span>{
+        Box::new(map64::Map64::new())
+    }
 }
 
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
@@ -95,13 +103,13 @@
 /// Heap range include the availble range, but may include some address ranges
 /// that we count as part of the heap but we do not allocate into, such as
 /// VM spaces. However, currently, heap range is the same as available range.
-</span><span class="kw">pub const fn </span>heap_range() -&gt; Range&lt;Address&gt; {
-    vm_layout_constants::HEAP_START..vm_layout_constants::HEAP_END
+</span><span class="kw">pub fn </span>heap_range() -&gt; Range&lt;Address&gt; {
+    vm_layout().heap_start..vm_layout().heap_end
 }
 
 <span class="doccomment">/// The avialable heap range between AVAILABLE_START and AVAILABLE_END.
 /// Available range is what MMTk may allocate into.
-</span><span class="kw">pub const fn </span>available_range() -&gt; Range&lt;Address&gt; {
-    vm_layout_constants::AVAILABLE_START..vm_layout_constants::AVAILABLE_END
+</span><span class="kw">pub fn </span>available_range() -&gt; Range&lt;Address&gt; {
+    vm_layout().available_start()..vm_layout().available_end()
 }
 </code></pre></div></section></main></body></html>

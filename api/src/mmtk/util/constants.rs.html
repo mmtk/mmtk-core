@@ -115,6 +115,9 @@
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
 <a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
 
 <span class="doccomment">/**
@@ -132,6 +135,9 @@
 <span class="kw">pub const </span>BYTES_IN_BYTE: usize = <span class="number">1</span>;
 <span class="kw">pub const </span>LOG_BITS_IN_BYTE: u8 = <span class="number">3</span>;
 <span class="kw">pub const </span>BITS_IN_BYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_BYTE;
+
+<span class="kw">pub const </span>LOG_BYTES_IN_GBYTE: u8 = <span class="number">30</span>;
+<span class="kw">pub const </span>BYTES_IN_GBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_GBYTE;
 
 <span class="kw">pub const </span>LOG_BYTES_IN_MBYTE: u8 = <span class="number">20</span>;
 <span class="kw">pub const </span>BYTES_IN_MBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;

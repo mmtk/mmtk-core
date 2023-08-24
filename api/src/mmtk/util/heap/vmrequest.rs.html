@@ -67,7 +67,7 @@
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
 <a href="#69" id="69">69</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout_constants::<span class="kw-2">*</span>;
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
@@ -86,20 +86,20 @@
 
     <span class="kw">pub fn </span>common64bit(top: bool) -&gt; <span class="self">Self </span>{
         VMRequest::Extent {
-            extent: MAX_SPACE_EXTENT,
+            extent: vm_layout().max_space_extent(),
             top,
         }
     }
 
     <span class="kw">pub fn </span>discontiguous() -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) &amp;&amp; vm_layout().force_use_contiguous_spaces {
             <span class="kw">return </span><span class="self">Self</span>::common64bit(<span class="bool-val">false</span>);
         }
         VMRequest::Discontiguous
     }
 
     <span class="kw">pub fn </span>fixed_size(mb: usize) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) &amp;&amp; vm_layout().force_use_contiguous_spaces {
             <span class="kw">return </span><span class="self">Self</span>::common64bit(<span class="bool-val">false</span>);
         }
         VMRequest::Extent {
@@ -109,14 +109,14 @@
     }
 
     <span class="kw">pub fn </span>fraction(frac: f32) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) &amp;&amp; vm_layout().force_use_contiguous_spaces {
             <span class="kw">return </span><span class="self">Self</span>::common64bit(<span class="bool-val">false</span>);
         }
         VMRequest::Fraction { frac, top: <span class="bool-val">false </span>}
     }
 
     <span class="kw">pub fn </span>high_fixed_size(mb: usize) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) &amp;&amp; vm_layout().force_use_contiguous_spaces {
             <span class="kw">return </span><span class="self">Self</span>::common64bit(<span class="bool-val">true</span>);
         }
         VMRequest::Extent {
@@ -126,7 +126,7 @@
     }
 
     <span class="kw">pub fn </span>fixed_extent(extent: usize, top: bool) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) &amp;&amp; vm_layout().force_use_contiguous_spaces {
             <span class="kw">return </span><span class="self">Self</span>::common64bit(top);
         }
         VMRequest::Extent { extent, top }

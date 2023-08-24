@@ -1098,6 +1098,24 @@
 <a href="#1098" id="1098">1098</a>
 <a href="#1099" id="1099">1099</a>
 <a href="#1100" id="1100">1100</a>
+<a href="#1101" id="1101">1101</a>
+<a href="#1102" id="1102">1102</a>
+<a href="#1103" id="1103">1103</a>
+<a href="#1104" id="1104">1104</a>
+<a href="#1105" id="1105">1105</a>
+<a href="#1106" id="1106">1106</a>
+<a href="#1107" id="1107">1107</a>
+<a href="#1108" id="1108">1108</a>
+<a href="#1109" id="1109">1109</a>
+<a href="#1110" id="1110">1110</a>
+<a href="#1111" id="1111">1111</a>
+<a href="#1112" id="1112">1112</a>
+<a href="#1113" id="1113">1113</a>
+<a href="#1114" id="1114">1114</a>
+<a href="#1115" id="1115">1115</a>
+<a href="#1116" id="1116">1116</a>
+<a href="#1117" id="1117">1117</a>
+<a href="#1118" id="1118">1118</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -1106,6 +1124,8 @@
 <span class="kw">use </span>std::fmt::Debug;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>strum_macros::EnumString;
+
+<span class="kw">use </span><span class="kw">super</span>::heap::vm_layout::vm_layout;
 
 <span class="attr">#[derive(Copy, Clone, EnumString, Debug)]
 </span><span class="kw">pub enum </span>NurseryZeroingOptions {
@@ -1193,8 +1213,9 @@
 </span><span class="kw">pub const </span>DEFAULT_MIN_NURSERY: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="doccomment">/// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY: usize = <span class="number">32 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
+</span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY_32: usize = <span class="number">32 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
+<span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
 <span class="kw">fn </span>always_valid&lt;T&gt;(<span class="kw">_</span>: <span class="kw-2">&amp;</span>T) -&gt; bool {
     <span class="bool-val">true
@@ -1475,11 +1496,11 @@
     <span class="doccomment">/// Minimum nursery size (in bytes)
     </span><span class="kw">pub </span>min: usize,
     <span class="doccomment">/// Maximum nursery size (in bytes)
-    </span><span class="kw">pub </span>max: usize,
+    </span>max: <span class="prelude-ty">Option</span>&lt;usize&gt;,
 }
 
 <span class="kw">impl </span>NurserySize {
-    <span class="kw">pub fn </span>new(kind: NurseryKind, value: usize) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(kind: NurseryKind, value: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>kind {
             NurseryKind::Bounded =&gt; NurserySize {
                 kind,
@@ -1488,7 +1509,7 @@
             },
             NurseryKind::Fixed =&gt; NurserySize {
                 kind,
-                min: value,
+                min: value.unwrap(),
                 max: value,
             },
         }
@@ -1505,7 +1526,7 @@
         <span class="kw">let </span>value = ns[<span class="number">1</span>]
             .parse()
             .map_err(|<span class="kw">_</span>| String::from(<span class="string">&quot;Failed to parse size&quot;</span>))<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(NurserySize::new(kind, value))
+        <span class="prelude-val">Ok</span>(NurserySize::new(kind, <span class="prelude-val">Some</span>(value)))
     }
 }
 
@@ -1520,12 +1541,18 @@
 <span class="kw">impl </span>Options {
     <span class="doccomment">/// Return upper bound of the nursery size (in number of bytes)
     </span><span class="kw">pub fn </span>get_max_nursery_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.nursery.max
+        <span class="self">self</span>.nursery.max.unwrap_or_else(|| {
+            <span class="kw">if </span>!vm_layout().force_use_contiguous_spaces {
+                DEFAULT_MAX_NURSERY_32
+            } <span class="kw">else </span>{
+                DEFAULT_MAX_NURSERY
+            }
+        })
     }
 
     <span class="doccomment">/// Return upper bound of the nursery size (in number of pages)
     </span><span class="kw">pub fn </span>get_max_nursery_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(<span class="self">self</span>.nursery.max)
+        <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(<span class="self">self</span>.get_max_nursery_bytes())
     }
 
     <span class="doccomment">/// Return lower bound of the nursery size (in number of bytes)
@@ -1551,6 +1578,15 @@
     <span class="kw">const </span>M: u64 = <span class="number">1024 </span>* <span class="self">Self</span>::K;
     <span class="kw">const </span>G: u64 = <span class="number">1024 </span>* <span class="self">Self</span>::M;
     <span class="kw">const </span>T: u64 = <span class="number">1024 </span>* <span class="self">Self</span>::G;
+
+    <span class="doccomment">/// get max heap size
+    </span><span class="kw">pub fn </span>max_heap_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::FixedHeapSize(s) =&gt; <span class="kw-2">*</span>s,
+            <span class="self">Self</span>::DynamicHeapSize(<span class="kw">_</span>, s) =&gt; <span class="kw-2">*</span>s,
+            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;Cannot get max heap size&quot;</span>),
+        }
+    }
 
     <span class="doccomment">/// Parse a size representation, which could be a number to represents bytes,
     /// or a number with the suffix K/k/M/m/G/g. Return the byte number if it can be
@@ -1757,8 +1793,8 @@
     // Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
     // both the upper and lower bounds. The nursery size can be set like &quot;Fixed:8192&quot;, for example,
     // to have a Fixed nursery size of 8192 bytes
-    </span>nursery:               NurserySize          [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>NurserySize| v.min &gt; <span class="number">0 </span>&amp;&amp; v.max &gt; <span class="number">0 </span>&amp;&amp; v.max &gt;= v.min]
-        = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: DEFAULT_MAX_NURSERY },
+    </span>nursery:               NurserySize          [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>NurserySize| v.min &gt; <span class="number">0 </span>&amp;&amp; v.max.map(|max| max &gt; <span class="number">0 </span>&amp;&amp; max &gt;= v.min).unwrap_or(<span class="bool-val">true</span>)]
+        = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: <span class="prelude-val">None </span>},
     <span class="comment">// Should a major GC be performed when a system GC is required?
     </span>full_heap_system_gc:   bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
     <span class="comment">// Should we shrink/grow the heap to adjust to application working set? (not supported)
@@ -1786,7 +1822,7 @@
     <span class="comment">// The start of vmspace.
     </span>vm_space_start:        Address              [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = Address::ZERO,
     <span class="comment">// The size of vmspace.
-    </span>vm_space_size:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = usize::MAX,
+    </span>vm_space_size:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = <span class="number">0xdc0_0000</span>,
     <span class="comment">// Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).

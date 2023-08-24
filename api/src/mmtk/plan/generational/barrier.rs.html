@@ -114,7 +114,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorQueue;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
-<span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_INT;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::MemorySlice;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -201,9 +201,9 @@
         </span><span class="kw">if </span>!dst_in_nursery {
             <span class="comment">// enqueue
             </span><span class="macro">debug_assert_eq!</span>(
-                dst.bytes() &amp; (BYTES_IN_ADDRESS - <span class="number">1</span>),
+                dst.bytes() &amp; (BYTES_IN_INT - <span class="number">1</span>),
                 <span class="number">0</span>,
-                <span class="string">&quot;bytes should be a multiple of words&quot;
+                <span class="string">&quot;bytes should be a multiple of 32-bit words&quot;
             </span>);
             <span class="self">self</span>.region_modbuf.push(dst);
             <span class="self">self</span>.region_modbuf

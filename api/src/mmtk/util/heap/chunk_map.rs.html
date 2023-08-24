@@ -148,7 +148,7 @@
 </span><span class="kw">pub struct </span>Chunk(Address);
 
 <span class="kw">impl </span>Region <span class="kw">for </span>Chunk {
-    <span class="kw">const </span>LOG_BYTES: usize = <span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+    <span class="kw">const </span>LOG_BYTES: usize = <span class="kw">crate</span>::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 
     <span class="kw">fn </span>from_aligned_address(address: Address) -&gt; <span class="self">Self </span>{
         <span class="macro">debug_assert!</span>(address.is_aligned_to(<span class="self">Self</span>::BYTES));

@@ -920,7 +920,6 @@
 <a href="#920" id="920">920</a>
 <a href="#921" id="921">921</a>
 <a href="#922" id="922">922</a>
-<a href="#923" id="923">923</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -942,8 +941,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCController, GCWork, GCWorker};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::HEAP_END;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::HEAP_START;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::MemorySlice;
@@ -1491,13 +1489,13 @@
 <span class="doccomment">/// Return the starting address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 </span><span class="kw">pub fn </span>starting_heap_address() -&gt; Address {
-    HEAP_START
+    vm_layout().heap_start
 }
 
 <span class="doccomment">/// Return the ending address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 </span><span class="kw">pub fn </span>last_heap_address() -&gt; Address {
-    HEAP_END
+    vm_layout().heap_end
 }
 
 <span class="doccomment">/// Return the total memory in bytes.

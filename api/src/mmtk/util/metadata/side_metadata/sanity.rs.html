@@ -852,6 +852,11 @@
 <a href="#852" id="852">852</a>
 <a href="#853" id="853">853</a>
 <a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::io::{Error, ErrorKind, <span class="prelude-ty">Result</span>};
@@ -861,9 +866,11 @@
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 <span class="kw">use super</span>::{SideMetadataContext, SideMetadataSpec};
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
+<span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 
 <span class="doccomment">/// An internal enum to enhance code style for add/sub
 </span><span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
@@ -917,7 +924,9 @@
         total_size += <span class="kw">super</span>::metadata_address_range_size(spec);
     }
 
-    <span class="kw">if </span>total_size &lt;= <span class="number">1usize </span>&lt;&lt; (LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO) {
+    <span class="kw">if </span>total_size
+        &lt;= <span class="number">1usize </span>&lt;&lt; (VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO)
+    {
         <span class="prelude-val">Ok</span>(())
     } <span class="kw">else </span>{
         <span class="prelude-val">Err</span>(Error::new(
@@ -938,7 +947,8 @@
 </span><span class="kw">fn </span>verify_local_specs_size(l_specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">for </span>spec <span class="kw">in </span>l_specs {
         <span class="kw">if </span><span class="kw">super</span>::metadata_address_range_size(spec)
-            &gt; <span class="number">1usize </span>&lt;&lt; (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
+            &gt; <span class="number">1usize
+                </span>&lt;&lt; (VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
         {
             <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
                 ErrorKind::InvalidInput,
@@ -1221,12 +1231,12 @@
 /// 2. Check if metadata address is out of bounds. If this fails, we will panic.
 </span><span class="kw">fn </span>verify_metadata_address_bound(spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) {
     <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-    </span><span class="macro">assert_eq!</span>(LOG_ADDRESS_SPACE, <span class="number">32</span>, <span class="string">&quot;We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.&quot;</span>);
+    </span><span class="macro">assert_eq!</span>(VMLayout::LOG_ARCH_ADDRESS_SPACE, <span class="number">32</span>, <span class="string">&quot;We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.&quot;</span>);
     <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
     </span><span class="kw">let </span>data_addr_in_address_space = <span class="bool-val">true</span>;
     <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
     </span><span class="kw">let </span>data_addr_in_address_space =
-        data_addr &lt;= <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">1usize </span>&lt;&lt; LOG_ADDRESS_SPACE) };
+        data_addr &lt;= <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">1usize </span>&lt;&lt; vm_layout().log_address_space) };
 
     <span class="kw">if </span>!data_addr_in_address_space {
         <span class="macro">warn!</span>(

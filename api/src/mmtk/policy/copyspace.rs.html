@@ -342,7 +342,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
-</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+</span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{extract_side_metadata, MetadataSpec};
 <span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;

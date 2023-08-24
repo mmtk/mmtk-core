@@ -134,17 +134,13 @@
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
-<a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::address_to_chunked_meta_address;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
-<span class="kw">use </span><span class="kw">crate</span>::util::{
-    constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
-    heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
-};
 <span class="kw">use </span><span class="kw">crate</span>::MMAPPER;
 <span class="kw">use </span>std::io::Result;
 
@@ -257,7 +253,7 @@
 
 <span class="attr">#[allow(dead_code)]
 </span><span class="kw">pub const fn </span>metadata_address_range_size(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; usize {
-    <span class="number">1usize </span>&lt;&lt; (LOG_ADDRESS_SPACE - addr_rshift(metadata_spec) <span class="kw">as </span>usize)
+    <span class="number">1usize </span>&lt;&lt; (VMLayout::LOG_ARCH_ADDRESS_SPACE - addr_rshift(metadata_spec) <span class="kw">as </span>usize)
 }
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_lshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u8 {

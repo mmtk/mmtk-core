@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["LOG_MAX_SPACES","LOG_SPACE_SIZE_64","MAX_SPACES"]};
+window.SIDEBAR_ITEMS = {"constant":["LOG_MAX_SPACES","MAX_SPACES"]};

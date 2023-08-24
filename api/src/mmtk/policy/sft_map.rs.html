@@ -524,13 +524,6 @@
 <a href="#524" id="524">524</a>
 <a href="#525" id="525">525</a>
 <a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -599,7 +592,12 @@
             <span class="comment">// 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
             </span>Box::new(dense_chunk_map::SFTDenseChunkMap::new())
         } <span class="kw">else if </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)] </span>{
-            Box::new(space_map::SFTSpaceMap::new())
+            <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
+            <span class="kw">if </span>vm_layout().force_use_contiguous_spaces {
+                Box::new(space_map::SFTSpaceMap::new())
+            } <span class="kw">else </span>{
+                Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
+            }
         } <span class="kw">else if </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)] </span>{
             Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
         } <span class="kw">else </span>{
@@ -612,9 +610,7 @@
 #[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)] </span><span class="comment">// This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
 </span><span class="kw">mod </span>space_map {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::{
-        HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
-    };
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
     <span class="kw">use </span>std::cell::UnsafeCell;
 
     <span class="doccomment">/// Space map is a small table, and it has one entry for each MMTk space.
@@ -651,6 +647,7 @@
             start: Address,
             bytes: usize,
         ) {
+            <span class="kw">let </span>table_size = <span class="self">Self</span>::addr_to_index(Address::MAX) + <span class="number">1</span>;
             <span class="kw">let </span>index = <span class="self">Self</span>::addr_to_index(start);
             <span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
                 <span class="comment">// Make sure we only update from empty to a valid space, or overwrite the space
@@ -661,9 +658,9 @@
                 <span class="comment">// FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
                 // but the VM space is an exception. Any address after the last space is considered as the last space,
                 // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
-                </span><span class="kw">if </span>index != <span class="self">Self</span>::TABLE_SIZE - <span class="number">1 </span>{
+                </span><span class="kw">if </span>index != table_size - <span class="number">1 </span>{
                     <span class="macro">assert!</span>(start &gt;= space_start);
-                    <span class="macro">assert!</span>(start + bytes &lt;= space_start + MAX_SPACE_EXTENT);
+                    <span class="macro">assert!</span>(start + bytes &lt;= space_start + vm_layout().max_space_extent());
                 }
             }
 
@@ -677,43 +674,32 @@
     }
 
     <span class="kw">impl </span>SFTSpaceMap {
-        <span class="doccomment">/// This mask extracts a few bits from address, and use it as index to the space map table.
-        /// This constant is specially picked for the current heap range (HEAP_STRAT/HEAP_END), and the space size (MAX_SPACE_EXTENT).
-        /// If any of these changes, the test `test_address_arithmetic()` may fail, and this constant will need to be updated.
-        /// Currently our spaces are using address range 0x0000_0200_0000_0000 to 0x0000_2200_0000_0000 (with a maximum of 16 spaces).
-        /// When masked with this constant, the index is 1 to 16. If we mask any arbitrary address with this mask, we will get 0 to 31 (32 entries).
-        </span><span class="kw">pub const </span>ADDRESS_MASK: usize = <span class="number">0x0000_3f00_0000_0000usize</span>;
-        <span class="doccomment">/// The table size for the space map.
-        </span><span class="kw">pub const </span>TABLE_SIZE: usize = <span class="self">Self</span>::addr_to_index(Address::MAX) + <span class="number">1</span>;
-
         <span class="doccomment">/// Create a new space map.
         </span><span class="attr">#[allow(clippy::assertions_on_constants)] </span><span class="comment">// We assert to make sure the constants
         </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-            <span class="macro">debug_assert!</span>(
-                <span class="self">Self</span>::TABLE_SIZE &gt;= <span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES
-            );
+            <span class="kw">let </span>table_size = <span class="self">Self</span>::addr_to_index(Address::MAX) + <span class="number">1</span>;
+            <span class="macro">debug_assert!</span>(table_size &gt;= <span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES);
             <span class="self">Self </span>{
-                sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; <span class="self">Self</span>::TABLE_SIZE]),
+                sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; table_size]),
             }
         }
 
-        <span class="kw">const fn </span>addr_to_index(addr: Address) -&gt; usize {
-            addr.and(<span class="self">Self</span>::ADDRESS_MASK) &gt;&gt; LOG_SPACE_EXTENT
+        <span class="kw">fn </span>addr_to_index(addr: Address) -&gt; usize {
+            addr.and(vm_layout().address_mask()) &gt;&gt; vm_layout().log_space_extent
         }
 
-        <span class="kw">const fn </span>index_to_space_start(i: usize) -&gt; Address {
+        <span class="kw">fn </span>index_to_space_start(i: usize) -&gt; Address {
             <span class="kw">let </span>(start, <span class="kw">_</span>) = <span class="self">Self</span>::index_to_space_range(i);
             start
         }
 
-        <span class="kw">const fn </span>index_to_space_range(i: usize) -&gt; (Address, Address) {
+        <span class="kw">fn </span>index_to_space_range(i: usize) -&gt; (Address, Address) {
             <span class="kw">if </span>i == <span class="number">0 </span>{
                 <span class="macro">panic!</span>(<span class="string">&quot;Invalid index: there is no space for index 0&quot;</span>)
             } <span class="kw">else </span>{
-                (
-                    HEAP_START.add((i - <span class="number">1</span>) &lt;&lt; LOG_SPACE_EXTENT),
-                    HEAP_START.add(i &lt;&lt; LOG_SPACE_EXTENT),
-                )
+                <span class="kw">let </span>start = Address::ZERO.add(i &lt;&lt; vm_layout().log_space_extent);
+                <span class="kw">let </span>extent = <span class="number">1 </span>&lt;&lt; vm_layout().log_space_extent;
+                (start, start.add(extent))
             }
         }
     }
@@ -722,7 +708,7 @@
     </span><span class="kw">mod </span>tests {
         <span class="kw">use super</span>::<span class="kw-2">*</span>;
         <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES;
-        <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+        <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
 
         <span class="comment">// If the test `test_address_arithmetic()` fails, it is possible due to change of our heap range, max space extent, or max number of spaces.
         // We need to update the code and the constants for the address arithemtic.
@@ -730,7 +716,7 @@
         </span><span class="kw">fn </span>test_address_arithmetic() {
             <span class="comment">// Before 1st space
             </span><span class="macro">assert_eq!</span>(SFTSpaceMap::addr_to_index(Address::ZERO), <span class="number">0</span>);
-            <span class="macro">assert_eq!</span>(SFTSpaceMap::addr_to_index(HEAP_START - <span class="number">1</span>), <span class="number">0</span>);
+            <span class="macro">assert_eq!</span>(SFTSpaceMap::addr_to_index(vm_layout().heap_start - <span class="number">1</span>), <span class="number">0</span>);
 
             <span class="kw">let </span>assert_for_index = |i: usize| {
                 <span class="kw">let </span>(start, end) = SFTSpaceMap::index_to_space_range(i);
@@ -747,8 +733,8 @@
             <span class="comment">// assert space end
             </span><span class="kw">let </span>(<span class="kw">_</span>, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES);
             <span class="macro">println!</span>(<span class="string">&quot;Space end = {}&quot;</span>, last_space_end);
-            <span class="macro">println!</span>(<span class="string">&quot;Heap  end = {}&quot;</span>, HEAP_END);
-            <span class="macro">assert_eq!</span>(last_space_end, HEAP_END);
+            <span class="macro">println!</span>(<span class="string">&quot;Heap  end = {}&quot;</span>, vm_layout().heap_end);
+            <span class="macro">assert_eq!</span>(last_space_end, vm_layout().heap_end);
 
             <span class="comment">// after last space
             </span><span class="macro">assert_eq!</span>(SFTSpaceMap::addr_to_index(last_space_end), <span class="number">17</span>);
@@ -761,7 +747,7 @@
 </span><span class="kw">mod </span>dense_chunk_map {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX;
     <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::<span class="kw-2">*</span>;
     <span class="kw">use </span>std::cell::UnsafeCell;
@@ -914,8 +900,8 @@
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
     <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
     <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
+    <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 
     <span class="doccomment">/// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
     </span><span class="kw">pub struct </span>SFTSparseChunkMap {
@@ -926,7 +912,7 @@
 
     <span class="kw">impl </span>SFTMap <span class="kw">for </span>SFTSparseChunkMap {
         <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-            addr.chunk_index() &lt; MAX_CHUNKS
+            addr.chunk_index() &lt; vm_layout().max_chunks()
         }
 
         <span class="kw">fn </span>get_side_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>SideMetadataSpec&gt; {
@@ -986,7 +972,7 @@
     <span class="kw">impl </span>SFTSparseChunkMap {
         <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
             SFTSparseChunkMap {
-                sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; MAX_CHUNKS]),
+                sft: UnsafeCell::new(<span class="macro">vec!</span>[<span class="kw-2">&amp;</span>EMPTY_SPACE_SFT; vm_layout().max_chunks()]),
             }
         }
 
