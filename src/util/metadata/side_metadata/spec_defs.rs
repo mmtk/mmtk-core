@@ -1,5 +1,5 @@
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::constants::{
     GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET,

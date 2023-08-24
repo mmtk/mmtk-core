@@ -66,7 +66,12 @@ pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
             // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
             Box::new(dense_chunk_map::SFTDenseChunkMap::new())
         } else if #[cfg(target_pointer_width = "64")] {
-            Box::new(space_map::SFTSpaceMap::new())
+            use crate::util::heap::layout::vm_layout::vm_layout;
+            if vm_layout().force_use_contiguous_spaces {
+                Box::new(space_map::SFTSpaceMap::new())
+            } else {
+                Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
+            }
         } else if #[cfg(target_pointer_width = "32")] {
             Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
         } else {
@@ -79,9 +84,7 @@ pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
 #[cfg(target_pointer_width = "64")] // This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
 mod space_map {
     use super::*;
-    use crate::util::heap::layout::vm_layout_constants::{
-        HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
-    };
+    use crate::util::heap::layout::vm_layout::vm_layout;
     use std::cell::UnsafeCell;
 
     /// Space map is a small table, and it has one entry for each MMTk space.
@@ -118,6 +121,7 @@ mod space_map {
             start: Address,
             bytes: usize,
         ) {
+            let table_size = Self::addr_to_index(Address::MAX) + 1;
             let index = Self::addr_to_index(start);
             if cfg!(debug_assertions) {
                 // Make sure we only update from empty to a valid space, or overwrite the space
@@ -128,9 +132,9 @@ mod space_map {
                 // FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
                 // but the VM space is an exception. Any address after the last space is considered as the last space,
                 // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
-                if index != Self::TABLE_SIZE - 1 {
+                if index != table_size - 1 {
                     assert!(start >= space_start);
-                    assert!(start + bytes <= space_start + MAX_SPACE_EXTENT);
+                    assert!(start + bytes <= space_start + vm_layout().max_space_extent());
                 }
             }
 
@@ -144,43 +148,32 @@ mod space_map {
     }
 
     impl SFTSpaceMap {
-        /// This mask extracts a few bits from address, and use it as index to the space map table.
-        /// This constant is specially picked for the current heap range (HEAP_STRAT/HEAP_END), and the space size (MAX_SPACE_EXTENT).
-        /// If any of these changes, the test `test_address_arithmetic()` may fail, and this constant will need to be updated.
-        /// Currently our spaces are using address range 0x0000_0200_0000_0000 to 0x0000_2200_0000_0000 (with a maximum of 16 spaces).
-        /// When masked with this constant, the index is 1 to 16. If we mask any arbitrary address with this mask, we will get 0 to 31 (32 entries).
-        pub const ADDRESS_MASK: usize = 0x0000_3f00_0000_0000usize;
-        /// The table size for the space map.
-        pub const TABLE_SIZE: usize = Self::addr_to_index(Address::MAX) + 1;
-
         /// Create a new space map.
         #[allow(clippy::assertions_on_constants)] // We assert to make sure the constants
         pub fn new() -> Self {
-            debug_assert!(
-                Self::TABLE_SIZE >= crate::util::heap::layout::heap_parameters::MAX_SPACES
-            );
+            let table_size = Self::addr_to_index(Address::MAX) + 1;
+            debug_assert!(table_size >= crate::util::heap::layout::heap_parameters::MAX_SPACES);
             Self {
-                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT; Self::TABLE_SIZE]),
+                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT; table_size]),
             }
         }
 
-        const fn addr_to_index(addr: Address) -> usize {
-            addr.and(Self::ADDRESS_MASK) >> LOG_SPACE_EXTENT
+        fn addr_to_index(addr: Address) -> usize {
+            addr.and(vm_layout().address_mask()) >> vm_layout().log_space_extent
         }
 
-        const fn index_to_space_start(i: usize) -> Address {
+        fn index_to_space_start(i: usize) -> Address {
             let (start, _) = Self::index_to_space_range(i);
             start
         }
 
-        const fn index_to_space_range(i: usize) -> (Address, Address) {
+        fn index_to_space_range(i: usize) -> (Address, Address) {
             if i == 0 {
                 panic!("Invalid index: there is no space for index 0")
             } else {
-                (
-                    HEAP_START.add((i - 1) << LOG_SPACE_EXTENT),
-                    HEAP_START.add(i << LOG_SPACE_EXTENT),
-                )
+                let start = Address::ZERO.add(i << vm_layout().log_space_extent);
+                let extent = 1 << vm_layout().log_space_extent;
+                (start, start.add(extent))
             }
         }
     }
@@ -189,7 +182,7 @@ mod space_map {
     mod tests {
         use super::*;
         use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-        use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+        use crate::util::heap::layout::vm_layout::vm_layout;
 
         // If the test `test_address_arithmetic()` fails, it is possible due to change of our heap range, max space extent, or max number of spaces.
         // We need to update the code and the constants for the address arithemtic.
@@ -197,7 +190,7 @@ mod space_map {
         fn test_address_arithmetic() {
             // Before 1st space
             assert_eq!(SFTSpaceMap::addr_to_index(Address::ZERO), 0);
-            assert_eq!(SFTSpaceMap::addr_to_index(HEAP_START - 1), 0);
+            assert_eq!(SFTSpaceMap::addr_to_index(vm_layout().heap_start - 1), 0);
 
             let assert_for_index = |i: usize| {
                 let (start, end) = SFTSpaceMap::index_to_space_range(i);
@@ -214,8 +207,8 @@ mod space_map {
             // assert space end
             let (_, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES);
             println!("Space end = {}", last_space_end);
-            println!("Heap  end = {}", HEAP_END);
-            assert_eq!(last_space_end, HEAP_END);
+            println!("Heap  end = {}", vm_layout().heap_end);
+            assert_eq!(last_space_end, vm_layout().heap_end);
 
             // after last space
             assert_eq!(SFTSpaceMap::addr_to_index(last_space_end), 17);
@@ -228,7 +221,7 @@ mod space_map {
 mod dense_chunk_map {
     use super::*;
     use crate::util::conversions;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+    use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
     use crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX;
     use crate::util::metadata::side_metadata::*;
     use std::cell::UnsafeCell;
@@ -381,8 +374,8 @@ mod sparse_chunk_map {
     use super::*;
     use crate::util::conversions;
     use crate::util::conversions::*;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-    use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
+    use crate::util::heap::layout::vm_layout::vm_layout;
+    use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 
     /// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
     pub struct SFTSparseChunkMap {
@@ -393,7 +386,7 @@ mod sparse_chunk_map {
 
     impl SFTMap for SFTSparseChunkMap {
         fn has_sft_entry(&self, addr: Address) -> bool {
-            addr.chunk_index() < MAX_CHUNKS
+            addr.chunk_index() < vm_layout().max_chunks()
         }
 
         fn get_side_metadata(&self) -> Option<&SideMetadataSpec> {
@@ -453,7 +446,7 @@ mod sparse_chunk_map {
     impl SFTSparseChunkMap {
         pub fn new() -> Self {
             SFTSparseChunkMap {
-                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT; MAX_CHUNKS]),
+                sft: UnsafeCell::new(vec![&EMPTY_SPACE_SFT; vm_layout().max_chunks()]),
             }
         }
 

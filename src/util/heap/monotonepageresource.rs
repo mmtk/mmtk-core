@@ -1,11 +1,11 @@
-use super::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
+use super::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 use crate::policy::space::required_chunks;
 use crate::util::address::Address;
 use crate::util::conversions::*;
 use std::sync::{Mutex, MutexGuard};
 
 use crate::util::alloc::embedded_meta_data::*;
-use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::opaque_pointer::*;
 

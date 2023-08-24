@@ -186,3 +186,35 @@ impl FixtureContent for MutatorFixture {
 }
 
 unsafe impl Send for MutatorFixture {}
+
+use mmtk::util::heap::vm_layout::VMLayout;
+
+pub struct VMLayoutFixture {
+    pub mmtk: &'static MMTK<DummyVM>,
+    pub mutator: *mut Mutator<DummyVM>,
+}
+
+impl VMLayoutFixture {
+    pub fn create_with_layout(layout: Option<VMLayout>) -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init_with_layout(MB, layout);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        VMLayoutFixture {
+            mmtk: &crate::SINGLETON,
+            mutator: handle,
+        }
+    }
+}
+
+impl FixtureContent for VMLayoutFixture {
+    fn create() -> Self {
+        Self::create_with_layout(None::<VMLayout>)
+    }
+}
+
+unsafe impl Send for VMLayoutFixture {}

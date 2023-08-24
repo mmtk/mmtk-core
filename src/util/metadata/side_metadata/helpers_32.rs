@@ -1,7 +1,7 @@
 use super::SideMetadataSpec;
 use crate::util::{
     constants::{self, LOG_BITS_IN_BYTE},
-    heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, CHUNK_MASK, LOG_BYTES_IN_CHUNK},
+    heap::layout::vm_layout::{BYTES_IN_CHUNK, CHUNK_MASK, LOG_BYTES_IN_CHUNK},
     memory, Address,
 };
 use std::io::Result;
