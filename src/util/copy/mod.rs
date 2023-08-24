@@ -253,16 +253,11 @@ impl CopySemantics {
 }
 
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum CopySelector {
     CopySpace(u8),
     Immix(u8),
     ImmixHybrid(u8),
+    #[default]
     Unused,
-}
-
-impl std::default::Default for CopySelector {
-    fn default() -> Self {
-        CopySelector::Unused
-    }
 }
