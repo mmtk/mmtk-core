@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["LOCAL_BUFFER_SIZE",""],["UNINITIALIZED_WATER_MARK",""]],"struct":[["BlockPageResource","A fast PageResource for fixed-size block allocation only."],["BlockPool","A block queue which contains a global pool and a set of thread-local queues."],["BlockQueue","A block list that supports fast lock-free push/pop operations"]]};
+window.SIDEBAR_ITEMS = {"constant":["LOCAL_BUFFER_SIZE","UNINITIALIZED_WATER_MARK"],"struct":["BlockPageResource","BlockPool","BlockQueue"]};

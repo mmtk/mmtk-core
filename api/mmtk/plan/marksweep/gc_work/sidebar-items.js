@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["MSGCWorkContext",""]]};
+window.SIDEBAR_ITEMS = {"struct":["MSGCWorkContext"]};

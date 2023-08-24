@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["GENCOPY_CONSTRAINTS",""]],"struct":[["GenCopy",""]]};
+window.SIDEBAR_ITEMS = {"constant":["GENCOPY_CONSTRAINTS"],"struct":["GenCopy"]};

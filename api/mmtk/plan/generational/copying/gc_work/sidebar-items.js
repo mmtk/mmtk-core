@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["GenCopyGCWorkContext",""],["GenCopyNurseryGCWorkContext",""]]};
+window.SIDEBAR_ITEMS = {"struct":["GenCopyGCWorkContext","GenCopyNurseryGCWorkContext"]};

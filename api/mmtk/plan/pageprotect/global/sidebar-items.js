@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["CONSTRAINTS",""]],"struct":[["PageProtect",""]]};
+window.SIDEBAR_ITEMS = {"constant":["CONSTRAINTS"],"struct":["PageProtect"]};

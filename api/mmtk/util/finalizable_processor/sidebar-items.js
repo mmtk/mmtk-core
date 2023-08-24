@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["FinalizableProcessor","A special processor for Finalizable objects."],["Finalization",""],["ForwardFinalization",""]]};
+window.SIDEBAR_ITEMS = {"struct":["FinalizableProcessor","Finalization","ForwardFinalization"]};

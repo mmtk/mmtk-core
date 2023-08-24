@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["RESERVED_ALLOCATORS",""]],"fn":[["create_immix_mutator",""],["immix_mutator_prepare",""],["immix_mutator_release",""]],"struct":[["ALLOCATOR_MAPPING",""]]};
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_immix_mutator","immix_mutator_prepare","immix_mutator_release"],"struct":["ALLOCATOR_MAPPING"]};

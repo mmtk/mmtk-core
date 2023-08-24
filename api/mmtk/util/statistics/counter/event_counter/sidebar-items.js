@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["EventCounter","This file implements a simple event counter (counting number events that occur for each phase)."]]};
+window.SIDEBAR_ITEMS = {"struct":["EventCounter"]};

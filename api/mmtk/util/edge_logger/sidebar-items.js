@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["should_check_duplicate_edges","Whether we should check duplicate edges. This depends on the actual plan."]],"struct":[["EdgeLogger",""]]};
+window.SIDEBAR_ITEMS = {"fn":["should_check_duplicate_edges"],"struct":["EdgeLogger"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["SizeCounter",""]]};
+window.SIDEBAR_ITEMS = {"struct":["SizeCounter"]};

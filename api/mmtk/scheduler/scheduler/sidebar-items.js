@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["GCWorkScheduler",""]]};
+window.SIDEBAR_ITEMS = {"struct":["GCWorkScheduler"]};

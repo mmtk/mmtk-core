@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["MallocAllocator",""]]};
+window.SIDEBAR_ITEMS = {"struct":["MallocAllocator"]};

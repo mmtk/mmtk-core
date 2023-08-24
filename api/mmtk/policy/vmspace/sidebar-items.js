@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["VMSpace",""]]};
+window.SIDEBAR_ITEMS = {"struct":["VMSpace"]};

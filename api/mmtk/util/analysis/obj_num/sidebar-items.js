@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["ObjectCounter","Simple analysis routine that counts the number of objects allocated"]]};
+window.SIDEBAR_ITEMS = {"struct":["ObjectCounter"]};

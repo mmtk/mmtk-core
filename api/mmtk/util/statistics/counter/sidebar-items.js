@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["event_counter",""],["long_counter",""],["size_counter",""]],"struct":[["MonotoneNanoTime",""]],"trait":[["Counter","An abstraction over how a specific Diffable value is counted"],["Diffable","An abstraction over some changing values that we want to measure."]]};
+window.SIDEBAR_ITEMS = {"mod":["event_counter","long_counter","size_counter"],"struct":["MonotoneNanoTime"],"trait":["Counter","Diffable"]};

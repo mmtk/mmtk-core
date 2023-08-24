@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["IntArrayFreeList",""]]};
+window.SIDEBAR_ITEMS = {"struct":["IntArrayFreeList"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["global",""],["metadata",""]]};
+window.SIDEBAR_ITEMS = {"mod":["global","metadata"]};

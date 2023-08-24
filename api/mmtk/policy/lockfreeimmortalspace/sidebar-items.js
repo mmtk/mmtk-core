@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["LockFreeImmortalSpace","This type implements a lock free version of the immortal collection policy. This is close to the OpenJDK’s epsilon GC. Different from the normal ImmortalSpace, this version should only be used by NoGC plan, and it now uses the whole heap range."]]};
+window.SIDEBAR_ITEMS = {"struct":["LockFreeImmortalSpace"]};

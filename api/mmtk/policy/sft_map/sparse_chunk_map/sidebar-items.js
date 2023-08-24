@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["SFTSparseChunkMap","The chunk map is a sparse table. It has one entry for each chunk in the address space we may use."]]};
+window.SIDEBAR_ITEMS = {"struct":["SFTSparseChunkMap"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["bind_current_thread_to_core","Bind the current thread to the specified core."],["get_total_num_cpus","Return the total number of cores allocated to the program."]],"type":[["CoreId","Represents the ID of a logical CPU on a system."]]};
+window.SIDEBAR_ITEMS = {"fn":["bind_current_thread_to_core","get_total_num_cpus"],"type":["CoreId"]};

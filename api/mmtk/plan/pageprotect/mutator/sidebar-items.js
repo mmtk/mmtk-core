@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["RESERVED_ALLOCATORS",""]],"fn":[["create_pp_mutator","Create a mutator instance. Every object is allocated to LOS."],["pp_mutator_prepare","Prepare mutator. Do nothing."],["pp_mutator_release","Release mutator. Do nothing."]],"struct":[["ALLOCATOR_MAPPING",""]]};
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_pp_mutator","pp_mutator_prepare","pp_mutator_release"],"struct":["ALLOCATOR_MAPPING"]};

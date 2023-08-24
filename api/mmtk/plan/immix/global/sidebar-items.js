@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["IMMIX_CONSTRAINTS",""]],"struct":[["Immix",""]]};
+window.SIDEBAR_ITEMS = {"constant":["IMMIX_CONSTRAINTS"],"struct":["Immix"]};

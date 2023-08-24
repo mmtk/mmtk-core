@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["RevisitableGroup",""],["RevisitableGroupBy","An iterator through groups of items with the same key."]],"trait":[["RevisitableGroupByForIterator","This trait provides the `revisitable_group_by` method for all `Iterator` that also implements `Clone`."]]};
+window.SIDEBAR_ITEMS = {"struct":["RevisitableGroup","RevisitableGroupBy"],"trait":["RevisitableGroupByForIterator"]};

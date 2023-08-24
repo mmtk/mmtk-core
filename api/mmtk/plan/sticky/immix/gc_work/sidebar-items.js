@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["StickyImmixMatureGCWorkContext",""],["StickyImmixNurseryGCWorkContext",""]]};
+window.SIDEBAR_ITEMS = {"struct":["StickyImmixMatureGCWorkContext","StickyImmixNurseryGCWorkContext"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"static":[["SFT_MAP",""]],"struct":[["MMAPPER","A global Mmapper for mmaping and protection of virtual memory."],["MMTK","An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap. Note that multi-instances is not fully supported yet"],["MMTKBuilder",""],["VM_MAP","A global VMMap that manages the mapping of spaces to virtual memory ranges."]]};
+window.SIDEBAR_ITEMS = {"static":["SFT_MAP"],"struct":["MMAPPER","MMTK","MMTKBuilder","VM_MAP"]};

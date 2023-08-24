@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["create_stickyimmix_mutator",""],["stickyimmix_mutator_prepare",""],["stickyimmix_mutator_release",""]]};
+window.SIDEBAR_ITEMS = {"fn":["create_stickyimmix_mutator","stickyimmix_mutator_prepare","stickyimmix_mutator_release"]};

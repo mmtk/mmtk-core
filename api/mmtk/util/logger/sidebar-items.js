@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["try_init","Attempt to init a env_logger for MMTk."]]};
+window.SIDEBAR_ITEMS = {"fn":["try_init"]};

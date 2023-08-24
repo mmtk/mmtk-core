@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["Map32",""]]};
+window.SIDEBAR_ITEMS = {"struct":["Map32"]};

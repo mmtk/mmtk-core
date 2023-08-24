@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["RESERVED_ALLOCATORS",""]],"fn":[["create_space_mapping",""],["get_freelist_allocator_mut",""],["ms_mutator_prepare",""],["ms_mutator_release",""]],"struct":[["ALLOCATOR_MAPPING",""]]};
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_space_mapping","get_freelist_allocator_mut","ms_mutator_prepare","ms_mutator_release"],"struct":["ALLOCATOR_MAPPING"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["immix",""]]};
+window.SIDEBAR_ITEMS = {"mod":["immix"]};

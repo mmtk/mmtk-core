@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["PageAccounting","The struct is used for page usage. Both page resource and side metadata uses this struct to do page accounting."]]};
+window.SIDEBAR_ITEMS = {"struct":["PageAccounting"]};

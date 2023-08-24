@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["MMAP_NUM_CHUNKS",""],["VERBOSE",""]],"struct":[["ByteMapMmapper",""]]};
+window.SIDEBAR_ITEMS = {"constant":["MMAP_NUM_CHUNKS","VERBOSE"],"struct":["ByteMapMmapper"]};

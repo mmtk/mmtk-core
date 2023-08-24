@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["VO_BIT_REGION_SIZE","The region size (in bytes) of the `VO_BIT` side metadata. The VM can use this to check if an object is properly aligned."]]};
+window.SIDEBAR_ITEMS = {"constant":["VO_BIT_REGION_SIZE"]};

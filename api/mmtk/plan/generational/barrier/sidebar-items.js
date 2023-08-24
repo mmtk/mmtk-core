@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["GenObjectBarrierSemantics",""]]};
+window.SIDEBAR_ITEMS = {"struct":["GenObjectBarrierSemantics"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["STICKY_IMMIX_CONSTRAINTS",""]],"struct":[["StickyImmix",""]]};
+window.SIDEBAR_ITEMS = {"constant":["STICKY_IMMIX_CONSTRAINTS"],"struct":["StickyImmix"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["HeapMeta",""]]};
+window.SIDEBAR_ITEMS = {"struct":["HeapMeta"]};
