@@ -621,7 +621,7 @@ pub trait ProcessEdgesWork:
     /// Create an object-scanning work packet to be used for this ProcessEdgesWork.
     ///
     /// `roots` indicates if we are creating a packet for root scanning.  It is only true when this
-    /// method is called to handle `RootsWorkFactory::create_process_node_roots_work`.
+    /// method is called to handle `RootsWorkFactory::create_process_pinned_roots_work`.
     fn create_scan_work(
         &self,
         nodes: Vec<ObjectReference>,
@@ -743,29 +743,29 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
         );
     }
 
-    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_process_pinned_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         // Will process roots within the NodeRootsTrace bucket
         // And put work in the Closure bucket
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::NodeRootsTrace,
+            WorkBucketStage::PinnedRootsTrace,
             ProcessRootNode::<VM, I, E>::new(nodes, WorkBucketStage::Closure),
         );
     }
 
-    fn create_process_tp_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
+    fn create_process_tpinned_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::TPClosure,
-            I::new(edges, true, self.mmtk, WorkBucketStage::TPClosure),
+            WorkBucketStage::TPinningClosure,
+            I::new(edges, true, self.mmtk, WorkBucketStage::TPinningClosure),
         );
     }
 
-    fn create_process_tp_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_process_tpinned_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::TPClosure,
-            ProcessRootNode::<VM, I, I>::new(nodes, WorkBucketStage::TPClosure),
+            WorkBucketStage::TPinningClosure,
+            ProcessRootNode::<VM, I, I>::new(nodes, WorkBucketStage::TPinningClosure),
         );
     }
 }
@@ -1126,7 +1126,7 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
         let scanned_root_objects = {
             // We create an instance of E to use its `trace_object` method and its object queue.
             let mut process_edges_work =
-                E1::new(vec![], true, mmtk, WorkBucketStage::NodeRootsTrace);
+                E1::new(vec![], true, mmtk, WorkBucketStage::PinnedRootsTrace);
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {

@@ -66,15 +66,15 @@ impl RootsWorkFactory<Address> for MockFactory {
         }
     }
 
-    fn create_process_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
+    fn create_process_pinned_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }
 
-    fn create_process_tp_edge_roots_work(&mut self, _edges: Vec<Address>) {
+    fn create_process_tpinned_edge_roots_work(&mut self, _edges: Vec<Address>) {
         unimplemented!();
     }
 
-    fn create_process_tp_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
+    fn create_process_tpinned_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }
 }

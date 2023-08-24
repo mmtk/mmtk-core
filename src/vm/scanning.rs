@@ -107,16 +107,15 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
 
     /// Create work packets to handle nodes pointed by root edges.
     ///
-    /// The work packet cannot update root edges, therefore it cannot move the objects.  This
-    /// method can only be used by GC algorithms that never moves objects, or GC algorithms that
-    /// supports object pinning.
+    /// The work packet cannot update root edges, therefore it cannot move the objects
+    /// i.e. they will be pinned for the duration of the GC
     ///
     /// This method is useful for conservative stack scanning, or VMs that cannot update some
     /// of the root edges.
     ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by root edges.
-    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
+    fn create_process_pinned_roots_work(&mut self, nodes: Vec<ObjectReference>);
 
     /// Create work packets to handle root edges.
     ///
@@ -124,16 +123,16 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     ///
     /// Arguments:
     /// * `edges`: A vector of edges.
-    fn create_process_tp_edge_roots_work(&mut self, edges: Vec<ES>);
+    fn create_process_tpinned_edge_roots_work(&mut self, edges: Vec<ES>);
 
     /// Create work packets to handle nodes pointed by root edges.
     ///
-    /// Similar to `create_process_node_roots_work`, this work packet won't move root objects, but also will
+    /// Similar to `create_process_pinned_roots_work`, this work packet won't move root objects, but also will
     /// not move any object in their transitive closure.
     ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by root edges.
-    fn create_process_tp_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
+    fn create_process_tpinned_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
 /// VM-specific methods for scanning roots/objects.
