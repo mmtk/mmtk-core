@@ -250,7 +250,7 @@ pub trait Scanning<VM: VMBinding> {
     /// `ObjectReference::is_reachable()`.
     ///
     /// If an object is already reached, the VM binding can get its new address by calling
-    /// `ObjectReference::get_forwarded_object()`.
+    /// `ObjectReference::get_forwarded_object()` as the object may have been moved.
     ///
     /// If an object is not yet reached, the VM binding can keep that object and its descendents
     /// alive.  To do this, the VM binding should use `tracer_context.with_tracer` to get access to
