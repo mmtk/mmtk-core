@@ -100,17 +100,17 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     #[cfg(feature = "object_pinning")]
-    fn pin_object(&self, _object: ObjectReference) -> bool {
+    fn set_pinned(&self, _object: ObjectReference) -> bool {
         false
     }
 
     #[cfg(feature = "object_pinning")]
-    fn unpin_object(&self, _object: ObjectReference) -> bool {
+    fn unset_pinned(&self, _object: ObjectReference) -> bool {
         false
     }
 
     #[cfg(feature = "object_pinning")]
-    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+    fn debug_get_pinned(&self, _object: ObjectReference) -> bool {
         false
     }
 

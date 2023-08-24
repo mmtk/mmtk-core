@@ -48,11 +48,11 @@ pub trait SFT {
     // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
     // is currently pinned.
     #[cfg(feature = "object_pinning")]
-    fn pin_object(&self, object: ObjectReference) -> bool;
+    fn set_pinned(&self, object: ObjectReference) -> bool;
     #[cfg(feature = "object_pinning")]
-    fn unpin_object(&self, object: ObjectReference) -> bool;
+    fn unset_pinned(&self, object: ObjectReference) -> bool;
     #[cfg(feature = "object_pinning")]
-    fn is_object_pinned(&self, object: ObjectReference) -> bool;
+    fn debug_get_pinned(&self, object: ObjectReference) -> bool;
 
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
@@ -128,15 +128,15 @@ impl SFT for EmptySpaceSFT {
         false
     }
     #[cfg(feature = "object_pinning")]
-    fn pin_object(&self, _object: ObjectReference) -> bool {
+    fn set_pinned(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of EmptySpace.")
     }
     #[cfg(feature = "object_pinning")]
-    fn unpin_object(&self, _object: ObjectReference) -> bool {
+    fn unset_pinned(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of EmptySpace.")
     }
     #[cfg(feature = "object_pinning")]
-    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+    fn debug_get_pinned(&self, _object: ObjectReference) -> bool {
         false
     }
     fn is_movable(&self) -> bool {
