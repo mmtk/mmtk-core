@@ -1,4 +1,7 @@
+use std::mem::size_of;
 use std::mem::MaybeUninit;
+
+use memoffset::offset_of;
 
 use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -10,6 +13,7 @@ use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
+use crate::Mutator;
 
 use super::FreeListAllocator;
 use super::MarkCompactAllocator;
@@ -173,5 +177,71 @@ pub enum AllocatorSelector {
 impl Default for AllocatorSelector {
     fn default() -> Self {
         AllocatorSelector::None
+    }
+}
+
+/// This type describes allocator information. It is used to
+/// generate fast paths for the GC. All offset fields are relative to [`Mutator`](crate::Mutator).
+#[repr(C, u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum AllocatorInfo {
+    BumpPointer { bump_pointer_offset: usize },
+    // FIXME: Add free-list fast-path
+    Unimplemented,
+    None,
+}
+
+impl Default for AllocatorInfo {
+    fn default() -> Self {
+        AllocatorInfo::None
+    }
+}
+
+impl AllocatorInfo {
+    /// Return an AllocatorInfo for the given allocator selector. This method is provided
+    /// so that VM compilers may generate allocator fast-path and load fields for the fast-path.
+    ///
+    /// Arguments:
+    /// * `selector`: The allocator selector to query.
+    pub fn new<VM: VMBinding>(selector: AllocatorSelector) -> AllocatorInfo {
+        match selector {
+            AllocatorSelector::BumpPointer(index) => {
+                let base_offset = offset_of!(Mutator<VM>, allocators)
+                    + offset_of!(Allocators<VM>, bump_pointer)
+                    + size_of::<BumpAllocator<VM>>() * index as usize;
+                let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
+
+                AllocatorInfo::BumpPointer {
+                    bump_pointer_offset: base_offset + bump_pointer_offset,
+                }
+            }
+
+            AllocatorSelector::Immix(index) => {
+                let base_offset = offset_of!(Mutator<VM>, allocators)
+                    + offset_of!(Allocators<VM>, immix)
+                    + size_of::<ImmixAllocator<VM>>() * index as usize;
+                let bump_pointer_offset = offset_of!(ImmixAllocator<VM>, bump_pointer);
+
+                AllocatorInfo::BumpPointer {
+                    bump_pointer_offset: base_offset + bump_pointer_offset,
+                }
+            }
+
+            AllocatorSelector::MarkCompact(index) => {
+                let base_offset = offset_of!(Mutator<VM>, allocators)
+                    + offset_of!(Allocators<VM>, markcompact)
+                    + size_of::<MarkCompactAllocator<VM>>() * index as usize;
+                let bump_offset =
+                    base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
+                let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
+
+                AllocatorInfo::BumpPointer {
+                    bump_pointer_offset: bump_offset + bump_pointer_offset,
+                }
+            }
+
+            AllocatorSelector::FreeList(_) => AllocatorInfo::Unimplemented,
+            _ => AllocatorInfo::None,
+        }
     }
 }
