@@ -13,7 +13,7 @@ use std::ops::Range;
 pub struct Chunk(Address);
 
 impl Region for Chunk {
-    const LOG_BYTES: usize = crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+    const LOG_BYTES: usize = crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 
     fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));

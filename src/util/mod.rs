@@ -40,7 +40,7 @@ pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
 /// Heap implementation, including page resource, mmapper, etc.
-pub(crate) mod heap;
+pub mod heap;
 #[cfg(feature = "is_mmtk_object")]
 pub mod is_mmtk_object;
 /// Logger initialization

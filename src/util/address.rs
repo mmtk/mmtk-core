@@ -277,7 +277,7 @@ impl Address {
     }
 
     /// is this address aligned to the given alignment
-    pub fn is_aligned_to(self, align: usize) -> bool {
+    pub const fn is_aligned_to(self, align: usize) -> bool {
         use crate::util::conversions;
         conversions::raw_is_aligned(self.0, align)
     }

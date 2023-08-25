@@ -2,7 +2,7 @@ use super::mmapper::MapState;
 use super::Mmapper;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::memory::MmapStrategy;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
@@ -367,7 +367,7 @@ impl Default for FragmentedMapper {
 mod tests {
     use super::*;
     use crate::util::constants::LOG_BYTES_IN_PAGE;
-    use crate::util::heap::layout::vm_layout_constants::MMAP_CHUNK_BYTES;
+    use crate::util::heap::layout::vm_layout::MMAP_CHUNK_BYTES;
     use crate::util::memory;
     use crate::util::test_util::FRAGMENTED_MMAPPER_TEST_REGION;
     use crate::util::test_util::{serial_test, with_cleanup};

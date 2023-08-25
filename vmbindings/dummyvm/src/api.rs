@@ -7,6 +7,7 @@ use crate::SINGLETON;
 use libc::c_char;
 use mmtk::memory_manager;
 use mmtk::scheduler::{GCController, GCWorker};
+use mmtk::util::heap::vm_layout::VMLayout;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::AllocationSemantics;
@@ -15,10 +16,18 @@ use std::ffi::CStr;
 use std::sync::atomic::Ordering;
 
 #[no_mangle]
-pub extern "C" fn mmtk_init(heap_size: usize) {
+pub fn mmtk_init(heap_size: usize) {
+    mmtk_init_with_layout(heap_size, None)
+}
+
+#[no_mangle]
+pub fn mmtk_init_with_layout(heap_size: usize, layout: Option<VMLayout>) {
     // set heap size first
     {
         let mut builder = BUILDER.lock().unwrap();
+        if let Some(layout) = layout {
+            builder.set_vm_layout(layout);
+        }
         let success =
             builder
                 .options
