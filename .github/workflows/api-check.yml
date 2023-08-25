@@ -24,13 +24,25 @@ jobs:
           # Full git history needed
           fetch-depth: 0
 
-      - name: Install Rust toolchain
+      # cargo-public-api can be built with the latest stable toolchain.
+      - name: Install stable Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
+          # make it the active toolchain
           override: true
+
+      # cargo-public-api needs a nightly toolchain installed in order to work.
+      # It does not have to be the active toolchain.
+      - name: Install nightly Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+
       - run: cargo --version
+      - run: cargo +nightly --version
 
       - name: Install cargo-public-api
         run: cargo install cargo-public-api
