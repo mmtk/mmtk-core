@@ -18,25 +18,33 @@ jobs:
   check-public-api-changes:
     runs-on: ubuntu-latest
     steps:
-      # Full git history needed
-      - uses: actions/checkout@v2
+      - name: Checkout mmtk-core
+        uses: actions/checkout@v2
         with:
+          # Full git history needed
           fetch-depth: 0
 
-      # Install nightly
-      - uses: actions-rs/toolchain@v1
+      # cargo-public-api can be built with the latest stable toolchain.
+      - name: Install stable Rust toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          # We need nightly for cargo-public-api to get the API output.
-          toolchain: nightly-2023-01-04
+          toolchain: stable
           profile: minimal
-          # It is not necessary to use nightly as default (which is used to install cargo-public-api and compile our code).
-          # However, our current toolchain is 1.59.0, and cargo-public-api requires 1.60 at least. To make it simple,
-          # we just use the latest nightly toolchain.
+          # make it the active toolchain
           override: true
-      - run: cargo --version
 
-      # Install cargo-public-api
+      # cargo-public-api needs a nightly toolchain installed in order to work.
+      # It does not have to be the active toolchain.
+      - name: Install nightly Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+
+      - run: cargo --version
+      - run: cargo +nightly --version
+
       - name: Install cargo-public-api
-        run: cargo install cargo-public-api --version 0.26.0
+        run: cargo install cargo-public-api
       - name: API Diff
         run: cargo public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all
