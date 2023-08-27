@@ -1,5 +1,5 @@
 use crate::util::address::{Address, ByteSize};
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use std::panic;
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -26,10 +26,18 @@ impl MmapTestRegion {
 }
 
 // Make sure we use the address range before our heap start so we won't conflict with our heap range.
-const_assert!(
-    TEST_ADDRESS.as_usize()
-        <= crate::util::heap::layout::vm_layout_constants::HEAP_START.as_usize()
-);
+#[cfg(test)]
+mod test {
+    #[test]
+    fn verify_test_address() {
+        assert!(
+            super::TEST_ADDRESS.as_usize()
+                <= crate::util::heap::layout::vm_layout::vm_layout()
+                    .heap_start
+                    .as_usize()
+        );
+    }
+}
 
 // Test with an address that works for 32bits.
 #[cfg(target_os = "linux")]

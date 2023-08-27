@@ -35,12 +35,12 @@ pub(crate) mod analysis;
 /// Logging edges to check duplicated edges in GC.
 #[cfg(feature = "extreme_assertions")]
 pub(crate) mod edge_logger;
-/// Non-generic refs to generic types of <VM>.
+/// Non-generic refs to generic types of `<VM>`.
 pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
 /// Heap implementation, including page resource, mmapper, etc.
-pub(crate) mod heap;
+pub mod heap;
 #[cfg(feature = "is_mmtk_object")]
 pub mod is_mmtk_object;
 /// Logger initialization

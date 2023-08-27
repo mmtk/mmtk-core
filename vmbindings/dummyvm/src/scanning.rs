@@ -1,5 +1,5 @@
-use crate::DummyVM;
 use crate::edges::DummyVMEdge;
+use crate::DummyVM;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::ObjectReference;
 use mmtk::vm::EdgeVisitor;

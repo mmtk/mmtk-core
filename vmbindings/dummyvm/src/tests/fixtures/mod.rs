@@ -2,12 +2,12 @@
 #![allow(dead_code)]
 
 use atomic_refcell::AtomicRefCell;
-use std::sync::Once;
 use std::sync::Mutex;
+use std::sync::Once;
 
+use mmtk::util::{ObjectReference, VMMutatorThread, VMThread};
 use mmtk::AllocationSemantics;
 use mmtk::MMTK;
-use mmtk::util::{ObjectReference, VMThread, VMMutatorThread};
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
@@ -16,7 +16,6 @@ use crate::DummyVM;
 pub trait FixtureContent {
     fn create() -> Self;
 }
-
 
 pub struct Fixture<T: FixtureContent> {
     content: AtomicRefCell<Option<Box<T>>>,
@@ -46,13 +45,13 @@ impl<T: FixtureContent> Fixture<T> {
 
 /// SerialFixture ensures all `with_fixture()` calls will be executed serially.
 pub struct SerialFixture<T: FixtureContent> {
-    content: Mutex<Option<Box<T>>>
+    content: Mutex<Option<Box<T>>>,
 }
 
 impl<T: FixtureContent> SerialFixture<T> {
     pub fn new() -> Self {
         Self {
-            content: Mutex::new(None)
+            content: Mutex::new(None),
         }
     }
 
@@ -62,6 +61,27 @@ impl<T: FixtureContent> SerialFixture<T> {
             *c = Some(Box::new(T::create()));
         }
         func(c.as_ref().unwrap())
+    }
+
+    pub fn with_fixture_expect_benign_panic<
+        F: Fn(&T) + std::panic::UnwindSafe + std::panic::RefUnwindSafe,
+    >(
+        &self,
+        func: F,
+    ) {
+        let res = {
+            // The lock will be dropped at the end of the block. So panic won't poison the lock.
+            let mut c = self.content.lock().unwrap();
+            if c.is_none() {
+                *c = Some(Box::new(T::create()));
+            }
+
+            std::panic::catch_unwind(|| func(c.as_ref().unwrap()))
+        };
+        // We do not hold the lock now. It is safe to resume now.
+        if let Err(e) = res {
+            std::panic::resume_unwind(e);
+        }
     }
 }
 
@@ -94,7 +114,7 @@ impl FixtureContent for SingleObject {
 }
 
 pub struct MMTKSingleton {
-    pub mmtk: &'static MMTK<DummyVM>
+    pub mmtk: &'static MMTK<DummyVM>,
 }
 
 impl FixtureContent for MMTKSingleton {
@@ -166,3 +186,35 @@ impl FixtureContent for MutatorFixture {
 }
 
 unsafe impl Send for MutatorFixture {}
+
+use mmtk::util::heap::vm_layout::VMLayout;
+
+pub struct VMLayoutFixture {
+    pub mmtk: &'static MMTK<DummyVM>,
+    pub mutator: *mut Mutator<DummyVM>,
+}
+
+impl VMLayoutFixture {
+    pub fn create_with_layout(layout: Option<VMLayout>) -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init_with_layout(MB, layout);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        VMLayoutFixture {
+            mmtk: &crate::SINGLETON,
+            mutator: handle,
+        }
+    }
+}
+
+impl FixtureContent for VMLayoutFixture {
+    fn create() -> Self {
+        Self::create_with_layout(None::<VMLayout>)
+    }
+}
+
+unsafe impl Send for VMLayoutFixture {}

@@ -2,6 +2,8 @@
 
 export RUSTFLAGS="-D warnings -A unknown-lints"
 
+# --- Check main crate ---
+
 # check base
 cargo clippy
 # check all features
@@ -10,8 +12,6 @@ for_all_features "cargo clippy"
 for_all_features "cargo clippy --release"
 # check for tests
 for_all_features "cargo clippy --tests"
-# check for dummyvm
-cargo clippy --manifest-path=vmbindings/dummyvm/Cargo.toml
 
 # target-specific features
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
@@ -20,5 +20,14 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo clippy --tests --features perf_counter
 fi
 
-# check format
-cargo fmt -- --check
+# --- Check auxiliary crate ---
+
+style_check_auxiliary_crate() {
+    crate_path=$1
+
+    cargo clippy --manifest-path=$crate_path/Cargo.toml
+    cargo fmt --manifest-path=$crate_path/Cargo.toml -- --check
+}
+
+style_check_auxiliary_crate macros
+style_check_auxiliary_crate vmbindings/dummyvm

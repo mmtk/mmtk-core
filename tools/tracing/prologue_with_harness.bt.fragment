@@ -1,0 +1,10 @@
+usdt:$MMTK:mmtk:harness_begin {
+    //begin collecting data at harness_begin (start of final iteration)
+    @stats_enabled = 1;
+}
+
+usdt:$MMTK:mmtk:harness_end {
+    //end data at harness_end (end of final iteration)
+    @stats_enabled = 0;
+    exit();
+}

@@ -280,7 +280,10 @@ pub trait Plan: 'static + Sync + Downcast {
 
     /// Get the total number of pages for the heap.
     fn get_total_pages(&self) -> usize {
-        self.base().gc_trigger.policy.get_heap_size_in_pages()
+        self.base()
+            .gc_trigger
+            .policy
+            .get_current_heap_size_in_pages()
     }
 
     /// Get the number of pages that are still available for use. The available pages

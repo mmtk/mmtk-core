@@ -20,7 +20,7 @@ jobs:
       pull_request: ${{ github.event.pull_request.number }}
 
   v8-binding-test:
-    runs-on: [self-hosted, linux, freq-scaling-off]
+    runs-on: ubuntu-20.04
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
@@ -167,3 +167,54 @@ jobs:
           export RUST_BACKTRACE=1
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
+
+
+  ruby-binding-test:
+    runs-on: ubuntu-22.04
+    needs: binding-refs
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    strategy:
+      fail-fast: true
+      matrix:
+        debug-level: ["debug", "release"]
+    env:
+      DEBUG_LEVEL: ${{ matrix.debug-level }}
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v3
+        with:
+          path: mmtk-core
+
+      - name: Checkout MMTk Ruby binding
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
+          path: mmtk-ruby
+          ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
+
+      - name: Checkout Ruby
+        uses: actions/checkout@v3
+        with:
+          repository: mmtk/ruby
+          path: ruby
+          ref: mmtk
+
+      - name: Override mmtk-core dependency for binding
+        run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml .
+        working-directory: mmtk-core
+
+      - name: Setup environment
+        run: ./.github/scripts/ci-setup.sh
+        working-directory: mmtk-ruby
+
+      - name: Build MMTk Ruby ${{ matrix.debug-level }}
+        run: ./.github/scripts/ci-build.sh
+        working-directory: mmtk-ruby
+
+      - name: Run bootstrap tests (btest)
+        run: ./.github/scripts/ci-btest.sh
+        working-directory: mmtk-ruby
+
+      - name: Run all tests (test-all)
+        run: ./.github/scripts/ci-test-all.sh
+        working-directory: mmtk-ruby

@@ -1,0 +1,11 @@
+usdt:$MMTK:mmtk:alloc_slow_once_start {
+    if (@stats_enabled) {
+        @alloc_slow_nsecs[tid] = nsecs;
+    }
+}
+
+usdt:$MMTK:mmtk:alloc_slow_once_end {
+    if (@stats_enabled) {
+        @alloc_slow_hist = hist((nsecs - @alloc_slow_nsecs[tid])/400);
+    }
+}

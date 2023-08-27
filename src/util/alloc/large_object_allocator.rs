@@ -45,15 +45,13 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        let header = 0; // HashSet is used instead of DoublyLinkedList
-        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size + header, align);
-        let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
-        let sp = self.space.allocate_pages(self.tls, pages);
-        if sp.is_zero() {
-            sp
-        } else {
-            sp + header
+        if self.space.will_oom_on_acquire(self.tls, size) {
+            return Address::ZERO;
         }
+
+        let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
+        let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
+        self.space.allocate_pages(self.tls, pages)
     }
 }
 

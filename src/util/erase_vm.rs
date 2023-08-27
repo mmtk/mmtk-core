@@ -3,7 +3,7 @@
 //! However, in some cases, using generic types is not allowed. For example, in an object-safe trait,
 //! the methods cannot be generic, thus the method's parameters cannot be generic types.
 //!
-//! This module defines macros that can be used to create a special ref type that erases the <VM> type parameter.
+//! This module defines macros that can be used to create a special ref type that erases the `<VM>` type parameter.
 //! For example, we create a type `TErasedRef` for `&T<VM>`. `TErasedRef` has no type parameter, and
 //! can be used in places where a type parameter is undesired. The type `TErasedRef` can be cast back to `&T<VM>`
 //! when we supply a type parameter `<VM>`. This works under the assumption that

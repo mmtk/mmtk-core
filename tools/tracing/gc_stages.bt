@@ -1,0 +1,28 @@
+usdt:$MMTK:mmtk:gc_start {
+    if (@stats_enabled) {
+        @gc_start_nsecs = nsecs;
+    }
+}
+
+usdt:$MMTK:mmtk:gc_end {
+    if (@stats_enabled) {
+        @post_closure_time += nsecs - @post_closure_nsecs;
+    }
+}
+
+usdt:$MMTK:mmtk:bucket_opened {
+    if (@stats_enabled) {
+        $ns = nsecs;
+        // Please check enum WorkBucketStage for the numerical values of stages
+        // Closure is 2 when vo_bit is not set
+        if (arg0 == 2) {
+            @closure_nsecs = $ns;
+            @pre_closure_time += $ns - @gc_start_nsecs;
+        }
+        // Release is 14 when vo_bit is not set
+        if (arg0 == 14) {
+            @post_closure_nsecs = $ns;
+            @closure_time += $ns - @closure_nsecs;
+        }
+    }
+}

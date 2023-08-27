@@ -145,7 +145,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         args: &mut CreateSpecificPlanArgs<VM>,
         location: Option<(Address, usize)>,
     ) -> ImmortalSpace<VM> {
-        use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+        use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 
         // If the location of the VM space is not supplied, find them in the options.
         let (vm_space_start, vm_space_bytes) = location.unwrap_or((

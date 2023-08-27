@@ -202,7 +202,7 @@ pub trait Scanning<VM: VMBinding> {
     /// scan them while enumerating, but cannot scan stacks individually when given
     /// the references of threads.
     /// In that case, it can leave this method empty, and deal with stack
-    /// roots in [`Collection::scan_vm_specific_roots`]. However, in that case, MMTk
+    /// roots in [`Scanning::scan_vm_specific_roots`]. However, in that case, MMTk
     /// does not know those roots are stack roots, and cannot perform any possible
     /// optimization for the stack roots.
     ///
@@ -242,20 +242,33 @@ pub trait Scanning<VM: VMBinding> {
     /// MMTk core enables the VM binding to do the following in this function:
     ///
     /// 1.  Query if an object is already reached in this transitive closure.
-    /// 2.  Keep certain objects and their descendents alive.
-    /// 3.  Get the new address of objects that are either
-    ///     -   already alive before this function is called, or
-    ///     -   explicitly kept alive in this function.
+    /// 2.  Get the new address of an object if it is already reached.
+    /// 3.  Keep an object and its descendents alive if not yet reached.
     /// 4.  Request this function to be called again after transitive closure is finished again.
     ///
-    /// The VM binding can call `ObjectReference::is_reachable()` to query if an object is
-    /// currently reached.
+    /// The VM binding can query if an object is currently reached by calling
+    /// `ObjectReference::is_reachable()`.
     ///
-    /// The VM binding can use `tracer_factory` to get access to an `ObjectTracer`, and call
-    /// its `trace_object(object)` method to keep `object` and its decendents alive.
+    /// If an object is already reached, the VM binding can get its new address by calling
+    /// `ObjectReference::get_forwarded_object()` as the object may have been moved.
     ///
-    /// The return value of `ObjectTracer::trace_object(object)` is the new address of the given
-    /// `object` if it is moved by the GC.
+    /// If an object is not yet reached, the VM binding can keep that object and its descendents
+    /// alive.  To do this, the VM binding should use `tracer_context.with_tracer` to get access to
+    /// an `ObjectTracer`, and then call its `trace_object(object)` method.  The `trace_object`
+    /// method will return the new address of the `object` if it moved the object, or its original
+    /// address if not moved.  Implementation-wise, the `ObjectTracer` may contain an internal
+    /// queue for newly traced objects, and will flush the queue when `tracer_context.with_tracer`
+    /// returns. Therefore, it is recommended to reuse the `ObjectTracer` instance to trace
+    /// multiple objects.
+    ///
+    /// *Note that if `trace_object` is called on an already reached object, the behavior will be
+    /// equivalent to `ObjectReference::get_forwarded_object()`.  It will return the new address if
+    /// the GC already moved the object when tracing that object, or the original address if the GC
+    /// did not move the object when tracing it.  In theory, the VM binding can use `trace_object`
+    /// wherever `ObjectReference::get_forwarded_object()` is needed.  However, if a VM never
+    /// resurrects objects, it should completely avoid touching `tracer_context`, and exclusively
+    /// use `ObjectReference::get_forwarded_object()` to get new addresses of objects.  By doing
+    /// so, the VM binding can avoid accidentally resurrecting objects.*
     ///
     /// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`
     /// to be called again after the MMTk core finishes transitive closure again from the objects
@@ -264,7 +277,7 @@ pub trait Scanning<VM: VMBinding> {
     ///
     /// Implementation-wise, this function is called as the "sentinel" of the `VMRefClosure` work
     /// bucket, which means it is called when all work packets in that bucket have finished.  The
-    /// `tracer_factory` expands the transitive closure by adding more work packets in the same
+    /// `tracer_context` expands the transitive closure by adding more work packets in the same
     /// bucket.  This means if `process_weak_refs` returns true, those work packets will have
     /// finished (completing the transitive closure) by the time `process_weak_refs` is called
     /// again.  The VM binding can make use of this by adding custom work packets into the
