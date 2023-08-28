@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - master
+  merge_group:
+    branches:
+      - master
 
 concurrency:
   # Cancels pending runs when a PR gets updated.
