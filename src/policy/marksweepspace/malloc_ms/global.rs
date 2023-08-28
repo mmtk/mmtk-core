@@ -21,7 +21,7 @@ use crate::util::ObjectReference;
 use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
-use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
+use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK};
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 use std::marker::PhantomData;

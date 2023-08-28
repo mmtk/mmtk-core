@@ -149,7 +149,7 @@ impl Address {
     /// creates a null Address (0)
     /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
-    /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option<Address>).
+    /// The zero address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use `Option<Address>`).
     pub const unsafe fn zero() -> Address {
         Address(0)
     }
@@ -157,7 +157,7 @@ impl Address {
     /// creates an Address of (usize::MAX)
     /// # Safety
     /// It is unsafe and the user needs to be aware that they are creating an invalid address.
-    /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use Option<Address>).
+    /// The max address should only be used as unininitialized or sentinel values in performance critical code (where you dont want to use `Option<Address>`).
     pub unsafe fn max() -> Address {
         use std::usize;
         Address(usize::MAX)
@@ -277,7 +277,7 @@ impl Address {
     }
 
     /// is this address aligned to the given alignment
-    pub fn is_aligned_to(self, align: usize) -> bool {
+    pub const fn is_aligned_to(self, align: usize) -> bool {
         use crate::util::conversions;
         conversions::raw_is_aligned(self.0, align)
     }

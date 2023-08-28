@@ -4,7 +4,7 @@ use crate::util::conversions;
 use crate::util::freelist::FreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
@@ -32,17 +32,18 @@ pub struct Map32 {
 
 impl Map32 {
     pub fn new() -> Self {
+        let max_chunks = vm_layout().max_chunks();
         Map32 {
-            prev_link: vec![0; MAX_CHUNKS],
-            next_link: vec![0; MAX_CHUNKS],
-            region_map: IntArrayFreeList::new(MAX_CHUNKS, MAX_CHUNKS as _, 1),
+            prev_link: vec![0; max_chunks],
+            next_link: vec![0; max_chunks],
+            region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
             global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
             shared_discontig_fl_count: 0,
             shared_fl_map: vec![None; MAX_SPACES],
             total_available_discontiguous_chunks: 0,
             finalized: false,
             sync: Mutex::new(()),
-            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
+            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
             cumulative_committed_pages: AtomicUsize::new(0),
         }
     }
@@ -186,7 +187,7 @@ impl VMMap for Map32 {
         let first_chunk = start_address.chunk_index();
         let last_chunk = to.chunk_index();
         let unavail_start_chunk = last_chunk + 1;
-        let trailing_chunks = MAX_CHUNKS - unavail_start_chunk;
+        let trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912

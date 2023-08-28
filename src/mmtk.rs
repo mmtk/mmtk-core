@@ -6,6 +6,7 @@ use crate::scheduler::GCWorkScheduler;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
+use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
@@ -65,6 +66,12 @@ impl MMTKBuilder {
         self.options.set_bulk_from_command_line(options)
     }
 
+    /// Custom VM layout constants. VM bindings may use this function for compressed or 39-bit heap support.
+    /// This function must be called before MMTk::new()
+    pub fn set_vm_layout(&mut self, constants: VMLayout) {
+        VMLayout::set_custom_vm_layout(constants)
+    }
+
     /// Build an MMTk instance from the builder.
     pub fn build<VM: VMBinding>(&self) -> MMTK<VM> {
         MMTK::new(Arc::new(self.options.clone()))
@@ -122,6 +129,10 @@ impl<VM: VMBinding> MMTK<VM> {
             plan.base().heap.get_discontig_start(),
             plan.base().heap.get_discontig_end(),
         );
+
+        if *options.transparent_hugepages {
+            MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
+        }
 
         MMTK {
             options,

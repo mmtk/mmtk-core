@@ -7,13 +7,12 @@ use crate::util::metadata::side_metadata::{
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
+use crate::util::heap::layout::vm_layout::{vm_layout, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
-use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
@@ -23,7 +22,7 @@ use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
@@ -46,8 +45,42 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
     fn initialize_sft(&self);
 
+    /// A check for the obvious out-of-memory case: if the requested size is larger than
+    /// the heap size, it is definitely an OOM. We would like to identify that, and
+    /// allows the binding to deal with OOM. Without this check, we will attempt
+    /// to allocate from the page resource. If the requested size is unrealistically large
+    /// (such as `usize::MAX`), it breaks the assumptions of our implementation of
+    /// page resource, vm map, etc. This check prevents that, and allows us to
+    /// handle the OOM case.
+    /// Each allocator that may request an arbitrary size should call this method before
+    /// acquring memory from the space. For example, bump pointer allocator and large object
+    /// allocator need to call this method. On the other hand, allocators that only allocate
+    /// memory in fixed size blocks do not need to call this method.
+    /// An allocator should call this method before doing any computation on the size to
+    /// avoid arithmatic overflow. If we have to do computation in the allocation fastpath and
+    /// overflow happens there, there is nothing we can do about it.
+    /// Return a boolean to indicate if we will be out of memory, determined by the check.
+    fn will_oom_on_acquire(&self, tls: VMThread, size: usize) -> bool {
+        let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
+        let requested_pages = size >> LOG_BYTES_IN_PAGE;
+        if requested_pages > max_pages {
+            VM::VMCollection::out_of_memory(
+                tls,
+                crate::util::alloc::AllocationError::HeapOutOfMemory,
+            );
+            return true;
+        }
+        false
+    }
+
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
+
+        debug_assert!(
+            !self.will_oom_on_acquire(tls, pages << LOG_BYTES_IN_PAGE),
+            "The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
+        );
+
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
@@ -579,10 +612,10 @@ impl<VM: VMBinding> CommonSpace<VM> {
 }
 
 fn get_frac_available(frac: f32) -> usize {
-    trace!("AVAILABLE_START={}", AVAILABLE_START);
-    trace!("AVAILABLE_END={}", AVAILABLE_END);
-    let bytes = (frac * AVAILABLE_BYTES as f32) as usize;
-    trace!("bytes={}*{}={}", frac, AVAILABLE_BYTES, bytes);
+    trace!("AVAILABLE_START={}", vm_layout().available_start());
+    trace!("AVAILABLE_END={}", vm_layout().available_end());
+    let bytes = (frac * vm_layout().available_bytes() as f32) as usize;
+    trace!("bytes={}*{}={}", frac, vm_layout().available_bytes(), bytes);
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
     trace!("rtn={}", rtn);

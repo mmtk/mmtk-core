@@ -1,5 +1,5 @@
-use mmtk::util::malloc::malloc_ms_util;
 use crate::DummyVM;
+use mmtk::util::malloc::malloc_ms_util;
 
 #[test]
 fn test_malloc() {
@@ -26,11 +26,15 @@ fn test_malloc() {
     assert!(malloc_ms_util::get_malloc_usable_size(address3, bool3) >= 16);
     assert!(malloc_ms_util::get_malloc_usable_size(address4, bool4) >= 32);
 
-    unsafe { malloc_ms_util::free(address1.to_mut_ptr()); }
+    unsafe {
+        malloc_ms_util::free(address1.to_mut_ptr());
+    }
     #[cfg(feature = "malloc_hoard")]
     malloc_ms_util::offset_free(address2);
     #[cfg(not(feature = "malloc_hoard"))]
-    unsafe { malloc_ms_util::free(address2.to_mut_ptr()); }
+    unsafe {
+        malloc_ms_util::free(address2.to_mut_ptr());
+    }
     malloc_ms_util::offset_free(address3);
     malloc_ms_util::offset_free(address4);
 }

@@ -2,7 +2,7 @@ use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::{FreeListPageResource, PageResource};
 use crate::util::address::Address;
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
@@ -161,7 +161,6 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
     }
 
     pub fn release_block(&self, block: B) {
-        debug_assert!(self.common().contiguous);
         let pages = 1 << Self::LOG_PAGES;
         debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
         self.common().accounting.release(pages as _);
