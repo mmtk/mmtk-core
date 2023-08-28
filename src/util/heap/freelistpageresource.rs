@@ -146,19 +146,23 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let pages = conversions::bytes_to_pages(bytes);
         let common_flpr = {
             let free_list = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
-            let Some(limit) = free_list.maybe_get_limit() else {
-                panic!("You are using 32-bit system.  Let's fix it later.");
-            };
-            let actual_start = conversions::chunk_align_up(limit);
-            debug!("  in new_contiguous: limit = {}, actual_start = {}", limit, actual_start);
+            let maybe_limit = free_list.maybe_get_limit();
+            let actual_start =
+                maybe_limit.map_or(start, |limit| conversions::chunk_align_up(limit));
+            debug!(
+                "  in new_contiguous: maybe_limit = {:?}, actual_start = {}",
+                maybe_limit, actual_start
+            );
             let common_flpr = CommonFreeListPageResource {
                 free_list,
                 start: actual_start,
             };
-            // Removing "bind_freelist" will break 32-bit systems.  We need to consider it later.
-            // vm_map.bind_freelist(unsafe {
-            //     &*(&common_flpr as &CommonFreeListPageResource as *const _)
-            // });
+            if maybe_limit.is_none() {
+                vm_map.bind_freelist(unsafe {
+                    // FIXME: This is not right.  `common_flpr` is a local variable.
+                    &*(&common_flpr as &CommonFreeListPageResource as *const _)
+                });
+            }
             common_flpr
         };
         let growable = cfg!(target_pointer_width = "64");
