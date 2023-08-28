@@ -1,5 +1,7 @@
 use downcast_rs::{impl_downcast, Downcast};
 
+use super::Address;
+
 pub const FAILURE: i32 = -1;
 
 pub const MAX_HEADS: i32 = 128; // somewhat arbitrary
@@ -14,7 +16,12 @@ const MULTI_MASK: i32 = 1 << (TOTAL_BITS - 1);
 const COALESC_MASK: i32 = 1 << (TOTAL_BITS - 2);
 const SIZE_MASK: i32 = (1 << UNIT_BITS) - 1;
 
-pub trait FreeList: Sync + Downcast {
+// TODO: FreeList should not implement Sync.
+// FreeList instances are not thread-safe.
+// They need external synchronisation (e.g. using Mutex).
+// On the other hand, to put FreeList into a Mutex<T>, FreeList must implement Send.
+// There is no problem sending FreeList instances between threads.
+pub trait FreeList: Sync + Send + Downcast {
     fn head(&self) -> i32;
     // fn head_mut(&mut self) -> &mut i32;
     fn heads(&self) -> i32;
@@ -23,6 +30,10 @@ pub trait FreeList: Sync + Downcast {
     // fn resize_freelist(&mut self, units: i32, heads: i32);
     fn get_entry(&self, index: i32) -> i32;
     fn set_entry(&mut self, index: i32, value: i32);
+
+    // Workaround space start calculation.
+    // TODO: This is a hack, and is unlikely to be the final solution.
+    fn maybe_get_limit(&self) -> Option<Address>;
 
     fn alloc(&mut self, size: i32) -> i32 {
         let mut unit = self.head();

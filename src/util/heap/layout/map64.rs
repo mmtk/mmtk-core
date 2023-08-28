@@ -177,33 +177,33 @@ impl VMMap for Map64 {
     }
 
     fn boot(&self) {
-        // This is only called during boot process by a single thread.
-        // It is fine to get a mutable reference.
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        for pr in 0..MAX_SPACES {
-            if let Some(fl) = self_mut.fl_map[pr] {
-                #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut RawMemoryFreeList = unsafe { &mut *(fl as *const _ as *mut _) };
-                fl_mut.grow_freelist(0);
-            }
-        }
+        // // This is only called during boot process by a single thread.
+        // // It is fine to get a mutable reference.
+        // let self_mut: &mut Self = unsafe { self.mut_self() };
+        // for pr in 0..MAX_SPACES {
+        //     if let Some(fl) = self_mut.fl_map[pr] {
+        //         #[allow(clippy::cast_ref_to_mut)]
+        //         let fl_mut: &mut RawMemoryFreeList = unsafe { &mut *(fl as *const _ as *mut _) };
+        //         fl_mut.grow_freelist(0);
+        //     }
+        // }
     }
 
     fn finalize_static_space_map(&self, _from: Address, _to: Address) {
-        // This is only called during boot process by a single thread.
-        // It is fine to get a mutable reference.
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        for pr in 0..MAX_SPACES {
-            if let Some(fl) = self_mut.fl_page_resources[pr] {
-                #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut CommonFreeListPageResource =
-                    unsafe { &mut *(fl as *const _ as *mut _) };
-                fl_mut.resize_freelist(conversions::chunk_align_up(
-                    self.fl_map[pr].unwrap().get_limit(),
-                ));
-            }
-        }
-        self_mut.finalized = true;
+        // // This is only called during boot process by a single thread.
+        // // It is fine to get a mutable reference.
+        // let self_mut: &mut Self = unsafe { self.mut_self() };
+        // for pr in 0..MAX_SPACES {
+        //     if let Some(fl) = self_mut.fl_page_resources[pr] {
+        //         #[allow(clippy::cast_ref_to_mut)]
+        //         let fl_mut: &mut CommonFreeListPageResource =
+        //             unsafe { &mut *(fl as *const _ as *mut _) };
+        //         fl_mut.resize_freelist(conversions::chunk_align_up(
+        //             self.fl_map[pr].unwrap().get_limit(),
+        //         ));
+        //     }
+        // }
+        // self_mut.finalized = true;
     }
 
     fn is_finalized(&self) -> bool {

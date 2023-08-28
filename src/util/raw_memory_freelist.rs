@@ -35,8 +35,16 @@ impl FreeList for RawMemoryFreeList {
         self.heads
     }
     fn get_entry(&self, index: i32) -> i32 {
+        debug!("get_entry({index})");
         let offset = (index << LOG_BYTES_IN_ENTRY) as usize;
-        debug_assert!(self.base + offset >= self.base && self.base + offset < self.high_water);
+        debug_assert!(
+            self.base + offset >= self.base && self.base + offset < self.high_water,
+            "Base: {}, offset: {}, sum: {}, high_water: {}",
+            self.base,
+            offset,
+            self.base + offset,
+            self.high_water
+        );
         unsafe { (self.base + offset).load() }
     }
     fn set_entry(&mut self, index: i32, value: i32) {
@@ -49,8 +57,20 @@ impl FreeList for RawMemoryFreeList {
             self.base + offset,
             self.high_water
         );
+        debug!(
+            "Storing 0x{:x} at {} + 0x{:x} = {}",
+            value,
+            self.base,
+            offset,
+            self.base + offset
+        );
         unsafe { (self.base + offset).store(value) }
     }
+
+    fn maybe_get_limit(&self) -> Option<Address> {
+        Some(self.get_limit())
+    }
+
     fn alloc(&mut self, size: i32) -> i32 {
         if self.current_units == 0 {
             return FAILURE;
@@ -96,6 +116,7 @@ impl RawMemoryFreeList {
         heads: i32,
         strategy: MmapStrategy,
     ) -> Self {
+        dbg!(base, limit, pages_per_block, units, grain, heads, strategy);
         debug_assert!(units <= MAX_UNITS && heads <= MAX_HEADS);
         debug_assert!(
             base + conversions::pages_to_bytes(Self::size_in_pages(units, heads) as _) <= limit

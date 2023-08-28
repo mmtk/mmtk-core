@@ -22,6 +22,9 @@ impl FreeList for IntArrayFreeList {
     fn set_entry(&mut self, index: i32, value: i32) {
         self.table_mut()[index as usize] = value;
     }
+    fn maybe_get_limit(&self) -> Option<super::Address> {
+        None
+    }
 }
 
 impl IntArrayFreeList {
