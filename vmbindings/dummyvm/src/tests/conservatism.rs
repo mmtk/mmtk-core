@@ -13,7 +13,8 @@ lazy_static! {
 }
 
 fn basic_filter(addr: Address) -> bool {
-    !addr.is_zero() && addr.as_usize() % VO_BIT_REGION_SIZE == (OBJECT_REF_OFFSET % VO_BIT_REGION_SIZE)
+    !addr.is_zero()
+        && addr.as_usize() % VO_BIT_REGION_SIZE == (OBJECT_REF_OFFSET % VO_BIT_REGION_SIZE)
 }
 
 fn assert_filter_pass(addr: Address) {
@@ -129,7 +130,12 @@ pub fn large_offsets_aligned() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for log_offset in 12usize..(usize::BITS as usize) {
             let offset = 1usize << log_offset;
-            let addr = match fixture.objref.to_raw_address().as_usize().checked_add(offset) {
+            let addr = match fixture
+                .objref
+                .to_raw_address()
+                .as_usize()
+                .checked_add(offset)
+            {
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };
@@ -144,7 +150,12 @@ pub fn negative_offsets() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for log_offset in LOG_BITS_IN_WORD..(usize::BITS as usize) {
             let offset = 1usize << log_offset;
-            let addr = match fixture.objref.to_raw_address().as_usize().checked_sub(offset) {
+            let addr = match fixture
+                .objref
+                .to_raw_address()
+                .as_usize()
+                .checked_sub(offset)
+            {
                 Some(0) => break,
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,

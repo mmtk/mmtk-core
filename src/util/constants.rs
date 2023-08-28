@@ -16,6 +16,9 @@ pub const BYTES_IN_BYTE: usize = 1;
 pub const LOG_BITS_IN_BYTE: u8 = 3;
 pub const BITS_IN_BYTE: usize = 1 << LOG_BITS_IN_BYTE;
 
+pub const LOG_BYTES_IN_GBYTE: u8 = 30;
+pub const BYTES_IN_GBYTE: usize = 1 << LOG_BYTES_IN_GBYTE;
+
 pub const LOG_BYTES_IN_MBYTE: u8 = 20;
 pub const BYTES_IN_MBYTE: usize = 1 << LOG_BYTES_IN_MBYTE;
 

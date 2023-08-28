@@ -105,7 +105,9 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Is current heap full?
     fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool;
     /// Return the current heap size (in pages)
-    fn get_heap_size_in_pages(&self) -> usize;
+    fn get_current_heap_size_in_pages(&self) -> usize;
+    /// Return the upper bound of heap size
+    fn get_max_heap_size_in_pages(&self) -> usize;
     /// Can the heap size grow?
     fn can_heap_size_grow(&self) -> bool;
 }
@@ -130,7 +132,11 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
         plan.get_reserved_pages() > self.total_pages
     }
 
-    fn get_heap_size_in_pages(&self) -> usize {
+    fn get_current_heap_size_in_pages(&self) -> usize {
+        self.total_pages
+    }
+
+    fn get_max_heap_size_in_pages(&self) -> usize {
         self.total_pages
     }
 
@@ -394,8 +400,12 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         plan.get_reserved_pages() > self.current_heap_pages.load(Ordering::Relaxed)
     }
 
-    fn get_heap_size_in_pages(&self) -> usize {
+    fn get_current_heap_size_in_pages(&self) -> usize {
         self.current_heap_pages.load(Ordering::Relaxed)
+    }
+
+    fn get_max_heap_size_in_pages(&self) -> usize {
+        self.max_heap_pages
     }
 
     fn can_heap_size_grow(&self) -> bool {

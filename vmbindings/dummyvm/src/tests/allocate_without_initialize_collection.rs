@@ -11,7 +11,9 @@ pub fn allocate_without_initialize_collection() {
     // 1MB heap
     mmtk_init(MB);
     let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
-    // Attempt to allocate 2MB memory. This should trigger a GC, but as we never call initialize_collection(), we cannot do GC.
-    let addr = mmtk_alloc(handle, 2 * MB, 8, 0, AllocationSemantics::Default);
+    // Fill up the heap.
+    let _ = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
+    // Attempt another memory. This should trigger a GC, but as we never call initialize_collection(), we cannot do GC.
+    let addr = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
 }

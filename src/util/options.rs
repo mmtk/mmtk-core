@@ -7,6 +7,8 @@ use std::fmt::Debug;
 use std::str::FromStr;
 use strum_macros::EnumString;
 
+use super::heap::vm_layout::vm_layout;
+
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum NurseryZeroingOptions {
     Temporal,
@@ -93,8 +95,9 @@ pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
+pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "32")]
-pub const DEFAULT_MAX_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
+pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
 fn always_valid<T>(_: &T) -> bool {
     true
@@ -196,9 +199,10 @@ macro_rules! options {
             /// This method returns false if the option string is invalid, or if it includes any invalid option.
             ///
             /// Arguments:
-            /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+            /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
+            /// or `threads=1,stress_factor=4096`
             pub fn set_bulk_from_command_line(&mut self, options: &str) -> bool {
-                for opt in options.split_ascii_whitespace() {
+                for opt in options.replace(",", " ").split_ascii_whitespace() {
                     let kv_pair: Vec<&str> = opt.split('=').collect();
                     if kv_pair.len() != 2 {
                         return false;
@@ -374,11 +378,11 @@ pub struct NurserySize {
     /// Minimum nursery size (in bytes)
     pub min: usize,
     /// Maximum nursery size (in bytes)
-    pub max: usize,
+    max: Option<usize>,
 }
 
 impl NurserySize {
-    pub fn new(kind: NurseryKind, value: usize) -> Self {
+    pub fn new(kind: NurseryKind, value: Option<usize>) -> Self {
         match kind {
             NurseryKind::Bounded => NurserySize {
                 kind,
@@ -387,14 +391,14 @@ impl NurserySize {
             },
             NurseryKind::Fixed => NurserySize {
                 kind,
-                min: value,
+                min: value.unwrap(),
                 max: value,
             },
         }
     }
 
-    /// Returns a NurserySize or String containing error. Expects nursery size to be formatted as
-    /// "<NurseryKind>:<size in bytes>". For example, "Fixed:8192" creates a Fixed nursery of size
+    /// Returns a [`NurserySize`] or [`String`] containing error. Expects nursery size to be formatted as
+    /// `<NurseryKind>:<size in bytes>`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
     /// 8192 bytes.
     pub fn parse(s: &str) -> Result<NurserySize, String> {
         let ns: Vec<&str> = s.split(':').collect();
@@ -404,7 +408,7 @@ impl NurserySize {
         let value = ns[1]
             .parse()
             .map_err(|_| String::from("Failed to parse size"))?;
-        Ok(NurserySize::new(kind, value))
+        Ok(NurserySize::new(kind, Some(value)))
     }
 }
 
@@ -419,12 +423,18 @@ impl FromStr for NurserySize {
 impl Options {
     /// Return upper bound of the nursery size (in number of bytes)
     pub fn get_max_nursery_bytes(&self) -> usize {
-        self.nursery.max
+        self.nursery.max.unwrap_or_else(|| {
+            if !vm_layout().force_use_contiguous_spaces {
+                DEFAULT_MAX_NURSERY_32
+            } else {
+                DEFAULT_MAX_NURSERY
+            }
+        })
     }
 
     /// Return upper bound of the nursery size (in number of pages)
     pub fn get_max_nursery_pages(&self) -> usize {
-        crate::util::conversions::bytes_to_pages_up(self.nursery.max)
+        crate::util::conversions::bytes_to_pages_up(self.get_max_nursery_bytes())
     }
 
     /// Return lower bound of the nursery size (in number of bytes)
@@ -450,6 +460,15 @@ impl GCTriggerSelector {
     const M: u64 = 1024 * Self::K;
     const G: u64 = 1024 * Self::M;
     const T: u64 = 1024 * Self::G;
+
+    /// get max heap size
+    pub fn max_heap_size(&self) -> usize {
+        match self {
+            Self::FixedHeapSize(s) => *s,
+            Self::DynamicHeapSize(_, s) => *s,
+            _ => unreachable!("Cannot get max heap size"),
+        }
+    }
 
     /// Parse a size representation, which could be a number to represents bytes,
     /// or a number with the suffix K/k/M/m/G/g. Return the byte number if it can be
@@ -656,8 +675,8 @@ options! {
     // Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
     // both the upper and lower bounds. The nursery size can be set like "Fixed:8192", for example,
     // to have a Fixed nursery size of 8192 bytes
-    nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.min > 0 && v.max > 0 && v.max >= v.min]
-        = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: DEFAULT_MAX_NURSERY },
+    nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.min > 0 && v.max.map(|max| max > 0 && max >= v.min).unwrap_or(true)]
+        = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: None },
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)
@@ -685,7 +704,7 @@ options! {
     // The start of vmspace.
     vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
     // The size of vmspace.
-    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = usize::MAX,
+    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0xdc0_0000,
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
@@ -1050,6 +1069,17 @@ mod tests {
         serial_test(|| {
             let mut options = Options::default();
             let success = options.set_bulk_from_command_line("no_finalizer=true stress_factor=42");
+            assert!(success);
+            assert!(*options.no_finalizer);
+            assert_eq!(*options.stress_factor, 42);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_comma_separated_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_bulk_from_command_line("no_finalizer=true,stress_factor=42");
             assert!(success);
             assert!(*options.no_finalizer);
             assert_eq!(*options.stress_factor, 42);

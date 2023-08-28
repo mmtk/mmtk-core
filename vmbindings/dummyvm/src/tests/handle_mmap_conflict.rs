@@ -1,11 +1,11 @@
-use mmtk::util::Address;
-use mmtk::util::opaque_pointer::*;
-use mmtk::util::memory;
 use crate::DummyVM;
+use mmtk::util::memory;
+use mmtk::util::opaque_pointer::*;
+use mmtk::util::Address;
 
 #[test]
 pub fn test_handle_mmap_conflict() {
-    let start = unsafe { Address::from_usize(0x100_0000 )};
+    let start = unsafe { Address::from_usize(0x100_0000) };
     let one_megabyte = 1000000;
     let mmap1_res = memory::dzmmap_noreplace(start, one_megabyte, memory::MmapStrategy::Normal);
     assert!(mmap1_res.is_ok());

@@ -1,7 +1,7 @@
 use super::*;
 use crate::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 use crate::util::conversions::raw_align_up;
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
@@ -1292,7 +1292,7 @@ mod tests {
         assert_eq!(side_metadata.calculate_reserved_pages(1024), 16 + 1);
     }
 
-    use crate::util::heap::layout::vm_layout_constants;
+    use crate::util::heap::layout::vm_layout;
     use crate::util::test_util::{serial_test, with_cleanup};
     use paste::paste;
 
@@ -1315,7 +1315,7 @@ mod tests {
             let mut sanity = SideMetadataSanity::new();
             sanity.verify_metadata_context("TestPolicy", &context);
 
-            let data_addr = vm_layout_constants::HEAP_START;
+            let data_addr = vm_layout::vm_layout().heap_start;
             let meta_addr = address_to_meta_address(&spec, data_addr);
             with_cleanup(
                 || {

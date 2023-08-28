@@ -1,4 +1,4 @@
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::memory::*;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
@@ -38,11 +38,11 @@ pub trait Mmapper: Sync {
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
-    /// occurs at chunk granularity, not page granularity.<p>
+    /// occurs at chunk granularity, not page granularity.
     ///
-    /// Argumetns:
-    /// `start`: The start of the range to be mapped.
-    /// `pages`: The size of the range to be mapped, in pages
+    /// Arguments:
+    /// * `start`: The start of the range to be mapped.
+    /// * `pages`: The size of the range to be mapped, in pages
     // NOTE: There is a monotonicity assumption so that only updates require lock
     // acquisition.
     // TODO: Fix the above to support unmapping.
