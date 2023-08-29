@@ -46,8 +46,6 @@ impl Map64 {
             descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks()) },
             high_water,
             base_address,
-            // fl_page_resources: vec![None; MAX_SPACES],
-            // fl_map: vec![None; MAX_SPACES],
             finalized: false,
             cumulative_committed_pages: AtomicUsize::new(0),
         }
@@ -95,9 +93,6 @@ impl VMMap for Map64 {
             heads,
             MmapStrategy::Normal,
         ));
-
-        // self_mut.fl_map[index] =
-        //     Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
 
         /* Adjust the base address and highwater to account for the allocated chunks for the map */
         let base = conversions::chunk_align_up(start + list_extent);
@@ -173,20 +168,6 @@ impl VMMap for Map64 {
         _to: Address,
         _update_starts: &mut dyn FnMut(Address),
     ) {
-        // // This is only called during boot process by a single thread.
-        // // It is fine to get a mutable reference.
-        // let self_mut: &mut Self = unsafe { self.mut_self() };
-        // for pr in 0..MAX_SPACES {
-        //     if let Some(fl) = self_mut.fl_page_resources[pr] {
-        //         #[allow(clippy::cast_ref_to_mut)]
-        //         let fl_mut: &mut CommonFreeListPageResource =
-        //             unsafe { &mut *(fl as *const _ as *mut _) };
-        //         fl_mut.resize_freelist(conversions::chunk_align_up(
-        //             self.fl_map[pr].unwrap().get_limit(),
-        //         ));
-        //     }
-        // }
-        // self_mut.finalized = true;
     }
 
     fn is_finalized(&self) -> bool {

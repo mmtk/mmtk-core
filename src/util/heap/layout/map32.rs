@@ -17,7 +17,6 @@ pub struct Map32 {
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    // shared_fl_map: Vec<Option<&'static CommonFreeListPageResource>>,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     sync: Mutex<()>,
@@ -193,17 +192,6 @@ impl VMMap for Map32 {
         // there is no test to ensure the refactoring will be correct.
 
         update_starts(start_address);
-        // #[allow(clippy::manual_flatten)]
-        // for fl in self_mut.shared_fl_map.iter() {
-        //     if let Some(fl) = fl {
-        //         #[allow(clippy::cast_ref_to_mut)]
-        //         let fl_mut: &mut CommonFreeListPageResource = unsafe {
-        //             &mut *(*fl as *const CommonFreeListPageResource
-        //                 as *mut CommonFreeListPageResource)
-        //         };
-        //         fl_mut.resize_freelist(start_address);
-        //     }
-        // }
 
         // [
         //  2: -1073741825
