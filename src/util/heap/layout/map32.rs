@@ -2,12 +2,12 @@ use super::map::VMMap;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
+use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
@@ -17,7 +17,7 @@ pub struct Map32 {
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    shared_fl_map: Vec<Option<&'static CommonFreeListPageResource>>,
+    // shared_fl_map: Vec<Option<&'static CommonFreeListPageResource>>,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     sync: Mutex<()>,
@@ -39,7 +39,6 @@ impl Map32 {
             region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
             global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
             shared_discontig_fl_count: 0,
-            shared_fl_map: vec![None; MAX_SPACES],
             total_available_discontiguous_chunks: 0,
             finalized: false,
             sync: Mutex::new(()),
@@ -88,21 +87,12 @@ impl VMMap for Map32 {
         Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
-    fn bind_freelist(&self, pr: &'static CommonFreeListPageResource) {
-        let ordinal: usize = pr
-            .free_list
-            .downcast_ref::<IntArrayFreeList>()
-            .unwrap()
-            .get_ordinal() as usize;
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        self_mut.shared_fl_map[ordinal] = Some(pr);
-    }
-
     fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
+        _maybe_raw_memory_freelist: Option<&mut RawMemoryFreeList>,
     ) -> Address {
         let (_sync, self_mut) = self.mut_self_with_sync();
         let chunk = self_mut.region_map.alloc(chunks as _);
@@ -178,7 +168,12 @@ impl VMMap for Map32 {
         self_mut.free_contiguous_chunks_no_lock(chunk as _)
     }
 
-    fn finalize_static_space_map(&self, from: Address, to: Address) {
+    fn finalize_static_space_map(
+        &self,
+        from: Address,
+        to: Address,
+        update_starts: &mut dyn FnMut(Address),
+    ) {
         // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
@@ -196,17 +191,20 @@ impl VMMap for Map32 {
         // https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
         // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
         // there is no test to ensure the refactoring will be correct.
-        #[allow(clippy::manual_flatten)]
-        for fl in self_mut.shared_fl_map.iter() {
-            if let Some(fl) = fl {
-                #[allow(clippy::cast_ref_to_mut)]
-                let fl_mut: &mut CommonFreeListPageResource = unsafe {
-                    &mut *(*fl as *const CommonFreeListPageResource
-                        as *mut CommonFreeListPageResource)
-                };
-                fl_mut.resize_freelist(start_address);
-            }
-        }
+
+        update_starts(start_address);
+        // #[allow(clippy::manual_flatten)]
+        // for fl in self_mut.shared_fl_map.iter() {
+        //     if let Some(fl) = fl {
+        //         #[allow(clippy::cast_ref_to_mut)]
+        //         let fl_mut: &mut CommonFreeListPageResource = unsafe {
+        //             &mut *(*fl as *const CommonFreeListPageResource
+        //                 as *mut CommonFreeListPageResource)
+        //         };
+        //         fl_mut.resize_freelist(start_address);
+        //     }
+        // }
+
         // [
         //  2: -1073741825
         //  3: -1073741825

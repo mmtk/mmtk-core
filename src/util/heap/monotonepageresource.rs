@@ -49,6 +49,9 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     fn common_mut(&mut self) -> &mut CommonPageResource {
         &mut self.common
     }
+    fn update_discontiguous_start(&mut self, _start: Address) {
+        // Do nothing.
+    }
 
     fn reserve_pages(&self, pages: usize) -> usize {
         self.common().accounting.reserve(pages);
@@ -113,7 +116,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             let required_chunks = required_chunks(required_pages);
             sync.current_chunk = self
                 .common
-                .grow_discontiguous_space(space_descriptor, required_chunks); // Returns zero on failure
+                .grow_discontiguous_space(space_descriptor, required_chunks, None); // Returns zero on failure
             sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + if sync.current_chunk.is_zero() {

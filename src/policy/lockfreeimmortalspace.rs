@@ -96,6 +96,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         unimplemented!()
     }
+    fn for_each_page_resource_mut(&mut self, _f: &mut dyn FnMut(&mut dyn PageResource<VM>)) {
+        // We have no page resources!
+    }
+
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!()
     }

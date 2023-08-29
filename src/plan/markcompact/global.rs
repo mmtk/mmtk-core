@@ -57,6 +57,11 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         ret
     }
 
+    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
+        self.common.for_each_space_mut(f);
+        f(&mut self.mc_space);
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }

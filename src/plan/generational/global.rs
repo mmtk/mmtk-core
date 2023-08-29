@@ -72,6 +72,11 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         ret
     }
 
+    pub(crate) fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<VM>)) {
+        self.common.for_each_space_mut(f);
+        f(&mut self.nursery);
+    }
+
     /// Prepare Gen. This should be called by a single thread in GC prepare work.
     pub fn prepare(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();

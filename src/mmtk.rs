@@ -114,7 +114,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
 
-        let plan = crate::plan::create_plan(
+        let mut plan = crate::plan::create_plan(
             *options.plan,
             VM_MAP.as_ref(),
             MMAPPER.as_ref(),
@@ -122,12 +122,15 @@ impl<VM: VMBinding> MMTK<VM> {
             scheduler.clone(),
         );
 
+
         // TODO: This probably does not work if we have multiple MMTk instances.
-        VM_MAP.boot();
         // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
         VM_MAP.finalize_static_space_map(
             plan.base().heap.get_discontig_start(),
             plan.base().heap.get_discontig_end(),
+            &mut |start| {
+                plan.update_discontiguous_page_resources(start);
+            }
         );
 
         if *options.transparent_hugepages {

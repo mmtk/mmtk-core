@@ -79,6 +79,12 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         ret
     }
 
+    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
+        self.gen.for_each_space_mut(f);
+        f(&mut self.copyspace0);
+        f(&mut self.copyspace1);
+    }
+
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         self.base().set_collection_kind::<Self>(self);

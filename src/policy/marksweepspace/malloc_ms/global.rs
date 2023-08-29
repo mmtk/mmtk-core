@@ -137,6 +137,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unreachable!()
     }
 
+    fn for_each_page_resource_mut(&mut self, _f: &mut dyn FnMut(&mut dyn PageResource<VM>)) {
+        // We have no page resources!
+    }
+
     fn common(&self) -> &CommonSpace<VM> {
         unreachable!()
     }

@@ -45,6 +45,13 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         ret
     }
 
+    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
+        self.base.for_each_space_mut(f);
+        f(&mut self.nogc_space);
+        f(&mut self.immortal);
+        f(&mut self.los);
+    }
+
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }

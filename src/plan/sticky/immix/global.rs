@@ -108,6 +108,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.get_spaces()
     }
 
+    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
+        self.immix.for_each_space_mut(f);
+    }
+
     fn get_allocator_mapping(
         &self,
     ) -> &'static enum_map::EnumMap<crate::AllocationSemantics, crate::util::alloc::AllocatorSelector>

@@ -2,7 +2,6 @@ use super::map::VMMap;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
@@ -15,8 +14,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 
 pub struct Map64 {
-    fl_page_resources: Vec<Option<&'static CommonFreeListPageResource>>,
-    fl_map: Vec<Option<&'static RawMemoryFreeList>>,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
@@ -49,8 +46,8 @@ impl Map64 {
             descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks()) },
             high_water,
             base_address,
-            fl_page_resources: vec![None; MAX_SPACES],
-            fl_map: vec![None; MAX_SPACES],
+            // fl_page_resources: vec![None; MAX_SPACES],
+            // fl_map: vec![None; MAX_SPACES],
             finalized: false,
             cumulative_committed_pages: AtomicUsize::new(0),
         }
@@ -99,8 +96,8 @@ impl VMMap for Map64 {
             MmapStrategy::Normal,
         ));
 
-        self_mut.fl_map[index] =
-            Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
+        // self_mut.fl_map[index] =
+        //     Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
 
         /* Adjust the base address and highwater to account for the allocated chunks for the map */
         let base = conversions::chunk_align_up(start + list_extent);
@@ -110,17 +107,12 @@ impl VMMap for Map64 {
         list
     }
 
-    fn bind_freelist(&self, pr: &'static CommonFreeListPageResource) {
-        let index = Self::space_index(pr.get_start()).unwrap();
-        let self_mut = unsafe { self.mut_self() };
-        self_mut.fl_page_resources[index] = Some(pr);
-    }
-
     fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
         _head: Address,
+        maybe_raw_memory_freelist: Option<&mut RawMemoryFreeList>,
     ) -> Address {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
@@ -133,10 +125,9 @@ impl VMMap for Map64 {
         self_mut.high_water[index] = rtn + extent;
 
         /* Grow the free list to accommodate the new chunks */
-        let free_list = self.fl_map[Self::space_index(descriptor.get_start()).unwrap()];
-        if let Some(free_list) = free_list {
-            let free_list =
-                unsafe { &mut *(free_list as *const _ as usize as *mut RawMemoryFreeList) };
+        // TODO: Maybe the following should be moved to Space or PageResource.
+        // Map64 currently knows too much about spaces!
+        if let Some(free_list) = maybe_raw_memory_freelist {
             free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
             let base_page = conversions::bytes_to_pages(rtn - self.base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
@@ -176,20 +167,12 @@ impl VMMap for Map64 {
         unreachable!()
     }
 
-    fn boot(&self) {
-        // // This is only called during boot process by a single thread.
-        // // It is fine to get a mutable reference.
-        // let self_mut: &mut Self = unsafe { self.mut_self() };
-        // for pr in 0..MAX_SPACES {
-        //     if let Some(fl) = self_mut.fl_map[pr] {
-        //         #[allow(clippy::cast_ref_to_mut)]
-        //         let fl_mut: &mut RawMemoryFreeList = unsafe { &mut *(fl as *const _ as *mut _) };
-        //         fl_mut.grow_freelist(0);
-        //     }
-        // }
-    }
-
-    fn finalize_static_space_map(&self, _from: Address, _to: Address) {
+    fn finalize_static_space_map(
+        &self,
+        _from: Address,
+        _to: Address,
+        _update_starts: &mut dyn FnMut(Address),
+    ) {
         // // This is only called during boot process by a single thread.
         // // It is fine to get a mutable reference.
         // let self_mut: &mut Self = unsafe { self.mut_self() };

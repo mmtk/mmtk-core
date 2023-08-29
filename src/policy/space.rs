@@ -38,7 +38,12 @@ use downcast_rs::Downcast;
 pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
+
+    // TODO: Generate this function automatically in mmtk-macros like PlanTraceObject.
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
+
+    // TODO: Generate this function automatically in mmtk-macros like PlanTraceObject.
+    fn for_each_page_resource_mut(&mut self, f: &mut dyn FnMut(&mut dyn PageResource<VM>));
 
     /// Initialize entires in SFT map for the space. This is called when the Space object
     /// has a non-moving address, as we will use the address to set sft.

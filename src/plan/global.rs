@@ -25,7 +25,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
-use crate::util::{conversions, ObjectReference};
+use crate::util::{conversions, ObjectReference, Address};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
@@ -194,6 +194,9 @@ pub trait Plan: 'static + Sync + Downcast {
 
     /// get all the spaces in the plan
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
+
+    /// Iterate through each space mutably
+    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
@@ -368,6 +371,14 @@ pub trait Plan: 'static + Sync + Downcast {
     /// Return true if the object is considered valid by the plan.
     fn sanity_check_object(&self, _object: ObjectReference) -> bool {
         true
+    }
+
+    fn update_discontiguous_page_resources(&mut self, start: Address) {
+        self.for_each_space_mut(&mut |space: &mut dyn Space<Self::VM>| {
+            space.for_each_page_resource_mut(&mut |pr| {
+                pr.update_discontiguous_start(start);
+            });
+        });
     }
 }
 
@@ -572,6 +583,17 @@ impl<VM: VMBinding> BasePlan<VM> {
             &self.vm_space,
         ]
     }
+
+    pub(crate) fn for_each_space_mut(&self, _f: &mut dyn FnMut(&mut dyn Space<VM>)) {
+        #[cfg(feature = "code_space")]
+        _f(&mut self.code_space);
+        #[cfg(feature = "code_space")]
+        _f(&mut self.code_lo_space);
+        #[cfg(feature = "ro_space")]
+        _f(&mut self.ro_space);
+        #[cfg(feature = "vm_space")]
+        _f(&mut self.vm_space);
+}
 
     /// The application code has requested a collection.
     pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
@@ -929,6 +951,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
         ret.push(&self.los);
         ret.push(&self.nonmoving);
         ret
+    }
+
+    pub(crate) fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<VM>)) {
+        self.base.for_each_space_mut(f);
+        f(&mut self.immortal);
+        f(&mut self.los);
+        f(&mut self.nonmoving);
     }
 
     pub fn get_used_pages(&self) -> usize {

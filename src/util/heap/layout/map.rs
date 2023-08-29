@@ -1,29 +1,24 @@
 use crate::util::freelist::FreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
+use crate::util::raw_memory_freelist::RawMemoryFreeList;
 
 pub trait VMMap: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
-    /// bind_freelist() must be called by the caller after this method.
     fn create_freelist(&self, start: Address) -> Box<dyn FreeList>;
 
     /// Create a free-list for a contiguous space. Must only be called at boot time.
-    /// bind_freelist() must be called by the caller after this method.
     fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
         -> Box<dyn FreeList>;
-
-    /// Bind a created freelist with the page resource.
-    /// This must called after create_freelist() or create_parent_freelist().
-    fn bind_freelist(&self, pr: &'static CommonFreeListPageResource);
 
     fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
+        maybe_raw_memory_freelist: Option<&mut RawMemoryFreeList>,
     ) -> Address;
 
     fn get_next_contiguous_region(&self, start: Address) -> Address;
@@ -44,9 +39,12 @@ pub trait VMMap: Sync {
 
     fn free_contiguous_chunks(&self, start: Address) -> usize;
 
-    fn boot(&self) {}
-
-    fn finalize_static_space_map(&self, from: Address, to: Address);
+    fn finalize_static_space_map(
+        &self,
+        from: Address,
+        to: Address,
+        update_starts: &mut dyn FnMut(Address),
+    );
 
     fn is_finalized(&self) -> bool;
 

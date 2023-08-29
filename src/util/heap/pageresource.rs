@@ -1,6 +1,7 @@
 use crate::util::address::Address;
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
+use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::vm::ActivePlan;
 use std::sync::Mutex;
 
@@ -106,6 +107,11 @@ pub trait PageResource<VM: VMBinding>: 'static {
     fn vm_map(&self) -> &'static dyn VMMap {
         self.common().vm_map
     }
+
+    // Some page resources need to record the start address.
+    // This method will be called after the start address of the discontigous region is determined.
+    // `start` is the computed start address.
+    fn update_discontiguous_start(&mut self, start: Address);
 }
 
 pub struct PRAllocResult {
@@ -145,6 +151,7 @@ impl CommonPageResource {
         &self,
         space_descriptor: SpaceDescriptor,
         chunks: usize,
+        maybe_raw_memory_freelist: Option<&mut RawMemoryFreeList>,
     ) -> Address {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
 
@@ -152,6 +159,7 @@ impl CommonPageResource {
             space_descriptor,
             chunks,
             *head_discontiguous_region,
+            maybe_raw_memory_freelist,
         );
         if new_head.is_zero() {
             return Address::ZERO;

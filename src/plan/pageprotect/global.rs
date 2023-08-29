@@ -45,6 +45,11 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         ret
     }
 
+    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
+        self.common.for_each_space_mut(f);
+        f(&mut self.space)
+    }
+
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);

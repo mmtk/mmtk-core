@@ -101,6 +101,10 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.pr
     }
 
+    fn for_each_page_resource_mut(&mut self, f: &mut dyn FnMut(&mut dyn PageResource<VM>)) {
+        f(&mut self.pr);
+    }
+
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }
