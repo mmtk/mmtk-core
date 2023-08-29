@@ -92,7 +92,20 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     }
 
     fn initialize_sft(&self) {
-        // Do nothing here. We always initialize SFT when we know any external pages
+        // Initialize sft for current external pages. This method is called at the end of plan creation.
+        // So we only set SFT for VM regions that are set by options (we skipped sft initialization for them earlier).
+        for external_pages in self.pr.get_external_pages().iter() {
+            // Chunk align things.
+            let start = external_pages.start.align_down(BYTES_IN_CHUNK);
+            let size = external_pages.end.align_up(BYTES_IN_CHUNK) - start;
+            // The region should be empty in SFT map -- if they were set before this point, there could be invalid SFT pointers.
+            debug_assert_eq!(
+                SFT_MAP.get_checked(start).name(),
+                crate::policy::sft::EMPTY_SFT_NAME
+            );
+            // Set SFT
+            self.set_sft_for_vm_region(start, size);
+        }
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -160,17 +173,18 @@ impl<VM: VMBinding> VMSpace<VM> {
         };
 
         if !vm_space_start.is_zero() {
-            space.add_external_pages(vm_space_start, vm_space_size);
+            // Do not set sft here, as the space may be moved. We do so for those regions in `initialize_sft`.
+            space.set_vm_region_inner(vm_space_start, vm_space_size, false);
         }
 
         space
     }
 
     pub fn set_vm_region(&mut self, start: Address, size: usize) {
-        self.add_external_pages(start, size);
+        self.set_vm_region_inner(start, size, true);
     }
 
-    pub fn add_external_pages(&self, start: Address, size: usize) {
+    fn set_vm_region_inner(&self, start: Address, size: usize, set_sft: bool) {
         assert!(size > 0);
         assert!(!start.is_zero());
 
@@ -202,16 +216,27 @@ impl<VM: VMBinding> VMSpace<VM> {
             .unwrap();
         // Insert to vm map: it would be good if we can make VM map aware of the region. However, the region may be outside what we can map in our VM map implementation.
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);
-        // Update SFT
-        assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
-        unsafe {
-            SFT_MAP.eager_initialize(self.as_sft(), chunk_start, chunk_size);
+        // Set SFT if we should
+        if set_sft {
+            self.set_sft_for_vm_region(chunk_start, chunk_size);
         }
 
         self.pr.add_new_external_pages(ExternalPages {
             start: start.align_down(BYTES_IN_PAGE),
             end: end.align_up(BYTES_IN_PAGE),
         });
+    }
+
+    fn set_sft_for_vm_region(&self, chunk_start: Address, chunk_size: usize) {
+        assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
+        assert!(crate::util::conversions::raw_is_aligned(
+            chunk_size,
+            BYTES_IN_CHUNK
+        ));
+        assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
+        unsafe {
+            SFT_MAP.eager_initialize(self.as_sft(), chunk_start, chunk_size);
+        }
     }
 
     pub fn prepare(&mut self) {
