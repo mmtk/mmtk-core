@@ -148,11 +148,13 @@ impl CommonPageResource {
     ) -> Address {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
 
-        let new_head: Address = self.vm_map.allocate_contiguous_chunks(
-            space_descriptor,
-            chunks,
-            *head_discontiguous_region,
-        );
+        let new_head: Address = unsafe {
+            self.vm_map.allocate_contiguous_chunks(
+                space_descriptor,
+                chunks,
+                *head_discontiguous_region,
+            )
+        };
         if new_head.is_zero() {
             return Address::ZERO;
         }
@@ -169,7 +171,9 @@ impl CommonPageResource {
         if chunk == *head_discontiguous_region {
             *head_discontiguous_region = self.vm_map.get_next_contiguous_region(chunk);
         }
-        self.vm_map.free_contiguous_chunks(chunk);
+        unsafe {
+            self.vm_map.free_contiguous_chunks(chunk);
+        }
     }
 
     pub fn release_all_chunks(&self) {
