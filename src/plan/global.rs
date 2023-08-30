@@ -40,9 +40,9 @@ pub fn create_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
-        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
+        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk.get_plan()),
         PlanSelector::SemiSpace => {
-            crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
+            crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::GenCopy => {
             crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
@@ -51,14 +51,16 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
         }
         PlanSelector::MarkSweep => {
-            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
+            crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk.get_plan())
         }
-        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
+        PlanSelector::Immix => {
+            crate::plan::immix::mutator::create_immix_mutator(tls, mmtk.get_plan())
+        }
         PlanSelector::PageProtect => {
-            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
+            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
@@ -137,7 +139,7 @@ pub fn create_gc_worker_context<VM: VMBinding>(
     tls: VMWorkerThread,
     mmtk: &'static MMTK<VM>,
 ) -> GCWorkerCopyContext<VM> {
-    GCWorkerCopyContext::<VM>::new(tls, &*mmtk.plan, mmtk.plan.create_copy_config())
+    GCWorkerCopyContext::<VM>::new(tls, mmtk.get_plan(), mmtk.get_plan().create_copy_config())
 }
 
 /// A plan describes the global core functionality for all memory management schemes.
@@ -861,6 +863,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     #[allow(unused_variables)] // depending on the enabled features, base may not be used.
+    #[allow(clippy::needless_pass_by_ref_mut)] // depending on the enabled features, base may not be used.
     pub(crate) fn verify_side_metadata_sanity(
         &self,
         side_metadata_sanity_checker: &mut SideMetadataSanity,
