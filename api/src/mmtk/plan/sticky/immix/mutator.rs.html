@@ -74,12 +74,12 @@
     mutator_tls: VMMutatorThread,
     mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
 ) -&gt; Mutator&lt;VM&gt; {
-    <span class="kw">let </span>stickyimmix = mmtk.plan.downcast_ref::&lt;StickyImmix&lt;VM&gt;&gt;().unwrap();
+    <span class="kw">let </span>stickyimmix = mmtk.get_plan().downcast_ref::&lt;StickyImmix&lt;VM&gt;&gt;().unwrap();
     <span class="kw">let </span>config = MutatorConfig {
         allocator_mapping: <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             <span class="kw">let </span><span class="kw-2">mut </span>vec =
-                create_space_mapping(immix::mutator::RESERVED_ALLOCATORS, <span class="bool-val">true</span>, <span class="kw-2">&amp;*</span>mmtk.plan);
+                create_space_mapping(immix::mutator::RESERVED_ALLOCATORS, <span class="bool-val">true</span>, mmtk.get_plan());
             vec.push((AllocatorSelector::Immix(<span class="number">0</span>), stickyimmix.get_immix_space()));
             vec
         }),
@@ -88,14 +88,14 @@
     };
 
     Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, <span class="kw-2">&amp;*</span>mmtk.plan, <span class="kw-2">&amp;</span>config.space_mapping),
+        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk.get_plan(), <span class="kw-2">&amp;</span>config.space_mapping),
         barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
             mmtk,
             stickyimmix,
         ))),
         mutator_tls,
         config,
-        plan: <span class="kw-2">&amp;*</span>mmtk.plan,
+        plan: mmtk.get_plan(),
     }
 }
 </code></pre></div></section></main></body></html>

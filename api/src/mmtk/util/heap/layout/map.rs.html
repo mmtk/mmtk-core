@@ -54,6 +54,17 @@
 <a href="#54" id="54">54</a>
 <a href="#55" id="55">55</a>
 <a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
@@ -73,9 +84,17 @@
 
     <span class="doccomment">/// Bind a created freelist with the page resource.
     /// This must called after create_freelist() or create_parent_freelist().
-    </span><span class="kw">fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CommonFreeListPageResource);
+    ///
+    /// # Safety
+    ///
+    /// * `pr` must be a valid pointer to a CommonFreeListPageResource and be alive
+    ///  for the duration of the VMMap.
+    </span><span class="kw">unsafe fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">*const </span>CommonFreeListPageResource);
 
-    <span class="kw">fn </span>allocate_contiguous_chunks(
+    <span class="doccomment">/// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    </span><span class="kw">unsafe fn </span>allocate_contiguous_chunks(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -98,7 +117,10 @@
 
     <span class="kw">fn </span>free_all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, any_chunk: Address);
 
-    <span class="kw">fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize;
+    <span class="doccomment">/// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    </span><span class="kw">unsafe fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize;
 
     <span class="kw">fn </span>boot(<span class="kw-2">&amp;</span><span class="self">self</span>) {}
 

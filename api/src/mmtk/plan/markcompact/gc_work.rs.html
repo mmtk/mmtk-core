@@ -134,7 +134,7 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="comment">// The following needs to be done right before the second round of root scanning
         </span>VM::VMScanning::prepare_for_roots_re_scanning();
-        mmtk.plan.base().prepare_for_stack_scanning();
+        mmtk.get_plan().base().prepare_for_stack_scanning();
         <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
         </span>mmtk.edge_logger.reset();
 

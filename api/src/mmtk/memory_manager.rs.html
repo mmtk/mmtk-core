@@ -920,6 +920,15 @@
 <a href="#920" id="920">920</a>
 <a href="#921" id="921">921</a>
 <a href="#922" id="922">922</a>
+<a href="#923" id="923">923</a>
+<a href="#924" id="924">924</a>
+<a href="#925" id="925">925</a>
+<a href="#926" id="926">926</a>
+<a href="#927" id="927">927</a>
+<a href="#928" id="928">928</a>
+<a href="#929" id="929">929</a>
+<a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1010,7 +1019,12 @@
 
 <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
 </span><span class="kw">pub fn </span>lazy_init_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
-    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
+    <span class="kw">unsafe </span>{
+        mmtk.get_plan_mut()
+            .base_mut()
+            .vm_space
+            .lazy_initialize(start, size);
+    }
 }
 
 <span class="doccomment">/// Request MMTk to create a mutator for the given thread. The ownership
@@ -1267,7 +1281,7 @@
     mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;,
     semantics: AllocationSemantics,
 ) -&gt; AllocatorSelector {
-    mmtk.plan.get_allocator_mapping()[semantics]
+    mmtk.get_plan().get_allocator_mapping()[semantics]
 }
 
 <span class="doccomment">/// The standard malloc. MMTk either uses its own allocator, or forward the call to a
@@ -1389,11 +1403,14 @@
 ///   Collection::spawn_gc_thread() so that the VM knows the context.
 </span><span class="kw">pub fn </span>initialize_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;, tls: VMThread) {
     <span class="macro">assert!</span>(
-        !mmtk.plan.is_initialized(),
+        !mmtk.get_plan().is_initialized(),
         <span class="string">&quot;MMTk collection has been initialized (was initialize_collection() already called before?)&quot;
     </span>);
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.plan.base().initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+    mmtk.get_plan()
+        .base()
+        .initialized
+        .store(<span class="bool-val">true</span>, Ordering::SeqCst);
     <span class="macro">probe!</span>(mmtk, collection_initialized);
 }
 
@@ -1405,10 +1422,10 @@
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>enable_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
     <span class="macro">debug_assert!</span>(
-        !mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        !mmtk.get_plan().should_trigger_gc_when_heap_is_full(),
         <span class="string">&quot;enable_collection() is called when GC is already enabled.&quot;
     </span>);
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .trigger_gc_when_heap_is_full
         .store(<span class="bool-val">true</span>, Ordering::SeqCst);
@@ -1426,10 +1443,10 @@
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>disable_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
     <span class="macro">debug_assert!</span>(
-        mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        mmtk.get_plan().should_trigger_gc_when_heap_is_full(),
         <span class="string">&quot;disable_collection() is called when GC is not enabled.&quot;
     </span>);
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .trigger_gc_when_heap_is_full
         .store(<span class="bool-val">false</span>, Ordering::SeqCst);
@@ -1460,7 +1477,7 @@
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>used_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
-    mmtk.plan.get_used_pages() &lt;&lt; LOG_BYTES_IN_PAGE
+    mmtk.get_plan().get_used_pages() &lt;&lt; LOG_BYTES_IN_PAGE
 }
 
 <span class="doccomment">/// Return free memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
@@ -1469,7 +1486,7 @@
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>free_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
-    mmtk.plan.get_free_pages() &lt;&lt; LOG_BYTES_IN_PAGE
+    mmtk.get_plan().get_free_pages() &lt;&lt; LOG_BYTES_IN_PAGE
 }
 
 <span class="doccomment">/// Return the size of all the live objects in bytes in the last GC. MMTk usually accounts for memory in pages.
@@ -1480,7 +1497,7 @@
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 </span><span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
 </span><span class="kw">pub fn </span>live_bytes_in_last_gc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .live_bytes_in_last_gc
         .load(Ordering::SeqCst)
@@ -1503,7 +1520,7 @@
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>total_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
-    mmtk.plan.get_total_pages() &lt;&lt; LOG_BYTES_IN_PAGE
+    mmtk.get_plan().get_total_pages() &lt;&lt; LOG_BYTES_IN_PAGE
 }
 
 <span class="doccomment">/// Trigger a garbage collection as requested by the user.
@@ -1512,7 +1529,8 @@
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
 </span><span class="kw">pub fn </span>handle_user_collection_request&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, tls: VMMutatorThread) {
-    mmtk.plan.handle_user_collection_request(tls, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
+    mmtk.get_plan()
+        .handle_user_collection_request(tls, <span class="bool-val">false</span>, <span class="bool-val">false</span>);
 }
 
 <span class="doccomment">/// Is the object alive?
@@ -1631,7 +1649,7 @@
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `object`: The object to check.
 </span><span class="kw">pub fn </span>modify_check&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, object: ObjectReference) {
-    mmtk.plan.modify_check(object);
+    mmtk.get_plan().modify_check(object);
 }
 
 <span class="doccomment">/// Add a reference to the list of weak references. A binding may

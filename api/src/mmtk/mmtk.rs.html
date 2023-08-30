@@ -172,6 +172,21 @@
 <a href="#172" id="172">172</a>
 <a href="#173" id="173">173</a>
 <a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
@@ -189,6 +204,7 @@
 </span><span class="kw">use </span><span class="kw">crate</span>::util::sanity::sanity_checker::SanityChecker;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ReferenceGlue;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::default::Default;
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
 <span class="kw">use </span>std::sync::Arc;
@@ -204,10 +220,10 @@
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     </span><span class="doccomment">/// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    </span><span class="kw">pub static </span><span class="kw-2">ref </span>VM_MAP: Box&lt;<span class="kw">dyn </span>VMMap&gt; = layout::create_vm_map();
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>VM_MAP: Box&lt;<span class="kw">dyn </span>VMMap + Send + Sync&gt; = layout::create_vm_map();
 
     <span class="doccomment">/// A global Mmapper for mmaping and protection of virtual memory.
-    </span><span class="kw">pub static </span><span class="kw-2">ref </span>MMAPPER: Box&lt;<span class="kw">dyn </span>Mmapper&gt; = layout::create_mmapper();
+    </span><span class="kw">pub static </span><span class="kw-2">ref </span>MMAPPER: Box&lt;<span class="kw">dyn </span>Mmapper + Send + Sync&gt; = layout::create_mmapper();
 }
 
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::InitializeOnce;
@@ -262,7 +278,7 @@
 /// *Note that multi-instances is not fully supported yet*
 </span><span class="kw">pub struct </span>MMTK&lt;VM: VMBinding&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) options: Arc&lt;Options&gt;,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) plan: Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) plan: UnsafeCell&lt;Box&lt;<span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) reference_processors: ReferenceProcessors,
     <span class="kw">pub</span>(<span class="kw">crate</span>) finalizable_processor:
         Mutex&lt;FinalizableProcessor&lt;&lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType&gt;&gt;,
@@ -273,6 +289,9 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) edge_logger: EdgeLogger&lt;VM::VMEdge&gt;,
     inside_harness: AtomicBool,
 }
+
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>MMTK&lt;VM&gt; {}
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>MMTK&lt;VM&gt; {}
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MMTK&lt;VM&gt; {
     <span class="kw">pub fn </span>new(options: Arc&lt;Options&gt;) -&gt; <span class="self">Self </span>{
@@ -310,7 +329,7 @@
 
         MMTK {
             options,
-            plan,
+            plan: UnsafeCell::new(plan),
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::&lt;
                 &lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType,
@@ -326,20 +345,31 @@
 
     <span class="kw">pub fn </span>harness_begin(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMMutatorThread) {
         <span class="macro">probe!</span>(mmtk, harness_begin);
-        <span class="self">self</span>.plan.handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
+        <span class="self">self</span>.get_plan()
+            .handle_user_collection_request(tls, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="self">self</span>.inside_harness.store(<span class="bool-val">true</span>, Ordering::SeqCst);
-        <span class="self">self</span>.plan.base().stats.start_all();
+        <span class="self">self</span>.get_plan().base().stats.start_all();
         <span class="self">self</span>.scheduler.enable_stat();
     }
 
     <span class="kw">pub fn </span>harness_end(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) {
-        <span class="self">self</span>.plan.base().stats.stop_all(<span class="self">self</span>);
+        <span class="self">self</span>.get_plan().base().stats.stop_all(<span class="self">self</span>);
         <span class="self">self</span>.inside_harness.store(<span class="bool-val">false</span>, Ordering::SeqCst);
         <span class="macro">probe!</span>(mmtk, harness_end);
     }
 
     <span class="kw">pub fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="self">self</span>.plan.as_ref()
+        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;**</span>(<span class="self">self</span>.plan.get()) }
+    }
+
+    <span class="doccomment">/// Get the plan as mutable reference.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because the caller must ensure that the plan is not used by other threads.
+    </span><span class="attr">#[allow(clippy::mut_from_ref)]
+    </span><span class="kw">pub unsafe fn </span>get_plan_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+        <span class="kw-2">&amp;mut **</span>(<span class="self">self</span>.plan.get())
     }
 
     <span class="kw">pub fn </span>get_options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {

@@ -250,6 +250,21 @@
 <a href="#250" id="250">250</a>
 <a href="#251" id="251">251</a>
 <a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -262,13 +277,19 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::raw_memory_freelist::RawMemoryFreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span>std::cell::UnsafeCell;
+<span class="kw">use </span>std::ptr::NonNull;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 
 <span class="kw">const </span>NON_MAP_FRACTION: f64 = <span class="number">1.0 </span>- <span class="number">8.0 </span>/ <span class="number">4096.0</span>;
 
 <span class="kw">pub struct </span>Map64 {
-    fl_page_resources: Vec&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CommonFreeListPageResource&gt;&gt;,
-    fl_map: Vec&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RawMemoryFreeList&gt;&gt;,
+    inner: UnsafeCell&lt;Map64Inner&gt;,
+}
+
+<span class="kw">struct </span>Map64Inner {
+    fl_page_resources: Vec&lt;<span class="prelude-ty">Option</span>&lt;NonNull&lt;CommonFreeListPageResource&gt;&gt;&gt;,
+    fl_map: Vec&lt;<span class="prelude-ty">Option</span>&lt;NonNull&lt;RawMemoryFreeList&gt;&gt;&gt;,
     finalized: bool,
     descriptor_map: Vec&lt;SpaceDescriptor&gt;,
     base_address: Vec&lt;Address&gt;,
@@ -280,6 +301,9 @@
     // references to vm_map - so it is convenient to put it here.
     </span>cumulative_committed_pages: AtomicUsize,
 }
+
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>Map64 {}
+<span class="kw">unsafe impl </span>Sync <span class="kw">for </span>Map64 {}
 
 <span class="kw">impl </span>Map64 {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
@@ -293,18 +317,20 @@
         }
 
         <span class="self">Self </span>{
-            <span class="comment">// Note: descriptor_map is very large. Although it is initialized to
-            // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
-            // elide the storing of 0 for each of the element.  Using standard vector creation,
-            // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
-            // slowdown during start-up.
-            </span>descriptor_map: <span class="kw">unsafe </span>{ new_zeroed_vec::&lt;SpaceDescriptor&gt;(vm_layout().max_chunks()) },
-            high_water,
-            base_address,
-            fl_page_resources: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
-            fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
-            finalized: <span class="bool-val">false</span>,
-            cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
+            inner: UnsafeCell::new(Map64Inner {
+                <span class="comment">// Note: descriptor_map is very large. Although it is initialized to
+                // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
+                // elide the storing of 0 for each of the element.  Using standard vector creation,
+                // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
+                // slowdown during start-up.
+                </span>descriptor_map: <span class="kw">unsafe </span>{ new_zeroed_vec::&lt;SpaceDescriptor&gt;(vm_layout().max_chunks()) },
+                high_water,
+                base_address,
+                fl_page_resources: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
+                fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
+                finalized: <span class="bool-val">false</span>,
+                cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
+            }),
         }
     }
 }
@@ -341,7 +367,7 @@
 
         <span class="kw">let </span>heads = <span class="number">1</span>;
         <span class="kw">let </span>pages_per_block = RawMemoryFreeList::default_block_size(units <span class="kw">as _</span>, heads);
-        <span class="kw">let </span>list = Box::new(RawMemoryFreeList::new(
+        <span class="kw">let </span><span class="kw-2">mut </span>list = Box::new(RawMemoryFreeList::new(
             start,
             start + list_extent,
             pages_per_block,
@@ -351,9 +377,10 @@
             MmapStrategy::Normal,
         ));
 
-        self_mut.fl_map[index] =
-            <span class="prelude-val">Some</span>(<span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>list <span class="kw">as </span><span class="kw-2">&amp;</span>RawMemoryFreeList <span class="kw">as </span><span class="kw-2">*const </span>RawMemoryFreeList) });
-
+        <span class="comment">/*self_mut.fl_map[index] =
+            Some(unsafe { &amp;*(&amp;list as &amp;RawMemoryFreeList as *const RawMemoryFreeList) });
+        */
+        </span>self_mut.fl_map[index] = <span class="kw">unsafe </span>{ <span class="prelude-val">Some</span>(NonNull::new_unchecked(<span class="kw-2">&amp;mut *</span>list)) };
         <span class="comment">/* Adjust the base address and highwater to account for the allocated chunks for the map */
         </span><span class="kw">let </span>base = conversions::chunk_align_up(start + list_extent);
 
@@ -362,13 +389,16 @@
         list
     }
 
-    <span class="kw">fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CommonFreeListPageResource) {
-        <span class="kw">let </span>index = <span class="self">Self</span>::space_index(pr.get_start()).unwrap();
-        <span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-        self_mut.fl_page_resources[index] = <span class="prelude-val">Some</span>(pr);
+    <span class="kw">unsafe fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">*const </span>CommonFreeListPageResource) {
+        <span class="kw">let </span>index = <span class="self">Self</span>::space_index((<span class="kw-2">*</span>pr).get_start()).unwrap();
+        <span class="kw">let </span>self_mut = <span class="self">self</span>.mut_self();
+        self_mut.fl_page_resources[index] = <span class="prelude-val">Some</span>(NonNull::new_unchecked(pr <span class="kw">as _</span>));
     }
 
-    <span class="kw">fn </span>allocate_contiguous_chunks(
+    <span class="doccomment">/// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    </span><span class="kw">unsafe fn </span>allocate_contiguous_chunks(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -377,20 +407,19 @@
         <span class="macro">debug_assert!</span>(<span class="self">Self</span>::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
-        </span><span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+        </span><span class="kw">let </span>self_mut = <span class="self">self</span>.mut_self();
 
         <span class="kw">let </span>index = descriptor.get_index();
-        <span class="kw">let </span>rtn = <span class="self">self</span>.high_water[index];
+        <span class="kw">let </span>rtn = <span class="self">self</span>.inner().high_water[index];
         <span class="kw">let </span>extent = chunks &lt;&lt; LOG_BYTES_IN_CHUNK;
         self_mut.high_water[index] = rtn + extent;
 
         <span class="comment">/* Grow the free list to accommodate the new chunks */
-        </span><span class="kw">let </span>free_list = <span class="self">self</span>.fl_map[<span class="self">Self</span>::space_index(descriptor.get_start()).unwrap()];
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(free_list) = free_list {
-            <span class="kw">let </span>free_list =
-                <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(free_list <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize <span class="kw">as </span><span class="kw-2">*mut </span>RawMemoryFreeList) };
+        </span><span class="kw">let </span>free_list = <span class="self">self</span>.inner().fl_map[<span class="self">Self</span>::space_index(descriptor.get_start()).unwrap()];
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>free_list) = free_list {
+            <span class="kw">let </span>free_list = free_list.as_mut();
             free_list.grow_freelist(conversions::bytes_to_pages(extent) <span class="kw">as _</span>);
-            <span class="kw">let </span>base_page = conversions::bytes_to_pages(rtn - <span class="self">self</span>.base_address[index]);
+            <span class="kw">let </span>base_page = conversions::bytes_to_pages(rtn - <span class="self">self</span>.inner().base_address[index]);
             <span class="kw">for </span>offset <span class="kw">in </span>(<span class="number">0</span>..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
                 free_list.set_uncoalescable((base_page + offset) <span class="kw">as _</span>);
                 <span class="comment">/* The 32-bit implementation requires that pages are returned allocated to the caller */
@@ -424,18 +453,17 @@
         <span class="macro">unreachable!</span>()
     }
 
-    <span class="kw">fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, _start: Address) -&gt; usize {
+    <span class="kw">unsafe fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, _start: Address) -&gt; usize {
         <span class="macro">unreachable!</span>()
     }
 
     <span class="kw">fn </span>boot(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map64Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         <span class="kw">for </span>pr <span class="kw">in </span><span class="number">0</span>..MAX_SPACES {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(fl) = self_mut.fl_map[pr] {
-                <span class="attr">#[allow(clippy::cast_ref_to_mut)]
-                </span><span class="kw">let </span>fl_mut: <span class="kw-2">&amp;mut </span>RawMemoryFreeList = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(fl <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>fl) = self_mut.fl_map[pr] {
+                <span class="kw">let </span>fl_mut: <span class="kw-2">&amp;mut </span>RawMemoryFreeList = <span class="kw">unsafe </span>{ fl.as_mut() };
                 fl_mut.grow_freelist(<span class="number">0</span>);
             }
         }
@@ -444,31 +472,30 @@
     <span class="kw">fn </span>finalize_static_space_map(<span class="kw-2">&amp;</span><span class="self">self</span>, _from: Address, _to: Address) {
         <span class="comment">// This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map64Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         <span class="kw">for </span>pr <span class="kw">in </span><span class="number">0</span>..MAX_SPACES {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(fl) = self_mut.fl_page_resources[pr] {
-                <span class="attr">#[allow(clippy::cast_ref_to_mut)]
-                </span><span class="kw">let </span>fl_mut: <span class="kw-2">&amp;mut </span>CommonFreeListPageResource =
-                    <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(fl <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
-                fl_mut.resize_freelist(conversions::chunk_align_up(
-                    <span class="self">self</span>.fl_map[pr].unwrap().get_limit(),
-                ));
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>fl) = self_mut.fl_page_resources[pr] {
+                <span class="kw">let </span>fl_mut = <span class="kw">unsafe </span>{ fl.as_mut() };
+                fl_mut.resize_freelist(conversions::chunk_align_up(<span class="kw">unsafe </span>{
+                    <span class="self">self</span>.inner().fl_map[pr].unwrap().as_ref().get_limit()
+                }));
             }
         }
         self_mut.finalized = <span class="bool-val">true</span>;
     }
 
     <span class="kw">fn </span>is_finalized(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.finalized
+        <span class="self">self</span>.inner().finalized
     }
 
     <span class="kw">fn </span>get_descriptor_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; SpaceDescriptor {
         <span class="kw">let </span>index = <span class="self">Self</span>::space_index(address).unwrap();
-        <span class="self">self</span>.descriptor_map[index]
+        <span class="self">self</span>.inner().descriptor_map[index]
     }
 
     <span class="kw">fn </span>add_to_cumulative_committed_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
-        <span class="self">self</span>.cumulative_committed_pages
+        <span class="self">self</span>.inner()
+            .cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
 }
@@ -479,10 +506,13 @@
     /// The caller needs to guarantee there is no race condition. Either only one single thread
     /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
     /// In other cases, use mut_self_with_sync().
-    </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
-    #[allow(clippy::mut_from_ref)]
-    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
-        <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
+    </span><span class="attr">#[allow(clippy::mut_from_ref)]
+    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Map64Inner {
+        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get()
+    }
+
+    <span class="kw">fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Map64Inner {
+        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.inner.get() }
     }
 
     <span class="kw">fn </span>space_index(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {

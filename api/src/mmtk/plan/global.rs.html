@@ -1071,6 +1071,9 @@
 <a href="#1071" id="1071">1071</a>
 <a href="#1072" id="1072">1072</a>
 <a href="#1073" id="1073">1073</a>
+<a href="#1074" id="1074">1074</a>
+<a href="#1075" id="1075">1075</a>
+<a href="#1076" id="1076">1076</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1113,9 +1116,9 @@
     mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
 ) -&gt; Box&lt;Mutator&lt;VM&gt;&gt; {
     Box::new(<span class="kw">match </span><span class="kw-2">*</span>mmtk.options.plan {
-        PlanSelector::NoGC =&gt; <span class="kw">crate</span>::plan::nogc::mutator::create_nogc_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan),
+        PlanSelector::NoGC =&gt; <span class="kw">crate</span>::plan::nogc::mutator::create_nogc_mutator(tls, mmtk.get_plan()),
         PlanSelector::SemiSpace =&gt; {
-            <span class="kw">crate</span>::plan::semispace::mutator::create_ss_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan)
+            <span class="kw">crate</span>::plan::semispace::mutator::create_ss_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::GenCopy =&gt; {
             <span class="kw">crate</span>::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
@@ -1124,14 +1127,16 @@
             <span class="kw">crate</span>::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
         }
         PlanSelector::MarkSweep =&gt; {
-            <span class="kw">crate</span>::plan::marksweep::mutator::create_ms_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan)
+            <span class="kw">crate</span>::plan::marksweep::mutator::create_ms_mutator(tls, mmtk.get_plan())
         }
-        PlanSelector::Immix =&gt; <span class="kw">crate</span>::plan::immix::mutator::create_immix_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan),
+        PlanSelector::Immix =&gt; {
+            <span class="kw">crate</span>::plan::immix::mutator::create_immix_mutator(tls, mmtk.get_plan())
+        }
         PlanSelector::PageProtect =&gt; {
-            <span class="kw">crate</span>::plan::pageprotect::mutator::create_pp_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan)
+            <span class="kw">crate</span>::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::MarkCompact =&gt; {
-            <span class="kw">crate</span>::plan::markcompact::mutator::create_markcompact_mutator(tls, <span class="kw-2">&amp;*</span>mmtk.plan)
+            <span class="kw">crate</span>::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::StickyImmix =&gt; {
             <span class="kw">crate</span>::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
@@ -1210,7 +1215,7 @@
     tls: VMWorkerThread,
     mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
 ) -&gt; GCWorkerCopyContext&lt;VM&gt; {
-    GCWorkerCopyContext::&lt;VM&gt;::new(tls, <span class="kw-2">&amp;*</span>mmtk.plan, mmtk.plan.create_copy_config())
+    GCWorkerCopyContext::&lt;VM&gt;::new(tls, mmtk.get_plan(), mmtk.get_plan().create_copy_config())
 }
 
 <span class="doccomment">/// A plan describes the global core functionality for all memory management schemes.
@@ -1930,6 +1935,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     }
 
     <span class="attr">#[allow(unused_variables)] </span><span class="comment">// depending on the enabled features, base may not be used.
+    </span><span class="attr">#[allow(clippy::needless_pass_by_ref_mut)] </span><span class="comment">// depending on the enabled features, base may not be used.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>verify_side_metadata_sanity(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         side_metadata_sanity_checker: <span class="kw-2">&amp;mut </span>SideMetadataSanity,

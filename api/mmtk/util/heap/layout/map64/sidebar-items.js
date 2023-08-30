@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["NON_MAP_FRACTION"],"struct":["Map64"]};
+window.SIDEBAR_ITEMS = {"constant":["NON_MAP_FRACTION"],"struct":["Map64","Map64Inner"]};

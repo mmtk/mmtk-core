@@ -334,7 +334,7 @@
 
         <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk);
         w.set_worker(worker);
-        finalizable_processor.scan(worker.tls, <span class="kw-2">&amp;mut </span>w, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        finalizable_processor.scan(worker.tls, <span class="kw-2">&amp;mut </span>w, is_nursery_gc(mmtk.get_plan()));
         <span class="macro">debug!</span>(
             <span class="string">&quot;Finished finalization, {} objects in candidates, {} objects ready to finalize&quot;</span>,
             finalizable_processor.candidates.len(),
@@ -357,9 +357,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk);
         w.set_worker(worker);
-        finalizable_processor.forward_candidate(<span class="kw-2">&amp;mut </span>w, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        finalizable_processor.forward_candidate(<span class="kw-2">&amp;mut </span>w, is_nursery_gc(mmtk.get_plan()));
 
-        finalizable_processor.forward_finalizable(<span class="kw-2">&amp;mut </span>w, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        finalizable_processor.forward_finalizable(<span class="kw-2">&amp;mut </span>w, is_nursery_gc(mmtk.get_plan()));
         <span class="macro">trace!</span>(<span class="string">&quot;Finished forwarding finlizable&quot;</span>);
     }
 }

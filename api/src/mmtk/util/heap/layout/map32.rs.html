@@ -309,6 +309,22 @@
 <a href="#309" id="309">309</a>
 <a href="#310" id="310">310</a>
 <a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -319,19 +335,26 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::int_array_freelist::IntArrayFreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<span class="kw">use </span>std::cell::UnsafeCell;
+<span class="kw">use </span>std::ptr::NonNull;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">pub struct </span>Map32 {
+    sync: Mutex&lt;()&gt;,
+    inner: UnsafeCell&lt;Map32Inner&gt;,
+}
+
+<span class="attr">#[doc(hidden)]
+</span><span class="kw">pub struct </span>Map32Inner {
     prev_link: Vec&lt;i32&gt;,
     next_link: Vec&lt;i32&gt;,
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    shared_fl_map: Vec&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CommonFreeListPageResource&gt;&gt;,
+    shared_fl_map: Vec&lt;<span class="prelude-ty">Option</span>&lt;NonNull&lt;CommonFreeListPageResource&gt;&gt;&gt;,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
-    sync: Mutex&lt;()&gt;,
     descriptor_map: Vec&lt;SpaceDescriptor&gt;,
 
     <span class="comment">// TODO: Is this the right place for this field?
@@ -341,22 +364,34 @@
     </span>cumulative_committed_pages: AtomicUsize,
 }
 
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>Map32 {}
+<span class="kw">unsafe impl </span>Sync <span class="kw">for </span>Map32 {}
+
 <span class="kw">impl </span>Map32 {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>max_chunks = vm_layout().max_chunks();
         Map32 {
-            prev_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
-            next_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
-            region_map: IntArrayFreeList::new(max_chunks, max_chunks <span class="kw">as _</span>, <span class="number">1</span>),
-            global_page_map: IntArrayFreeList::new(<span class="number">1</span>, <span class="number">1</span>, MAX_SPACES),
-            shared_discontig_fl_count: <span class="number">0</span>,
-            shared_fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
-            total_available_discontiguous_chunks: <span class="number">0</span>,
-            finalized: <span class="bool-val">false</span>,
+            inner: UnsafeCell::new(Map32Inner {
+                prev_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
+                next_link: <span class="macro">vec!</span>[<span class="number">0</span>; max_chunks],
+                region_map: IntArrayFreeList::new(max_chunks, max_chunks <span class="kw">as _</span>, <span class="number">1</span>),
+                global_page_map: IntArrayFreeList::new(<span class="number">1</span>, <span class="number">1</span>, MAX_SPACES),
+                shared_discontig_fl_count: <span class="number">0</span>,
+                shared_fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
+                total_available_discontiguous_chunks: <span class="number">0</span>,
+                finalized: <span class="bool-val">false</span>,
+                descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; max_chunks],
+                cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
+            }),
             sync: Mutex::new(()),
-            descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; max_chunks],
-            cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
         }
+    }
+}
+
+<span class="kw">impl </span>std::ops::Deref <span class="kw">for </span>Map32 {
+    <span class="kw">type </span>Target = Map32Inner;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.inner.get() }
     }
 }
 
@@ -364,7 +399,7 @@
     <span class="kw">fn </span>insert(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         <span class="kw">let </span><span class="kw-2">mut </span>e = <span class="number">0</span>;
         <span class="kw">while </span>e &lt; extent {
             <span class="kw">let </span>index = (start + e).chunk_index();
@@ -399,17 +434,17 @@
         Box::new(IntArrayFreeList::new(units, grain, <span class="number">1</span>))
     }
 
-    <span class="kw">fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CommonFreeListPageResource) {
-        <span class="kw">let </span>ordinal: usize = pr
+    <span class="kw">unsafe fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">*const </span>CommonFreeListPageResource) {
+        <span class="kw">let </span>ordinal: usize = (<span class="kw-2">*</span>pr)
             .free_list
             .downcast_ref::&lt;IntArrayFreeList&gt;()
             .unwrap()
             .get_ordinal() <span class="kw">as </span>usize;
-        <span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-        self_mut.shared_fl_map[ordinal] = <span class="prelude-val">Some</span>(pr);
+        <span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="self">self</span>.mut_self();
+        self_mut.shared_fl_map[ordinal] = <span class="prelude-val">Some</span>(NonNull::new_unchecked(pr <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>));
     }
 
-    <span class="kw">fn </span>allocate_contiguous_chunks(
+    <span class="kw">unsafe fn </span>allocate_contiguous_chunks(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -419,7 +454,7 @@
         <span class="kw">let </span>chunk = self_mut.region_map.alloc(chunks <span class="kw">as _</span>);
         <span class="macro">debug_assert!</span>(chunk != <span class="number">0</span>);
         <span class="kw">if </span>chunk == -<span class="number">1 </span>{
-            <span class="kw">return unsafe </span>{ Address::zero() };
+            <span class="kw">return </span>Address::zero();
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
         <span class="kw">let </span>rtn = conversions::chunk_index_to_address(chunk <span class="kw">as _</span>);
@@ -462,8 +497,8 @@
     <span class="kw">fn </span>get_chunk_consumer_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.shared_discontig_fl_count
     }
-
-    <span class="kw">fn </span>free_all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, any_chunk: Address) {
+    <span class="attr">#[allow(clippy::while_immutable_condition)]
+    </span><span class="kw">fn </span>free_all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, any_chunk: Address) {
         <span class="macro">debug!</span>(<span class="string">&quot;free_all_chunks: {}&quot;</span>, any_chunk);
         <span class="kw">let </span>(_sync, self_mut) = <span class="self">self</span>.mut_self_with_sync();
         <span class="macro">debug_assert!</span>(any_chunk == conversions::chunk_align_down(any_chunk));
@@ -471,28 +506,28 @@
             <span class="kw">let </span>chunk = any_chunk.chunk_index();
             <span class="kw">while </span>self_mut.next_link[chunk] != <span class="number">0 </span>{
                 <span class="kw">let </span>x = self_mut.next_link[chunk];
-                self_mut.free_contiguous_chunks_no_lock(x);
+                <span class="self">self</span>.free_contiguous_chunks_no_lock(x);
             }
             <span class="kw">while </span>self_mut.prev_link[chunk] != <span class="number">0 </span>{
                 <span class="kw">let </span>x = self_mut.prev_link[chunk];
-                self_mut.free_contiguous_chunks_no_lock(x);
+                <span class="self">self</span>.free_contiguous_chunks_no_lock(x);
             }
-            self_mut.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>);
+            <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>);
         }
     }
 
-    <span class="kw">fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
+    <span class="kw">unsafe fn </span>free_contiguous_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; usize {
         <span class="macro">debug!</span>(<span class="string">&quot;free_contiguous_chunks: {}&quot;</span>, start);
-        <span class="kw">let </span>(_sync, self_mut) = <span class="self">self</span>.mut_self_with_sync();
+        <span class="kw">let </span>(_sync, <span class="kw">_</span>) = <span class="self">self</span>.mut_self_with_sync();
         <span class="macro">debug_assert!</span>(start == conversions::chunk_align_down(start));
         <span class="kw">let </span>chunk = start.chunk_index();
-        self_mut.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>)
+        <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>)
     }
 
     <span class="kw">fn </span>finalize_static_space_map(<span class="kw-2">&amp;</span><span class="self">self</span>, from: Address, to: Address) {
         <span class="comment">// This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         <span class="comment">/* establish bounds of discontiguous space */
         </span><span class="kw">let </span>start_address = from;
         <span class="kw">let </span>first_chunk = start_address.chunk_index();
@@ -508,13 +543,9 @@
         // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
         // there is no test to ensure the refactoring will be correct.
         </span><span class="attr">#[allow(clippy::manual_flatten)]
-        </span><span class="kw">for </span>fl <span class="kw">in </span>self_mut.shared_fl_map.iter() {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(fl) = fl {
-                <span class="attr">#[allow(clippy::cast_ref_to_mut)]
-                </span><span class="kw">let </span>fl_mut: <span class="kw-2">&amp;mut </span>CommonFreeListPageResource = <span class="kw">unsafe </span>{
-                    <span class="kw-2">&amp;mut *</span>(<span class="kw-2">*</span>fl <span class="kw">as </span><span class="kw-2">*const </span>CommonFreeListPageResource
-                        <span class="kw">as </span><span class="kw-2">*mut </span>CommonFreeListPageResource)
-                };
+        </span><span class="kw">for </span>fl <span class="kw">in </span>self_mut.shared_fl_map.iter().copied() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>fl) = fl {
+                <span class="kw">let </span>fl_mut = <span class="kw">unsafe </span>{ fl.as_mut() };
                 fl_mut.resize_freelist(start_address);
             }
         }
@@ -573,43 +604,44 @@
     /// The caller needs to guarantee there is no race condition. Either only one single thread
     /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
     /// In other cases, use mut_self_with_sync().
-    </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
-    #[allow(clippy::mut_from_ref)]
-    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
-        <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
+    </span><span class="attr">#[allow(clippy::mut_from_ref)]
+    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Map32Inner {
+        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get()
     }
 
-    <span class="kw">fn </span>mut_self_with_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (MutexGuard&lt;()&gt;, <span class="kw-2">&amp;mut </span><span class="self">Self</span>) {
+    <span class="kw">fn </span>mut_self_with_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (MutexGuard&lt;()&gt;, <span class="kw-2">&amp;mut </span>Map32Inner) {
         <span class="kw">let </span>guard = <span class="self">self</span>.sync.lock().unwrap();
         (guard, <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() })
     }
 
-    <span class="kw">fn </span>free_contiguous_chunks_no_lock(<span class="kw-2">&amp;mut </span><span class="self">self</span>, chunk: i32) -&gt; usize {
-        <span class="kw">let </span>chunks = <span class="self">self</span>.region_map.free(chunk, <span class="bool-val">false</span>);
-        <span class="self">self</span>.total_available_discontiguous_chunks += chunks <span class="kw">as </span>usize;
-        <span class="kw">let </span>next = <span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize];
-        <span class="kw">let </span>prev = <span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize];
-        <span class="kw">if </span>next != <span class="number">0 </span>{
-            <span class="self">self</span>.prev_link[next <span class="kw">as </span>usize] = prev
-        };
-        <span class="kw">if </span>prev != <span class="number">0 </span>{
-            <span class="self">self</span>.next_link[prev <span class="kw">as </span>usize] = next
-        };
-        <span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize] = <span class="number">0</span>;
-        <span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize] = <span class="number">0</span>;
-        <span class="kw">for </span>offset <span class="kw">in </span><span class="number">0</span>..chunks {
-            <span class="kw">let </span>index = (chunk + offset) <span class="kw">as </span>usize;
-            <span class="kw">let </span>chunk_start = conversions::chunk_index_to_address(index);
-            <span class="macro">debug!</span>(<span class="string">&quot;Clear descriptor for Chunk {}&quot;</span>, chunk_start);
-            <span class="self">self</span>.descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
-            <span class="kw">unsafe </span>{ SFT_MAP.clear(chunk_start) };
-        }
-        chunks <span class="kw">as _
-    </span>}
+    <span class="kw">fn </span>free_contiguous_chunks_no_lock(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: i32) -&gt; usize {
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>chunks = <span class="self">self</span>.mut_self().region_map.free(chunk, <span class="bool-val">false</span>);
+            <span class="self">self</span>.mut_self().total_available_discontiguous_chunks += chunks <span class="kw">as </span>usize;
+            <span class="kw">let </span>next = <span class="self">self</span>.next_link[chunk <span class="kw">as </span>usize];
+            <span class="kw">let </span>prev = <span class="self">self</span>.prev_link[chunk <span class="kw">as </span>usize];
+            <span class="kw">if </span>next != <span class="number">0 </span>{
+                <span class="self">self</span>.mut_self().prev_link[next <span class="kw">as </span>usize] = prev
+            };
+            <span class="kw">if </span>prev != <span class="number">0 </span>{
+                <span class="self">self</span>.mut_self().next_link[prev <span class="kw">as </span>usize] = next
+            };
+            <span class="self">self</span>.mut_self().prev_link[chunk <span class="kw">as </span>usize] = <span class="number">0</span>;
+            <span class="self">self</span>.mut_self().next_link[chunk <span class="kw">as </span>usize] = <span class="number">0</span>;
+            <span class="kw">for </span>offset <span class="kw">in </span><span class="number">0</span>..chunks {
+                <span class="kw">let </span>index = (chunk + offset) <span class="kw">as </span>usize;
+                <span class="kw">let </span>chunk_start = conversions::chunk_index_to_address(index);
+                <span class="macro">debug!</span>(<span class="string">&quot;Clear descriptor for Chunk {}&quot;</span>, chunk_start);
+                <span class="self">self</span>.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
+                SFT_MAP.clear(chunk_start);
+            }
+            chunks <span class="kw">as _
+        </span>}
+    }
 
     <span class="kw">fn </span>get_discontig_freelist_pr_ordinal(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
+        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         self_mut.shared_discontig_fl_count += <span class="number">1</span>;
         <span class="self">self</span>.shared_discontig_fl_count
     }

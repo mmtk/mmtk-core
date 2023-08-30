@@ -1030,6 +1030,9 @@
 <a href="#1030" id="1030">1030</a>
 <a href="#1031" id="1031">1031</a>
 <a href="#1032" id="1032">1032</a>
+<a href="#1033" id="1033">1033</a>
+<a href="#1034" id="1034">1034</a>
+<a href="#1035" id="1035">1035</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1046,14 +1049,14 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ScheduleCollection {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        mmtk.plan.schedule_collection(worker.scheduler());
+        mmtk.get_plan().schedule_collection(worker.scheduler());
 
         <span class="comment">// Tell GC trigger that GC started.
         // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
         // TODO: Depending on the OS scheduling, other workers can run so fast that they can finish
         // everything in the `Unconstrained` and the `Prepare` buckets before we execute the next
         // statement. Consider if there is a better place to call `on_gc_start`.
-        </span>mmtk.plan.base().gc_trigger.policy.on_gc_start(mmtk);
+        </span>mmtk.get_plan().base().gc_trigger.policy.on_gc_start(mmtk);
     }
 }
 
@@ -1065,11 +1068,13 @@
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
 </span><span class="kw">pub struct </span>Prepare&lt;C: GCWorkContext&gt; {
-    <span class="kw">pub </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>C::PlanType,
+    <span class="kw">pub </span>plan: <span class="kw-2">*const </span>C::PlanType,
 }
 
+<span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Prepare&lt;C&gt; {}
+
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; Prepare&lt;C&gt; {
-    <span class="kw">pub fn </span>new(plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>C::PlanType) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(plan: <span class="kw-2">*const </span>C::PlanType) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ plan }
     }
 }
@@ -1078,7 +1083,6 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;Prepare Global&quot;</span>);
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
-        </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
         plan_mut.prepare(worker.tls);
 
@@ -1121,7 +1125,7 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;Prepare Collector&quot;</span>);
         worker.get_copy_context_mut().prepare();
-        mmtk.plan.prepare_worker(worker);
+        mmtk.get_plan().prepare_worker(worker);
     }
 }
 
@@ -1133,23 +1137,26 @@
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
 </span><span class="kw">pub struct </span>Release&lt;C: GCWorkContext&gt; {
-    <span class="kw">pub </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>C::PlanType,
+    <span class="kw">pub </span>plan: <span class="kw-2">*const </span>C::PlanType,
 }
 
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; Release&lt;C&gt; {
-    <span class="kw">pub fn </span>new(plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>C::PlanType) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(plan: <span class="kw-2">*const </span>C::PlanType) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ plan }
     }
 }
+
+<span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Release&lt;C&gt; {}
 
 <span class="kw">impl</span>&lt;C: GCWorkContext + <span class="lifetime">&#39;static</span>&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Release&lt;C&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;Release Global&quot;</span>);
 
-        <span class="self">self</span>.plan.base().gc_trigger.policy.on_gc_release(mmtk);
-
+        <span class="kw">unsafe </span>{
+            (<span class="kw-2">*</span><span class="self">self</span>.plan).base().gc_trigger.policy.on_gc_release(mmtk);
+        }
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
-        </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
+
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
         plan_mut.release(worker.tls);
 
@@ -1168,7 +1175,7 @@
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            <span class="self">self</span>.plan
+            mmtk.get_plan()
                 .base()
                 .live_bytes_in_last_gc
                 .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
@@ -1222,7 +1229,7 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>StopMutators&lt;E&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators start&quot;</span>);
-        mmtk.plan.base().prepare_for_stack_scanning();
+        mmtk.get_plan().base().prepare_for_stack_scanning();
         &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             <span class="comment">// TODO: The stack scanning work won&#39;t start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
@@ -1244,20 +1251,20 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">info!</span>(
             <span class="string">&quot;End of GC ({}/{} pages, took {} ms)&quot;</span>,
-            mmtk.plan.get_reserved_pages(),
-            mmtk.plan.get_total_pages(),
+            mmtk.get_plan().get_reserved_pages(),
+            mmtk.get_plan().get_total_pages(),
             <span class="self">self</span>.elapsed.as_millis()
         );
 
         <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
         </span>{
             <span class="kw">let </span>live_bytes = mmtk
-                .plan
+                .get_plan()
                 .base()
                 .live_bytes_in_last_gc
                 .load(std::sync::atomic::Ordering::SeqCst);
             <span class="kw">let </span>used_bytes =
-                mmtk.plan.get_used_pages() &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
+                mmtk.get_plan().get_used_pages() &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
             <span class="macro">debug_assert!</span>(
                 live_bytes &lt;= used_bytes,
                 <span class="string">&quot;Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.&quot;</span>,
@@ -1267,25 +1274,24 @@
                 <span class="string">&quot;Live objects = {} bytes ({:04.1}% of {} used pages)&quot;</span>,
                 live_bytes,
                 live_bytes <span class="kw">as </span>f64 * <span class="number">100.0 </span>/ used_bytes <span class="kw">as </span>f64,
-                mmtk.plan.get_used_pages()
+                mmtk.get_plan().get_used_pages()
             );
         }
 
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
-        </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
-        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="kw-2">&amp;*</span>mmtk.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
+        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ mmtk.get_plan_mut() };
         plan_mut.end_of_gc(worker.tls);
 
         <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
-        </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(<span class="kw-2">&amp;*</span>mmtk.plan) {
+        </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             <span class="comment">// reset the logging info at the end of each GC
             </span>mmtk.edge_logger.reset();
         }
 
-        mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
+        mmtk.get_plan().base().set_gc_status(GcStatus::NotInGC);
 
         <span class="comment">// Reset the triggering information.
-        </span>mmtk.plan.base().reset_collection_trigger();
+        </span>mmtk.get_plan().base().reset_collection_trigger();
 
         &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::resume_mutators(worker.tls);
     }
@@ -1480,7 +1486,7 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;E&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;ScanMutatorRoots for mutator {:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
-        <span class="kw">let </span>base = <span class="kw-2">&amp;</span>mmtk.plan.base();
+        <span class="kw">let </span>base = mmtk.get_plan().base();
         <span class="kw">let </span>mutators = &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;E&gt;::new(mmtk);
         &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
@@ -1490,7 +1496,7 @@
         );
         <span class="self">self</span>.<span class="number">0</span>.flush();
 
-        <span class="kw">if </span>mmtk.plan.base().inform_stack_scanned(mutators) {
+        <span class="kw">if </span>mmtk.get_plan().base().inform_stack_scanned(mutators) {
             &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(
                 <span class="bool-val">false</span>, worker.tls,
             );
@@ -1533,7 +1539,7 @@
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
     </span><span class="kw">pub fn </span>new(edges: Vec&lt;VM::VMEdge&gt;, roots: bool, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
-        </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(<span class="kw-2">&amp;*</span>mmtk.plan) {
+        </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             <span class="kw">for </span>edge <span class="kw">in </span><span class="kw-2">&amp;</span>edges {
                 <span class="comment">// log edge, panic if already logged
                 </span>mmtk.edge_logger.log_edge(<span class="kw-2">*</span>edge);
@@ -1560,7 +1566,7 @@
     }
 
     <span class="kw">pub fn </span>plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="kw-2">&amp;*</span><span class="self">self</span>.mmtk.plan
+        <span class="self">self</span>.mmtk.get_plan()
     }
 
     <span class="doccomment">/// Pop all nodes from nodes, and clear nodes to an empty vector.
@@ -1672,7 +1678,7 @@
             <span class="self">self</span>.flush();
         }
         <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
-        </span><span class="kw">if </span><span class="self">self</span>.roots &amp;&amp; !_mmtk.plan.is_in_sanity() {
+        </span><span class="kw">if </span><span class="self">self</span>.roots &amp;&amp; !_mmtk.get_plan().is_in_sanity() {
             <span class="self">self</span>.cache_roots_for_sanity_gc();
         }
         <span class="macro">trace!</span>(<span class="string">&quot;ProcessEdgesWork End&quot;</span>);
@@ -1792,7 +1798,7 @@
 
         <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
         </span>{
-            <span class="kw">if </span><span class="self">self</span>.roots() &amp;&amp; !mmtk.plan.is_in_sanity() {
+            <span class="kw">if </span><span class="self">self</span>.roots() &amp;&amp; !mmtk.get_plan().is_in_sanity() {
                 mmtk.sanity_checker
                     .lock()
                     .unwrap()

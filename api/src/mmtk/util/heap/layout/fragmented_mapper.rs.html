@@ -566,6 +566,22 @@
 <a href="#566" id="566">566</a>
 <a href="#567" id="567">567</a>
 <a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
@@ -574,6 +590,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
+<span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::io::Result;
 <span class="kw">use </span>std::mem::transmute;
@@ -614,6 +631,13 @@
 
 <span class="kw">pub struct </span>FragmentedMapper {
     lock: Mutex&lt;()&gt;,
+    inner: UnsafeCell&lt;InnerFragmentedMapper&gt;,
+}
+
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>FragmentedMapper {}
+<span class="kw">unsafe impl </span>Sync <span class="kw">for </span>FragmentedMapper {}
+
+<span class="kw">struct </span>InnerFragmentedMapper {
     free_slab_index: usize,
     free_slabs: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
     slab_table: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
@@ -629,7 +653,7 @@
 
 <span class="kw">impl </span>Mmapper <span class="kw">for </span>FragmentedMapper {
     <span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy) {
-        <span class="self">self</span>.strategy.store(strategy, Ordering::Relaxed);
+        <span class="self">self</span>.inner().strategy.store(strategy, Ordering::Relaxed);
     }
 
     <span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]) {}
@@ -700,7 +724,7 @@
             MapState::bulk_transition_to_quarantined(
                 state_slices.as_slice(),
                 mmap_start,
-                <span class="self">self</span>.strategy.load(Ordering::Relaxed),
+                <span class="self">self</span>.inner().strategy.load(Ordering::Relaxed),
             )<span class="question-mark">?</span>;
         }
 
@@ -735,7 +759,7 @@
                 MapState::transition_to_mapped(
                     entry,
                     mmap_start,
-                    <span class="self">self</span>.strategy.load(Ordering::Relaxed),
+                    <span class="self">self</span>.inner().strategy.load(Ordering::Relaxed),
                 )<span class="question-mark">?</span>;
             }
             start = high;
@@ -791,11 +815,13 @@
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             lock: Mutex::new(()),
-            free_slab_index: <span class="number">0</span>,
-            free_slabs: (<span class="number">0</span>..MAX_SLABS).map(|<span class="kw">_</span>| <span class="prelude-val">Some</span>(<span class="self">Self</span>::new_slab())).collect(),
-            slab_table: (<span class="number">0</span>..SLAB_TABLE_SIZE).map(|<span class="kw">_</span>| <span class="prelude-val">None</span>).collect(),
-            slab_map: <span class="macro">vec!</span>[SENTINEL; SLAB_TABLE_SIZE],
-            strategy: Atomic::new(MmapStrategy::Normal),
+            inner: UnsafeCell::new(InnerFragmentedMapper {
+                free_slab_index: <span class="number">0</span>,
+                free_slabs: (<span class="number">0</span>..MAX_SLABS).map(|<span class="kw">_</span>| <span class="prelude-val">Some</span>(<span class="self">Self</span>::new_slab())).collect(),
+                slab_table: (<span class="number">0</span>..SLAB_TABLE_SIZE).map(|<span class="kw">_</span>| <span class="prelude-val">None</span>).collect(),
+                slab_map: <span class="macro">vec!</span>[SENTINEL; SLAB_TABLE_SIZE],
+                strategy: Atomic::new(MmapStrategy::Normal),
+            }),
         }
     }
 
@@ -816,23 +842,24 @@
     }
 
     <span class="kw">fn </span>slab_table(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Slab&gt; {
-        <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() }.get_or_optionally_allocate_slab_table(addr, <span class="bool-val">false</span>)
+        <span class="self">self</span>.get_or_optionally_allocate_slab_table(addr, <span class="bool-val">false</span>)
     }
 
     <span class="kw">fn </span>get_or_allocate_slab_table(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="kw-2">&amp;</span>Slab {
-        <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() }
-            .get_or_optionally_allocate_slab_table(addr, <span class="bool-val">true</span>)
+        <span class="self">self</span>.get_or_optionally_allocate_slab_table(addr, <span class="bool-val">true</span>)
             .unwrap()
     }
 
-    <span class="attr">#[allow(clippy::cast_ref_to_mut)]
-    #[allow(clippy::mut_from_ref)]
-    </span><span class="kw">unsafe fn </span>mut_self(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
-        <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>)
+    <span class="kw">fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>InnerFragmentedMapper {
+        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.inner.get() }
+    }
+    <span class="attr">#[allow(clippy::mut_from_ref)]
+    </span><span class="kw">fn </span>inner_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>InnerFragmentedMapper {
+        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get() }
     }
 
     <span class="kw">fn </span>get_or_optionally_allocate_slab_table(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         addr: Address,
         allocate: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Slab&gt; {
@@ -842,25 +869,27 @@
         <span class="kw">let </span><span class="kw-2">mut </span>index = hash; <span class="comment">// Use &#39;index&#39; to iterate over the hash table so that we remember where we started
         </span><span class="kw">loop </span>{
             <span class="comment">/* Check for a hash-table hit.  Should be the frequent case. */
-            </span><span class="kw">if </span>base == <span class="self">self</span>.slab_map[index] {
+            </span><span class="kw">if </span>base == <span class="self">self</span>.inner().slab_map[index] {
                 <span class="kw">return </span><span class="self">self</span>.slab_table_for(addr, index);
             }
             <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
 
             <span class="comment">/* Check whether another thread has allocated a slab while we were acquiring the lock */
-            </span><span class="kw">if </span>base == <span class="self">self</span>.slab_map[index] {
+            </span><span class="kw">if </span>base == <span class="self">self</span>.inner().slab_map[index] {
                 <span class="comment">// drop(guard);
                 </span><span class="kw">return </span><span class="self">self</span>.slab_table_for(addr, index);
             }
 
             <span class="comment">/* Check for a free slot */
-            </span><span class="kw">if </span><span class="self">self</span>.slab_map[index] == SENTINEL {
+            </span><span class="kw">if </span><span class="self">self</span>.inner().slab_map[index] == SENTINEL {
                 <span class="kw">if </span>!allocate {
                     <span class="comment">// drop(guard);
                     </span><span class="kw">return </span><span class="prelude-val">None</span>;
                 }
-                <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() }.commit_free_slab(index);
-                <span class="self">self</span>.slab_map[index] = base;
+                <span class="kw">unsafe </span>{
+                    <span class="self">self</span>.commit_free_slab(index);
+                }
+                <span class="self">self</span>.inner_mut().slab_map[index] = base;
                 <span class="kw">return </span><span class="self">self</span>.slab_table_for(addr, index);
             }
             <span class="comment">//   lock.release();
@@ -871,8 +900,8 @@
     }
 
     <span class="kw">fn </span>slab_table_for(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Slab&gt; {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.slab_table[index].is_some());
-        <span class="self">self</span>.slab_table[index].as_ref().map(|x| x <span class="kw">as </span><span class="kw-2">&amp;</span>Slab)
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.inner().slab_table[index].is_some());
+        <span class="self">self</span>.inner().slab_table[index].as_ref().map(|x| x <span class="kw">as </span><span class="kw-2">&amp;</span>Slab)
     }
 
     <span class="doccomment">/**
@@ -880,18 +909,21 @@
      * at the correct index in the slabTable.
      * @param index slab table index
      */
-    </span><span class="kw">fn </span>commit_free_slab(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize) {
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this function at a time.
+    </span><span class="kw">unsafe fn </span>commit_free_slab(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) {
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.free_slab_index &lt; MAX_SLABS,
+            <span class="self">self</span>.inner().free_slab_index &lt; MAX_SLABS,
             <span class="string">&quot;All free slabs used: virtual address space is exhausled.&quot;
         </span>);
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.slab_table[index].is_none());
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.free_slabs[<span class="self">self</span>.free_slab_index].is_some());
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.inner().slab_table[index].is_none());
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.inner().free_slabs[<span class="self">self</span>.inner().free_slab_index].is_some());
         ::std::mem::swap(
-            <span class="kw-2">&amp;mut </span><span class="self">self</span>.slab_table[index],
-            <span class="kw-2">&amp;mut </span><span class="self">self</span>.free_slabs[<span class="self">self</span>.free_slab_index],
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.inner_mut().slab_table[index],
+            <span class="kw-2">&amp;mut </span><span class="self">self</span>.inner_mut().free_slabs[<span class="self">self</span>.inner().free_slab_index],
         );
-        <span class="self">self</span>.free_slab_index += <span class="number">1</span>;
+        <span class="self">self</span>.inner_mut().free_slab_index += <span class="number">1</span>;
     }
 
     <span class="kw">fn </span>chunk_index_to_address(base: Address, chunk: usize) -&gt; Address {

@@ -813,22 +813,22 @@
 
     </span><span class="kw">fn </span>non_generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.allocation_pages = mmtk
-            .plan
+            .get_plan()
             .get_reserved_pages()
             .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
             <span class="string">&quot;allocated pages = used {} - live in last gc {} = {}&quot;</span>,
-            mmtk.plan.get_reserved_pages(),
+            mmtk.get_plan().get_reserved_pages(),
             <span class="self">self</span>.gc_end_live_pages,
             <span class="self">self</span>.allocation_pages
         );
     }
     <span class="kw">fn </span>non_generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="self">self</span>.gc_release_live_pages = mmtk.plan.get_reserved_pages();
+        <span class="self">self</span>.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
         <span class="macro">trace!</span>(<span class="string">&quot;live before release = {}&quot;</span>, <span class="self">self</span>.gc_release_live_pages);
     }
     <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="self">self</span>.gc_end_live_pages = mmtk.plan.get_reserved_pages();
+        <span class="self">self</span>.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         <span class="macro">trace!</span>(<span class="string">&quot;live pages = {}&quot;</span>, <span class="self">self</span>.gc_end_live_pages);
         <span class="self">self</span>.collection_pages = <span class="self">self
             </span>.gc_release_live_pages
@@ -858,7 +858,7 @@
                 stats.allocation_time
             );
 
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.plan.generational() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
                 stats.generational_mem_stats_on_gc_start(plan);
             } <span class="kw">else </span>{
                 stats.non_generational_mem_stats_on_gc_start(mmtk);
@@ -869,7 +869,7 @@
     <span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_release ===&quot;</span>);
         <span class="self">self</span>.access_stats(|stats| {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.plan.generational() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
                 stats.generational_mem_stats_on_gc_release(plan);
             } <span class="kw">else </span>{
                 stats.non_generational_mem_stats_on_gc_release(mmtk);
@@ -888,13 +888,13 @@
                 stats.collection_time
             );
 
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.plan.generational() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
                 <span class="kw">if </span>stats.generational_mem_stats_on_gc_end(plan) {
                     <span class="self">self</span>.compute_new_heap_limit(
-                        mmtk.plan.get_reserved_pages(),
+                        mmtk.get_plan().get_reserved_pages(),
                         <span class="comment">// We reserve an extra of min nursery. This ensures that we will not trigger
                         // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
-                        </span>mmtk.plan.get_collection_reserved_pages()
+                        </span>mmtk.get_plan().get_collection_reserved_pages()
                             + mmtk.options.get_min_nursery_pages(),
                         stats,
                     );
@@ -902,8 +902,8 @@
             } <span class="kw">else </span>{
                 stats.non_generational_mem_stats_on_gc_end(mmtk);
                 <span class="self">self</span>.compute_new_heap_limit(
-                    mmtk.plan.get_reserved_pages(),
-                    mmtk.plan.get_collection_reserved_pages(),
+                    mmtk.get_plan().get_reserved_pages(),
+                    mmtk.get_plan().get_collection_reserved_pages(),
                     stats,
                 );
             }

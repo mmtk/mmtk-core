@@ -550,6 +550,10 @@
 <a href="#550" id="550">550</a>
 <a href="#551" id="551">551</a>
 <a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -619,12 +623,15 @@
     /// plans, this separate step is required.
     </span><span class="kw">pub fn </span>forward_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">debug_assert!</span>(
-            mmtk.plan.constraints().needs_forward_after_liveness,
+            mmtk.get_plan().constraints().needs_forward_after_liveness,
             <span class="string">&quot;A plan with needs_forward_after_liveness=false does not need a separate forward step&quot;
         </span>);
-        <span class="self">self</span>.soft.forward::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
-        <span class="self">self</span>.weak.forward::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
-        <span class="self">self</span>.phantom.forward::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        <span class="self">self</span>.soft
+            .forward::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
+        <span class="self">self</span>.weak
+            .forward::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
+        <span class="self">self</span>.phantom
+            .forward::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     <span class="comment">// Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft &gt; weak &gt; phantom
@@ -633,18 +640,18 @@
     </span><span class="kw">pub fn </span>scan_soft_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="comment">// For soft refs, it is up to the VM to decide when to reclaim this.
         // If this is not an emergency collection, we have no heap stress. We simply retain soft refs.
-        </span><span class="kw">if </span>!mmtk.plan.is_emergency_collection() {
+        </span><span class="kw">if </span>!mmtk.get_plan().is_emergency_collection() {
             <span class="comment">// This step only retains the referents (keep the referents alive), it does not update its addresses.
             // We will call soft.scan() again with retain=false to update its addresses based on liveness.
-            </span><span class="self">self</span>.soft.retain::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+            </span><span class="self">self</span>.soft.retain::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
         }
         <span class="comment">// This will update the references (and the referents).
-        </span><span class="self">self</span>.soft.scan::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        </span><span class="self">self</span>.soft.scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     <span class="doccomment">/// Scan weak references.
     </span><span class="kw">pub fn </span>scan_weak_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
-        <span class="self">self</span>.weak.scan::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        <span class="self">self</span>.weak.scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
     <span class="doccomment">/// Scan phantom references.
@@ -653,7 +660,8 @@
         trace: <span class="kw-2">&amp;mut </span>E,
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;,
     ) {
-        <span class="self">self</span>.phantom.scan::&lt;E&gt;(trace, is_nursery_gc(<span class="kw-2">&amp;*</span>mmtk.plan));
+        <span class="self">self</span>.phantom
+            .scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
     }
 }
 

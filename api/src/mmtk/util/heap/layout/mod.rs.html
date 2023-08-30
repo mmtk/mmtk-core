@@ -72,12 +72,12 @@
 </span><span class="kw">mod </span>map64;
 
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap&gt; {
+</span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap + Send + Sync&gt; {
     Box::new(map32::Map32::new())
 }
 
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
-</span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap&gt; {
+</span><span class="kw">pub fn </span>create_vm_map() -&gt; Box&lt;<span class="kw">dyn </span>VMMap + Send + Sync&gt; {
     <span class="kw">if </span>!vm_layout().force_use_contiguous_spaces {
         Box::new(map32::Map32::new())
     } <span class="kw">else </span>{
@@ -86,12 +86,12 @@
 }
 
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
-</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper&gt; {
+</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper + Send + Sync&gt; {
     Box::new(byte_map_mmapper::ByteMapMmapper::new())
 }
 
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
-</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper&gt; {
+</span><span class="kw">pub fn </span>create_mmapper() -&gt; Box&lt;<span class="kw">dyn </span>Mmapper + Send + Sync&gt; {
     <span class="comment">// TODO: ByteMapMmapper for 39-bit or less virtual space
     </span>Box::new(fragmented_mapper::FragmentedMapper::new())
 }

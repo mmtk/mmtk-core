@@ -367,7 +367,55 @@
 <a href="#367" id="367">367</a>
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::ops::{Deref, DerefMut};
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::cell::UnsafeCell;
+<span class="kw">use </span>std::ops::{Deref, DerefMut};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::PAGES_IN_CHUNK;
@@ -406,12 +454,19 @@
 }
 
 <span class="kw">pub struct </span>FreeListPageResource&lt;VM: VMBinding&gt; {
-    common: CommonPageResource,
-    common_flpr: Box&lt;CommonFreeListPageResource&gt;,
+    inner: UnsafeCell&lt;FreeListPageResourceInner&gt;,
     sync: Mutex&lt;FreeListPageResourceSync&gt;,
     _p: PhantomData&lt;VM&gt;,
     <span class="doccomment">/// Protect memory on release, and unprotect on re-allocate.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) protect_memory_on_release: bool,
+}
+
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>FreeListPageResource&lt;VM&gt; {}
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>FreeListPageResource&lt;VM&gt; {}
+
+<span class="kw">struct </span>FreeListPageResourceInner {
+    common: CommonPageResource,
+    common_flpr: Box&lt;CommonFreeListPageResource&gt;,
 }
 
 <span class="kw">struct </span>FreeListPageResourceSync {
@@ -423,11 +478,25 @@
     <span class="kw">type </span>Target = CommonFreeListPageResource;
 
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonFreeListPageResource {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.common_flpr
+        <span class="kw-2">&amp;</span><span class="self">self</span>.inner().common_flpr
     }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; DerefMut <span class="kw">for </span>FreeListPageResource&lt;VM&gt; {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonFreeListPageResource {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.inner.get_mut().common_flpr
+    }
+}
+
+<span class="kw">impl </span>Deref <span class="kw">for </span>FreeListPageResourceInner {
+    <span class="kw">type </span>Target = CommonFreeListPageResource;
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonFreeListPageResource {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.common_flpr
+    }
+}
+
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>FreeListPageResourceInner {
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonFreeListPageResource {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.common_flpr
     }
@@ -435,22 +504,23 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; PageResource&lt;VM&gt; <span class="kw">for </span>FreeListPageResource&lt;VM&gt; {
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPageResource {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.common
+        <span class="kw-2">&amp;</span><span class="self">self</span>.inner().common
     }
     <span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPageResource {
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>.common
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.inner.get_mut().common
     }
 
     <span class="kw">fn </span>get_available_physical_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="kw">let </span><span class="kw-2">mut </span>rtn = <span class="self">self</span>.sync.lock().unwrap().pages_currently_on_freelist;
-        <span class="kw">if </span>!<span class="self">self</span>.common.contiguous {
+        <span class="kw">if </span>!<span class="self">self</span>.inner().common.contiguous {
             <span class="kw">let </span>chunks: usize = <span class="self">self
-                </span>.common
+                </span>.inner()
+                .common
                 .vm_map
                 .get_available_discontiguous_chunks()
-                .saturating_sub(<span class="self">self</span>.common.vm_map.get_chunk_consumer_count());
+                .saturating_sub(<span class="self">self</span>.inner().common.vm_map.get_chunk_consumer_count());
             rtn += chunks * PAGES_IN_CHUNK;
-        } <span class="kw">else if </span><span class="self">self</span>.common.growable &amp;&amp; <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        } <span class="kw">else if </span><span class="self">self</span>.inner().common.growable &amp;&amp; <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
             rtn = vm_layout().pages_in_space64() - <span class="self">self</span>.reserved_pages();
         }
 
@@ -465,14 +535,14 @@
         tls: VMThread,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;PRAllocResult, PRAllocFail&gt; {
         <span class="comment">// FIXME: We need a safe implementation
-        </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
+        </span><span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.inner_mut() };
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>new_chunk = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>page_offset = self_mut.free_list.alloc(required_pages <span class="kw">as _</span>);
-        <span class="kw">if </span>page_offset == freelist::FAILURE &amp;&amp; <span class="self">self</span>.common.growable {
-            page_offset =
-                self_mut.allocate_contiguous_chunks(space_descriptor, required_pages, <span class="kw-2">&amp;mut </span>sync);
+        <span class="kw">if </span>page_offset == freelist::FAILURE &amp;&amp; <span class="self">self</span>.inner().common.growable {
+            page_offset = <span class="kw">unsafe </span>{
+                <span class="self">self</span>.allocate_contiguous_chunks(space_descriptor, required_pages, <span class="kw-2">&amp;mut </span>sync)
+            };
             new_chunk = <span class="bool-val">true</span>;
         }
 
@@ -526,15 +596,17 @@
             <span class="comment">// `CommonFreeListPageResource` lives as a member in space instances.
             // Since `Space` instances are always stored as global variables, so it is okay here
             // to turn `&amp;CommonFreeListPageResource` into `&amp;&#39;static CommonFreeListPageResource`
-            </span>vm_map.bind_freelist(<span class="kw">unsafe </span>{
-                <span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>common_flpr <span class="kw">as </span><span class="kw-2">&amp;</span>CommonFreeListPageResource <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>)
-            });
+            </span><span class="kw">unsafe </span>{
+                vm_map.bind_freelist(<span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>common_flpr <span class="kw">as </span><span class="kw-2">&amp;</span>CommonFreeListPageResource <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>));
+            }
             common_flpr
         };
         <span class="kw">let </span>growable = <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>);
         FreeListPageResource {
-            common: CommonPageResource::new(<span class="bool-val">true</span>, growable, vm_map),
-            common_flpr,
+            inner: UnsafeCell::new(FreeListPageResourceInner {
+                common: CommonPageResource::new(<span class="bool-val">true</span>, growable, vm_map),
+                common_flpr,
+            }),
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: <span class="kw">if </span>growable { <span class="number">0 </span>} <span class="kw">else </span>{ pages },
                 highwater_mark: UNINITIALIZED_WATER_MARK,
@@ -554,14 +626,16 @@
             <span class="comment">// `CommonFreeListPageResource` lives as a member in space instances.
             // Since `Space` instances are always stored as global variables, so it is okay here
             // to turn `&amp;CommonFreeListPageResource` into `&amp;&#39;static CommonFreeListPageResource`
-            </span>vm_map.bind_freelist(<span class="kw">unsafe </span>{
-                <span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>common_flpr <span class="kw">as </span><span class="kw-2">&amp;</span>CommonFreeListPageResource <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>)
-            });
+            </span><span class="kw">unsafe </span>{
+                vm_map.bind_freelist(<span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>common_flpr <span class="kw">as </span><span class="kw-2">&amp;</span>CommonFreeListPageResource <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>));
+            }
             common_flpr
         };
         FreeListPageResource {
-            common: CommonPageResource::new(<span class="bool-val">false</span>, <span class="bool-val">true</span>, vm_map),
-            common_flpr,
+            inner: UnsafeCell::new(FreeListPageResourceInner {
+                common: CommonPageResource::new(<span class="bool-val">false</span>, <span class="bool-val">true</span>, vm_map),
+                common_flpr,
+            }),
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: <span class="number">0</span>,
                 highwater_mark: UNINITIALIZED_WATER_MARK,
@@ -569,6 +643,14 @@
             _p: PhantomData,
             protect_memory_on_release: <span class="bool-val">false</span>,
         }
+    }
+
+    <span class="kw">fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>FreeListPageResourceInner {
+        <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span><span class="self">self</span>.inner.get() }
+    }
+    <span class="attr">#[allow(clippy::mut_from_ref)]
+    </span><span class="kw">unsafe fn </span>inner_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>FreeListPageResourceInner {
+        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.inner.get()
     }
 
     <span class="doccomment">/// Protect the memory
@@ -605,13 +687,11 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         space_descriptor: SpaceDescriptor,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;PRAllocResult, PRAllocFail&gt; {
-        <span class="macro">assert!</span>(<span class="self">self</span>.common.growable);
+        <span class="macro">assert!</span>(<span class="self">self</span>.inner().common.growable);
         <span class="comment">// FIXME: We need a safe implementation
-        </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>= <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
-        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
+        </span><span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">let </span>page_offset =
-            self_mut.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, <span class="kw-2">&amp;mut </span>sync);
+            <span class="kw">unsafe </span>{ <span class="self">self</span>.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, <span class="kw-2">&amp;mut </span>sync) };
 
         <span class="kw">if </span>page_offset == freelist::FAILURE {
             <span class="kw">return </span>Result::Err(PRAllocFail);
@@ -630,8 +710,8 @@
         })
     }
 
-    <span class="kw">fn </span>allocate_contiguous_chunks(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+    <span class="kw">unsafe fn </span>allocate_contiguous_chunks(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         space_descriptor: SpaceDescriptor,
         pages: usize,
         sync: <span class="kw-2">&amp;mut </span>MutexGuard&lt;FreeListPageResourceSync&gt;,
@@ -639,36 +719,45 @@
         <span class="kw">let </span><span class="kw-2">mut </span>rtn = freelist::FAILURE;
         <span class="kw">let </span>required_chunks = <span class="kw">crate</span>::policy::space::required_chunks(pages);
         <span class="kw">let </span>region = <span class="self">self
-            </span>.common
+            </span>.inner()
+            .common
             .grow_discontiguous_space(space_descriptor, required_chunks);
 
         <span class="kw">if </span>!region.is_zero() {
             <span class="kw">let </span>region_start = conversions::bytes_to_pages(region - <span class="self">self</span>.start);
             <span class="kw">let </span>region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - <span class="number">1</span>;
-            <span class="self">self</span>.free_list.set_uncoalescable(region_start <span class="kw">as _</span>);
-            <span class="self">self</span>.free_list.set_uncoalescable(region_end <span class="kw">as </span>i32 + <span class="number">1</span>);
+            <span class="self">self</span>.inner_mut()
+                .free_list
+                .set_uncoalescable(region_start <span class="kw">as _</span>);
+            <span class="self">self</span>.inner_mut()
+                .free_list
+                .set_uncoalescable(region_end <span class="kw">as </span>i32 + <span class="number">1</span>);
             <span class="kw">for </span>p <span class="kw">in </span>(region_start..region_end).step_by(PAGES_IN_CHUNK) {
                 <span class="kw">if </span>p != region_start {
-                    <span class="self">self</span>.free_list.clear_uncoalescable(p <span class="kw">as _</span>);
+                    <span class="self">self</span>.inner_mut().free_list.clear_uncoalescable(p <span class="kw">as _</span>);
                 }
-                <span class="kw">let </span>liberated = <span class="self">self</span>.free_list.free(p <span class="kw">as _</span>, <span class="bool-val">true</span>); <span class="comment">// add chunk to our free list
+                <span class="kw">let </span>liberated = <span class="self">self</span>.inner_mut().free_list.free(p <span class="kw">as _</span>, <span class="bool-val">true</span>); <span class="comment">// add chunk to our free list
                 </span><span class="macro">debug_assert!</span>(liberated <span class="kw">as </span>usize == PAGES_IN_CHUNK + (p - region_start));
                 sync.pages_currently_on_freelist += PAGES_IN_CHUNK;
             }
-            rtn = <span class="self">self</span>.free_list.alloc(pages <span class="kw">as _</span>); <span class="comment">// re-do the request which triggered this call
+            rtn = <span class="self">self</span>.inner_mut().free_list.alloc(pages <span class="kw">as _</span>); <span class="comment">// re-do the request which triggered this call
         </span>}
+
         rtn
     }
 
-    <span class="kw">fn </span>free_contiguous_chunk(<span class="kw-2">&amp;mut </span><span class="self">self</span>, chunk: Address, sync: <span class="kw-2">&amp;mut </span>FreeListPageResourceSync) {
+    <span class="kw">unsafe fn </span>free_contiguous_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Address, sync: <span class="kw-2">&amp;mut </span>FreeListPageResourceSync) {
         <span class="kw">let </span>num_chunks = <span class="self">self</span>.vm_map().get_contiguous_region_chunks(chunk);
         <span class="comment">/* nail down all pages associated with the chunk, so it is no longer on our free list */
         </span><span class="kw">let </span><span class="kw-2">mut </span>chunk_start = conversions::bytes_to_pages(chunk - <span class="self">self</span>.start);
         <span class="kw">let </span>chunk_end = chunk_start + (num_chunks * PAGES_IN_CHUNK);
         <span class="kw">while </span>chunk_start &lt; chunk_end {
-            <span class="self">self</span>.free_list.set_uncoalescable(chunk_start <span class="kw">as _</span>);
+            <span class="self">self</span>.inner_mut()
+                .free_list
+                .set_uncoalescable(chunk_start <span class="kw">as _</span>);
             <span class="kw">let </span>tmp = <span class="self">self
-                </span>.free_list
+                </span>.inner_mut()
+                .free_list
                 .alloc_from_unit(PAGES_IN_CHUNK <span class="kw">as _</span>, chunk_start <span class="kw">as _</span>)
                 <span class="kw">as </span>usize; <span class="comment">// then alloc the entire chunk
             </span><span class="macro">debug_assert!</span>(tmp == chunk_start);
@@ -676,7 +765,8 @@
             sync.pages_currently_on_freelist -= PAGES_IN_CHUNK;
         }
         <span class="comment">/* now return the address space associated with the chunk for global reuse */
-        </span><span class="self">self</span>.common.release_discontiguous_chunks(chunk);
+
+        </span><span class="self">self</span>.inner_mut().common.release_discontiguous_chunks(chunk);
     }
 
     <span class="kw">pub fn </span>release_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, first: Address) {
@@ -685,27 +775,26 @@
         <span class="kw">let </span>pages = <span class="self">self</span>.free_list.size(page_offset <span class="kw">as _</span>);
         <span class="comment">// if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
-        </span><span class="macro">debug_assert!</span>(pages <span class="kw">as </span>usize &lt;= <span class="self">self</span>.common.accounting.get_committed_pages());
+        </span><span class="macro">debug_assert!</span>(pages <span class="kw">as </span>usize &lt;= <span class="self">self</span>.inner().common.accounting.get_committed_pages());
 
         <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release {
             <span class="self">self</span>.mprotect(first, pages <span class="kw">as _</span>);
         }
 
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        <span class="comment">// FIXME
-        </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
-        </span><span class="kw">let </span>me = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="self">Self</span>) };
-        <span class="self">self</span>.common.accounting.release(pages <span class="kw">as _</span>);
+        <span class="comment">// FIXME: We need a safe implementation
+        </span><span class="kw">let </span>me = <span class="kw">unsafe </span>{ <span class="self">self</span>.inner_mut() };
+        <span class="self">self</span>.inner().common.accounting.release(pages <span class="kw">as _</span>);
         <span class="kw">let </span>freed = me.free_list.free(page_offset <span class="kw">as _</span>, <span class="bool-val">true</span>);
         sync.pages_currently_on_freelist += pages <span class="kw">as </span>usize;
-        <span class="kw">if </span>!<span class="self">self</span>.common.contiguous {
+        <span class="kw">if </span>!<span class="self">self</span>.inner().common.contiguous {
             <span class="comment">// only discontiguous spaces use chunks
-            </span>me.release_free_chunks(first, freed <span class="kw">as _</span>, <span class="kw-2">&amp;mut </span>sync);
+            </span><span class="self">self</span>.release_free_chunks(first, freed <span class="kw">as _</span>, <span class="kw-2">&amp;mut </span>sync);
         }
     }
 
     <span class="kw">fn </span>release_free_chunks(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         freed_page: Address,
         pages_freed: usize,
         sync: <span class="kw-2">&amp;mut </span>FreeListPageResourceSync,
@@ -731,7 +820,12 @@
             <span class="macro">debug_assert!</span>(next_region_start &lt; freelist::MAX_UNITS <span class="kw">as </span>usize);
             <span class="kw">if </span>pages_freed == next_region_start - region_start {
                 <span class="kw">let </span>start = <span class="self">self</span>.start;
-                <span class="self">self</span>.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start), sync);
+                <span class="kw">unsafe </span>{
+                    <span class="self">self</span>.free_contiguous_chunk(
+                        start + conversions::pages_to_bytes(region_start),
+                        sync,
+                    );
+                }
             }
         }
     }

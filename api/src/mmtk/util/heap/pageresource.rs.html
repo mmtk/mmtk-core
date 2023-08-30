@@ -182,6 +182,10 @@
 <a href="#182" id="182">182</a>
 <a href="#183" id="183">183</a>
 <a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -332,11 +336,13 @@
     ) -&gt; Address {
         <span class="kw">let </span><span class="kw-2">mut </span>head_discontiguous_region = <span class="self">self</span>.head_discontiguous_region.lock().unwrap();
 
-        <span class="kw">let </span>new_head: Address = <span class="self">self</span>.vm_map.allocate_contiguous_chunks(
-            space_descriptor,
-            chunks,
-            <span class="kw-2">*</span>head_discontiguous_region,
-        );
+        <span class="kw">let </span>new_head: Address = <span class="kw">unsafe </span>{
+            <span class="self">self</span>.vm_map.allocate_contiguous_chunks(
+                space_descriptor,
+                chunks,
+                <span class="kw-2">*</span>head_discontiguous_region,
+            )
+        };
         <span class="kw">if </span>new_head.is_zero() {
             <span class="kw">return </span>Address::ZERO;
         }
@@ -353,7 +359,9 @@
         <span class="kw">if </span>chunk == <span class="kw-2">*</span>head_discontiguous_region {
             <span class="kw-2">*</span>head_discontiguous_region = <span class="self">self</span>.vm_map.get_next_contiguous_region(chunk);
         }
-        <span class="self">self</span>.vm_map.free_contiguous_chunks(chunk);
+        <span class="kw">unsafe </span>{
+            <span class="self">self</span>.vm_map.free_contiguous_chunks(chunk);
+        }
     }
 
     <span class="kw">pub fn </span>release_all_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) {

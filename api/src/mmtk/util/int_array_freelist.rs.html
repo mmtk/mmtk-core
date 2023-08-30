@@ -383,17 +383,19 @@
 <a href="#383" id="383">383</a>
 <a href="#384" id="384">384</a>
 <a href="#385" id="385">385</a>
-<a href="#386" id="386">386</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::freelist::<span class="kw-2">*</span>;
-<span class="kw">use </span>std::mem;
+<span class="kw">use </span>std::{mem, ptr::NonNull};
 
 <span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>IntArrayFreeList {
     <span class="kw">pub </span>head: i32,
     <span class="kw">pub </span>heads: i32,
     <span class="kw">pub </span>table: <span class="prelude-ty">Option</span>&lt;Vec&lt;i32&gt;&gt;,
-    parent: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IntArrayFreeList&gt;,
+    parent: <span class="prelude-ty">Option</span>&lt;NonNull&lt;IntArrayFreeList&gt;&gt;,
 }
+
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>IntArrayFreeList {}
+<span class="kw">unsafe impl </span>Sync <span class="kw">for </span>IntArrayFreeList {}
 
 <span class="kw">impl </span>FreeList <span class="kw">for </span>IntArrayFreeList {
     <span class="kw">fn </span>head(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i32 {
@@ -439,20 +441,16 @@
     </span>}
     <span class="kw">fn </span>table(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Vec&lt;i32&gt; {
         <span class="kw">match </span><span class="self">self</span>.parent {
-            <span class="prelude-val">Some</span>(p) =&gt; p.table(),
+            <span class="prelude-val">Some</span>(p) =&gt; <span class="kw">unsafe </span>{ p.as_ref().table() },
             <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.table.as_ref().unwrap(),
         }
     }
 
     <span class="comment">// FIXME: We need a safe implementation
-    </span><span class="attr">#[allow(clippy::cast_ref_to_mut)]
+
     </span><span class="kw">fn </span>table_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Vec&lt;i32&gt; {
         <span class="kw">match </span><span class="self">self</span>.parent {
-            <span class="prelude-val">Some</span>(p) =&gt; {
-                <span class="kw">let </span>parent_mut: <span class="kw-2">&amp;mut </span><span class="self">Self </span>=
-                    <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(p <span class="kw">as </span><span class="kw-2">*const </span>IntArrayFreeList <span class="kw">as </span><span class="kw-2">*mut </span>IntArrayFreeList) };
-                parent_mut.table_mut()
-            }
+            <span class="prelude-val">Some</span>(<span class="kw-2">mut </span>p) =&gt; <span class="kw">unsafe </span>{ p.as_mut().table_mut() },
             <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.table.as_mut().unwrap(),
         }
     }
