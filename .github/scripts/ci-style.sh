@@ -1,6 +1,6 @@
 . $(dirname "$0")/ci-common.sh
 
-export RUSTFLAGS="-D warnings"
+export RUSTFLAGS="-D warnings -A unknown-lints"
 
 # --- Check main crate ---
 

@@ -198,7 +198,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
             if Block::containing::<VM>(object).is_defrag_source() {
                 debug_assert!(self.in_defrag());
                 debug_assert!(
-                    !crate::plan::is_nursery_gc(&*worker.mmtk.plan),
+                    !crate::plan::is_nursery_gc(worker.mmtk.get_plan()),
                     "Calling PolicyTraceObject on Immix in nursery GC"
                 );
                 self.trace_object_with_opportunistic_copy(

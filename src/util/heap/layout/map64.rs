@@ -10,11 +10,16 @@ use crate::util::memory::MmapStrategy;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
+use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
 
 pub struct Map64 {
+    inner: UnsafeCell<Map64Inner>,
+}
+
+struct Map64Inner {
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
@@ -26,6 +31,9 @@ pub struct Map64 {
     // references to vm_map - so it is convenient to put it here.
     cumulative_committed_pages: AtomicUsize,
 }
+
+unsafe impl Send for Map64 {}
+unsafe impl Sync for Map64 {}
 
 impl Map64 {
     pub fn new() -> Self {
@@ -39,16 +47,18 @@ impl Map64 {
         }
 
         Self {
-            // Note: descriptor_map is very large. Although it is initialized to
-            // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
-            // elide the storing of 0 for each of the element.  Using standard vector creation,
-            // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
-            // slowdown during start-up.
-            descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks()) },
-            high_water,
-            base_address,
-            finalized: false,
-            cumulative_committed_pages: AtomicUsize::new(0),
+            inner: UnsafeCell::new(Map64Inner {
+                // Note: descriptor_map is very large. Although it is initialized to
+                // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
+                // elide the storing of 0 for each of the element.  Using standard vector creation,
+                // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
+                // slowdown during start-up.
+                descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks()) },
+                high_water,
+                base_address,
+                finalized: false,
+                cumulative_committed_pages: AtomicUsize::new(0),
+            }),
         }
     }
 }
@@ -110,7 +120,10 @@ impl VMMap for Map64 {
         }
     }
 
-    fn allocate_contiguous_chunks(
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    unsafe fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -120,10 +133,10 @@ impl VMMap for Map64 {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
-        let self_mut = unsafe { self.mut_self() };
+        let self_mut = self.mut_self();
 
         let index = descriptor.get_index();
-        let rtn = self.high_water[index];
+        let rtn = self.inner().high_water[index];
         let extent = chunks << LOG_BYTES_IN_CHUNK;
         self_mut.high_water[index] = rtn + extent;
 
@@ -132,7 +145,7 @@ impl VMMap for Map64 {
         // Map64 currently knows too much about spaces!
         if let Some(free_list) = maybe_raw_memory_freelist {
             free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
-            let base_page = conversions::bytes_to_pages(rtn - self.base_address[index]);
+            let base_page = conversions::bytes_to_pages(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
                 free_list.set_uncoalescable((base_page + offset) as _);
                 /* The 32-bit implementation requires that pages are returned allocated to the caller */
@@ -166,7 +179,7 @@ impl VMMap for Map64 {
         unreachable!()
     }
 
-    fn free_contiguous_chunks(&self, _start: Address) -> usize {
+    unsafe fn free_contiguous_chunks(&self, _start: Address) -> usize {
         unreachable!()
     }
 
@@ -179,16 +192,17 @@ impl VMMap for Map64 {
     }
 
     fn is_finalized(&self) -> bool {
-        self.finalized
+        self.inner().finalized
     }
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = Self::space_index(address).unwrap();
-        self.descriptor_map[index]
+        self.inner().descriptor_map[index]
     }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize) {
-        self.cumulative_committed_pages
+        self.inner()
+            .cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
 }
@@ -199,10 +213,13 @@ impl Map64 {
     /// The caller needs to guarantee there is no race condition. Either only one single thread
     /// is using this method, or multiple threads are accessing mutally exclusive data (e.g. different indices in arrays).
     /// In other cases, use mut_self_with_sync().
-    #[allow(clippy::cast_ref_to_mut)]
     #[allow(clippy::mut_from_ref)]
-    unsafe fn mut_self(&self) -> &mut Self {
-        &mut *(self as *const _ as *mut _)
+    unsafe fn mut_self(&self) -> &mut Map64Inner {
+        &mut *self.inner.get()
+    }
+
+    fn inner(&self) -> &Map64Inner {
+        unsafe { &*self.inner.get() }
     }
 
     fn space_index(addr: Address) -> Option<usize> {

@@ -286,22 +286,22 @@ impl MemBalancerStats {
 
     fn non_generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.allocation_pages = mmtk
-            .plan
+            .get_plan()
             .get_reserved_pages()
             .saturating_sub(self.gc_end_live_pages) as f64;
         trace!(
             "allocated pages = used {} - live in last gc {} = {}",
-            mmtk.plan.get_reserved_pages(),
+            mmtk.get_plan().get_reserved_pages(),
             self.gc_end_live_pages,
             self.allocation_pages
         );
     }
     fn non_generational_mem_stats_on_gc_release<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
-        self.gc_release_live_pages = mmtk.plan.get_reserved_pages();
+        self.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live before release = {}", self.gc_release_live_pages);
     }
     fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
-        self.gc_end_live_pages = mmtk.plan.get_reserved_pages();
+        self.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live pages = {}", self.gc_end_live_pages);
         self.collection_pages = self
             .gc_release_live_pages
@@ -331,7 +331,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 stats.allocation_time
             );
 
-            if let Some(plan) = mmtk.plan.generational() {
+            if let Some(plan) = mmtk.get_plan().generational() {
                 stats.generational_mem_stats_on_gc_start(plan);
             } else {
                 stats.non_generational_mem_stats_on_gc_start(mmtk);
@@ -342,7 +342,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
     fn on_gc_release(&self, mmtk: &'static MMTK<VM>) {
         trace!("=== on_gc_release ===");
         self.access_stats(|stats| {
-            if let Some(plan) = mmtk.plan.generational() {
+            if let Some(plan) = mmtk.get_plan().generational() {
                 stats.generational_mem_stats_on_gc_release(plan);
             } else {
                 stats.non_generational_mem_stats_on_gc_release(mmtk);
@@ -361,13 +361,13 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 stats.collection_time
             );
 
-            if let Some(plan) = mmtk.plan.generational() {
+            if let Some(plan) = mmtk.get_plan().generational() {
                 if stats.generational_mem_stats_on_gc_end(plan) {
                     self.compute_new_heap_limit(
-                        mmtk.plan.get_reserved_pages(),
+                        mmtk.get_plan().get_reserved_pages(),
                         // We reserve an extra of min nursery. This ensures that we will not trigger
                         // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
-                        mmtk.plan.get_collection_reserved_pages()
+                        mmtk.get_plan().get_collection_reserved_pages()
                             + mmtk.options.get_min_nursery_pages(),
                         stats,
                     );
@@ -375,8 +375,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
             } else {
                 stats.non_generational_mem_stats_on_gc_end(mmtk);
                 self.compute_new_heap_limit(
-                    mmtk.plan.get_reserved_pages(),
-                    mmtk.plan.get_collection_reserved_pages(),
+                    mmtk.get_plan().get_reserved_pages(),
+                    mmtk.get_plan().get_collection_reserved_pages(),
                     stats,
                 );
             }

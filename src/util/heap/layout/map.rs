@@ -25,7 +25,10 @@ pub trait VMMap: Sync {
     fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
         -> CreateFreeListResult;
 
-    fn allocate_contiguous_chunks(
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    unsafe fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
@@ -49,7 +52,10 @@ pub trait VMMap: Sync {
 
     fn free_all_chunks(&self, any_chunk: Address);
 
-    fn free_contiguous_chunks(&self, start: Address) -> usize;
+    /// # Safety
+    ///
+    /// Caller must ensure that only one thread is calling this method.
+    unsafe fn free_contiguous_chunks(&self, start: Address) -> usize;
 
     fn finalize_static_space_map(
         &self,

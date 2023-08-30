@@ -16,12 +16,12 @@ mod map32;
 mod map64;
 
 #[cfg(target_pointer_width = "32")]
-pub fn create_vm_map() -> Box<dyn VMMap> {
+pub fn create_vm_map() -> Box<dyn VMMap + Send + Sync> {
     Box::new(map32::Map32::new())
 }
 
 #[cfg(target_pointer_width = "64")]
-pub fn create_vm_map() -> Box<dyn VMMap> {
+pub fn create_vm_map() -> Box<dyn VMMap + Send + Sync> {
     if !vm_layout().force_use_contiguous_spaces {
         Box::new(map32::Map32::new())
     } else {
@@ -30,12 +30,12 @@ pub fn create_vm_map() -> Box<dyn VMMap> {
 }
 
 #[cfg(target_pointer_width = "32")]
-pub fn create_mmapper() -> Box<dyn Mmapper> {
+pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
     Box::new(byte_map_mmapper::ByteMapMmapper::new())
 }
 
 #[cfg(target_pointer_width = "64")]
-pub fn create_mmapper() -> Box<dyn Mmapper> {
+pub fn create_mmapper() -> Box<dyn Mmapper + Send + Sync> {
     // TODO: ByteMapMmapper for 39-bit or less virtual space
     Box::new(fragmented_mapper::FragmentedMapper::new())
 }
