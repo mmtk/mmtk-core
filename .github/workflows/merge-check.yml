@@ -1,0 +1,26 @@
+name: Merge Check
+on:
+  merge_group:
+    branches:
+      - master
+
+jobs:
+  ready-to-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Wait for status checks'
+        id: waitforstatuschecks
+        timeout-minutes: 120
+        uses: "WyriHaximus/github-action-wait-for-status@v1.7.0"
+        with:
+          # Ignore some actions (based on what merge_group triggers):
+          # - this action
+          # - pre code review checks for stable Rust (we allow them to fail)
+          ignoreActions: "ready-to-merge,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable"
+          # This action uses API. We have a quota of 1000 per day.
+          # We normally run tests within 1 hours (excluding binding tests).
+          # If we check every 10 mins, we use roughly 6 API calls per trigger.
+          # We can handle ~160 triggers.
+          checkInterval: 600
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
