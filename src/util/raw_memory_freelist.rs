@@ -67,10 +67,6 @@ impl FreeList for RawMemoryFreeList {
         unsafe { (self.base + offset).store(value) }
     }
 
-    fn maybe_get_limit(&self) -> Option<Address> {
-        Some(self.get_limit())
-    }
-
     fn alloc(&mut self, size: i32) -> i32 {
         if self.current_units == 0 {
             return FAILURE;

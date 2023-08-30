@@ -1,7 +1,5 @@
 use downcast_rs::{impl_downcast, Downcast};
 
-use super::Address;
-
 pub const FAILURE: i32 = -1;
 
 pub const MAX_HEADS: i32 = 128; // somewhat arbitrary
@@ -30,10 +28,6 @@ pub trait FreeList: Sync + Send + Downcast {
     // fn resize_freelist(&mut self, units: i32, heads: i32);
     fn get_entry(&self, index: i32) -> i32;
     fn set_entry(&mut self, index: i32, value: i32);
-
-    // Workaround space start calculation.
-    // TODO: This is a hack, and is unlikely to be the final solution.
-    fn maybe_get_limit(&self) -> Option<Address>;
 
     fn alloc(&mut self, size: i32) -> i32 {
         let mut unit = self.head();

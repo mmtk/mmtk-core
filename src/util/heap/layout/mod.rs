@@ -9,6 +9,7 @@ mod fragmented_mapper;
 
 mod map;
 pub use self::map::VMMap;
+pub(crate) use self::map::CreateFreeListResult;
 use self::vm_layout::vm_layout;
 mod map32;
 #[cfg(target_pointer_width = "64")]

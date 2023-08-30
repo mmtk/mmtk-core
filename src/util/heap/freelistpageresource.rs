@@ -11,6 +11,7 @@ use crate::util::conversions;
 use crate::util::freelist;
 use crate::util::freelist::FreeList;
 use crate::util::heap::layout::vm_layout::*;
+use crate::util::heap::layout::CreateFreeListResult;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory;
@@ -142,13 +143,18 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         debug!("new_contiguous({start}, {bytes})");
         let pages = conversions::bytes_to_pages(bytes);
-        let free_list = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
-        let maybe_limit = free_list.maybe_get_limit();
-        let actual_start = maybe_limit.map_or(start, |limit| conversions::chunk_align_up(limit));
+        let CreateFreeListResult {
+            free_list,
+            space_displacement,
+        } = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
+
+        // If it is RawMemoryFreeList, it will occupy `space_displacement` bytes at the start of
+        // the space.  We displace the start address.
+        let actual_start = start + space_displacement;
 
         debug!(
-            "  in new_contiguous: maybe_limit = {:?}, actual_start = {}",
-            maybe_limit, actual_start
+            "  in new_contiguous: space_displacement = {:?}, actual_start = {}",
+            space_displacement, actual_start
         );
 
         let growable = cfg!(target_pointer_width = "64");
@@ -171,8 +177,16 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             "We shouldn't use discontiguous spaces on 64-bit system"
         );
         let start = vm_layout().available_start();
-        let free_list = vm_map.create_freelist(start);
+        let CreateFreeListResult {
+            free_list,
+            space_displacement,
+        } = vm_map.create_freelist(start);
+
+        // Discontiguous free list page resources are only used on 32-bit machines, where
+        // IntArrayFreeList is used exclusively.  It does not have space displacement.
+        debug_assert_eq!(space_displacement, 0);
         debug!("new_discontiguous. start: {start})");
+
         FreeListPageResource {
             common: CommonPageResource::new(false, true, vm_map),
             sync: Mutex::new(FreeListPageResourceSync {

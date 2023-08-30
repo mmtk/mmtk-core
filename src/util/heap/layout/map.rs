@@ -3,15 +3,27 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 
+/// The result of creating free lists
+pub struct CreateFreeListResult {
+    // The created free list.
+    pub free_list: Box<dyn FreeList>,
+    // Some free lists (notably `RawMemoryFreeList`) will occupy a portion of the space at the
+    // start of the space. `space_displacement` is the number of bytes (aligned up to chunk) that
+    // the free list occupies.  The actual starting address of the space should be displaced by
+    // this amount.  If the free list does not occupy address space of the `Space`, this field will
+    // be zero.
+    pub space_displacement: usize,
+}
+
 pub trait VMMap: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
-    fn create_freelist(&self, start: Address) -> Box<dyn FreeList>;
+    fn create_freelist(&self, start: Address) -> CreateFreeListResult;
 
     /// Create a free-list for a contiguous space. Must only be called at boot time.
     fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
-        -> Box<dyn FreeList>;
+        -> CreateFreeListResult;
 
     fn allocate_contiguous_chunks(
         &self,
