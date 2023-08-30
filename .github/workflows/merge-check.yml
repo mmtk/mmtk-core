@@ -19,11 +19,9 @@ jobs:
           # Ignore some actions (based on what merge_group triggers):
           # - this action
           # - pre code review checks for stable Rust (we allow them to fail)
-          ignoreActions: "ready-to-merge,check-public-api-changes,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable"
-          # This action uses API. We have a quota of 1000 per day.
-          # We normally run tests within 1 hours (excluding binding tests).
-          # If we check every 10 mins, we use roughly 6 API calls per trigger.
-          # We can handle ~160 triggers.
+          # - binding tests (it may take long to run)
+          ignoreActions: "ready-to-merge,check-public-api-changes,pre-code-review-checks/x86_64-unknown-linux-gnu/stable,pre-code-review-checks/i686-unknown-linux-gnu/stable,pre-code-review-checks/x86_64-apple-darwin/stable,v8-binding-test,openjdk-binding-test,jikesrvm-binding-test,julia-binding-test,ruby-binding-test"
+          # This action uses API. We have a quota of 1000 per hour.
           checkInterval: 600
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
