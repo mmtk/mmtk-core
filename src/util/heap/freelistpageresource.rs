@@ -21,16 +21,22 @@ use std::marker::PhantomData;
 
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 
-pub struct CommonFreeListPageResource {
+pub struct FreeListPageResource<VM: VMBinding> {
+    common: CommonPageResource,
+    sync: Mutex<FreeListPageResourceSync>,
+    _p: PhantomData<VM>,
+    /// Protect memory on release, and unprotect on re-allocate.
+    pub(crate) protect_memory_on_release: bool,
+}
+
+struct FreeListPageResourceSync {
+    pages_currently_on_freelist: usize,
+    highwater_mark: i32,
     pub(crate) free_list: Box<dyn FreeList>,
     start: Address,
 }
 
-impl CommonFreeListPageResource {
-    pub fn get_start(&self) -> Address {
-        self.start
-    }
-
+impl FreeListPageResourceSync {
     pub fn resize_freelist(&mut self, start_address: Address) {
         if cfg!(target_pointer_width = "64") {
             // Hack.  We'll probably revamp the space initialization process,
@@ -48,20 +54,6 @@ impl CommonFreeListPageResource {
     }
 }
 
-pub struct FreeListPageResource<VM: VMBinding> {
-    common: CommonPageResource,
-    sync: Mutex<FreeListPageResourceSync>,
-    _p: PhantomData<VM>,
-    /// Protect memory on release, and unprotect on re-allocate.
-    pub(crate) protect_memory_on_release: bool,
-}
-
-struct FreeListPageResourceSync {
-    pages_currently_on_freelist: usize,
-    highwater_mark: i32,
-    common_flpr: CommonFreeListPageResource,
-}
-
 impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     fn common(&self) -> &CommonPageResource {
         &self.common
@@ -72,7 +64,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     fn update_discontiguous_start(&mut self, start: Address) {
         // Note: since we have a `&mut self`, we must have exclusive access to self.
         // So We don't need to hold the lock.
-        self.sync.get_mut().unwrap().common_flpr.start = start;
+        self.sync.get_mut().unwrap().start = start;
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -100,7 +92,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     ) -> Result<PRAllocResult, PRAllocFail> {
         let mut sync = self.sync.lock().unwrap();
         let mut new_chunk = false;
-        let mut page_offset = sync.common_flpr.free_list.alloc(required_pages as _);
+        let mut page_offset = sync.free_list.alloc(required_pages as _);
         if page_offset == freelist::FAILURE && self.common.growable {
             page_offset =
                 self.allocate_contiguous_chunks(space_descriptor, required_pages, &mut sync);
@@ -121,7 +113,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             }
         }
 
-        let rtn = sync.common_flpr.start + conversions::pages_to_bytes(page_offset as _);
+        let rtn = sync.start + conversions::pages_to_bytes(page_offset as _);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
         if self.protect_memory_on_release && !new_chunk {
@@ -136,7 +128,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             // in Space.acquire(). We can either move it the option of 'protect_on_release' to space, or have a call to page resource
             // after ensure_mapped(). However, I think this is sufficient given that this option is only used for PageProtect for debugging use.
             while !MMAPPER.is_mapped_address(rtn) {}
-            self.munprotect(rtn, sync.common_flpr.free_list.size(page_offset as _) as _)
+            self.munprotect(rtn, sync.free_list.size(page_offset as _) as _)
         };
         Result::Ok(PRAllocResult {
             start: rtn,
@@ -150,28 +142,23 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         debug!("new_contiguous({start}, {bytes})");
         let pages = conversions::bytes_to_pages(bytes);
-        let common_flpr = {
-            let free_list = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
-            let maybe_limit = free_list.maybe_get_limit();
-            let actual_start =
-                maybe_limit.map_or(start, |limit| conversions::chunk_align_up(limit));
-            debug!(
-                "  in new_contiguous: maybe_limit = {:?}, actual_start = {}",
-                maybe_limit, actual_start
-            );
-            let common_flpr = CommonFreeListPageResource {
-                free_list,
-                start: actual_start,
-            };
-            common_flpr
-        };
+        let free_list = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
+        let maybe_limit = free_list.maybe_get_limit();
+        let actual_start = maybe_limit.map_or(start, |limit| conversions::chunk_align_up(limit));
+
+        debug!(
+            "  in new_contiguous: maybe_limit = {:?}, actual_start = {}",
+            maybe_limit, actual_start
+        );
+
         let growable = cfg!(target_pointer_width = "64");
         FreeListPageResource {
             common: CommonPageResource::new(true, growable, vm_map),
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: if growable { 0 } else { pages },
                 highwater_mark: UNINITIALIZED_WATER_MARK,
-                common_flpr,
+                free_list,
+                start: actual_start,
             }),
             _p: PhantomData,
             protect_memory_on_release: false,
@@ -183,22 +170,16 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             !cfg!(target_pointer_width = "64"),
             "We shouldn't use discontiguous spaces on 64-bit system"
         );
-
-        let common_flpr = {
-            let start = vm_layout().available_start();
-            debug!("new_discontiguous. start: {start})");
-            let common_flpr = CommonFreeListPageResource {
-                free_list: vm_map.create_freelist(start),
-                start,
-            };
-            common_flpr
-        };
+        let start = vm_layout().available_start();
+        let free_list = vm_map.create_freelist(start);
+        debug!("new_discontiguous. start: {start})");
         FreeListPageResource {
             common: CommonPageResource::new(false, true, vm_map),
             sync: Mutex::new(FreeListPageResourceSync {
                 pages_currently_on_freelist: 0,
                 highwater_mark: UNINITIALIZED_WATER_MARK,
-                common_flpr,
+                free_list,
+                start,
             }),
             _p: PhantomData,
             protect_memory_on_release: false,
@@ -253,7 +234,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             }
         }
 
-        let rtn = sync.common_flpr.start + conversions::pages_to_bytes(page_offset as _);
+        let rtn = sync.start + conversions::pages_to_bytes(page_offset as _);
         Result::Ok(PRAllocResult {
             start: rtn,
             pages: PAGES_IN_CHUNK,
@@ -270,33 +251,31 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         let mut rtn = freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
         let region = {
-            let maybe_raw_memory_freelist = sync.common_flpr.free_list.downcast_mut::<RawMemoryFreeList>();
-            self
-            .common
-            .grow_discontiguous_space(space_descriptor, required_chunks, maybe_raw_memory_freelist)
+            let maybe_raw_memory_freelist = sync.free_list.downcast_mut::<RawMemoryFreeList>();
+            self.common.grow_discontiguous_space(
+                space_descriptor,
+                required_chunks,
+                maybe_raw_memory_freelist,
+            )
         };
 
         if !region.is_zero() {
             dbg!(region);
-            dbg!(sync.common_flpr.start);
-            let region_start = conversions::bytes_to_pages(region - sync.common_flpr.start);
+            dbg!(sync.start);
+            let region_start = conversions::bytes_to_pages(region - sync.start);
             dbg!(region_start);
             let region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - 1;
-            sync.common_flpr
-                .free_list
-                .set_uncoalescable(region_start as _);
-            sync.common_flpr
-                .free_list
-                .set_uncoalescable(region_end as i32 + 1);
+            sync.free_list.set_uncoalescable(region_start as _);
+            sync.free_list.set_uncoalescable(region_end as i32 + 1);
             for p in (region_start..region_end).step_by(PAGES_IN_CHUNK) {
                 if p != region_start {
-                    sync.common_flpr.free_list.clear_uncoalescable(p as _);
+                    sync.free_list.clear_uncoalescable(p as _);
                 }
-                let liberated = sync.common_flpr.free_list.free(p as _, true); // add chunk to our free list
+                let liberated = sync.free_list.free(p as _, true); // add chunk to our free list
                 debug_assert_eq!(liberated as usize, PAGES_IN_CHUNK + (p - region_start));
                 sync.pages_currently_on_freelist += PAGES_IN_CHUNK;
             }
-            rtn = sync.common_flpr.free_list.alloc(pages as _); // re-do the request which triggered this call
+            rtn = sync.free_list.alloc(pages as _); // re-do the request which triggered this call
         }
         rtn
     }
@@ -304,14 +283,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     fn free_contiguous_chunk(&self, chunk: Address, sync: &mut FreeListPageResourceSync) {
         let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
-        let mut chunk_start = conversions::bytes_to_pages(chunk - sync.common_flpr.start);
+        let mut chunk_start = conversions::bytes_to_pages(chunk - sync.start);
         let chunk_end = chunk_start + (num_chunks * PAGES_IN_CHUNK);
         while chunk_start < chunk_end {
-            sync.common_flpr
-                .free_list
-                .set_uncoalescable(chunk_start as _);
+            sync.free_list.set_uncoalescable(chunk_start as _);
             let tmp = sync
-                .common_flpr
                 .free_list
                 .alloc_from_unit(PAGES_IN_CHUNK as _, chunk_start as _)
                 as usize; // then alloc the entire chunk
@@ -326,8 +302,8 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let mut sync = self.sync.lock().unwrap();
-        let page_offset = conversions::bytes_to_pages(first - sync.common_flpr.start);
-        let pages = sync.common_flpr.free_list.size(page_offset as _);
+        let page_offset = conversions::bytes_to_pages(first - sync.start);
+        let pages = sync.free_list.size(page_offset as _);
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
@@ -337,7 +313,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
 
         self.common.accounting.release(pages as _);
-        let freed = sync.common_flpr.free_list.free(page_offset as _, true);
+        let freed = sync.free_list.free(page_offset as _, true);
         sync.pages_currently_on_freelist += pages as usize;
         if !self.common.contiguous {
             // only discontiguous spaces use chunks
@@ -351,7 +327,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         pages_freed: usize,
         sync: &mut FreeListPageResourceSync,
     ) {
-        let page_offset = conversions::bytes_to_pages(freed_page - sync.common_flpr.start);
+        let page_offset = conversions::bytes_to_pages(freed_page - sync.start);
 
         // may be multiple chunks
         if pages_freed % PAGES_IN_CHUNK == 0 {
@@ -360,21 +336,18 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             let mut region_start = page_offset & !(PAGES_IN_CHUNK - 1);
             let mut next_region_start = region_start + PAGES_IN_CHUNK;
             /* now try to grow (end point pages are marked as non-coalescing) */
-            while sync.common_flpr.free_list.is_coalescable(region_start as _) {
+            while sync.free_list.is_coalescable(region_start as _) {
                 // region_start is guaranteed to be positive. Otherwise this line will fail due to subtraction overflow.
                 region_start -= PAGES_IN_CHUNK;
             }
             while next_region_start < freelist::MAX_UNITS as usize
-                && sync
-                    .common_flpr
-                    .free_list
-                    .is_coalescable(next_region_start as _)
+                && sync.free_list.is_coalescable(next_region_start as _)
             {
                 next_region_start += PAGES_IN_CHUNK;
             }
             debug_assert!(next_region_start < freelist::MAX_UNITS as usize);
             if pages_freed == next_region_start - region_start {
-                let start = sync.common_flpr.start;
+                let start = sync.start;
                 self.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start), sync);
             }
         }
