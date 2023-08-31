@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
+use proc_macro_error::abort_call_site;
 use quote::quote;
-use syn::{Field, TypeGenerics};
+use syn::{Expr, Field, TypeGenerics};
 
 use crate::util;
 
@@ -16,20 +17,23 @@ pub(crate) fn generate_trace_object<'a>(
 
         // Figure out copy
         let trace_attr = util::get_field_attribute(f, "trace").unwrap();
-        let copy = if !trace_attr.tokens.is_empty() {
-            use syn::Token;
-            use syn::NestedMeta;
-            use syn::punctuated::Punctuated;
-
-            let args = trace_attr.parse_args_with(Punctuated::<NestedMeta, Token![,]>::parse_terminated).unwrap();
-            // CopySemantics::X is a path.
-            if let Some(NestedMeta::Meta(syn::Meta::Path(p))) = args.first() {
-                quote!{ Some(#p) }
-            } else {
+        let copy = match &trace_attr.meta {
+            syn::Meta::Path(_) => {
+                // #[trace]
                 quote!{ None }
-            }
-        } else {
-            quote!{ None }
+            },
+            syn::Meta::List(list) => {
+                // #[trace(CopySemantics::BlahBlah)]
+                let copy_semantics = list.parse_args::<Expr>().unwrap_or_else(|_| {
+                    abort_call_site!("In `#[trace(copy_semantics)]`, copy_semantics must be an expression.");
+                });
+
+                quote!{ Some(#copy_semantics) }
+            },
+            syn::Meta::NameValue(_) => {
+                // #[trace = BlahBlah]
+                abort_call_site!("The #[trace] macro does not support name-value form.");
+            },
         };
 
         quote! {

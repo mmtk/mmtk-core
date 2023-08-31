@@ -34,35 +34,35 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     let ident = input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let output = if let syn::Data::Struct(syn::DataStruct {
+    let syn::Data::Struct(syn::DataStruct {
         fields: syn::Fields::Named(ref fields),
         ..
-    }) = input.data
-    {
-        let spaces = util::get_fields_with_attribute(fields, "trace");
-        let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
-        let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
+    }) = input.data else {
+        abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.");
+    };
 
-        let trace_object_function =
-            plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
-        let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(
-            &post_scan_spaces,
-            &fallback,
-            &ty_generics,
-        );
-        let may_move_objects_function =
-            plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
-        quote! {
-            impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
-                #trace_object_function
+    let spaces = util::get_fields_with_attribute(fields, "trace");
+    let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
+    let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
-                #post_scan_object_function
+    let trace_object_function =
+        plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
+    let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(
+        &post_scan_spaces,
+        &fallback,
+        &ty_generics,
+    );
+    let may_move_objects_function =
+        plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
 
-                #may_move_objects_function
-            }
+    let output = quote! {
+        impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
+            #trace_object_function
+
+            #post_scan_object_function
+
+            #may_move_objects_function
         }
-    } else {
-        abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.")
     };
 
     // Debug the output - use the following code to debug the generated code (when cargo exapand is not working)
