@@ -235,6 +235,8 @@
 <a href="#235" id="235">235</a>
 <a href="#236" id="236">236</a>
 <a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 <span class="kw">use </span>std::mem::MaybeUninit;
 
@@ -417,7 +419,9 @@
 </span><span class="attr">#[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 </span><span class="kw">pub enum </span>AllocatorInfo {
-    BumpPointer { bump_pointer_offset: usize },
+    BumpPointer {
+        bump_pointer_offset: usize,
+    },
     <span class="comment">// FIXME: Add free-list fast-path
     </span>Unimplemented,
     <span class="attr">#[default]

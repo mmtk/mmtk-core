@@ -928,7 +928,6 @@
 <a href="#928" id="928">928</a>
 <a href="#929" id="929">929</a>
 <a href="#930" id="930">930</a>
-<a href="#931" id="931">931</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1017,14 +1016,13 @@
     Box::new(mmtk)
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-</span><span class="kw">pub fn </span>lazy_init_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
-    <span class="kw">unsafe </span>{
-        mmtk.get_plan_mut()
-            .base_mut()
-            .vm_space
-            .lazy_initialize(start, size);
-    }
+<span class="doccomment">/// Add an externally mmapped region to the VM space. A VM space can be set through MMTk options (`vm_space_start` and `vm_space_size`),
+/// and can also be set through this function call. A VM space can be discontiguous. This function can be called multiple times,
+/// and all the address ranges passed as arguments in the function will be considered as part of the VM space.
+/// Currently we do not allow removing regions from VM space.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+</span><span class="kw">pub fn </span>set_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
+    <span class="kw">unsafe </span>{ mmtk.get_plan_mut() }.base_mut().vm_space.set_vm_region(start, size);
 }
 
 <span class="doccomment">/// Request MMTk to create a mutator for the given thread. The ownership

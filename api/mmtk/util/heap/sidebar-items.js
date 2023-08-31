@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["accounting","blockpageresource","chunk_map","freelistpageresource","gc_trigger","heap_meta","layout","monotonepageresource","pageresource","space_descriptor","vm_layout","vmrequest"]};
+window.SIDEBAR_ITEMS = {"mod":["accounting","blockpageresource","chunk_map","externalpageresource","freelistpageresource","gc_trigger","heap_meta","layout","monotonepageresource","pageresource","space_descriptor","vm_layout","vmrequest"]};

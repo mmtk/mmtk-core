@@ -1074,6 +1074,10 @@
 <a href="#1074" id="1074">1074</a>
 <a href="#1075" id="1075">1075</a>
 <a href="#1076" id="1076">1076</a>
+<a href="#1077" id="1077">1077</a>
+<a href="#1078" id="1078">1078</a>
+<a href="#1079" id="1079">1079</a>
+<a href="#1080" id="1080">1080</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1605,7 +1609,11 @@ BasePlan should contain all plan-related state and functions that are _fundament
                 VMRequest::discontiguous(),
             )),
             <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-            </span>vm_space: VMSpace::new(<span class="kw-2">&amp;mut </span>args),
+            </span>vm_space: VMSpace::new(args.get_space_args(
+                <span class="string">&quot;vm_space&quot;</span>,
+                <span class="bool-val">false</span>,
+                VMRequest::discontiguous(),
+            )),
 
             initialized: AtomicBool::new(<span class="bool-val">false</span>),
             trigger_gc_when_heap_is_full: AtomicBool::new(<span class="bool-val">true</span>),
