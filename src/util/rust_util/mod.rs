@@ -78,6 +78,13 @@ impl<T> InitializeOnce<T> {
         debug_assert!(self.once.is_completed());
         unsafe { (*self.v.get()).assume_init_ref() }
     }
+
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn get_mut(&self) -> &mut T {
+        // We only assert in debug builds.
+        debug_assert!(self.once.is_completed());
+        unsafe { (*self.v.get()).assume_init_mut() }
+    }
 }
 
 impl<T> std::ops::Deref for InitializeOnce<T> {

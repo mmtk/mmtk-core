@@ -104,6 +104,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        crate::policy::sft_map::SFTRefStorage::pre_use_check();
         SFT_MAP.initialize_once(&create_sft_map);
 
         let num_workers = if cfg!(feature = "single_worker") {

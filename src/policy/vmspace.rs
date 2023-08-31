@@ -64,9 +64,9 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         self.space().common()
     }
 
-    fn initialize_sft(&self) {
+    fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         if self.inner.is_some() {
-            self.common().initialize_sft(self.as_sft())
+            self.common().initialize_sft(self.as_sft(), sft_map)
         }
     }
 
@@ -138,7 +138,8 @@ impl<VM: VMBinding> VMSpace<VM> {
         assert!(self.inner.is_none(), "VM space has been initialized");
         self.inner = Some(Self::create_space(&mut self.args, Some((start, size))));
 
-        self.common().initialize_sft(self.as_sft());
+        // self.common().initialize_sft(self.as_sft(), );
+        unimplemented!()
     }
 
     fn create_space(
