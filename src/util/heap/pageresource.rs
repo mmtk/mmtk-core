@@ -110,8 +110,10 @@ pub trait PageResource<VM: VMBinding>: 'static {
 
     // Some page resources need to record the start address.
     // This method will be called after the start address of the discontigous region is determined.
-    // `start` is the computed start address.
-    fn update_discontiguous_start(&mut self, start: Address);
+    // `start` is the computed start address.  By default, this does nothing.
+    fn update_discontiguous_start(&mut self, _start: Address) {
+        // Do nothing.
+    }
 }
 
 pub struct PRAllocResult {

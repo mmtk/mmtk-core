@@ -49,9 +49,6 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     fn common_mut(&mut self) -> &mut CommonPageResource {
         &mut self.common
     }
-    fn update_discontiguous_start(&mut self, _start: Address) {
-        // Do nothing.
-    }
 
     fn reserve_pages(&self, pages: usize) -> usize {
         self.common().accounting.reserve(pages);
