@@ -38,10 +38,11 @@ pub trait SFTMap {
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
     unsafe fn update(&self, space: SFTRawPointer, start: Address, bytes: usize);
 
-    /// Eagerly initialize the SFT table for a space. If a memory range is given, we initialize SFT for the region to make sure SFT is availble
-    /// for use for the range. For most implementations, we simply call update().
-    /// However, we need this as a seprate method for SFTDenseChunkMap, as it needs to initialize tables based on the spaces we have, and
-    /// to map side metadata first before setting the table.
+    /// Eagerly initialize the SFT table for a space. This method is required for each space after planc reation.
+    /// If a memory range is given, we also initialize SFT for the region to make sure SFT is availble
+    /// for use for the range.
+    /// For most implementations, we simply call update(). However, we need this as a seprate method for SFTDenseChunkMap,
+    /// as it needs to initialize tables based on the spaces we have, and to map side metadata first before setting the table.
     ///
     /// # Safety
     /// The address must have a valid SFT entry in the map. Usually we know this if the address is from an object reference, or from our space address range.

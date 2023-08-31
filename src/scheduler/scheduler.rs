@@ -93,7 +93,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         );
         let gc_controller = GCController::new(
             mmtk,
-            mmtk.plan.base().gc_requester.clone(),
+            mmtk.get_plan().base().gc_requester.clone(),
             self.clone(),
             coordinator_worker,
         );
@@ -399,7 +399,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.base().gc_requester.clear_request();
+        mmtk.get_plan().base().gc_requester.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
         // Note: This is the only place where a non-coordinator thread opens a bucket.

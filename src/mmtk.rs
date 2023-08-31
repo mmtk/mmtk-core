@@ -15,6 +15,7 @@ use crate::util::reference_processor::ReferenceProcessors;
 use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
+use std::cell::UnsafeCell;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -30,10 +31,10 @@ lazy_static! {
     // TODO: We should refactor this when we know more about how multiple MMTK instances work.
 
     /// A global VMMap that manages the mapping of spaces to virtual memory ranges.
-    pub static ref VM_MAP: Box<dyn VMMap> = layout::create_vm_map();
+    pub static ref VM_MAP: Box<dyn VMMap + Send + Sync> = layout::create_vm_map();
 
     /// A global Mmapper for mmaping and protection of virtual memory.
-    pub static ref MMAPPER: Box<dyn Mmapper> = layout::create_mmapper();
+    pub static ref MMAPPER: Box<dyn Mmapper + Send + Sync> = layout::create_mmapper();
 }
 
 use crate::util::rust_util::InitializeOnce;
@@ -88,7 +89,7 @@ impl Default for MMTKBuilder {
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<Options>,
-    pub(crate) plan: Box<dyn Plan<VM = VM>>,
+    pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
@@ -99,6 +100,9 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) edge_logger: EdgeLogger<VM::VMEdge>,
     inside_harness: AtomicBool,
 }
+
+unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
+unsafe impl<VM: VMBinding> Send for MMTK<VM> {}
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
@@ -137,7 +141,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         MMTK {
             options,
-            plan,
+            plan: UnsafeCell::new(plan),
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::<
                 <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
@@ -153,20 +157,31 @@ impl<VM: VMBinding> MMTK<VM> {
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.plan.handle_user_collection_request(tls, true, true);
+        self.get_plan()
+            .handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
-        self.plan.base().stats.start_all();
+        self.get_plan().base().stats.start_all();
         self.scheduler.enable_stat();
     }
 
     pub fn harness_end(&'static self) {
-        self.plan.base().stats.stop_all(self);
+        self.get_plan().base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
-        self.plan.as_ref()
+        unsafe { &**(self.plan.get()) }
+    }
+
+    /// Get the plan as mutable reference.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because the caller must ensure that the plan is not used by other threads.
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn get_plan_mut(&self) -> &mut dyn Plan<VM = VM> {
+        &mut **(self.plan.get())
     }
 
     pub fn get_options(&self) -> &Options {
