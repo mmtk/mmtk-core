@@ -3,6 +3,7 @@ mod accounting;
 pub(crate) mod layout;
 pub(crate) mod blockpageresource;
 pub(crate) mod chunk_map;
+pub(crate) mod externalpageresource;
 pub(crate) mod freelistpageresource;
 pub(crate) mod gc_trigger;
 mod heap_meta;
