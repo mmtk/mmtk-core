@@ -16,24 +16,26 @@ pub(crate) fn generate_trace_object<'a>(
         let f_ty = &f.ty;
 
         // Figure out copy
-        let trace_attr = util::get_field_attribute(f, "trace").unwrap();
-        let copy = match &trace_attr.meta {
-            syn::Meta::Path(_) => {
-                // #[trace]
-                quote!{ None }
-            },
-            syn::Meta::List(list) => {
-                // #[trace(CopySemantics::BlahBlah)]
-                let copy_semantics = list.parse_args::<Expr>().unwrap_or_else(|_| {
-                    abort_call_site!("In `#[trace(copy_semantics)]`, copy_semantics must be an expression.");
-                });
-
-                quote!{ Some(#copy_semantics) }
-            },
-            syn::Meta::NameValue(_) => {
-                // #[trace = BlahBlah]
-                abort_call_site!("The #[trace] macro does not support name-value form.");
-            },
+        let maybe_copy_semantics_attr = util::get_field_attribute(f, "copy_semantics");
+        let copy = match maybe_copy_semantics_attr {
+            None => quote!{ None },
+            Some(attr) => match &attr.meta {
+                syn::Meta::Path(_) => {
+                    // #[copy_semantics]
+                    abort_call_site!("The `#[copy_semantics(expr)]` macro needs an argument.");
+                },
+                syn::Meta::List(list) => {
+                    // #[copy_semantics(BlahBlah)]
+                    let copy_semantics = list.parse_args::<Expr>().unwrap_or_else(|_| {
+                        abort_call_site!("In `#[copy_semantics(expr)]`, expr must be an expression.");
+                    });
+                    quote!{ Some(#copy_semantics) }
+                },
+                syn::Meta::NameValue(_) => {
+                    // #[copy_semantics = BlahBlah]
+                    abort_call_site!("The #[copy_semantics] macro does not support the name-value form.");
+                },
+            }
         };
 
         quote! {

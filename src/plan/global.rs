@@ -431,13 +431,13 @@ pub struct BasePlan<VM: VMBinding> {
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
-    #[trace]
+    #[space]
     pub code_space: ImmortalSpace<VM>,
     #[cfg(feature = "code_space")]
-    #[trace]
+    #[space]
     pub code_lo_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
-    #[trace]
+    #[space]
     pub ro_space: ImmortalSpace<VM>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
@@ -453,7 +453,7 @@ pub struct BasePlan<VM: VMBinding> {
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
     #[cfg(feature = "vm_space")]
-    #[trace]
+    #[space]
     pub vm_space: VMSpace<VM>,
 }
 
@@ -898,14 +898,14 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 */
 #[derive(PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
-    #[trace]
+    #[space]
     pub immortal: ImmortalSpace<VM>,
-    #[trace]
+    #[space]
     pub los: LargeObjectSpace<VM>,
     // TODO: We should use a marksweep space for nonmoving.
-    #[trace]
+    #[space]
     pub nonmoving: ImmortalSpace<VM>,
-    #[fallback_trace]
+    #[parent]
     pub base: BasePlan<VM>,
 }
 

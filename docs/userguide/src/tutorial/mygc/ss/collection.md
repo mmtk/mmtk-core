@@ -182,9 +182,10 @@ it can use `PlanProcessEdges`.
 You can manually provide an implementation of `PlanTraceObject` for `MyGC`. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of `PlanTraceObject`:
 * add `#[derive(PlanTraceObject)]` for `MyGC` (import the macro properly: `use mmtk_macros::PlanTraceObject`)
-* add `#[trace(CopySemantics::Default)]` to both copy space fields, `copyspace0` and `copyspace1`. This tells the macro to generate
+* add `#[space]
+#[copy_semantics(CopySemantics::Default)]` to both copy space fields, `copyspace0` and `copyspace1`. This tells the macro to generate
   trace code for both spaces, and for any copying in the spaces, use `CopySemantics::DefaultCopy` that we have configured early.
-* add `#[fallback_trace]` to `common`. This tells the macro that if an object is not found in any space with `#[trace]` in ths plan,
+* add `#[parent]` to `common`. This tells the macro that if an object is not found in any space with `#[space]` in ths plan,
   try find the space for the object in the 'parent' plan. In our case, we fall back to the `CommonPlan`, as the object may be
   in large object space or immortal space in the common plan. `CommonPlan` also implements `PlanTraceObject`, so it knows how to
   find a space for the object and trace it in the same way.

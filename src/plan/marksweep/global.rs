@@ -30,9 +30,9 @@ use crate::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE;
 
 #[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
-    #[fallback_trace]
+    #[parent]
     common: CommonPlan<VM>,
-    #[trace]
+    #[space]
     ms: MarkSweepSpace<VM>,
 }
 

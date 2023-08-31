@@ -24,10 +24,11 @@ use mmtk_macros::PlanTraceObject;
 #[derive(PlanTraceObject)]
 pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
-    #[trace(CopySemantics::PromoteToMature)]
+    #[space]
+    #[copy_semantics(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
     /// The common plan.
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan<VM>,
     /// Is this GC full heap?
     pub gc_full_heap: AtomicBool,

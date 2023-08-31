@@ -22,7 +22,7 @@ use mmtk_macros::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct PageProtect<VM: VMBinding> {
-    #[trace]
+    #[space]
     pub space: LargeObjectSpace<VM>,
     pub common: CommonPlan<VM>,
 }

@@ -29,9 +29,10 @@ use mmtk_macros::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub mc_space: MarkCompactSpace<VM>,
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan<VM>,
 }
 

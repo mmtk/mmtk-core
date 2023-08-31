@@ -25,11 +25,13 @@ use enum_map::EnumMap;
 #[derive(PlanTraceObject)]
 pub struct SemiSpace<VM: VMBinding> {
     pub hi: AtomicBool,
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace<VM>,
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan<VM>,
 }
 

@@ -38,11 +38,12 @@ use mmtk_macros::PlanTraceObject;
 #[derive(PlanTraceObject)]
 pub struct GenImmix<VM: VMBinding> {
     /// Generational plan, which includes a nursery space and operations related with nursery.
-    #[fallback_trace]
+    #[parent]
     pub gen: CommonGenPlan<VM>,
     /// An immix space as the mature space.
     #[post_scan]
-    #[trace(CopySemantics::Mature)]
+    #[space]
+    #[copy_semantics(CopySemantics::Mature)]
     pub immix_space: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.
     pub last_gc_was_defrag: AtomicBool,

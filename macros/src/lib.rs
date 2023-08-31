@@ -28,7 +28,7 @@ const DEBUG_MACRO_OUTPUT: bool = false;
 /// * add `#[post_scan]` to any space field that has some policy-specific post_scan_object(). For objects in those spaces,
 ///   `post_scan_object()` in the policy will be called after `VM::VMScanning::scan_object()`.
 #[proc_macro_error]
-#[proc_macro_derive(PlanTraceObject, attributes(trace, post_scan, fallback_trace))]
+#[proc_macro_derive(PlanTraceObject, attributes(space, parent, copy_semantics, post_scan))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident;
@@ -41,19 +41,16 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.");
     };
 
-    let spaces = util::get_fields_with_attribute(fields, "trace");
+    let spaces = util::get_fields_with_attribute(fields, "space");
     let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
-    let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
+    let parent = util::get_unique_field_with_attribute(fields, "parent");
 
     let trace_object_function =
-        plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
-    let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(
-        &post_scan_spaces,
-        &fallback,
-        &ty_generics,
-    );
+        plan_trace_object_impl::generate_trace_object(&spaces, &parent, &ty_generics);
+    let post_scan_object_function =
+        plan_trace_object_impl::generate_post_scan_object(&post_scan_spaces, &parent, &ty_generics);
     let may_move_objects_function =
-        plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
+        plan_trace_object_impl::generate_may_move_objects(&spaces, &parent, &ty_generics);
 
     let output = quote! {
         impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {

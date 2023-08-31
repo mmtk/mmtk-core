@@ -31,12 +31,14 @@ use mmtk_macros::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct GenCopy<VM: VMBinding> {
-    #[fallback_trace]
+    #[parent]
     pub gen: CommonGenPlan<VM>,
     pub hi: AtomicBool,
-    #[trace(CopySemantics::Mature)]
+    #[space]
+    #[copy_semantics(CopySemantics::Mature)]
     pub copyspace0: CopySpace<VM>,
-    #[trace(CopySemantics::Mature)]
+    #[space]
+    #[copy_semantics(CopySemantics::Mature)]
     pub copyspace1: CopySpace<VM>,
 }
 

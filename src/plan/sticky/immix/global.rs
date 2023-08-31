@@ -28,7 +28,7 @@ use super::gc_work::StickyImmixNurseryGCWorkContext;
 
 #[derive(PlanTraceObject)]
 pub struct StickyImmix<VM: VMBinding> {
-    #[fallback_trace]
+    #[parent]
     immix: immix::Immix<VM>,
     gc_full_heap: AtomicBool,
     next_gc_full_heap: AtomicBool,
