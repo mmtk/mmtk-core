@@ -93,21 +93,27 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         // Initialize for space first.
-        sft_map.initialize_for_space(self.as_sft(), None);
+        unsafe {
+            sft_map.initialize_for_space(self.as_sft(), None);
+        }
 
         // Initialize sft for current external pages. This method is called at the end of plan creation.
         // So we only set SFT for VM regions that are set by options (we skipped sft initialization for them earlier).
-        for external_pages in self.pr.get_external_pages().iter() {
+        let vm_regions = self.pr.get_external_pages();
+        // We should only have region at this point (set by the option). If we allow setting multiple VM spaces through options,
+        // we can remove this assertion.
+        assert_eq!(vm_regions.len(), 1);
+        for external_pages in vm_regions.iter() {
             // Chunk align things.
             let start = external_pages.start.align_down(BYTES_IN_CHUNK);
             let size = external_pages.end.align_up(BYTES_IN_CHUNK) - start;
             // The region should be empty in SFT map -- if they were set before this point, there could be invalid SFT pointers.
             debug_assert_eq!(
-                SFT_MAP.get_checked(start).name(),
+                sft_map.get_checked(start).name(),
                 crate::policy::sft::EMPTY_SFT_NAME
             );
             // Set SFT
-            assert!(sft_map.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", start);
+            assert!(sft_map.has_sft_entry(start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", start);
             unsafe {
                 sft_map.update(self.as_sft(), start, size);
             }

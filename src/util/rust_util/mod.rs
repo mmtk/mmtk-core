@@ -79,6 +79,12 @@ impl<T> InitializeOnce<T> {
         unsafe { (*self.v.get()).assume_init_ref() }
     }
 
+    /// Get a mutable reference to the value.
+    /// This is currently only used for SFTMap during plan creation (single threaded),
+    /// and before the plan creation is done, the binding cannot use MMTK at all.
+    ///
+    /// # Safety
+    /// The caller needs to make sure there is no race when mutating the value.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut(&self) -> &mut T {
         // We only assert in debug builds.
