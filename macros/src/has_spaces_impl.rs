@@ -5,7 +5,7 @@ use syn::{DeriveInput, Field};
 
 use crate::util;
 
-pub fn derive(input: DeriveInput) -> TokenStream2 {
+pub(crate) fn derive(input: DeriveInput) -> TokenStream2 {
     let ident = input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 

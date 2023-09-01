@@ -366,6 +366,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         true
     }
 
+    /// Call `space.verify_side_metadata_sanity` for all spaces in this plan.
     fn verify_side_metadata_sanity(&self) {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         self.for_each_space(&mut |space| {
@@ -965,30 +966,31 @@ use crate::vm::VMBinding;
 
 /// A trait for anything that contains spaces.
 /// Examples include concrete plans as well as `Gen`, `CommonPlan` and `BasePlan`.
+/// All plans must implement this trait.
 ///
-/// This trait provides methods for enumerating spaces in a struct, including nested struct such as
-/// `Gen`, `CommonPlan` and `BasePlan`.
+/// This trait provides methods for enumerating spaces in a struct, including spaces in nested
+/// struct.
 ///
-/// This trait can be implemented automatically using `#[derive(HasSpaces)]` defined in the
-/// `mmtk-macros` crate.
+/// This trait can be implemented automatically by adding the `#[derive(HasSpaces)]` attribute to a
+/// struct.  It uses the derive macro defined in the `mmtk-macros` crate.
 ///
 /// This trait visits spaces as `dyn`, so it should only be used when performance is not critical.
 /// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
 /// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
 /// implement (by hand or automatically) the method without `dyn`.
 pub trait HasSpaces {
-    // The type of the VM used by HasSpaces.  So named so that Plan<VM = VM> will not be ambiguous.
+    // The type of the VM.
     type VM: VMBinding;
 
     /// Visit each space field immutably.
     ///
-    /// If `Self` contains a parent field that contain more spaces, this method will visit spaces
+    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
     fn for_each_space(&self, func: &mut dyn FnMut(&dyn Space<Self::VM>));
 
     /// Visit each space field mutably.
     ///
-    /// If `Self` contains a parent field that contain more spaces, this method will visit spaces
+    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
     fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }

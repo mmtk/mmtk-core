@@ -1,9 +1,40 @@
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::abort_call_site;
 use quote::quote;
-use syn::{Expr, Field, TypeGenerics};
+use syn::{DeriveInput, Expr, Field, TypeGenerics};
 
 use crate::util;
+
+pub(crate) fn derive(input: DeriveInput) -> TokenStream2 {
+    let ident = input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let syn::Data::Struct(syn::DataStruct {
+        fields: syn::Fields::Named(ref fields),
+        ..
+    }) = input.data else {
+        abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.");
+    };
+
+    let spaces = util::get_fields_with_attribute(fields, "space");
+    let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
+    let parent = util::get_unique_field_with_attribute(fields, "parent");
+
+    let trace_object_function = generate_trace_object(&spaces, &parent, &ty_generics);
+    let post_scan_object_function =
+        generate_post_scan_object(&post_scan_spaces, &parent, &ty_generics);
+    let may_move_objects_function = generate_may_move_objects(&spaces, &parent, &ty_generics);
+
+    quote! {
+        impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
+            #trace_object_function
+
+            #post_scan_object_function
+
+            #may_move_objects_function
+        }
+    }
+}
 
 pub(crate) fn generate_trace_object<'a>(
     space_fields: &[&'a Field],
