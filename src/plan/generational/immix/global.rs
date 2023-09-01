@@ -252,18 +252,7 @@ impl<VM: VMBinding> GenImmix<VM> {
             last_gc_was_full_heap: AtomicBool::new(false),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            use crate::util::metadata::side_metadata::SideMetadataSanity;
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            genimmix
-                .gen
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            genimmix
-                .immix_space
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
+        genimmix.verify_side_metadata_sanity();
 
         genimmix
     }

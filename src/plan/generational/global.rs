@@ -7,7 +7,6 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -58,12 +57,6 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             next_gc_full_heap: AtomicBool::new(false),
             full_heap_gc_count,
         }
-    }
-
-    /// Verify side metadata specs used in the spaces in Gen.
-    pub fn verify_side_metadata_sanity(&self, sanity: &mut SideMetadataSanity) {
-        self.common.verify_side_metadata_sanity(sanity);
-        self.nursery.verify_side_metadata_sanity(sanity);
     }
 
     /// Prepare Gen. This should be called by a single thread in GC prepare work.

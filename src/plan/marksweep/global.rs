@@ -12,7 +12,7 @@ use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -112,11 +112,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.common
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.ms
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.verify_side_metadata_sanity();
+
         res
     }
 

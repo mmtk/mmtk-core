@@ -17,7 +17,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 #[cfg(not(feature = "vo_bit"))]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
@@ -201,13 +201,7 @@ impl<VM: VMBinding> MarkCompact<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.common
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.mc_space
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.verify_side_metadata_sanity();
 
         res
     }

@@ -154,7 +154,8 @@ pub fn create_gc_worker_context<VM: VMBinding>(
 /// 2. Create a vector of all the side metadata specs with `SideMetadataContext::new_global_specs()`,
 ///    the parameter is a vector of global side metadata specs that are specific to the plan.
 /// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
-/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
+/// 4. Invoke the `verify_side_metadata_sanity()` method of the plan.
+///    It will create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
 ///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
 ///
 /// Methods in this trait:
@@ -363,6 +364,13 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Return true if the object is considered valid by the plan.
     fn sanity_check_object(&self, _object: ObjectReference) -> bool {
         true
+    }
+
+    fn verify_side_metadata_sanity(&self) {
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        self.for_each_space(&mut |space| {
+            space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        })
     }
 }
 
@@ -842,23 +850,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         space_full || stress_force_gc || heap_full
     }
 
-    #[allow(unused_variables)] // depending on the enabled features, base may not be used.
-    #[allow(clippy::needless_pass_by_ref_mut)] // depending on the enabled features, base may not be used.
-    pub(crate) fn verify_side_metadata_sanity(
-        &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
-    ) {
-        #[cfg(feature = "code_space")]
-        self.code_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        #[cfg(feature = "ro_space")]
-        self.ro_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        #[cfg(feature = "vm_space")]
-        self.vm_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-    }
-
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) fn increase_malloc_bytes_by(&self, size: usize) {
         self.malloc_bytes.fetch_add(size, Ordering::SeqCst);
@@ -966,20 +957,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
         &self.nonmoving
-    }
-
-    pub(crate) fn verify_side_metadata_sanity(
-        &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
-    ) {
-        self.base
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.immortal
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.los
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.nonmoving
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
     }
 }
 

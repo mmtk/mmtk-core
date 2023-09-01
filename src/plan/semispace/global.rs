@@ -13,7 +13,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,17 +152,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            res.common
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            res.copyspace0
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            res.copyspace1
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
+        res.verify_side_metadata_sanity();
 
         res
     }

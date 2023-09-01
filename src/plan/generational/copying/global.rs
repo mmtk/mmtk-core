@@ -18,7 +18,6 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -220,17 +219,7 @@ impl<VM: VMBinding> GenCopy<VM> {
             copyspace1,
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            res.gen
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            res.copyspace0
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            res.copyspace1
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
+        res.verify_side_metadata_sanity();
 
         res
     }

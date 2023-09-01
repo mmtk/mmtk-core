@@ -106,16 +106,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            use crate::util::metadata::side_metadata::SideMetadataSanity;
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            ret.common
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            ret.space
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
+        ret.verify_side_metadata_sanity();
 
         ret
     }

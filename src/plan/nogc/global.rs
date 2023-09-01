@@ -11,7 +11,7 @@ use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -113,13 +113,7 @@ impl<VM: VMBinding> NoGC<VM> {
             base: BasePlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.base()
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.nogc_space
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.verify_side_metadata_sanity();
 
         res
     }
