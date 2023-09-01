@@ -15,16 +15,22 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
+use mmtk_macros::HasSpaces;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 #[cfg(feature = "nogc_lock_free")]
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
+#[derive(HasSpaces)]
 pub struct NoGC<VM: VMBinding> {
+    #[parent]
     pub base: BasePlan<VM>,
+    #[space]
     pub nogc_space: NoGCImmortalSpace<VM>,
+    #[space]
     pub immortal: ImmortalSpace<VM>,
+    #[space]
     pub los: ImmortalSpace<VM>,
 }
 
