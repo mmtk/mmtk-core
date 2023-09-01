@@ -38,23 +38,23 @@ pub trait SFTMap {
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
     unsafe fn update(&self, space: SFTRawPointer, start: Address, bytes: usize);
 
-    /// Eagerly initialize the SFT table for a space. This method is required for each space after planc reation.
-    /// If a memory range is given, we also initialize SFT for the region to make sure SFT is availble
-    /// for use for the range.
-    /// For most implementations, we simply call update(). However, we need this as a seprate method for SFTDenseChunkMap,
-    /// as it needs to initialize tables based on the spaces we have, and to map side metadata first before setting the table.
+    /// Notify the SFT map for space creation. `DenseChunkMap` needs to create an entry for the space.
+    fn notify_space_creation(&mut self, _space: SFTRawPointer) {}
+
+    /// Eagerly initialize the SFT table. For most implementations, it could be the same as update().
+    /// However, we need this as a seprate method for SFTDenseChunkMap, as it needs to map side metadata first
+    /// before setting the table.
     ///
     /// # Safety
     /// The address must have a valid SFT entry in the map. Usually we know this if the address is from an object reference, or from our space address range.
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
-    unsafe fn initialize_for_space(
+    unsafe fn eager_initialize(
         &mut self,
         space: *const (dyn SFT + Sync + 'static),
-        range: Option<(Address, usize)>,
+        start: Address,
+        bytes: usize,
     ) {
-        if let Some((start, bytes)) = range {
-            self.update(space, start, bytes);
-        }
+        self.update(space, start, bytes);
     }
 
     /// Clear SFT for the address. The address must have a valid SFT entry in the table.
@@ -343,34 +343,29 @@ mod dense_chunk_map {
             cell.load()
         }
 
-        unsafe fn initialize_for_space(
-            &mut self,
-            space: SFTRawPointer,
-            range: Option<(Address, usize)>,
-        ) {
+        fn notify_space_creation(&mut self, space: SFTRawPointer) {
             // Insert the space into the SFT table, and the SFT map.
 
-            let space_name = (*space).name().to_string();
+            let space_name = unsafe { &*space }.name().to_string();
             // We shouldn't have this space in our map yet. Otherwise, this method is called multiple times for the same space.
             assert!(self.index_map.get(&space_name).is_none());
             // Index for the space
             let index = self.sft.len();
-            // Insert to hahsmap and vec
+            // Insert to hashmap and vec
             self.sft.push(SFTRefStorage::new(space));
             self.index_map.insert(space_name, index);
+        }
 
-            // If a range is provided, mmap for side metadata for the range
-            if let Some((start, bytes)) = range {
-                let context = SideMetadataContext {
-                    global: vec![SFT_DENSE_CHUNK_MAP_INDEX],
-                    local: vec![],
-                };
-                if context.try_map_metadata_space(start, bytes).is_err() {
-                    panic!("failed to mmap metadata memory");
-                }
-
-                self.update(space, start, bytes);
+        unsafe fn eager_initialize(&mut self, space: SFTRawPointer, start: Address, bytes: usize) {
+            let context = SideMetadataContext {
+                global: vec![SFT_DENSE_CHUNK_MAP_INDEX],
+                local: vec![],
+            };
+            if context.try_map_metadata_space(start, bytes).is_err() {
+                panic!("failed to mmap metadata memory");
             }
+
+            self.update(space, start, bytes);
         }
 
         unsafe fn update(

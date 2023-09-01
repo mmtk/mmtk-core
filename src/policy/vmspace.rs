@@ -92,11 +92,6 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
-        // Initialize for space first.
-        unsafe {
-            sft_map.initialize_for_space(self.as_sft(), None);
-        }
-
         // Initialize sft for current external pages. This method is called at the end of plan creation.
         // So we only set SFT for VM regions that are set by options (we skipped sft initialization for them earlier).
         let vm_regions = self.pr.get_external_pages();
@@ -115,7 +110,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
             // Set SFT
             assert!(sft_map.has_sft_entry(start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", start);
             unsafe {
-                sft_map.update(self.as_sft(), start, size);
+                sft_map.eager_initialize(self.as_sft(), start, size);
             }
         }
     }

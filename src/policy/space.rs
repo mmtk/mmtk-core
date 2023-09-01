@@ -605,14 +605,9 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // * fix page resource, so it propelry returns new_chunk
         // * change grow_space() so it sets SFT no matter what the new_chunks value is.
         // FIXME: eagerly initializing SFT is not a good idea.
-
-        // If it is contiguous, we know the range we should initialize. Otherwise, it is None.
-        let range = if self.contiguous {
-            Some((self.start, self.extent))
-        } else {
-            None
-        };
-        unsafe { sft_map.initialize_for_space(sft, range) };
+        if self.contiguous {
+            unsafe { sft_map.eager_initialize(sft, self.start, self.extent) };
+        }
     }
 
     pub fn vm_map(&self) -> &'static dyn VMMap {
