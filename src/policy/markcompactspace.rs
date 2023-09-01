@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use super::sft::SFT;
 use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
@@ -7,6 +9,7 @@ use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::vm_layout::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
 use crate::util::{Address, ObjectReference};
@@ -179,6 +182,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
         forwarding_pointer: ObjectReference,
     ) {
+        println!("store_header_forwarding_pointer {:?}", forwarding_pointer);
         unsafe {
             Self::header_forwarding_pointer_address(object)
                 .store::<ObjectReference>(forwarding_pointer);
@@ -318,73 +322,135 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         Self::is_marked(object)
     }
 
-    pub fn calculate_forwarding_pointer(&self) {
-        let start = self.common.start;
-        let end = self.pr.cursor();
-        let mut to = start;
-
-        let linear_scan =
-            crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
-                start, end,
-            );
+    fn linear_scan_objects(
+        &self,
+        range: Range<Address>,
+        mut f: impl FnMut(ObjectReference, usize, usize, usize),
+    ) {
+        let linear_scan = crate::util::linear_scan::ObjectIterator::<
+            VM,
+            MarkCompactObjectSize<VM>,
+            true,
+        >::new(range.start, range.end);
         for obj in linear_scan.filter(|obj| Self::to_be_compacted(*obj)) {
             let copied_size =
                 VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
             let align = VM::VMObjectModel::get_align_when_copied(obj);
             let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
-            to = align_allocation_no_fill::<VM>(to, align, offset);
-            let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
-                obj,
-                to + Self::HEADER_RESERVED_IN_BYTES,
-            );
-
-            Self::store_header_forwarding_pointer(obj, new_obj);
-
-            trace!(
-                "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
-                obj,
-                VM::VMObjectModel::get_size_when_copied(obj),
-                to,
-                copied_size
-            );
-
-            to += copied_size;
+            f(obj, copied_size, align, offset);
         }
-        debug!("Calculate forward end: to = {}", to);
+    }
+
+    fn iterate_contiguous_regions<'a>(&'a self) -> impl Iterator<Item = (Address, Address)> + 'a {
+        struct Iter<'a, VM: VMBinding> {
+            space: &'a MarkCompactSpace<VM>,
+            contiguous_space: Option<Range<Address>>,
+            discontiguous_start: Address,
+        }
+        impl<VM: VMBinding> Iterator for Iter<'_, VM> {
+            type Item = (Address, Address);
+            fn next(&mut self) -> Option<Self::Item> {
+                if let Some(range) = self.contiguous_space.take() {
+                    Some((range.start, range.end))
+                } else if self.discontiguous_start.is_zero() {
+                    None
+                } else {
+                    let start = self.discontiguous_start;
+                    self.discontiguous_start =
+                        self.space.common.vm_map.get_next_contiguous_region(start);
+                    let end = start
+                        + (self.space.common.vm_map.get_contiguous_region_chunks(start)
+                            << LOG_BYTES_IN_CHUNK);
+                    Some((start, end))
+                }
+            }
+        }
+        if self.common.contiguous {
+            Iter {
+                space: self,
+                contiguous_space: Some(self.common.start..self.pr.cursor()),
+                discontiguous_start: Address::ZERO,
+            }
+        } else {
+            let discontiguous_start = self.pr.common().get_head_discontiguous_region();
+            Iter {
+                space: self,
+                contiguous_space: None,
+                discontiguous_start,
+            }
+        }
+    }
+
+    pub fn calculate_forwarding_pointer(&self) {
+        let mut to_iter = self.iterate_contiguous_regions();
+        let Some((mut to_cursor, mut to_end)) = to_iter.next() else {
+            return;
+        };
+        for (from_start, from_end) in self.iterate_contiguous_regions() {
+            println!("region {:?}", from_start..from_end);
+            // linear scan the contiguous region
+            self.linear_scan_objects(from_start..from_end, |obj, copied_size, align, offset| {
+                // move to_cursor to aliged start address
+                to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
+                // move to next to-block if there is no sufficient memory in current region
+                if to_cursor + copied_size > to_end {
+                    (to_cursor, to_end) = to_iter.next().unwrap();
+                    to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
+                    assert!(to_cursor + copied_size <= to_end);
+                }
+                // Get copied object
+                let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
+                    obj,
+                    to_cursor + Self::HEADER_RESERVED_IN_BYTES,
+                );
+                println!("get_reference_when_copied_to {:?} {:?}", obj, new_obj);
+                // update forwarding pointer
+                Self::store_header_forwarding_pointer(obj, new_obj);
+                trace!(
+                    "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
+                    obj,
+                    VM::VMObjectModel::get_size_when_copied(obj),
+                    to_cursor,
+                    copied_size
+                );
+                // bump to_cursor
+                to_cursor += copied_size;
+            });
+        }
     }
 
     pub fn compact(&self) {
-        let start = self.common.start;
-        let end = self.pr.cursor();
-        let mut to = end;
+        println!("compact");
+        // let start = self.common.start;
+        // assert!(!start.is_zero());
+        // let end = self.pr.cursor();
+        let mut to = Address::ZERO;
 
-        let linear_scan =
-            crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
-                start, end,
-            );
-        for obj in linear_scan {
-            // clear the VO bit
-            vo_bit::unset_vo_bit::<VM>(obj);
+        for (from_start, from_end) in self.iterate_contiguous_regions() {
+            self.linear_scan_objects(from_start..from_end, |obj, copied_size, _align, _offset| {
+                // clear the VO bit
+                vo_bit::unset_vo_bit::<VM>(obj);
 
-            let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
+                let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 
-            trace!("Compact {} to {}", obj, forwarding_pointer);
-            if !forwarding_pointer.is_null() {
-                let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
-                let new_object = forwarding_pointer;
-                Self::clear_header_forwarding_pointer(new_object);
+                trace!("Compact {} to {}", obj, forwarding_pointer);
+                if !forwarding_pointer.is_null() {
+                    let new_object = forwarding_pointer;
+                    Self::clear_header_forwarding_pointer(new_object);
 
-                // copy object
-                trace!(" copy from {} to {}", obj, new_object);
-                let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                // update VO bit,
-                vo_bit::set_vo_bit::<VM>(new_object);
-                to = new_object.to_object_start::<VM>() + copied_size;
-                debug_assert_eq!(end_of_new_object, to);
-            }
+                    // copy object
+                    trace!(" copy from {} to {}", obj, new_object);
+                    let _end_of_new_object =
+                        VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                    // update VO bit,
+                    vo_bit::set_vo_bit::<VM>(new_object);
+                    to = new_object.to_object_start::<VM>() + copied_size;
+                    // debug_assert_eq!(end_of_new_object, to);
+                }
+            });
         }
 
-        debug!("Compact end: to = {}", to);
+        // debug!("Compact end: to = {}", to);
 
         // reset the bump pointer
         self.pr.reset_cursor(to);
