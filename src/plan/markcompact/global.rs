@@ -25,9 +25,9 @@ use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]

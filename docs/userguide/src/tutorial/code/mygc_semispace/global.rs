@@ -24,11 +24,11 @@ use std::sync::atomic::{AtomicBool, Ordering}; // Add
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 // Modify
 // ANCHOR: plan_def
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct MyGC<VM: VMBinding> {
     pub hi: AtomicBool,
     #[space]

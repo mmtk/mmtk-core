@@ -29,13 +29,13 @@ use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 /// Generational immix. This implements the functionality of a two-generation copying
 /// collector where the higher generation is an immix space.
 /// See the PLDI'08 paper by Blackburn and McKinley for a description
 /// of the algorithm: <http://doi.acm.org/10.1145/1375581.1375586>.
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct GenImmix<VM: VMBinding> {
     /// Generational plan, which includes a nursery space and operations related with nursery.
     #[parent]

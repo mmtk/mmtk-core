@@ -10,10 +10,20 @@ use quote::quote;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 
+mod has_spaces_impl;
 mod plan_trace_object_impl;
 mod util;
 
 const DEBUG_MACRO_OUTPUT: bool = false;
+
+#[proc_macro_error]
+#[proc_macro_derive(HasSpaces, attributes(space, parent))]
+pub fn derive_has_spaces(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let output = has_spaces_impl::derive(input);
+
+    output.into()
+}
 
 /// Generally a plan needs to add these attributes in order for the macro to work. The macro will
 /// generate an implementation of `PlanTraceObject` for the plan. With `PlanTraceObject`, the plan use

@@ -16,7 +16,7 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 #[cfg(feature = "malloc_mark_sweep")]
 pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::malloc_ms::MallocSpace<VM>;
@@ -28,7 +28,7 @@ pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSwee
 #[cfg(not(feature = "malloc_mark_sweep"))]
 use crate::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE;
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
     #[parent]
     common: CommonPlan<VM>,

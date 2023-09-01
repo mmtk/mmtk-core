@@ -18,9 +18,9 @@ use crate::{
 };
 use enum_map::EnumMap;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct PageProtect<VM: VMBinding> {
     #[space]
     pub space: LargeObjectSpace<VM>,

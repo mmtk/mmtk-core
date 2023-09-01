@@ -21,12 +21,12 @@ use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 use super::gc_work::StickyImmixMatureGCWorkContext;
 use super::gc_work::StickyImmixNurseryGCWorkContext;
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct StickyImmix<VM: VMBinding> {
     #[parent]
     immix: immix::Immix<VM>,

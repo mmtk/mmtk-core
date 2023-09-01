@@ -33,7 +33,7 @@ use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
@@ -385,7 +385,7 @@ pub enum GcStatus {
 /**
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct BasePlan<VM: VMBinding> {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub initialized: AtomicBool,
@@ -896,7 +896,7 @@ impl<VM: VMBinding> BasePlan<VM> {
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
     #[space]
     pub immortal: ImmortalSpace<VM>,
@@ -1013,6 +1013,33 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
 use crate::policy::gc_work::TraceKind;
 use crate::vm::VMBinding;
+
+/// A trait for anything that contains spaces.
+/// Examples include concrete plans as well as `Gen`, `CommonPlan` and `BasePlan`.
+///
+/// This trait provides methods for enumerating spaces in a struct, including nested struct such as
+/// `Gen`, `CommonPlan` and `BasePlan`.
+///
+/// This trait can be implemented automatically using `#[derive(HasSpaces)]` defined in the
+/// `mmtk-macros` crate.
+///
+/// This trait visits spaces as `dyn`, so it should only be used when performance is not critical.
+/// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
+/// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
+/// implement (by hand or automatically) the method without `dyn`.
+pub trait HasSpaces<VM: VMBinding> {
+    /// Visit each space field immutably.
+    ///
+    /// If `Self` contains a parent field that contain more spaces, this method will visit spaces
+    /// in the outer struct first.
+    fn for_each_space(&self, func: impl FnMut(&dyn Space<VM>));
+
+    /// Visit each space field mutably.
+    ///
+    /// If `Self` contains a parent field that contain more spaces, this method will visit spaces
+    /// in the outer struct first.
+    fn for_each_space_mut(&mut self, func: impl FnMut(&mut dyn Space<VM>));
+}
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
 /// Generally a plan does not need to manually implement this trait. Instead, we provide

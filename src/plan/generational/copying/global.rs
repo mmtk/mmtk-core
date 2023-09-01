@@ -27,9 +27,9 @@ use crate::ObjectQueue;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct GenCopy<VM: VMBinding> {
     #[parent]
     pub gen: CommonGenPlan<VM>,

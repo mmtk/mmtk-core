@@ -72,7 +72,7 @@ you can implement object tracing, in this tutorial we use the macros, as it is t
 Make sure you import the macros. We will discuss on what those attributes mean in later sections.
 
 ```rust
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 ```
 
 ### Implement the Plan trait for MyGC

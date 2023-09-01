@@ -24,9 +24,9 @@ use std::sync::atomic::AtomicBool;
 use atomic::Ordering;
 use enum_map::EnumMap;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct Immix<VM: VMBinding> {
     #[post_scan]
     #[space]

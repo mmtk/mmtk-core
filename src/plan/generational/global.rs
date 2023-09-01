@@ -17,11 +17,11 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
     #[space]
