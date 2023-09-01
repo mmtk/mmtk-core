@@ -66,13 +66,6 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         self.nursery.verify_side_metadata_sanity(sanity);
     }
 
-    /// Get spaces in generation plans
-    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.nursery);
-        ret
-    }
-
     /// Prepare Gen. This should be called by a single thread in GC prepare work.
     pub fn prepare(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();

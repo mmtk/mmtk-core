@@ -190,9 +190,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         &self.base().options
     }
 
-    /// get all the spaces in the plan
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
-
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
     #[cfg(feature = "sanity")]
@@ -562,19 +559,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
-    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        vec![
-            #[cfg(feature = "code_space")]
-            &self.code_space,
-            #[cfg(feature = "code_space")]
-            &self.code_lo_space,
-            #[cfg(feature = "ro_space")]
-            &self.ro_space,
-            #[cfg(feature = "vm_space")]
-            &self.vm_space,
-        ]
-    }
-
     /// The application code has requested a collection.
     pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
         if force || !*self.options.ignore_system_gc {
@@ -924,14 +908,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             )),
             base: BasePlan::new(args),
         }
-    }
-
-    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        let mut ret = self.base.get_spaces();
-        ret.push(&self.immortal);
-        ret.push(&self.los);
-        ret.push(&self.nonmoving);
-        ret
     }
 
     pub fn get_used_pages(&self) -> usize {

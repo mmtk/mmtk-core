@@ -41,14 +41,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &NOGC_CONSTRAINTS
     }
 
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.base.get_spaces();
-        ret.push(&self.nogc_space);
-        ret.push(&self.immortal);
-        ret.push(&self.los);
-        ret
-    }
-
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }

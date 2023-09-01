@@ -72,13 +72,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.gen.get_spaces();
-        ret.push(&self.copyspace0);
-        ret.push(&self.copyspace1);
-        ret
-    }
-
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         self.base().set_collection_kind::<Self>(self);

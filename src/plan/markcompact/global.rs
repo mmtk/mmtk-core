@@ -50,12 +50,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         &MARKCOMPACT_CONSTRAINTS
     }
 
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.mc_space);
-        ret
-    }
-
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }

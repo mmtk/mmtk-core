@@ -97,12 +97,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.gen.get_spaces();
-        ret.push(&self.immix_space);
-        ret
-    }
-
     // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
     // are different types. However, it seems clippy does not recognize the constant type parameter and thinks we have identical blocks
     // in different if branches.

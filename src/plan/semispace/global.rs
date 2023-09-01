@@ -65,13 +65,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         }
     }
 
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.copyspace0);
-        ret.push(&self.copyspace1);
-        ret
-    }
-
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
