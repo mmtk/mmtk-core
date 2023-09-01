@@ -46,8 +46,6 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for MarkCompact<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &MARKCOMPACT_CONSTRAINTS
     }

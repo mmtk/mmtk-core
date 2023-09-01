@@ -127,9 +127,7 @@ pub fn create_plan<VM: VMBinding>(
     }
 
     // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    plan.get_spaces()
-        .into_iter()
-        .for_each(|s| s.initialize_sft());
+    plan.for_each_space(&mut |s| s.initialize_sft());
 
     plan
 }
@@ -167,9 +165,7 @@ pub fn create_gc_worker_context<VM: VMBinding>(
 /// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and
 /// they may call a wrong method by mistake.
 // TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
-pub trait Plan: 'static + Sync + Downcast {
-    type VM: VMBinding;
-
+pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn constraints(&self) -> &'static PlanConstraints;
 
     /// Create a copy config for this plan. A copying GC plan MUST override this method,
@@ -1027,18 +1023,21 @@ use crate::vm::VMBinding;
 /// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
 /// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
 /// implement (by hand or automatically) the method without `dyn`.
-pub trait HasSpaces<VM: VMBinding> {
+pub trait HasSpaces {
+    // The type of the VM used by HasSpaces.  So named so that Plan<VM = VM> will not be ambiguous.
+    type VM: VMBinding;
+
     /// Visit each space field immutably.
     ///
     /// If `Self` contains a parent field that contain more spaces, this method will visit spaces
     /// in the outer struct first.
-    fn for_each_space(&self, func: impl FnMut(&dyn Space<VM>));
+    fn for_each_space(&self, func: &mut dyn FnMut(&dyn Space<Self::VM>));
 
     /// Visit each space field mutably.
     ///
     /// If `Self` contains a parent field that contain more spaces, this method will visit spaces
     /// in the outer struct first.
-    fn for_each_space_mut(&mut self, func: impl FnMut(&mut dyn Space<VM>));
+    fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.

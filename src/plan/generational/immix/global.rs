@@ -66,8 +66,6 @@ pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for GenImmix<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &GENIMMIX_CONSTRAINTS
     }

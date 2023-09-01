@@ -46,8 +46,6 @@ pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for SemiSpace<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &SS_CONSTRAINTS
     }

@@ -37,8 +37,6 @@ pub struct NoGC<VM: VMBinding> {
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &NOGC_CONSTRAINTS
     }

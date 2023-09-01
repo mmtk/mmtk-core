@@ -45,8 +45,6 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for StickyImmix<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static crate::plan::PlanConstraints {
         &STICKY_IMMIX_CONSTRAINTS
     }

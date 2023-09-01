@@ -45,8 +45,6 @@ pub struct GenCopy<VM: VMBinding> {
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
 
 impl<VM: VMBinding> Plan for GenCopy<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &GENCOPY_CONSTRAINTS
     }

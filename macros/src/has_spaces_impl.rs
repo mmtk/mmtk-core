@@ -22,7 +22,9 @@ pub fn derive(input: DeriveInput) -> TokenStream2 {
     let items = generate_impl_items(&spaces, &parent);
 
     let output = quote! {
-        impl #impl_generics crate::plan::HasSpaces #ty_generics for #ident #ty_generics #where_clause {
+        impl #impl_generics crate::plan::HasSpaces for #ident #ty_generics #where_clause {
+            type VM = VM;
+
             #items
         }
     };
@@ -58,10 +60,10 @@ pub(crate) fn generate_impl_items<'a>(
     let (parent_visitor, parent_visitor_mut) = if let Some(f) = parent_field {
         let f_ident = f.ident.as_ref().unwrap();
         let visitor = quote! {
-            self.#f_ident.for_each_space(&mut __func)
+            self.#f_ident.for_each_space(__func)
         };
         let visitor_mut = quote! {
-            self.#f_ident.for_each_space_mut(&mut __func)
+            self.#f_ident.for_each_space_mut(__func)
         };
         (visitor, visitor_mut)
     } else {
@@ -69,12 +71,12 @@ pub(crate) fn generate_impl_items<'a>(
     };
 
     quote! {
-        fn for_each_space(&self, mut __func: impl FnMut(&dyn Space<VM>)) {
+        fn for_each_space(&self, __func: &mut dyn FnMut(&dyn Space<VM>)) {
             #(#space_visitors)*
             #parent_visitor
         }
 
-        fn for_each_space_mut(&mut self, mut __func: impl FnMut(&mut dyn Space<VM>)) {
+        fn for_each_space_mut(&mut self, __func: &mut dyn FnMut(&mut dyn Space<VM>)) {
             #(#space_visitors_mut)*
             #parent_visitor_mut
         }

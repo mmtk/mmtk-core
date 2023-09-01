@@ -33,8 +33,6 @@ pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for PageProtect<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &CONSTRAINTS
     }

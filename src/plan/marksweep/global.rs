@@ -47,8 +47,6 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
-    type VM = VM;
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.common.get_spaces();
         ret.push(&self.ms);
