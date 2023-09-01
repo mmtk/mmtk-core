@@ -43,6 +43,12 @@ impl<T: FixtureContent> Fixture<T> {
     }
 }
 
+impl<T: FixtureContent> Default for Fixture<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// SerialFixture ensures all `with_fixture()` calls will be executed serially.
 pub struct SerialFixture<T: FixtureContent> {
     content: Mutex<Option<Box<T>>>,
@@ -82,6 +88,12 @@ impl<T: FixtureContent> SerialFixture<T> {
         if let Err(e) = res {
             std::panic::resume_unwind(e);
         }
+    }
+}
+
+impl<T: FixtureContent> Default for SerialFixture<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
