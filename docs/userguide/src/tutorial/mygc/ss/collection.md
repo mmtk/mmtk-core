@@ -181,12 +181,19 @@ it can use `PlanProcessEdges`.
 
 You can manually provide an implementation of `PlanTraceObject` for `MyGC`. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of `PlanTraceObject`:
-* add `#[derive(PlanTraceObject)]` for `MyGC` (import the macro properly: `use mmtk_macros::PlanTraceObject`)
-* add `#[space]
-#[copy_semantics(CopySemantics::Default)]` to both copy space fields, `copyspace0` and `copyspace1`. This tells the macro to generate
-  trace code for both spaces, and for any copying in the spaces, use `CopySemantics::DefaultCopy` that we have configured early.
-* add `#[parent]` to `common`. This tells the macro that if an object is not found in any space with `#[space]` in ths plan,
-  try find the space for the object in the 'parent' plan. In our case, we fall back to the `CommonPlan`, as the object may be
+
+* Make sure `MyGC` already has the `#[derive(HasSpaces)]` attribute because all plans need to
+  implement the `HasSpaces` trait anyway.  (import the macro properly: `use mmtk_macros::HasSpaces`)
+* Add `#[derive(PlanTraceObject)]` for `MyGC` (import the macro properly: `use mmtk_macros::PlanTraceObject`)
+* Add both `#[space]` and `#[copy_semantics(CopySemantics::Default)]` to both copy space fields,
+  `copyspace0` and `copyspace1`. `#[space]` tells the macro that both `copyspace0` and `copyspace1`
+  are spaces in the `MyGC` plan, and the generated trace code will check both spaces.
+  `#[copy_semantics(CopySemantics::DefaultCopy)]` specifies the copy semantics to use when tracing
+  objects in the corresponding space.
+* Add `#[parent]` to `common`. This tells the macro that there are more spaces defined in `common`
+  and its nested structs.  If an object is not found in any space with `#[space]` in this plan,
+  the trace code will try to find the space for the object in the 'parent' plan.  In our case, the
+  trace code will proceed by checking spaces in the `CommonPlan`, as the object may be
   in large object space or immortal space in the common plan. `CommonPlan` also implements `PlanTraceObject`, so it knows how to
   find a space for the object and trace it in the same way.
 
@@ -239,7 +246,7 @@ In the end, use `MyGCProcessEdges` as `ProcessEdgesWorkType` in the `GCWorkConte
 ## Summary
 
 You should now have MyGC working and able to collect garbage. All three
-benchmarks should be able to pass now. 
+benchmarks should be able to pass now.
 
 If the benchmarks pass - good job! You have built a functional copying
 collector!

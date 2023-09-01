@@ -14,7 +14,7 @@ use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -32,10 +32,10 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 pub struct MyGC<VM: VMBinding> {
     pub hi: AtomicBool,
     #[space]
-#[copy_semantics(CopySemantics::DefaultCopy)]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
     #[space]
-#[copy_semantics(CopySemantics::DefaultCopy)]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace<VM>,
     #[parent]
     pub common: CommonPlan<VM>,
@@ -53,8 +53,6 @@ pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
 // ANCHOR_END: constraints
 
 impl<VM: VMBinding> Plan for MyGC<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &MYGC_CONSTRAINTS
     }
@@ -75,15 +73,6 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         }
     }
     // ANCHOR_END: create_copy_config
-
-    // ANCHOR: get_spaces
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.copyspace0);
-        ret.push(&self.copyspace1);
-        ret
-    }
-    // ANCHOR_EN: get_spaces
 
     // Modify
     // ANCHOR: schedule_collection
@@ -190,12 +179,7 @@ impl<VM: VMBinding> MyGC<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.common.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.copyspace0.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.copyspace1.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.verify_side_metadata_sanity();
 
         res
     }
