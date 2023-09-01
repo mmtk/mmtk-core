@@ -7,7 +7,9 @@ edition = "2021"
 [lib]
 name = "mmtk_dummyvm"
 # be careful - LTO is only allowed for certain crate types
-crate-type = ["cdylib"]
+# We know that cdylib should work for LTO.
+# We keep rlib here as we need to use the crate from benches.
+crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 lto = true
@@ -19,6 +21,13 @@ lazy_static = "1.1"
 atomic_refcell = "0.1.7"
 atomic = "0.4.6"
 log = "0.4"
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "bench_main"
+harness = false
 
 [features]
 default = []

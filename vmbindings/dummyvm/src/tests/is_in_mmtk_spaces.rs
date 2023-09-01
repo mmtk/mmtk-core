@@ -1,7 +1,7 @@
 // GITHUB-CI: MMTK_PLAN=all
 
 use crate::api::mmtk_is_in_mmtk_spaces as is_in_mmtk_spaces;
-use crate::tests::fixtures::{Fixture, SingleObject};
+use crate::test_fixtures::{Fixture, SingleObject};
 use mmtk::util::*;
 
 lazy_static! {
