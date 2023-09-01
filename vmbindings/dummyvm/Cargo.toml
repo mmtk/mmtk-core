@@ -26,7 +26,7 @@ log = "0.4"
 criterion = "0.4"
 
 [[bench]]
-name = "bench_main"
+name = "main"
 harness = false
 
 [features]
@@ -36,3 +36,7 @@ malloc_counted_size = ["mmtk/malloc_counted_size"]
 malloc_mark_sweep = ["mmtk/malloc_mark_sweep"]
 vo_bit = ["mmtk/vo_bit"]
 extreme_assertions = ["mmtk/extreme_assertions"]
+
+# Feature to control which benchmarks to run. See benches/main.rs
+bench_sft = []
+bench_alloc = []

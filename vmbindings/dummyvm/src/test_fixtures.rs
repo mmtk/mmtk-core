@@ -171,8 +171,13 @@ pub struct MutatorFixture {
 impl FixtureContent for MutatorFixture {
     fn create() -> Self {
         const MB: usize = 1024 * 1024;
-        // 1MB heap
-        mmtk_init(MB);
+        Self::create_with_heapsize(MB)
+    }
+}
+
+impl MutatorFixture {
+    pub fn create_with_heapsize(size: usize) -> Self {
+        mmtk_init(size);
         mmtk_initialize_collection(VMThread::UNINITIALIZED);
         // Make sure GC does not run during test.
         mmtk_disable_collection();
