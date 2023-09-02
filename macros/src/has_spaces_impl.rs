@@ -21,15 +21,13 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream2 {
 
     let items = generate_impl_items(&spaces, &parent);
 
-    let output = quote! {
+    quote! {
         impl #impl_generics crate::plan::HasSpaces for #ident #ty_generics #where_clause {
             type VM = VM;
 
             #items
         }
-    };
-
-    output.into()
+    }
 }
 
 pub(crate) fn generate_impl_items<'a>(
