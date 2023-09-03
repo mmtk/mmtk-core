@@ -325,6 +325,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     fn linear_scan_objects(
         &self,
         range: Range<Address>,
+        to_be_compacted_only: bool,
         mut f: impl FnMut(ObjectReference, usize, usize, usize),
     ) {
         let linear_scan = crate::util::linear_scan::ObjectIterator::<
@@ -332,7 +333,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             MarkCompactObjectSize<VM>,
             true,
         >::new(range.start, range.end);
-        for obj in linear_scan.filter(|obj| Self::to_be_compacted(*obj)) {
+        for obj in linear_scan.filter(|obj| !to_be_compacted_only || Self::to_be_compacted(*obj)) {
             let copied_size =
                 VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
             let align = VM::VMObjectModel::get_align_when_copied(obj);
@@ -389,33 +390,37 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         for (from_start, from_end) in self.iterate_contiguous_regions() {
             println!("region {:?}", from_start..from_end);
             // linear scan the contiguous region
-            self.linear_scan_objects(from_start..from_end, |obj, copied_size, align, offset| {
-                // move to_cursor to aliged start address
-                to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
-                // move to next to-block if there is no sufficient memory in current region
-                if to_cursor + copied_size > to_end {
-                    (to_cursor, to_end) = to_iter.next().unwrap();
+            self.linear_scan_objects(
+                from_start..from_end,
+                true,
+                |obj, copied_size, align, offset| {
+                    // move to_cursor to aliged start address
                     to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
-                    assert!(to_cursor + copied_size <= to_end);
-                }
-                // Get copied object
-                let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
-                    obj,
-                    to_cursor + Self::HEADER_RESERVED_IN_BYTES,
-                );
-                println!("get_reference_when_copied_to {:?} {:?}", obj, new_obj);
-                // update forwarding pointer
-                Self::store_header_forwarding_pointer(obj, new_obj);
-                trace!(
-                    "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
-                    obj,
-                    VM::VMObjectModel::get_size_when_copied(obj),
-                    to_cursor,
-                    copied_size
-                );
-                // bump to_cursor
-                to_cursor += copied_size;
-            });
+                    // move to next to-block if there is no sufficient memory in current region
+                    if to_cursor + copied_size > to_end {
+                        (to_cursor, to_end) = to_iter.next().unwrap();
+                        to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
+                        assert!(to_cursor + copied_size <= to_end);
+                    }
+                    // Get copied object
+                    let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
+                        obj,
+                        to_cursor + Self::HEADER_RESERVED_IN_BYTES,
+                    );
+                    println!("get_reference_when_copied_to {:?} {:?}", obj, new_obj);
+                    // update forwarding pointer
+                    Self::store_header_forwarding_pointer(obj, new_obj);
+                    trace!(
+                        "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
+                        obj,
+                        VM::VMObjectModel::get_size_when_copied(obj),
+                        to_cursor,
+                        copied_size
+                    );
+                    // bump to_cursor
+                    to_cursor += copied_size;
+                },
+            );
         }
     }
 
@@ -427,27 +432,32 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let mut to = Address::ZERO;
 
         for (from_start, from_end) in self.iterate_contiguous_regions() {
-            self.linear_scan_objects(from_start..from_end, |obj, copied_size, _align, _offset| {
-                // clear the VO bit
-                vo_bit::unset_vo_bit::<VM>(obj);
+            println!("compact {:?}", from_start..from_end);
+            self.linear_scan_objects(
+                from_start..from_end,
+                false,
+                |obj, copied_size, _align, _offset| {
+                    // clear the VO bit
+                    vo_bit::unset_vo_bit::<VM>(obj);
 
-                let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
+                    let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 
-                trace!("Compact {} to {}", obj, forwarding_pointer);
-                if !forwarding_pointer.is_null() {
-                    let new_object = forwarding_pointer;
-                    Self::clear_header_forwarding_pointer(new_object);
+                    trace!("Compact {} to {}", obj, forwarding_pointer);
+                    if !forwarding_pointer.is_null() {
+                        let new_object = forwarding_pointer;
+                        Self::clear_header_forwarding_pointer(new_object);
 
-                    // copy object
-                    trace!(" copy from {} to {}", obj, new_object);
-                    let _end_of_new_object =
-                        VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                    // update VO bit,
-                    vo_bit::set_vo_bit::<VM>(new_object);
-                    to = new_object.to_object_start::<VM>() + copied_size;
-                    // debug_assert_eq!(end_of_new_object, to);
-                }
-            });
+                        // copy object
+                        trace!(" copy from {} to {}", obj, new_object);
+                        let _end_of_new_object =
+                            VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                        // update VO bit,
+                        vo_bit::set_vo_bit::<VM>(new_object);
+                        to = new_object.to_object_start::<VM>() + copied_size;
+                        // debug_assert_eq!(end_of_new_object, to);
+                    }
+                },
+            );
         }
 
         // debug!("Compact end: to = {}", to);

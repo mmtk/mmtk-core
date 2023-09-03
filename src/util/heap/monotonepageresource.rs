@@ -1,6 +1,7 @@
 use super::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 use crate::policy::space::required_chunks;
 use crate::util::address::Address;
+use crate::util::constants::{BYTES_IN_PAGE, LOG_BYTES_IN_PAGE};
 use crate::util::conversions::*;
 use std::sync::{Mutex, MutexGuard};
 
@@ -253,22 +254,55 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
      }
      }*/
 
-    pub fn reset_cursor(&self, _start: Address) {
+    pub fn reset_cursor(&self, start: Address) {
+        println!("reset_cursor {:?}", start);
         if self.common.contiguous {
             let mut guard = self.sync.lock().unwrap();
-            let cursor = _start.align_up(crate::util::constants::BYTES_IN_PAGE);
-            let chunk = chunk_align_down(_start);
-            let start = match guard.conditional {
-                MonotonePageResourceConditional::Contiguous { start: _start, .. } => _start,
+            let cursor = start.align_up(crate::util::constants::BYTES_IN_PAGE);
+            let chunk = chunk_align_down(start);
+            let space_start = match guard.conditional {
+                MonotonePageResourceConditional::Contiguous { start, .. } => start,
                 _ => unreachable!(),
             };
-            let pages = bytes_to_pages(_start - start);
+            let pages = bytes_to_pages(start - space_start);
             self.common.accounting.reset();
             self.common.accounting.reserve_and_commit(pages);
             guard.current_chunk = chunk;
             guard.cursor = cursor;
         } else {
-            unimplemented!();
+            let mut chunk_start = self.common.get_head_discontiguous_region();
+            let mut last_live_chunk = None;
+            let mut release_chunks = vec![];
+            let mut live_size = 0;
+            while !chunk_start.is_zero() {
+                let chunk_end = chunk_start
+                    + (self.common.vm_map.get_contiguous_region_chunks(chunk_start)
+                        << LOG_BYTES_IN_CHUNK);
+                if start >= chunk_start && start < chunk_end {
+                    // This is the last live chunk
+                    last_live_chunk = Some(chunk_start);
+                    let mut guard = self.sync.lock().unwrap();
+                    guard.current_chunk = chunk_start;
+                    guard.sentinel = chunk_end;
+                    guard.cursor = start.align_up(BYTES_IN_PAGE);
+                    live_size += start - chunk_start;
+                    println!("keep {:?}", chunk_start);
+                    // break;
+                } else if last_live_chunk.is_some() {
+                    release_chunks.push(chunk_start)
+                } else {
+                    println!("keep {:?}", chunk_start);
+                    live_size += chunk_end - chunk_start;
+                }
+                chunk_start = self.common.vm_map.get_next_contiguous_region(chunk_start);
+            }
+            for c in release_chunks.iter().rev() {
+                println!("release {:?}", c);
+                self.common.release_discontiguous_chunks(*c);
+            }
+            let pages = bytes_to_pages(live_size);
+            self.common.accounting.reset();
+            self.common.accounting.reserve_and_commit(pages);
         }
     }
 
