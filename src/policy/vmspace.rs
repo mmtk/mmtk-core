@@ -95,9 +95,9 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         // Initialize sft for current external pages. This method is called at the end of plan creation.
         // So we only set SFT for VM regions that are set by options (we skipped sft initialization for them earlier).
         let vm_regions = self.pr.get_external_pages();
-        // We should only have region at this point (set by the option). If we allow setting multiple VM spaces through options,
+        // We should have at most one region at this point (set by the option). If we allow setting multiple VM spaces through options,
         // we can remove this assertion.
-        assert_eq!(vm_regions.len(), 1);
+        assert!(vm_regions.len() <= 1);
         for external_pages in vm_regions.iter() {
             // Chunk align things.
             let start = external_pages.start.align_down(BYTES_IN_CHUNK);
