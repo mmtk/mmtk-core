@@ -180,7 +180,9 @@ pub enum AllocatorSelector {
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorInfo {
-    BumpPointer { bump_pointer_offset: usize },
+    BumpPointer {
+        bump_pointer_offset: usize,
+    },
     // FIXME: Add free-list fast-path
     Unimplemented,
     #[default]
