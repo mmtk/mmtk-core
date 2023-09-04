@@ -12,7 +12,8 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream2 {
     let syn::Data::Struct(syn::DataStruct {
         fields: syn::Fields::Named(ref fields),
         ..
-    }) = input.data else {
+    }) = input.data
+    else {
         abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.");
     };
 
