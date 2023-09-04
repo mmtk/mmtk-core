@@ -563,8 +563,8 @@ impl SideMetadataSpec {
                 }
             },
             |_v| {
-                // #[cfg(feature = "extreme_assertions")]
-                // sanity::verify_load(self, data_addr, _v);
+                #[cfg(feature = "extreme_assertions")]
+                sanity::verify_load(self, data_addr, _v);
             },
         )
     }
