@@ -621,7 +621,7 @@ pub trait ProcessEdgesWork:
     /// Create an object-scanning work packet to be used for this ProcessEdgesWork.
     ///
     /// `roots` indicates if we are creating a packet for root scanning.  It is only true when this
-    /// method is called to handle `RootsWorkFactory::create_process_pinned_roots_work`.
+    /// method is called to handle `RootsWorkFactory::create_process_pinning_roots_work`.
     fn create_scan_work(
         &self,
         nodes: Vec<ObjectReference>,
@@ -743,7 +743,7 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
         );
     }
 
-    fn create_process_pinned_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         // Will process roots within the NodeRootsTrace bucket
         // And put work in the Closure bucket
         crate::memory_manager::add_work_packet(
@@ -1151,7 +1151,8 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
     }
 }
 
-// // create UnsupportedProcessEdge
+/// A `ProcessEdgesWork` type that panics when any of its method is used.
+/// This is currently used for plans that do not support transitively pinning.
 #[derive(Default)]
 pub struct UnsupportedProcessEdges<VM: VMBinding> {
     phantom: PhantomData<VM>,
