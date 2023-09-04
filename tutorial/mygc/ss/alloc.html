@@ -233,7 +233,7 @@ use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -253,24 +253,29 @@ This holds an instance of the common plan.</li>
 <p>Finished code (step 2):</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>#[derive(PlanTraceObject)]
+</span>#[derive(HasSpaces, PlanTraceObject)]
 pub struct MyGC&lt;VM: VMBinding&gt; {
     pub hi: AtomicBool,
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace&lt;VM&gt;,
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace&lt;VM&gt;,
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Note that we have attributes on some fields. These attributes tell MMTk's macros on
-how to generate code to trace objects in this plan. Although there are other approaches that
-you can implement object tracing, in this tutorial we use the macros, as it is the simplest.
-Make sure you import the macros. We will discuss on what those attributes mean in later sections.</p>
+<p>Note that <code>MyGC</code> now also derives <code>PlanTraceObject</code> besides <code>HasSpaces</code>, and we
+have attributes on some fields. These attributes tell MMTk's macros how to
+generate code to visit each space of this plan as well as trace objects in this
+plan.  Although there are other approaches that you can implement object
+tracing, in this tutorial we use the macros, as it is the simplest.  Make sure
+you import the macros. We will discuss on what those attributes mean in later
+sections.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use mmtk_macros::PlanTraceObject;
+</span>use mmtk_macros::{HasSpaces, PlanTraceObject};
 <span class="boring">}</span></code></pre></pre>
 <h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
 <h4 id="constructor"><a class="header" href="#constructor">Constructor</a></h4>
@@ -308,12 +313,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.common.verify_side_metadata_sanity(&amp;mut side_metadata_sanity_checker);
-        res.copyspace0.verify_side_metadata_sanity(&amp;mut side_metadata_sanity_checker);
-        res.copyspace1.verify_side_metadata_sanity(&amp;mut side_metadata_sanity_checker);
+        res.verify_side_metadata_sanity();
 
         res
     }

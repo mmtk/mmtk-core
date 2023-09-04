@@ -1059,25 +1059,6 @@
 <a href="#1059" id="1059">1059</a>
 <a href="#1060" id="1060">1060</a>
 <a href="#1061" id="1061">1061</a>
-<a href="#1062" id="1062">1062</a>
-<a href="#1063" id="1063">1063</a>
-<a href="#1064" id="1064">1064</a>
-<a href="#1065" id="1065">1065</a>
-<a href="#1066" id="1066">1066</a>
-<a href="#1067" id="1067">1067</a>
-<a href="#1068" id="1068">1068</a>
-<a href="#1069" id="1069">1069</a>
-<a href="#1070" id="1070">1070</a>
-<a href="#1071" id="1071">1071</a>
-<a href="#1072" id="1072">1072</a>
-<a href="#1073" id="1073">1073</a>
-<a href="#1074" id="1074">1074</a>
-<a href="#1075" id="1075">1075</a>
-<a href="#1076" id="1076">1076</a>
-<a href="#1077" id="1077">1077</a>
-<a href="#1078" id="1078">1078</a>
-<a href="#1079" id="1079">1079</a>
-<a href="#1080" id="1080">1080</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::gc_requester::GCRequester;
@@ -1113,7 +1094,7 @@
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::{Arc, Mutex};
 
-<span class="kw">use </span>mmtk_macros::PlanTraceObject;
+<span class="kw">use </span>mmtk_macros::{HasSpaces, PlanTraceObject};
 
 <span class="kw">pub fn </span>create_mutator&lt;VM: VMBinding&gt;(
     tls: VMMutatorThread,
@@ -1207,9 +1188,7 @@
     }
 
     <span class="comment">// Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    </span>plan.get_spaces()
-        .into_iter()
-        .for_each(|s| s.initialize_sft());
+    </span>plan.for_each_space(<span class="kw-2">&amp;mut </span>|s| s.initialize_sft());
 
     plan
 }
@@ -1236,7 +1215,8 @@
 /// 2. Create a vector of all the side metadata specs with `SideMetadataContext::new_global_specs()`,
 ///    the parameter is a vector of global side metadata specs that are specific to the plan.
 /// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
-/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
+/// 4. Invoke the `verify_side_metadata_sanity()` method of the plan.
+///    It will create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
 ///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
 ///
 /// Methods in this trait:
@@ -1247,9 +1227,7 @@
 /// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and
 /// they may call a wrong method by mistake.
 </span><span class="comment">// TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
-</span><span class="kw">pub trait </span>Plan: <span class="lifetime">&#39;static </span>+ Sync + Downcast {
-    <span class="kw">type </span>VM: VMBinding;
-
+</span><span class="kw">pub trait </span>Plan: <span class="lifetime">&#39;static </span>+ HasSpaces + Sync + Downcast {
     <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints;
 
     <span class="doccomment">/// Create a copy config for this plan. A copying GC plan MUST override this method,
@@ -1273,9 +1251,6 @@
     <span class="kw">fn </span>options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base().options
     }
-
-    <span class="doccomment">/// get all the spaces in the plan
-    </span><span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;;
 
     <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;;
 
@@ -1451,6 +1426,14 @@
     </span><span class="kw">fn </span>sanity_check_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">true
     </span>}
+
+    <span class="doccomment">/// Call `space.verify_side_metadata_sanity` for all spaces in this plan.
+    </span><span class="kw">fn </span>verify_side_metadata_sanity(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
+        <span class="self">self</span>.for_each_space(<span class="kw-2">&amp;mut </span>|space| {
+            space.verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
+        })
+    }
 }
 
 <span class="macro">impl_downcast!</span>(Plan assoc VM);
@@ -1465,7 +1448,7 @@
 <span class="doccomment">/**
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
-</span><span class="attr">#[derive(PlanTraceObject)]
+</span><span class="attr">#[derive(HasSpaces, PlanTraceObject)]
 </span><span class="kw">pub struct </span>BasePlan&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     </span><span class="kw">pub </span>initialized: AtomicBool,
@@ -1511,13 +1494,13 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
     <span class="comment">// Spaces in base plan
     </span><span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
-    #[trace]
+    #[space]
     </span><span class="kw">pub </span>code_space: ImmortalSpace&lt;VM&gt;,
     <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
-    #[trace]
+    #[space]
     </span><span class="kw">pub </span>code_lo_space: ImmortalSpace&lt;VM&gt;,
     <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
-    #[trace]
+    #[space]
     </span><span class="kw">pub </span>ro_space: ImmortalSpace&lt;VM&gt;,
 
     <span class="doccomment">/// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
@@ -1533,7 +1516,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
     </span><span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-    #[trace]
+    #[space]
     </span><span class="kw">pub </span>vm_space: VMSpace&lt;VM&gt;,
 }
 
@@ -1644,19 +1627,6 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="attr">#[cfg(feature = <span class="string">&quot;analysis&quot;</span>)]
             </span>analysis_manager,
         }
-    }
-
-    <span class="kw">pub fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt; {
-        <span class="macro">vec!</span>[
-            <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
-            </span><span class="kw-2">&amp;</span><span class="self">self</span>.code_space,
-            <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
-            </span><span class="kw-2">&amp;</span><span class="self">self</span>.code_lo_space,
-            <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
-            </span><span class="kw-2">&amp;</span><span class="self">self</span>.ro_space,
-            <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-            </span><span class="kw-2">&amp;</span><span class="self">self</span>.vm_space,
-        ]
     }
 
     <span class="doccomment">/// The application code has requested a collection.
@@ -1942,23 +1912,6 @@ BasePlan should contain all plan-related state and functions that are _fundament
         space_full || stress_force_gc || heap_full
     }
 
-    <span class="attr">#[allow(unused_variables)] </span><span class="comment">// depending on the enabled features, base may not be used.
-    </span><span class="attr">#[allow(clippy::needless_pass_by_ref_mut)] </span><span class="comment">// depending on the enabled features, base may not be used.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>verify_side_metadata_sanity(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        side_metadata_sanity_checker: <span class="kw-2">&amp;mut </span>SideMetadataSanity,
-    ) {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
-        </span><span class="self">self</span>.code_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
-        </span><span class="self">self</span>.ro_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-        </span><span class="self">self</span>.vm_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-    }
-
     <span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_malloc_bytes_by(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize) {
         <span class="self">self</span>.malloc_bytes.fetch_add(size, Ordering::SeqCst);
@@ -1976,16 +1929,16 @@ BasePlan should contain all plan-related state and functions that are _fundament
 <span class="doccomment">/**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
-</span><span class="attr">#[derive(PlanTraceObject)]
+</span><span class="attr">#[derive(HasSpaces, PlanTraceObject)]
 </span><span class="kw">pub struct </span>CommonPlan&lt;VM: VMBinding&gt; {
-    <span class="attr">#[trace]
+    <span class="attr">#[space]
     </span><span class="kw">pub </span>immortal: ImmortalSpace&lt;VM&gt;,
-    <span class="attr">#[trace]
+    <span class="attr">#[space]
     </span><span class="kw">pub </span>los: LargeObjectSpace&lt;VM&gt;,
     <span class="comment">// TODO: We should use a marksweep space for nonmoving.
-    </span><span class="attr">#[trace]
+    </span><span class="attr">#[space]
     </span><span class="kw">pub </span>nonmoving: ImmortalSpace&lt;VM&gt;,
-    <span class="attr">#[fallback_trace]
+    <span class="attr">#[parent]
     </span><span class="kw">pub </span>base: BasePlan&lt;VM&gt;,
 }
 
@@ -2008,14 +1961,6 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             )),
             base: BasePlan::new(args),
         }
-    }
-
-    <span class="kw">pub fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.base.get_spaces();
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.immortal);
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.los);
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.nonmoving);
-        ret
     }
 
     <span class="kw">pub fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
@@ -2075,24 +2020,41 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="kw">pub fn </span>get_nonmoving(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ImmortalSpace&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.nonmoving
     }
-
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>verify_side_metadata_sanity(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        side_metadata_sanity_checker: <span class="kw-2">&amp;mut </span>SideMetadataSanity,
-    ) {
-        <span class="self">self</span>.base
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        <span class="self">self</span>.immortal
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        <span class="self">self</span>.los
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        <span class="self">self</span>.nonmoving
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-    }
 }
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+
+<span class="doccomment">/// A trait for anything that contains spaces.
+/// Examples include concrete plans as well as `Gen`, `CommonPlan` and `BasePlan`.
+/// All plans must implement this trait.
+///
+/// This trait provides methods for enumerating spaces in a struct, including spaces in nested
+/// struct.
+///
+/// This trait can be implemented automatically by adding the `#[derive(HasSpaces)]` attribute to a
+/// struct.  It uses the derive macro defined in the `mmtk-macros` crate.
+///
+/// This trait visits spaces as `dyn`, so it should only be used when performance is not critical.
+/// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
+/// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
+/// implement (by hand or automatically) the method without `dyn`.
+</span><span class="kw">pub trait </span>HasSpaces {
+    <span class="comment">// The type of the VM.
+    </span><span class="kw">type </span>VM: VMBinding;
+
+    <span class="doccomment">/// Visit each space field immutably.
+    ///
+    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
+    /// in the outer struct first.
+    </span><span class="kw">fn </span>for_each_space(<span class="kw-2">&amp;</span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
+
+    <span class="doccomment">/// Visit each space field mutably.
+    ///
+    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
+    /// in the outer struct first.
+    </span><span class="kw">fn </span>for_each_space_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>, func: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;));
+}
 
 <span class="doccomment">/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
 /// Generally a plan does not need to manually implement this trait. Instead, we provide

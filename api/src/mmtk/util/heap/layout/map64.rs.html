@@ -265,6 +265,8 @@
 <a href="#265" id="265">265</a>
 <a href="#266" id="266">266</a>
 <a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -323,7 +325,9 @@
                 // elide the storing of 0 for each of the element.  Using standard vector creation,
                 // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
                 // slowdown during start-up.
-                </span>descriptor_map: <span class="kw">unsafe </span>{ new_zeroed_vec::&lt;SpaceDescriptor&gt;(vm_layout().max_chunks()) },
+                </span>descriptor_map: <span class="kw">unsafe </span>{
+                    new_zeroed_vec::&lt;SpaceDescriptor&gt;(vm_layout().max_chunks())
+                },
                 high_water,
                 base_address,
                 fl_page_resources: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],

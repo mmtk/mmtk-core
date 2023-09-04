@@ -261,24 +261,6 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -310,20 +292,21 @@
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="kw">use </span>mmtk_macros::PlanTraceObject;
+<span class="kw">use </span>mmtk_macros::{HasSpaces, PlanTraceObject};
 
 <span class="doccomment">/// Generational immix. This implements the functionality of a two-generation copying
 /// collector where the higher generation is an immix space.
 /// See the PLDI&#39;08 paper by Blackburn and McKinley for a description
 /// of the algorithm: &lt;http://doi.acm.org/10.1145/1375581.1375586&gt;.
-</span><span class="attr">#[derive(PlanTraceObject)]
+</span><span class="attr">#[derive(HasSpaces, PlanTraceObject)]
 </span><span class="kw">pub struct </span>GenImmix&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Generational plan, which includes a nursery space and operations related with nursery.
-    </span><span class="attr">#[fallback_trace]
+    </span><span class="attr">#[parent]
     </span><span class="kw">pub </span>gen: CommonGenPlan&lt;VM&gt;,
     <span class="doccomment">/// An immix space as the mature space.
     </span><span class="attr">#[post_scan]
-    #[trace(CopySemantics::Mature)]
+    #[space]
+    #[copy_semantics(CopySemantics::Mature)]
     </span><span class="kw">pub </span>immix_space: ImmixSpace&lt;VM&gt;,
     <span class="doccomment">/// Whether the last GC was a defrag GC for the immix space.
     </span><span class="kw">pub </span>last_gc_was_defrag: AtomicBool,
@@ -346,8 +329,6 @@
 };
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>GenImmix&lt;VM&gt; {
-    <span class="kw">type </span>VM = VM;
-
     <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints {
         <span class="kw-2">&amp;</span>GENIMMIX_CONSTRAINTS
     }
@@ -377,12 +358,6 @@
         </span><span class="self">Self</span>: Sized,
     {
         <span class="self">self</span>.gen.collection_required(<span class="self">self</span>, space_full, space)
-    }
-
-    <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.gen.get_spaces();
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.immix_space);
-        ret
     }
 
     <span class="comment">// GenImmixMatureProcessEdges&lt;VM, { TraceKind::Defrag }&gt; and GenImmixMatureProcessEdges&lt;VM, { TraceKind::Fast }&gt;
@@ -540,18 +515,7 @@
             last_gc_was_full_heap: AtomicBool::new(<span class="bool-val">false</span>),
         };
 
-        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        </span>{
-            <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
-            <span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
-            genimmix
-                .gen
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-            genimmix
-                .immix_space
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-        }
+        genimmix.verify_side_metadata_sanity();
 
         genimmix
     }

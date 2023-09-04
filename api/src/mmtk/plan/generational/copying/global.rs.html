@@ -260,24 +260,6 @@
 <a href="#260" id="260">260</a>
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
-<a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
@@ -298,7 +280,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
-<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
@@ -307,24 +288,24 @@
 <span class="kw">use </span>enum_map::EnumMap;
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
 
-<span class="kw">use </span>mmtk_macros::PlanTraceObject;
+<span class="kw">use </span>mmtk_macros::{HasSpaces, PlanTraceObject};
 
-<span class="attr">#[derive(PlanTraceObject)]
+<span class="attr">#[derive(HasSpaces, PlanTraceObject)]
 </span><span class="kw">pub struct </span>GenCopy&lt;VM: VMBinding&gt; {
-    <span class="attr">#[fallback_trace]
+    <span class="attr">#[parent]
     </span><span class="kw">pub </span>gen: CommonGenPlan&lt;VM&gt;,
     <span class="kw">pub </span>hi: AtomicBool,
-    <span class="attr">#[trace(CopySemantics::Mature)]
+    <span class="attr">#[space]
+    #[copy_semantics(CopySemantics::Mature)]
     </span><span class="kw">pub </span>copyspace0: CopySpace&lt;VM&gt;,
-    <span class="attr">#[trace(CopySemantics::Mature)]
+    <span class="attr">#[space]
+    #[copy_semantics(CopySemantics::Mature)]
     </span><span class="kw">pub </span>copyspace1: CopySpace&lt;VM&gt;,
 }
 
 <span class="kw">pub const </span>GENCOPY_CONSTRAINTS: PlanConstraints = <span class="kw">crate</span>::plan::generational::GEN_CONSTRAINTS;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>GenCopy&lt;VM&gt; {
-    <span class="kw">type </span>VM = VM;
-
     <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints {
         <span class="kw-2">&amp;</span>GENCOPY_CONSTRAINTS
     }
@@ -350,13 +331,6 @@
         </span><span class="self">Self</span>: Sized,
     {
         <span class="self">self</span>.gen.collection_required(<span class="self">self</span>, space_full, space)
-    }
-
-    <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.gen.get_spaces();
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.copyspace0);
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.copyspace1);
-        ret
     }
 
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
@@ -507,17 +481,7 @@
             copyspace1,
         };
 
-        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        </span>{
-            <span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
-            res.gen
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-            res.copyspace0
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-            res.copyspace1
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-        }
+        res.verify_side_metadata_sanity();
 
         res
     }

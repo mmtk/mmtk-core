@@ -375,25 +375,34 @@ it can use <code>PlanProcessEdges</code>.</p>
 <p>You can manually provide an implementation of <code>PlanTraceObject</code> for <code>MyGC</code>. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of <code>PlanTraceObject</code>:</p>
 <ul>
-<li>add <code>#[derive(PlanTraceObject)]</code> for <code>MyGC</code> (import the macro properly: <code>use mmtk_macros::PlanTraceObject</code>)</li>
-<li>add <code>#[trace(CopySemantics::Default)]</code> to both copy space fields, <code>copyspace0</code> and <code>copyspace1</code>. This tells the macro to generate
-trace code for both spaces, and for any copying in the spaces, use <code>CopySemantics::DefaultCopy</code> that we have configured early.</li>
-<li>add <code>#[fallback_trace]</code> to <code>common</code>. This tells the macro that if an object is not found in any space with <code>#[trace]</code> in ths plan,
-try find the space for the object in the 'parent' plan. In our case, we fall back to the <code>CommonPlan</code>, as the object may be
+<li>Make sure <code>MyGC</code> already has the <code>#[derive(HasSpaces)]</code> attribute because all plans need to
+implement the <code>HasSpaces</code> trait anyway.  (import the macro properly: <code>use mmtk_macros::HasSpaces</code>)</li>
+<li>Add <code>#[derive(PlanTraceObject)]</code> for <code>MyGC</code> (import the macro properly: <code>use mmtk_macros::PlanTraceObject</code>)</li>
+<li>Add both <code>#[space]</code> and <code>#[copy_semantics(CopySemantics::Default)]</code> to both copy space fields,
+<code>copyspace0</code> and <code>copyspace1</code>. <code>#[space]</code> tells the macro that both <code>copyspace0</code> and <code>copyspace1</code>
+are spaces in the <code>MyGC</code> plan, and the generated trace code will check both spaces.
+<code>#[copy_semantics(CopySemantics::DefaultCopy)]</code> specifies the copy semantics to use when tracing
+objects in the corresponding space.</li>
+<li>Add <code>#[parent]</code> to <code>common</code>. This tells the macro that there are more spaces defined in <code>common</code>
+and its nested structs.  If an object is not found in any space with <code>#[space]</code> in this plan,
+the trace code will try to find the space for the object in the 'parent' plan.  In our case, the
+trace code will proceed by checking spaces in the <code>CommonPlan</code>, as the object may be
 in large object space or immortal space in the common plan. <code>CommonPlan</code> also implements <code>PlanTraceObject</code>, so it knows how to
 find a space for the object and trace it in the same way.</li>
 </ul>
 <p>With the derive macro, your <code>MyGC</code> struct should look like this:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>#[derive(PlanTraceObject)]
+</span>#[derive(HasSpaces, PlanTraceObject)]
 pub struct MyGC&lt;VM: VMBinding&gt; {
     pub hi: AtomicBool,
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace&lt;VM&gt;,
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace&lt;VM&gt;,
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
@@ -407,76 +416,6 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext2&l
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
-}
-
-use crate::util::ObjectReference;
-use crate::util::copy::CopySemantics;
-use crate::MMTK;
-use crate::policy::space::Space;
-
-pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
-    plan: &amp;'static MyGC&lt;VM&gt;,
-    base: ProcessEdgesBase&lt;VM&gt;,
-}
-
-impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
-    type VM = VM;
-    type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
-
-    fn new(edges: Vec&lt;EdgeOf&lt;Self&gt;&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
-        Self { base, plan }
-    }
-
-    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        let worker = self.worker();
-        let queue = &amp;mut self.base.nodes;
-        if self.plan.tospace().in_space(object) {
-            self.plan.tospace().trace_object(
-                queue,
-                object,
-                Some(CopySemantics::DefaultCopy),
-                worker,
-            )
-        } else if self.plan.fromspace().in_space(object) {
-            self.plan.fromspace().trace_object(
-                queue,
-                object,
-                Some(CopySemantics::DefaultCopy),
-                worker,
-            )
-        } else {
-            self.plan.common.trace_object(queue, object, worker)
-        }
-    }
-
-    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
-        ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
-    }
-}
-
-impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
-    type Target = ProcessEdgesBase&lt;VM&gt;;
-    fn deref(&amp;self) -&gt; &amp;Self::Target {
-        &amp;self.base
-    }
-}
-
-impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
-        &amp;mut self.base
-    }
-}
-
-pub struct MyGCWorkContext3&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
-impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&lt;VM&gt; {
-    type VM = VM;
-    type PlanType = MyGC&lt;VM&gt;;
-    type ProcessEdgesWorkType = MyGCProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="approach-3-implement-your-own-processedgeswork"><a class="header" href="#approach-3-implement-your-own-processedgeswork">Approach 3: Implement your own <code>ProcessEdgesWork</code></a></h3>
@@ -571,7 +510,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&l
 <span class="boring">}</span></code></pre></pre>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <p>You should now have MyGC working and able to collect garbage. All three
-benchmarks should be able to pass now. </p>
+benchmarks should be able to pass now.</p>
 <p>If the benchmarks pass - good job! You have built a functional copying
 collector!</p>
 <p>If you get particularly stuck, the code for the completed <code>MyGC</code> plan

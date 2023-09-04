@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["AllocationSemantics","GcStatus"],"fn":["create_gc_worker_context","create_mutator","create_plan"],"struct":["BasePlan","CommonPlan","CreateGeneralPlanArgs","CreateSpecificPlanArgs"],"trait":["Plan","PlanTraceObject"]};
+window.SIDEBAR_ITEMS = {"enum":["AllocationSemantics","GcStatus"],"fn":["create_gc_worker_context","create_mutator","create_plan"],"struct":["BasePlan","CommonPlan","CreateGeneralPlanArgs","CreateSpecificPlanArgs"],"trait":["HasSpaces","Plan","PlanTraceObject"]};

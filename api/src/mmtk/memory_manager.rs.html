@@ -928,6 +928,9 @@
 <a href="#928" id="928">928</a>
 <a href="#929" id="929">929</a>
 <a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1022,7 +1025,10 @@
 /// Currently we do not allow removing regions from VM space.
 </span><span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
 </span><span class="kw">pub fn </span>set_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
-    <span class="kw">unsafe </span>{ mmtk.get_plan_mut() }.base_mut().vm_space.set_vm_region(start, size);
+    <span class="kw">unsafe </span>{ mmtk.get_plan_mut() }
+        .base_mut()
+        .vm_space
+        .set_vm_region(start, size);
 }
 
 <span class="doccomment">/// Request MMTk to create a mutator for the given thread. The ownership

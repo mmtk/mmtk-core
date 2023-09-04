@@ -183,22 +183,6 @@
 <a href="#183" id="183">183</a>
 <a href="#184" id="184">184</a>
 <a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
-<a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
-<a href="#190" id="190">190</a>
-<a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
-<a href="#193" id="193">193</a>
-<a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
@@ -217,7 +201,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
-<span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use crate</span>::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
@@ -225,14 +208,15 @@
 <span class="kw">use </span>atomic::Ordering;
 <span class="kw">use </span>enum_map::EnumMap;
 
-<span class="kw">use </span>mmtk_macros::PlanTraceObject;
+<span class="kw">use </span>mmtk_macros::{HasSpaces, PlanTraceObject};
 
-<span class="attr">#[derive(PlanTraceObject)]
+<span class="attr">#[derive(HasSpaces, PlanTraceObject)]
 </span><span class="kw">pub struct </span>Immix&lt;VM: VMBinding&gt; {
     <span class="attr">#[post_scan]
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     </span><span class="kw">pub </span>immix_space: ImmixSpace&lt;VM&gt;,
-    <span class="attr">#[fallback_trace]
+    <span class="attr">#[parent]
     </span><span class="kw">pub </span>common: CommonPlan&lt;VM&gt;,
     last_gc_was_defrag: AtomicBool,
 }
@@ -248,8 +232,6 @@
 };
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>Immix&lt;VM&gt; {
-    <span class="kw">type </span>VM = VM;
-
     <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, _space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
         <span class="self">self</span>.base().collection_required(<span class="self">self</span>, space_full)
     }
@@ -272,12 +254,6 @@
             space_mapping: <span class="macro">vec!</span>[(CopySelector::Immix(<span class="number">0</span>), <span class="kw-2">&amp;</span><span class="self">self</span>.immix_space)],
             constraints: <span class="kw-2">&amp;</span>IMMIX_CONSTRAINTS,
         }
-    }
-
-    <span class="kw">fn </span>get_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="self">self</span>.common.get_spaces();
-        ret.push(<span class="kw-2">&amp;</span><span class="self">self</span>.immix_space);
-        ret
     }
 
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
@@ -357,15 +333,7 @@
             last_gc_was_defrag: AtomicBool::new(<span class="bool-val">false</span>),
         };
 
-        {
-            <span class="kw">let </span><span class="kw-2">mut </span>side_metadata_sanity_checker = SideMetadataSanity::new();
-            immix
-                .common
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-            immix
-                .immix_space
-                .verify_side_metadata_sanity(<span class="kw-2">&amp;mut </span>side_metadata_sanity_checker);
-        }
+        immix.verify_side_metadata_sanity();
 
         immix
     }
