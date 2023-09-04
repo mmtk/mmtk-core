@@ -23,7 +23,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
 }
-// ANCHOR: workcontext_plan
+// ANCHOR_END: workcontext_plan
 
 use crate::util::ObjectReference;
 use crate::util::copy::CopySemantics;
