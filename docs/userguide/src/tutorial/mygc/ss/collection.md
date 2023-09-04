@@ -165,7 +165,7 @@ are.
 ### Approach 1: Use `SFTProcessEdges`
 
 [`SFTProcessEdges`](https://docs.mmtk.io/api/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html) dispatches
-the tracing of objects to their respective spaces through [Space Function Table (SFT)](https://docs.mmtk.io/api/mmtk/policy/space/trait.SFT.html).
+the tracing of objects to their respective spaces through [Space Function Table (SFT)](https://docs.mmtk.io/api/mmtk/policy/sft/trait.SFT.html).
 As long as all the policies in a plan provide an implementation of `sft_trace_object()` in their SFT implementations,
 the plan can use `SFTProcessEdges`. Currently most policies provide an implementation for `sft_trace_object()`, except
 mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
@@ -176,7 +176,7 @@ multiple `sft_trace_object()` for a policy.
 ### Approach 2: Derive `PlanTraceObject` and use `PlanProcessEdges`
 
 `PlanProcessEdges` is another general `ProcessEdgesWork` implementation that can be used by most plans. When a plan
-implements the [`PlanTraceObject`](https://docs.mmtk.io/api/mmtk/plan/transitive_closure/trait.PlanTraceObject.html),
+implements the [`PlanTraceObject`](https://docs.mmtk.io/api/mmtk/plan/global/trait.PlanTraceObject.html),
 it can use `PlanProcessEdges`.
 
 You can manually provide an implementation of `PlanTraceObject` for `MyGC`. But you can also use the derive macro MMTK provides,
@@ -244,4 +244,4 @@ If the benchmarks pass - good job! You have built a functional copying
 collector!
 
 If you get particularly stuck, the code for the completed `MyGC` plan
-is available [here](https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code/mygc_semispace).
+is available [here](https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code/mygc_semispace).
