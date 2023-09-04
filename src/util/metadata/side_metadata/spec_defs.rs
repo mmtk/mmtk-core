@@ -100,6 +100,9 @@ define_side_metadata_specs!(
 
 #[cfg(test)]
 mod tests {
+    // We assert on constants to test if the macro is working properly.
+    #![allow(clippy::assertions_on_constants)]
+
     use super::*;
     #[test]
     fn first_global_spec() {
