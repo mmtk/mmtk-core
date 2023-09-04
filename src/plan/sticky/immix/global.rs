@@ -21,14 +21,14 @@ use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 use super::gc_work::StickyImmixMatureGCWorkContext;
 use super::gc_work::StickyImmixNurseryGCWorkContext;
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct StickyImmix<VM: VMBinding> {
-    #[fallback_trace]
+    #[parent]
     immix: immix::Immix<VM>,
     gc_full_heap: AtomicBool,
     next_gc_full_heap: AtomicBool,
@@ -45,8 +45,6 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for StickyImmix<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static crate::plan::PlanConstraints {
         &STICKY_IMMIX_CONSTRAINTS
     }
@@ -102,10 +100,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
             >(self, &self.immix.immix_space, scheduler);
         }
-    }
-
-    fn get_spaces(&self) -> Vec<&dyn crate::policy::space::Space<Self::VM>> {
-        self.immix.get_spaces()
     }
 
     fn get_allocator_mapping(
