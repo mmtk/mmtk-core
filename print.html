@@ -219,7 +219,7 @@ finished code provided.</p>
 <p>Furthermore, please note that this code may not be identical to the main code
 of the MMTk. It is deliberately kept separate as a simpler stable
 version. Make sure to refer to the 
-<a href="https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code">provided tutorial code</a> 
+<a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code">provided tutorial code</a> 
 and not the main collector code during the tutorial. </p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
 <p><em>allocator</em>: Code that allocates new objects into memory.</p>
@@ -1091,7 +1091,7 @@ this section, we discuss what <code>SFTProcessEdges</code> does, and what the al
 are.</p>
 <h3 id="approach-1-use-sftprocessedges"><a class="header" href="#approach-1-use-sftprocessedges">Approach 1: Use <code>SFTProcessEdges</code></a></h3>
 <p><a href="https://docs.mmtk.io/api/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html"><code>SFTProcessEdges</code></a> dispatches
-the tracing of objects to their respective spaces through <a href="https://docs.mmtk.io/api/mmtk/policy/space/trait.SFT.html">Space Function Table (SFT)</a>.
+the tracing of objects to their respective spaces through <a href="https://docs.mmtk.io/api/mmtk/policy/sft/trait.SFT.html">Space Function Table (SFT)</a>.
 As long as all the policies in a plan provide an implementation of <code>sft_trace_object()</code> in their SFT implementations,
 the plan can use <code>SFTProcessEdges</code>. Currently most policies provide an implementation for <code>sft_trace_object()</code>, except
 mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
@@ -1099,7 +1099,7 @@ multiple <code>sft_trace_object()</code> for a policy.</p>
 <p><code>SFTProcessEdges</code> is the simplest approach when all the policies support it. Fortunately, we can use it for our GC, semispace.</p>
 <h3 id="approach-2-derive-plantraceobject-and-use-planprocessedges"><a class="header" href="#approach-2-derive-plantraceobject-and-use-planprocessedges">Approach 2: Derive <code>PlanTraceObject</code> and use <code>PlanProcessEdges</code></a></h3>
 <p><code>PlanProcessEdges</code> is another general <code>ProcessEdgesWork</code> implementation that can be used by most plans. When a plan
-implements the <a href="https://docs.mmtk.io/api/mmtk/plan/transitive_closure/trait.PlanTraceObject.html"><code>PlanTraceObject</code></a>,
+implements the <a href="https://docs.mmtk.io/api/mmtk/plan/global/trait.PlanTraceObject.html"><code>PlanTraceObject</code></a>,
 it can use <code>PlanProcessEdges</code>.</p>
 <p>You can manually provide an implementation of <code>PlanTraceObject</code> for <code>MyGC</code>. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of <code>PlanTraceObject</code>:</p>
@@ -1304,7 +1304,7 @@ benchmarks should be able to pass now. </p>
 <p>If the benchmarks pass - good job! You have built a functional copying
 collector!</p>
 <p>If you get particularly stuck, the code for the completed <code>MyGC</code> plan
-is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code/mygc_semispace">here</a>.</p>
+is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code/mygc_semispace">here</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="exercise-adding-another-copyspace"><a class="header" href="#exercise-adding-another-copyspace">Exercise: Adding another copyspace</a></h1>
 <p>Now that you have a working semispace collector, you should be familiar 
 enough with the code to start writing some yourself. The intention of this 
@@ -1338,7 +1338,7 @@ performance of this collector compares to MyGC. Great work!</p>
 in case you are stuck on the exercise.</p>
 <p><strong>Attempt the exercise yourself before reading this.</strong></p>
 <p>First, rename all instances of <code>mygc</code> to <code>triplespace</code>, and add it as a
-module by following the instructions in <a href="tutorial/mygc/ss/./create.html">Create MyGC</a>.</p>
+module by following the instructions in <a href="tutorial/mygc/ss/../create.html">Create MyGC</a>.</p>
 <p>In <code>triplespace/global.rs</code>:</p>
 <ol>
 <li>
