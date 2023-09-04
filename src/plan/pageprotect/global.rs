@@ -24,6 +24,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 pub struct PageProtect<VM: VMBinding> {
     #[space]
     pub space: LargeObjectSpace<VM>,
+    #[parent]
     pub common: CommonPlan<VM>,
 }
 
