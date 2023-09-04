@@ -182,7 +182,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
         forwarding_pointer: ObjectReference,
     ) {
-        println!("store_header_forwarding_pointer {:?}", forwarding_pointer);
         unsafe {
             Self::header_forwarding_pointer_address(object)
                 .store::<ObjectReference>(forwarding_pointer);
@@ -388,7 +387,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             return;
         };
         for (from_start, from_end) in self.iterate_contiguous_regions() {
-            println!("region {:?}", from_start..from_end);
+            // println!("region {:?}", from_start..from_end);
             // linear scan the contiguous region
             self.linear_scan_objects(
                 from_start..from_end,
@@ -407,7 +406,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                         obj,
                         to_cursor + Self::HEADER_RESERVED_IN_BYTES,
                     );
-                    println!("get_reference_when_copied_to {:?} {:?}", obj, new_obj);
+                    // println!("get_reference_when_copied_to {:?} {:?}", obj, new_obj);
                     // update forwarding pointer
                     Self::store_header_forwarding_pointer(obj, new_obj);
                     trace!(
@@ -432,11 +431,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let mut to = Address::ZERO;
 
         for (from_start, from_end) in self.iterate_contiguous_regions() {
-            println!("compact {:?}", from_start..from_end);
+            // println!("compact {:?}", from_start..from_end);
             self.linear_scan_objects(
                 from_start..from_end,
                 false,
-                |obj, copied_size, _align, _offset| {
+                |obj, _copied_size, _align, _offset| {
                     // clear the VO bit
                     vo_bit::unset_vo_bit::<VM>(obj);
 
@@ -449,12 +448,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
                         // copy object
                         trace!(" copy from {} to {}", obj, new_object);
-                        let _end_of_new_object =
+                        let end_of_new_object =
                             VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                         // update VO bit,
                         vo_bit::set_vo_bit::<VM>(new_object);
-                        to = new_object.to_object_start::<VM>() + copied_size;
-                        // debug_assert_eq!(end_of_new_object, to);
+                        to = end_of_new_object;
                     }
                 },
             );
