@@ -8,7 +8,7 @@ use mmtk::{
 
 use crate::{
     edges::{DummyVMEdge, OffsetEdge, TaggedEdge},
-    tests::fixtures::{Fixture, TwoObjects},
+    test_fixtures::{Fixture, TwoObjects},
 };
 
 #[cfg(target_pointer_width = "64")]

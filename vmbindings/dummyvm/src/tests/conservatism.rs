@@ -3,7 +3,7 @@
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
-use crate::tests::fixtures::{Fixture, SingleObject};
+use crate::test_fixtures::{Fixture, SingleObject};
 use mmtk::util::constants::LOG_BITS_IN_WORD;
 use mmtk::util::is_mmtk_object::VO_BIT_REGION_SIZE;
 use mmtk::util::*;
