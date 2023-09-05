@@ -1104,7 +1104,7 @@ impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> 
 
         #[cfg(feature = "sanity")]
         {
-            if !mmtk.plan.is_in_sanity() {
+            if !mmtk.get_plan().is_in_sanity() {
                 mmtk.sanity_checker
                     .lock()
                     .unwrap()
