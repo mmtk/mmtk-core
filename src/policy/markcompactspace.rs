@@ -316,8 +316,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         mark_bit != 0
     }
 
-    pub fn to_be_compacted(object: ObjectReference) -> bool {
-        Self::is_marked(object)
+    fn to_be_compacted(object: &ObjectReference) -> bool {
+        Self::is_marked(*object)
     }
 
     /// Linear scan all the live objects in the given memory region
@@ -339,7 +339,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             // linear scan the contiguous region
             for obj in self
                 .linear_scan_objects(from_start..from_end)
-                .filter(|o| Self::to_be_compacted(*o))
+                .filter(Self::to_be_compacted)
             {
                 let copied_size =
                     VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
