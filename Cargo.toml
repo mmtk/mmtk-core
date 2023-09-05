@@ -10,7 +10,7 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.66.0"
+rust-version = "1.70.0"
 build = "build.rs"
 
 [lib]
@@ -42,6 +42,7 @@ num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.0-beta.3", optional = true }
 probe = "0.5"
+portable-atomic = "1.4.3"
 regex = "1.7.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
