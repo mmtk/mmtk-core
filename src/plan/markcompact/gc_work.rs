@@ -44,8 +44,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.get_plan().base().prepare_for_stack_scanning();
         // Prepare common and base spaces for the 2nd round of transitive closure
-        let plan_mut =
-            unsafe { &mut *(self.plan as *const MarkCompact<VM> as *mut MarkCompact<VM>) };
+        let plan_mut = unsafe { &mut *(self.plan as *mut MarkCompact<VM>) };
         plan_mut.common.release(worker.tls, true);
         plan_mut.common.prepare(worker.tls, true);
         #[cfg(feature = "extreme_assertions")]
