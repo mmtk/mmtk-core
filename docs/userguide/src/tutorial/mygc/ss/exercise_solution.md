@@ -6,7 +6,7 @@ in case you are stuck on the exercise.
 **Attempt the exercise yourself before reading this.**
 
 First, rename all instances of `mygc` to `triplespace`, and add it as a
-module by following the instructions in [Create MyGC](./create.md).
+module by following the instructions in [Create MyGC](../create.md).
 
 In `triplespace/global.rs`:
 

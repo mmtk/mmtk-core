@@ -29,20 +29,21 @@ use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 /// Generational immix. This implements the functionality of a two-generation copying
 /// collector where the higher generation is an immix space.
 /// See the PLDI'08 paper by Blackburn and McKinley for a description
 /// of the algorithm: <http://doi.acm.org/10.1145/1375581.1375586>.
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct GenImmix<VM: VMBinding> {
     /// Generational plan, which includes a nursery space and operations related with nursery.
-    #[fallback_trace]
+    #[parent]
     pub gen: CommonGenPlan<VM>,
     /// An immix space as the mature space.
     #[post_scan]
-    #[trace(CopySemantics::Mature)]
+    #[space]
+    #[copy_semantics(CopySemantics::Mature)]
     pub immix_space: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.
     pub last_gc_was_defrag: AtomicBool,
@@ -65,8 +66,6 @@ pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for GenImmix<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &GENIMMIX_CONSTRAINTS
     }
@@ -96,12 +95,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         Self: Sized,
     {
         self.gen.collection_required(self, space_full, space)
-    }
-
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.gen.get_spaces();
-        ret.push(&self.immix_space);
-        ret
     }
 
     // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
@@ -259,18 +252,7 @@ impl<VM: VMBinding> GenImmix<VM> {
             last_gc_was_full_heap: AtomicBool::new(false),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            use crate::util::metadata::side_metadata::SideMetadataSanity;
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            genimmix
-                .gen
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            genimmix
-                .immix_space
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
+        genimmix.verify_side_metadata_sanity();
 
         genimmix
     }

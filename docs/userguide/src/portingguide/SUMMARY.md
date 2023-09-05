@@ -7,3 +7,5 @@
 - [How to Undertake a Port](./howto/prefix.md)
     - [NoGC](./howto/nogc.md)
     - [Next Steps](./howto/next_steps.md)
+- [Performance Tuning]()
+    - [Link Time Optimization](./perf_tuning/lto.md)
