@@ -397,7 +397,27 @@
 <a href="#397" id="397">397</a>
 <a href="#398" id="398">398</a>
 <a href="#399" id="399">399</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::SFT;
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::ops::Range;
+
+<span class="kw">use </span><span class="kw">super</span>::sft::SFT;
 <span class="kw">use </span><span class="kw">super</span>::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
@@ -713,73 +733,89 @@
         mark_bit != <span class="number">0
     </span>}
 
-    <span class="kw">pub fn </span>to_be_compacted(object: ObjectReference) -&gt; bool {
-        <span class="self">Self</span>::is_marked(object)
+    <span class="kw">fn </span>to_be_compacted(object: <span class="kw-2">&amp;</span>ObjectReference) -&gt; bool {
+        <span class="self">Self</span>::is_marked(<span class="kw-2">*</span>object)
+    }
+
+    <span class="doccomment">/// Linear scan all the live objects in the given memory region
+    </span><span class="kw">fn </span>linear_scan_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, range: Range&lt;Address&gt;) -&gt; <span class="kw">impl </span>Iterator&lt;Item = ObjectReference&gt; {
+        <span class="kw">crate</span>::util::linear_scan::ObjectIterator::&lt;VM, MarkCompactObjectSize&lt;VM&gt;, <span class="bool-val">true</span>&gt;::new(
+            range.start,
+            range.end,
+        )
     }
 
     <span class="kw">pub fn </span>calculate_forwarding_pointer(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let </span>start = <span class="self">self</span>.common.start;
-        <span class="kw">let </span>end = <span class="self">self</span>.pr.cursor();
-        <span class="kw">let </span><span class="kw-2">mut </span>to = start;
-
-        <span class="kw">let </span>linear_scan =
-            <span class="kw">crate</span>::util::linear_scan::ObjectIterator::&lt;VM, MarkCompactObjectSize&lt;VM&gt;, <span class="bool-val">true</span>&gt;::new(
-                start, end,
-            );
-        <span class="kw">for </span>obj <span class="kw">in </span>linear_scan.filter(|obj| <span class="self">Self</span>::to_be_compacted(<span class="kw-2">*</span>obj)) {
-            <span class="kw">let </span>copied_size =
-                VM::VMObjectModel::get_size_when_copied(obj) + <span class="self">Self</span>::HEADER_RESERVED_IN_BYTES;
-            <span class="kw">let </span>align = VM::VMObjectModel::get_align_when_copied(obj);
-            <span class="kw">let </span>offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
-            to = align_allocation_no_fill::&lt;VM&gt;(to, align, offset);
-            <span class="kw">let </span>new_obj = VM::VMObjectModel::get_reference_when_copied_to(
-                obj,
-                to + <span class="self">Self</span>::HEADER_RESERVED_IN_BYTES,
-            );
-
-            <span class="self">Self</span>::store_header_forwarding_pointer(obj, new_obj);
-
-            <span class="macro">trace!</span>(
-                <span class="string">&quot;Calculate forward: {} (size when copied = {}) ~&gt; {} (size = {})&quot;</span>,
-                obj,
-                VM::VMObjectModel::get_size_when_copied(obj),
-                to,
-                copied_size
-            );
-
-            to += copied_size;
+        <span class="kw">let </span><span class="kw-2">mut </span>to_iter = <span class="self">self</span>.pr.iterate_allocated_regions();
+        <span class="kw">let </span><span class="prelude-val">Some</span>((<span class="kw-2">mut </span>to_cursor, <span class="kw-2">mut </span>to_size)) = to_iter.next() <span class="kw">else </span>{
+            <span class="kw">return</span>;
+        };
+        <span class="kw">let </span><span class="kw-2">mut </span>to_end = to_cursor + to_size;
+        <span class="kw">for </span>(from_start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            <span class="kw">let </span>from_end = from_start + size;
+            <span class="comment">// linear scan the contiguous region
+            </span><span class="kw">for </span>obj <span class="kw">in </span><span class="self">self
+                </span>.linear_scan_objects(from_start..from_end)
+                .filter(<span class="self">Self</span>::to_be_compacted)
+            {
+                <span class="kw">let </span>copied_size =
+                    VM::VMObjectModel::get_size_when_copied(obj) + <span class="self">Self</span>::HEADER_RESERVED_IN_BYTES;
+                <span class="kw">let </span>align = VM::VMObjectModel::get_align_when_copied(obj);
+                <span class="kw">let </span>offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
+                <span class="comment">// move to_cursor to aliged start address
+                </span>to_cursor = align_allocation_no_fill::&lt;VM&gt;(to_cursor, align, offset);
+                <span class="comment">// move to next to-block if there is no sufficient memory in current region
+                </span><span class="kw">if </span>to_cursor + copied_size &gt; to_end {
+                    (to_cursor, to_size) = to_iter.next().unwrap();
+                    to_end = to_cursor + to_size;
+                    to_cursor = align_allocation_no_fill::&lt;VM&gt;(to_cursor, align, offset);
+                    <span class="macro">debug_assert!</span>(to_cursor + copied_size &lt;= to_end);
+                }
+                <span class="comment">// Get copied object
+                </span><span class="kw">let </span>new_obj = VM::VMObjectModel::get_reference_when_copied_to(
+                    obj,
+                    to_cursor + <span class="self">Self</span>::HEADER_RESERVED_IN_BYTES,
+                );
+                <span class="comment">// update forwarding pointer
+                </span><span class="self">Self</span>::store_header_forwarding_pointer(obj, new_obj);
+                <span class="macro">trace!</span>(
+                    <span class="string">&quot;Calculate forward: {} (size when copied = {}) ~&gt; {} (size = {})&quot;</span>,
+                    obj,
+                    VM::VMObjectModel::get_size_when_copied(obj),
+                    to_cursor,
+                    copied_size
+                );
+                <span class="comment">// bump to_cursor
+                </span>to_cursor += copied_size;
+            }
         }
-        <span class="macro">debug!</span>(<span class="string">&quot;Calculate forward end: to = {}&quot;</span>, to);
     }
 
     <span class="kw">pub fn </span>compact(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let </span>start = <span class="self">self</span>.common.start;
-        <span class="kw">let </span>end = <span class="self">self</span>.pr.cursor();
-        <span class="kw">let </span><span class="kw-2">mut </span>to = end;
-
-        <span class="kw">let </span>linear_scan =
-            <span class="kw">crate</span>::util::linear_scan::ObjectIterator::&lt;VM, MarkCompactObjectSize&lt;VM&gt;, <span class="bool-val">true</span>&gt;::new(
-                start, end,
-            );
-        <span class="kw">for </span>obj <span class="kw">in </span>linear_scan {
-            <span class="comment">// clear the VO bit
-            </span>vo_bit::unset_vo_bit::&lt;VM&gt;(obj);
-
-            <span class="kw">let </span>forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(obj);
-
-            <span class="macro">trace!</span>(<span class="string">&quot;Compact {} to {}&quot;</span>, obj, forwarding_pointer);
-            <span class="kw">if </span>!forwarding_pointer.is_null() {
+        <span class="kw">let </span><span class="kw-2">mut </span>to = Address::ZERO;
+        <span class="kw">for </span>(from_start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            <span class="kw">let </span>from_end = from_start + size;
+            <span class="kw">for </span>obj <span class="kw">in </span><span class="self">self</span>.linear_scan_objects(from_start..from_end) {
                 <span class="kw">let </span>copied_size = VM::VMObjectModel::get_size_when_copied(obj);
-                <span class="kw">let </span>new_object = forwarding_pointer;
-                <span class="self">Self</span>::clear_header_forwarding_pointer(new_object);
+                <span class="comment">// clear the VO bit
+                </span>vo_bit::unset_vo_bit::&lt;VM&gt;(obj);
 
-                <span class="comment">// copy object
-                </span><span class="macro">trace!</span>(<span class="string">&quot; copy from {} to {}&quot;</span>, obj, new_object);
-                <span class="kw">let </span>end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                <span class="comment">// update VO bit,
-                </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
-                to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
-                <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
+                <span class="kw">let </span>forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(obj);
+
+                <span class="macro">trace!</span>(<span class="string">&quot;Compact {} to {}&quot;</span>, obj, forwarding_pointer);
+                <span class="kw">if </span>!forwarding_pointer.is_null() {
+                    <span class="kw">let </span>new_object = forwarding_pointer;
+                    <span class="self">Self</span>::clear_header_forwarding_pointer(new_object);
+
+                    <span class="comment">// copy object
+                    </span><span class="macro">trace!</span>(<span class="string">&quot; copy from {} to {}&quot;</span>, obj, new_object);
+                    <span class="kw">let </span>end_of_new_object =
+                        VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                    <span class="comment">// update VO bit,
+                    </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
+                    to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
+                    <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
+                }
             }
         }
 

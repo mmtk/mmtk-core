@@ -630,8 +630,6 @@
 <a href="#630" id="630">630</a>
 <a href="#631" id="631">631</a>
 <a href="#632" id="632">632</a>
-<a href="#633" id="633">633</a>
-<a href="#634" id="634">634</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
@@ -1057,7 +1055,6 @@
 
     <span class="kw">pub </span>start: Address,
     <span class="kw">pub </span>extent: usize,
-    <span class="kw">pub </span>head_discontiguous_region: Address,
 
     <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
     <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
@@ -1129,7 +1126,6 @@
             zeroed: args.plan_args.zeroed,
             start: <span class="kw">unsafe </span>{ Address::zero() },
             extent: <span class="number">0</span>,
-            head_discontiguous_region: <span class="kw">unsafe </span>{ Address::zero() },
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,

@@ -367,7 +367,7 @@
                 .on_block_reset::&lt;VM&gt;(<span class="self">self</span>.common.start, <span class="self">self</span>.common.extent)
         } <span class="kw">else </span>{
             <span class="comment">// Otherwise, we reset the mark bit for the allocated regions.
-            </span><span class="self">self</span>.pr.for_allocated_regions(|addr, size| {
+            </span><span class="kw">for </span>(addr, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
                 <span class="macro">debug!</span>(
                     <span class="string">&quot;{:?}: reset mark bit from {} to {}&quot;</span>,
                     <span class="self">self</span>.name(),
@@ -375,7 +375,7 @@
                     addr + size
                 );
                 <span class="self">self</span>.mark_state.on_block_reset::&lt;VM&gt;(addr, size);
-            })
+            }
         }
     }
 
