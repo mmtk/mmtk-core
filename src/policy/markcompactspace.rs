@@ -395,7 +395,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 if to_cursor + copied_size > to_end {
                     (to_cursor, to_end) = to_iter.next().unwrap();
                     to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
-                    assert!(to_cursor + copied_size <= to_end);
+                    debug_assert!(to_cursor + copied_size <= to_end);
                 }
                 // Get copied object
                 let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
