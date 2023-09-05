@@ -1,7 +1,7 @@
 # MMTk
 
 [![crates.io](https://img.shields.io/crates/v/mmtk.svg)](https://crates.io/crates/mmtk)
-[![MSRV]](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmmtk%2Fmmtk-core%2Fmaster%2FCargo.toml&query=%24.package%5B%22rust-version%22%5D&label=MSRV)
+![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmmtk%2Fmmtk-core%2Fmaster%2FCargo.toml&query=%24.package%5B%22rust-version%22%5D&label=MSRV)
 [![docs.rs](https://docs.rs/mmtk/badge.svg)](https://docs.rs/mmtk/)
 [![project chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://mmtk.zulipchat.com/)
 
