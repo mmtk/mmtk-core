@@ -7,7 +7,7 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
 #[cfg(feature = "vo_bit")]
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_forwarding;

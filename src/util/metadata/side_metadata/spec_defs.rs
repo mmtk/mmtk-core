@@ -1,5 +1,5 @@
 use crate::util::constants::*;
-use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::heap::layout::vm_layout::*;
 use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::constants::{
     GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET,
@@ -100,6 +100,9 @@ define_side_metadata_specs!(
 
 #[cfg(test)]
 mod tests {
+    // We assert on constants to test if the macro is working properly.
+    #![allow(clippy::assertions_on_constants)]
+
     use super::*;
     #[test]
     fn first_global_spec() {

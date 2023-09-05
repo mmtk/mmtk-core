@@ -13,7 +13,6 @@ mod barrier_slow_path_assertion;
 #[cfg(feature = "is_mmtk_object")]
 mod conservatism;
 mod edges_test;
-mod fixtures;
 #[cfg(target_os = "linux")]
 mod handle_mmap_conflict;
 mod handle_mmap_oom;
@@ -25,3 +24,8 @@ mod malloc_api;
 #[cfg(feature = "malloc_counted_size")]
 mod malloc_counted;
 mod malloc_ms;
+#[cfg(target_pointer_width = "64")]
+mod vm_layout_compressed_pointer_64;
+mod vm_layout_default;
+mod vm_layout_heap_start;
+mod vm_layout_log_address_space;

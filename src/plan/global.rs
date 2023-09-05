@@ -33,16 +33,16 @@ use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
-        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
+        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk.get_plan()),
         PlanSelector::SemiSpace => {
-            crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
+            crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::GenCopy => {
             crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
@@ -51,14 +51,16 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
         }
         PlanSelector::MarkSweep => {
-            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
+            crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk.get_plan())
         }
-        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
+        PlanSelector::Immix => {
+            crate::plan::immix::mutator::create_immix_mutator(tls, mmtk.get_plan())
+        }
         PlanSelector::PageProtect => {
-            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
+            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk.get_plan())
         }
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
@@ -125,9 +127,7 @@ pub fn create_plan<VM: VMBinding>(
     }
 
     // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    plan.get_spaces()
-        .into_iter()
-        .for_each(|s| s.initialize_sft());
+    plan.for_each_space(&mut |s| s.initialize_sft());
 
     plan
 }
@@ -137,7 +137,7 @@ pub fn create_gc_worker_context<VM: VMBinding>(
     tls: VMWorkerThread,
     mmtk: &'static MMTK<VM>,
 ) -> GCWorkerCopyContext<VM> {
-    GCWorkerCopyContext::<VM>::new(tls, &*mmtk.plan, mmtk.plan.create_copy_config())
+    GCWorkerCopyContext::<VM>::new(tls, mmtk.get_plan(), mmtk.get_plan().create_copy_config())
 }
 
 /// A plan describes the global core functionality for all memory management schemes.
@@ -154,7 +154,8 @@ pub fn create_gc_worker_context<VM: VMBinding>(
 /// 2. Create a vector of all the side metadata specs with `SideMetadataContext::new_global_specs()`,
 ///    the parameter is a vector of global side metadata specs that are specific to the plan.
 /// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
-/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
+/// 4. Invoke the `verify_side_metadata_sanity()` method of the plan.
+///    It will create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
 ///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
 ///
 /// Methods in this trait:
@@ -165,9 +166,7 @@ pub fn create_gc_worker_context<VM: VMBinding>(
 /// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and
 /// they may call a wrong method by mistake.
 // TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
-pub trait Plan: 'static + Sync + Downcast {
-    type VM: VMBinding;
-
+pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn constraints(&self) -> &'static PlanConstraints;
 
     /// Create a copy config for this plan. A copying GC plan MUST override this method,
@@ -191,9 +190,6 @@ pub trait Plan: 'static + Sync + Downcast {
     fn options(&self) -> &Options {
         &self.base().options
     }
-
-    /// get all the spaces in the plan
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
@@ -369,6 +365,14 @@ pub trait Plan: 'static + Sync + Downcast {
     fn sanity_check_object(&self, _object: ObjectReference) -> bool {
         true
     }
+
+    /// Call `space.verify_side_metadata_sanity` for all spaces in this plan.
+    fn verify_side_metadata_sanity(&self) {
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        self.for_each_space(&mut |space| {
+            space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        })
+    }
 }
 
 impl_downcast!(Plan assoc VM);
@@ -383,7 +387,7 @@ pub enum GcStatus {
 /**
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct BasePlan<VM: VMBinding> {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub initialized: AtomicBool,
@@ -429,13 +433,13 @@ pub struct BasePlan<VM: VMBinding> {
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
-    #[trace]
+    #[space]
     pub code_space: ImmortalSpace<VM>,
     #[cfg(feature = "code_space")]
-    #[trace]
+    #[space]
     pub code_lo_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
-    #[trace]
+    #[space]
     pub ro_space: ImmortalSpace<VM>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
@@ -451,7 +455,7 @@ pub struct BasePlan<VM: VMBinding> {
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
     #[cfg(feature = "vm_space")]
-    #[trace]
+    #[space]
     pub vm_space: VMSpace<VM>,
 }
 
@@ -527,7 +531,11 @@ impl<VM: VMBinding> BasePlan<VM> {
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
-            vm_space: VMSpace::new(&mut args),
+            vm_space: VMSpace::new(args.get_space_args(
+                "vm_space",
+                false,
+                VMRequest::discontiguous(),
+            )),
 
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),
@@ -558,19 +566,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             #[cfg(feature = "analysis")]
             analysis_manager,
         }
-    }
-
-    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        vec![
-            #[cfg(feature = "code_space")]
-            &self.code_space,
-            #[cfg(feature = "code_space")]
-            &self.code_lo_space,
-            #[cfg(feature = "ro_space")]
-            &self.ro_space,
-            #[cfg(feature = "vm_space")]
-            &self.vm_space,
-        ]
     }
 
     /// The application code has requested a collection.
@@ -856,22 +851,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         space_full || stress_force_gc || heap_full
     }
 
-    #[allow(unused_variables)] // depending on the enabled features, base may not be used.
-    pub(crate) fn verify_side_metadata_sanity(
-        &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
-    ) {
-        #[cfg(feature = "code_space")]
-        self.code_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        #[cfg(feature = "ro_space")]
-        self.ro_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        #[cfg(feature = "vm_space")]
-        self.vm_space
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-    }
-
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) fn increase_malloc_bytes_by(&self, size: usize) {
         self.malloc_bytes.fetch_add(size, Ordering::SeqCst);
@@ -889,16 +868,16 @@ impl<VM: VMBinding> BasePlan<VM> {
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
-    #[trace]
+    #[space]
     pub immortal: ImmortalSpace<VM>,
-    #[trace]
+    #[space]
     pub los: LargeObjectSpace<VM>,
     // TODO: We should use a marksweep space for nonmoving.
-    #[trace]
+    #[space]
     pub nonmoving: ImmortalSpace<VM>,
-    #[fallback_trace]
+    #[parent]
     pub base: BasePlan<VM>,
 }
 
@@ -921,14 +900,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
             )),
             base: BasePlan::new(args),
         }
-    }
-
-    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        let mut ret = self.base.get_spaces();
-        ret.push(&self.immortal);
-        ret.push(&self.los);
-        ret.push(&self.nonmoving);
-        ret
     }
 
     pub fn get_used_pages(&self) -> usize {
@@ -988,24 +959,41 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
         &self.nonmoving
     }
-
-    pub(crate) fn verify_side_metadata_sanity(
-        &self,
-        side_metadata_sanity_checker: &mut SideMetadataSanity,
-    ) {
-        self.base
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.immortal
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.los
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-        self.nonmoving
-            .verify_side_metadata_sanity(side_metadata_sanity_checker);
-    }
 }
 
 use crate::policy::gc_work::TraceKind;
 use crate::vm::VMBinding;
+
+/// A trait for anything that contains spaces.
+/// Examples include concrete plans as well as `Gen`, `CommonPlan` and `BasePlan`.
+/// All plans must implement this trait.
+///
+/// This trait provides methods for enumerating spaces in a struct, including spaces in nested
+/// struct.
+///
+/// This trait can be implemented automatically by adding the `#[derive(HasSpaces)]` attribute to a
+/// struct.  It uses the derive macro defined in the `mmtk-macros` crate.
+///
+/// This trait visits spaces as `dyn`, so it should only be used when performance is not critical.
+/// For performance critical methods that visit spaces in a plan, such as `trace_object`, it is
+/// recommended to define a trait (such as `PlanTraceObject`) for concrete plans to implement, and
+/// implement (by hand or automatically) the method without `dyn`.
+pub trait HasSpaces {
+    // The type of the VM.
+    type VM: VMBinding;
+
+    /// Visit each space field immutably.
+    ///
+    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
+    /// in the outer struct first.
+    fn for_each_space(&self, func: &mut dyn FnMut(&dyn Space<Self::VM>));
+
+    /// Visit each space field mutably.
+    ///
+    /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
+    /// in the outer struct first.
+    fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
+}
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
 /// Generally a plan does not need to manually implement this trait. Instead, we provide

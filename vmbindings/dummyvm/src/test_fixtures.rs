@@ -43,6 +43,12 @@ impl<T: FixtureContent> Fixture<T> {
     }
 }
 
+impl<T: FixtureContent> Default for Fixture<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// SerialFixture ensures all `with_fixture()` calls will be executed serially.
 pub struct SerialFixture<T: FixtureContent> {
     content: Mutex<Option<Box<T>>>,
@@ -82,6 +88,12 @@ impl<T: FixtureContent> SerialFixture<T> {
         if let Err(e) = res {
             std::panic::resume_unwind(e);
         }
+    }
+}
+
+impl<T: FixtureContent> Default for SerialFixture<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -171,8 +183,13 @@ pub struct MutatorFixture {
 impl FixtureContent for MutatorFixture {
     fn create() -> Self {
         const MB: usize = 1024 * 1024;
-        // 1MB heap
-        mmtk_init(MB);
+        Self::create_with_heapsize(MB)
+    }
+}
+
+impl MutatorFixture {
+    pub fn create_with_heapsize(size: usize) -> Self {
+        mmtk_init(size);
         mmtk_initialize_collection(VMThread::UNINITIALIZED);
         // Make sure GC does not run during test.
         mmtk_disable_collection();
@@ -186,3 +203,35 @@ impl FixtureContent for MutatorFixture {
 }
 
 unsafe impl Send for MutatorFixture {}
+
+use mmtk::util::heap::vm_layout::VMLayout;
+
+pub struct VMLayoutFixture {
+    pub mmtk: &'static MMTK<DummyVM>,
+    pub mutator: *mut Mutator<DummyVM>,
+}
+
+impl VMLayoutFixture {
+    pub fn create_with_layout(layout: Option<VMLayout>) -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init_with_layout(MB, layout);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        VMLayoutFixture {
+            mmtk: &crate::SINGLETON,
+            mutator: handle,
+        }
+    }
+}
+
+impl FixtureContent for VMLayoutFixture {
+    fn create() -> Self {
+        Self::create_with_layout(None::<VMLayout>)
+    }
+}
+
+unsafe impl Send for VMLayoutFixture {}

@@ -149,7 +149,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
 
         let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalRefClosure);
         w.set_worker(worker);
-        finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(&*mmtk.plan));
+        finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(mmtk.get_plan()));
         debug!(
             "Finished finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
@@ -172,9 +172,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         let mut w = E::new(vec![], false, mmtk, WorkBucketStage::FinalizableForwarding);
         w.set_worker(worker);
-        finalizable_processor.forward_candidate(&mut w, is_nursery_gc(&*mmtk.plan));
+        finalizable_processor.forward_candidate(&mut w, is_nursery_gc(mmtk.get_plan()));
 
-        finalizable_processor.forward_finalizable(&mut w, is_nursery_gc(&*mmtk.plan));
+        finalizable_processor.forward_finalizable(&mut w, is_nursery_gc(mmtk.get_plan()));
         trace!("Finished forwarding finlizable");
     }
 }

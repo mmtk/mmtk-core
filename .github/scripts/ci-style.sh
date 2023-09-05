@@ -1,6 +1,13 @@
 . $(dirname "$0")/ci-common.sh
 
-export RUSTFLAGS="-D warnings"
+export RUSTFLAGS="-D warnings -A unknown-lints"
+
+# Workaround the clippy issue on Rust 1.72: https://github.com/mmtk/mmtk-core/issues/929.
+# If we are not testing with Rust 1.72, or there is no problem running the following clippy checks, we can remove this export.
+CLIPPY_VERSION=$(cargo clippy --version)
+if [[ $CLIPPY_VERSION == "clippy 0.1.72"* ]]; then
+    export CARGO_INCREMENTAL=0
+fi
 
 # --- Check main crate ---
 

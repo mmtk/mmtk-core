@@ -1,7 +1,7 @@
 // GITHUB-CI: MMTK_PLAN=all
 
 use crate::api;
-use crate::tests::fixtures::{MutatorFixture, SerialFixture};
+use crate::test_fixtures::{MutatorFixture, SerialFixture};
 use crate::DummyVM;
 use log::info;
 use mmtk::plan::AllocationSemantics;

@@ -22,6 +22,8 @@
 # V8_BINDING_REF=xxxxxx
 # JULIA_BINDING_REPO=xx/xx
 # JULIA_BINDING_REF=xxxxxx
+# RUBY_BINDING_REPO=xx/xx
+# RUBY_BINDING_REF=xxxxxx
 # ```
 
 name: Fetch Binding PR Info
@@ -57,6 +59,12 @@ on:
       julia_binding_ref:
         description: "The git ref of Julia binding, such as sha and branch name"
         value: ${{ jobs.binding-refs.outputs.julia_binding_ref}}
+      ruby_binding_repo:
+        description: "The repository of Ruby binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.ruby_binding_repo}}
+      ruby_binding_ref:
+        description: "The git ref of Ruby binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.ruby_binding_ref}}
 
 jobs:
   binding-refs:
@@ -70,13 +78,15 @@ jobs:
         v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
         julia_binding_repo: ${{ steps.print.outputs.julia_binding_repo }}
         julia_binding_ref: ${{ steps.print.outputs.julia_binding_ref }}
+        ruby_binding_repo: ${{ steps.print.outputs.ruby_binding_repo }}
+        ruby_binding_ref: ${{ steps.print.outputs.ruby_binding_ref }}
     steps:
         - name: Check binding revisions
           uses: qinsoon/comment-env-vars@1.1.0
           with:
             pull_request: ${{ inputs.pull_request }}
             token: ${{ secrets.GITHUB_TOKEN }}
-            default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master,JULIA_BINDING_REPO=mmtk/mmtk-julia,JULIA_BINDING_REF=master'
+            default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master,JULIA_BINDING_REPO=mmtk/mmtk-julia,JULIA_BINDING_REF=master,RUBY_BINDING_REPO=mmtk/mmtk-ruby,RUBY_BINDING_REF=master'
         - id: print
           run: |
             echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
@@ -87,3 +97,5 @@ jobs:
             echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
             echo "::set-output name=julia_binding_repo::${{ env.JULIA_BINDING_REPO }}"
             echo "::set-output name=julia_binding_ref::${{ env.JULIA_BINDING_REF }}"
+            echo "::set-output name=ruby_binding_repo::${{ env.RUBY_BINDING_REPO }}"
+            echo "::set-output name=ruby_binding_ref::${{ env.RUBY_BINDING_REF }}"

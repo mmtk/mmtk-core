@@ -19,8 +19,7 @@ use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
-use crate::util::heap::layout::vm_layout_constants::HEAP_END;
-use crate::util::heap::layout::vm_layout_constants::HEAP_START;
+use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::edge_shape::MemorySlice;
@@ -87,9 +86,16 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     Box::new(mmtk)
 }
 
+/// Add an externally mmapped region to the VM space. A VM space can be set through MMTk options (`vm_space_start` and `vm_space_size`),
+/// and can also be set through this function call. A VM space can be discontiguous. This function can be called multiple times,
+/// and all the address ranges passed as arguments in the function will be considered as part of the VM space.
+/// Currently we do not allow removing regions from VM space.
 #[cfg(feature = "vm_space")]
-pub fn lazy_init_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
-    mmtk.plan.base_mut().vm_space.lazy_initialize(start, size);
+pub fn set_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, size: usize) {
+    unsafe { mmtk.get_plan_mut() }
+        .base_mut()
+        .vm_space
+        .set_vm_region(start, size);
 }
 
 /// Request MMTk to create a mutator for the given thread. The ownership
@@ -346,7 +352,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk: &MMTK<VM>,
     semantics: AllocationSemantics,
 ) -> AllocatorSelector {
-    mmtk.plan.get_allocator_mapping()[semantics]
+    mmtk.get_plan().get_allocator_mapping()[semantics]
 }
 
 /// The standard malloc. MMTk either uses its own allocator, or forward the call to a
@@ -468,11 +474,14 @@ pub fn start_worker<VM: VMBinding>(
 ///   Collection::spawn_gc_thread() so that the VM knows the context.
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     assert!(
-        !mmtk.plan.is_initialized(),
+        !mmtk.get_plan().is_initialized(),
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    mmtk.get_plan()
+        .base()
+        .initialized
+        .store(true, Ordering::SeqCst);
     probe!(mmtk, collection_initialized);
 }
 
@@ -484,10 +493,10 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        !mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        !mmtk.get_plan().should_trigger_gc_when_heap_is_full(),
         "enable_collection() is called when GC is already enabled."
     );
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .trigger_gc_when_heap_is_full
         .store(true, Ordering::SeqCst);
@@ -505,10 +514,10 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        mmtk.get_plan().should_trigger_gc_when_heap_is_full(),
         "disable_collection() is called when GC is not enabled."
     );
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .trigger_gc_when_heap_is_full
         .store(false, Ordering::SeqCst);
@@ -539,7 +548,7 @@ pub fn process_bulk(builder: &mut MMTKBuilder, options: &str) -> bool {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan.get_used_pages() << LOG_BYTES_IN_PAGE
+    mmtk.get_plan().get_used_pages() << LOG_BYTES_IN_PAGE
 }
 
 /// Return free memory in bytes. MMTk accounts for memory in pages, thus this method always returns a value in
@@ -548,7 +557,7 @@ pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan.get_free_pages() << LOG_BYTES_IN_PAGE
+    mmtk.get_plan().get_free_pages() << LOG_BYTES_IN_PAGE
 }
 
 /// Return the size of all the live objects in bytes in the last GC. MMTk usually accounts for memory in pages.
@@ -559,7 +568,7 @@ pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 #[cfg(feature = "count_live_bytes_in_gc")]
 pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan
+    mmtk.get_plan()
         .base()
         .live_bytes_in_last_gc
         .load(Ordering::SeqCst)
@@ -568,13 +577,13 @@ pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Return the starting address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 pub fn starting_heap_address() -> Address {
-    HEAP_START
+    vm_layout().heap_start
 }
 
 /// Return the ending address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 pub fn last_heap_address() -> Address {
-    HEAP_END
+    vm_layout().heap_end
 }
 
 /// Return the total memory in bytes.
@@ -582,7 +591,7 @@ pub fn last_heap_address() -> Address {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan.get_total_pages() << LOG_BYTES_IN_PAGE
+    mmtk.get_plan().get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
 /// Trigger a garbage collection as requested by the user.
@@ -591,7 +600,8 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
 pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    mmtk.plan.handle_user_collection_request(tls, false, false);
+    mmtk.get_plan()
+        .handle_user_collection_request(tls, false, false);
 }
 
 /// Is the object alive?
@@ -710,7 +720,7 @@ pub fn is_mapped_address(address: Address) -> bool {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `object`: The object to check.
 pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
-    mmtk.plan.modify_check(object);
+    mmtk.get_plan().modify_check(object);
 }
 
 /// Add a reference to the list of weak references. A binding may

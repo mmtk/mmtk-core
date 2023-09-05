@@ -14,14 +14,14 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.schedule_collection(worker.scheduler());
+        mmtk.get_plan().schedule_collection(worker.scheduler());
 
         // Tell GC trigger that GC started.
         // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
         // TODO: Depending on the OS scheduling, other workers can run so fast that they can finish
         // everything in the `Unconstrained` and the `Prepare` buckets before we execute the next
         // statement. Consider if there is a better place to call `on_gc_start`.
-        mmtk.plan.base().gc_trigger.policy.on_gc_start(mmtk);
+        mmtk.get_plan().base().gc_trigger.policy.on_gc_start(mmtk);
     }
 }
 
@@ -33,11 +33,13 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
 pub struct Prepare<C: GCWorkContext> {
-    pub plan: &'static C::PlanType,
+    pub plan: *const C::PlanType,
 }
 
+unsafe impl<C: GCWorkContext> Send for Prepare<C> {}
+
 impl<C: GCWorkContext> Prepare<C> {
-    pub fn new(plan: &'static C::PlanType) -> Self {
+    pub fn new(plan: *const C::PlanType) -> Self {
         Self { plan }
     }
 }
@@ -46,7 +48,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
-        #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
 
@@ -89,7 +90,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
         worker.get_copy_context_mut().prepare();
-        mmtk.plan.prepare_worker(worker);
+        mmtk.get_plan().prepare_worker(worker);
     }
 }
 
@@ -101,23 +102,26 @@ impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
 pub struct Release<C: GCWorkContext> {
-    pub plan: &'static C::PlanType,
+    pub plan: *const C::PlanType,
 }
 
 impl<C: GCWorkContext> Release<C> {
-    pub fn new(plan: &'static C::PlanType) -> Self {
+    pub fn new(plan: *const C::PlanType) -> Self {
         Self { plan }
     }
 }
 
-impl<C: GCWorkContext> GCWork<C::VM> for Release<C> {
+unsafe impl<C: GCWorkContext> Send for Release<C> {}
+
+impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
 
-        self.plan.base().gc_trigger.policy.on_gc_release(mmtk);
-
+        unsafe {
+            (*self.plan).base().gc_trigger.policy.on_gc_release(mmtk);
+        }
         // We assume this is the only running work packet that accesses plan at the point of execution
-        #[allow(clippy::cast_ref_to_mut)]
+
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
@@ -136,7 +140,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for Release<C> {
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            self.plan
+            mmtk.get_plan()
                 .base()
                 .live_bytes_in_last_gc
                 .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
@@ -190,7 +194,7 @@ impl<C: GCWorkContext> StopMutators<C> {
 impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("stop_all_mutators start");
-        mmtk.plan.base().prepare_for_stack_scanning();
+        mmtk.get_plan().base().prepare_for_stack_scanning();
         <C::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             // TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
@@ -212,20 +216,20 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!(
             "End of GC ({}/{} pages, took {} ms)",
-            mmtk.plan.get_reserved_pages(),
-            mmtk.plan.get_total_pages(),
+            mmtk.get_plan().get_reserved_pages(),
+            mmtk.get_plan().get_total_pages(),
             self.elapsed.as_millis()
         );
 
         #[cfg(feature = "count_live_bytes_in_gc")]
         {
             let live_bytes = mmtk
-                .plan
+                .get_plan()
                 .base()
                 .live_bytes_in_last_gc
                 .load(std::sync::atomic::Ordering::SeqCst);
             let used_bytes =
-                mmtk.plan.get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+                mmtk.get_plan().get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
             debug_assert!(
                 live_bytes <= used_bytes,
                 "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
@@ -235,25 +239,24 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
                 "Live objects = {} bytes ({:04.1}% of {} used pages)",
                 live_bytes,
                 live_bytes as f64 * 100.0 / used_bytes as f64,
-                mmtk.plan.get_used_pages()
+                mmtk.get_plan().get_used_pages()
             );
         }
 
         // We assume this is the only running work packet that accesses plan at the point of execution
-        #[allow(clippy::cast_ref_to_mut)]
-        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { &mut *(&*mmtk.plan as *const _ as *mut _) };
+        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
         plan_mut.end_of_gc(worker.tls);
 
         #[cfg(feature = "extreme_assertions")]
-        if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
+        if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             // reset the logging info at the end of each GC
             mmtk.edge_logger.reset();
         }
 
-        mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
+        mmtk.get_plan().base().set_gc_status(GcStatus::NotInGC);
 
         // Reset the triggering information.
-        mmtk.plan.base().reset_collection_trigger();
+        mmtk.get_plan().base().reset_collection_trigger();
 
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
@@ -448,13 +451,13 @@ pub struct ScanMutatorRoots<C: GCWorkContext>(pub &'static mut Mutator<C::VM>);
 impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
-        let base = &mmtk.plan.base();
+        let base = mmtk.get_plan().base();
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
-            C::VM,
-            C::ProcessEdgesWorkType,
-            C::TPProcessEdges,
-        >::new(mmtk);
+        C::VM,
+        C::ProcessEdgesWorkType,
+        C::TPProcessEdges,
+    >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
@@ -462,7 +465,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
         );
         self.0.flush();
 
-        if mmtk.plan.base().inform_stack_scanned(mutators) {
+        if mmtk.get_plan().base().inform_stack_scanned(mutators) {
             <C::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
@@ -515,7 +518,7 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
         bucket: WorkBucketStage,
     ) -> Self {
         #[cfg(feature = "extreme_assertions")]
-        if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
+        if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             for edge in &edges {
                 // log edge, panic if already logged
                 mmtk.edge_logger.log_edge(*edge);
@@ -543,7 +546,7 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     }
 
     pub fn plan(&self) -> &'static dyn Plan<VM = VM> {
-        &*self.mmtk.plan
+        self.mmtk.get_plan()
     }
 
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
@@ -661,7 +664,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
             self.flush();
         }
         #[cfg(feature = "sanity")]
-        if self.roots && !_mmtk.plan.is_in_sanity() {
+        if self.roots && !_mmtk.get_plan().is_in_sanity() {
             self.cache_roots_for_sanity_gc();
         }
         trace!("ProcessEdgesWork End");

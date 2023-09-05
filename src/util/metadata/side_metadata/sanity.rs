@@ -7,9 +7,11 @@ use super::constants::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
-use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
+#[cfg(target_pointer_width = "64")]
+use crate::util::heap::layout::vm_layout::vm_layout;
+use crate::util::heap::layout::vm_layout::VMLayout;
 #[cfg(target_pointer_width = "32")]
-use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
 
 /// An internal enum to enhance code style for add/sub
 #[cfg(feature = "extreme_assertions")]
@@ -63,7 +65,9 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
         total_size += super::metadata_address_range_size(spec);
     }
 
-    if total_size <= 1usize << (LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO) {
+    if total_size
+        <= 1usize << (VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO)
+    {
         Ok(())
     } else {
         Err(Error::new(
@@ -84,7 +88,8 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
 fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     for spec in l_specs {
         if super::metadata_address_range_size(spec)
-            > 1usize << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
+            > 1usize
+                << (VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
         {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -367,12 +372,12 @@ impl SideMetadataSanity {
 /// 2. Check if metadata address is out of bounds. If this fails, we will panic.
 fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
     #[cfg(target_pointer_width = "32")]
-    assert_eq!(LOG_ADDRESS_SPACE, 32, "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.");
+    assert_eq!(VMLayout::LOG_ARCH_ADDRESS_SPACE, 32, "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.");
     #[cfg(target_pointer_width = "32")]
     let data_addr_in_address_space = true;
     #[cfg(target_pointer_width = "64")]
     let data_addr_in_address_space =
-        data_addr <= unsafe { Address::from_usize(1usize << LOG_ADDRESS_SPACE) };
+        data_addr <= unsafe { Address::from_usize(1usize << vm_layout().log_address_space) };
 
     if !data_addr_in_address_space {
         warn!(
@@ -428,7 +433,7 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
             }
         }
         None => {
-            panic!("Invalid Metadata Spec!");
+            panic!("Invalid Metadata Spec: {}", metadata_spec.name);
         }
     }
 }

@@ -33,7 +33,7 @@ pub struct GcHookWork;
 
 impl<VM: VMBinding> GCWork<VM> for GcHookWork {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let base = &mmtk.plan.base();
+        let base = &mmtk.get_plan().base();
         base.analysis_manager.gc_hook(mmtk);
     }
 }
