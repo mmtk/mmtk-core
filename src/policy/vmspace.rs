@@ -91,20 +91,27 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         &self.common
     }
 
-    fn initialize_sft(&self) {
+    fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         // Initialize sft for current external pages. This method is called at the end of plan creation.
         // So we only set SFT for VM regions that are set by options (we skipped sft initialization for them earlier).
-        for external_pages in self.pr.get_external_pages().iter() {
+        let vm_regions = self.pr.get_external_pages();
+        // We should have at most one region at this point (set by the option). If we allow setting multiple VM spaces through options,
+        // we can remove this assertion.
+        assert!(vm_regions.len() <= 1);
+        for external_pages in vm_regions.iter() {
             // Chunk align things.
             let start = external_pages.start.align_down(BYTES_IN_CHUNK);
             let size = external_pages.end.align_up(BYTES_IN_CHUNK) - start;
             // The region should be empty in SFT map -- if they were set before this point, there could be invalid SFT pointers.
             debug_assert_eq!(
-                SFT_MAP.get_checked(start).name(),
+                sft_map.get_checked(start).name(),
                 crate::policy::sft::EMPTY_SFT_NAME
             );
             // Set SFT
-            self.set_sft_for_vm_region(start, size);
+            assert!(sft_map.has_sft_entry(start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", start);
+            unsafe {
+                sft_map.eager_initialize(self.as_sft(), start, size);
+            }
         }
     }
 
@@ -218,25 +225,16 @@ impl<VM: VMBinding> VMSpace<VM> {
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);
         // Set SFT if we should
         if set_sft {
-            self.set_sft_for_vm_region(chunk_start, chunk_size);
+            assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
+            unsafe {
+                SFT_MAP.update(self.as_sft(), chunk_start, chunk_size);
+            }
         }
 
         self.pr.add_new_external_pages(ExternalPages {
             start: start.align_down(BYTES_IN_PAGE),
             end: end.align_up(BYTES_IN_PAGE),
         });
-    }
-
-    fn set_sft_for_vm_region(&self, chunk_start: Address, chunk_size: usize) {
-        assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
-        assert!(crate::util::conversions::raw_is_aligned(
-            chunk_size,
-            BYTES_IN_CHUNK
-        ));
-        assert!(SFT_MAP.has_sft_entry(chunk_start), "The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.", chunk_start);
-        unsafe {
-            SFT_MAP.eager_initialize(self.as_sft(), chunk_start, chunk_size);
-        }
     }
 
     pub fn prepare(&mut self) {
