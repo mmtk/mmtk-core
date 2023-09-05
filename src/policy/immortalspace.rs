@@ -166,7 +166,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 .on_block_reset::<VM>(self.common.start, self.common.extent)
         } else {
             // Otherwise, we reset the mark bit for the allocated regions.
-            self.pr.for_allocated_regions(|addr, size| {
+            for (addr, size) in self.pr.iterate_allocated_regions() {
                 debug!(
                     "{:?}: reset mark bit from {} to {}",
                     self.name(),
@@ -174,7 +174,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                     addr + size
                 );
                 self.mark_state.on_block_reset::<VM>(addr, size);
-            })
+            }
         }
     }
 

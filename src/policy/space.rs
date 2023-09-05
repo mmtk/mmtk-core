@@ -423,7 +423,6 @@ pub struct CommonSpace<VM: VMBinding> {
 
     pub start: Address,
     pub extent: usize,
-    pub head_discontiguous_region: Address,
 
     pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
@@ -495,7 +494,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
             zeroed: args.plan_args.zeroed,
             start: unsafe { Address::zero() },
             extent: 0,
-            head_discontiguous_region: unsafe { Address::zero() },
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
