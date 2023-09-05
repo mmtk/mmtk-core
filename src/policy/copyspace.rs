@@ -127,7 +127,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        assert!(
+        debug_assert!(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
             "Copyspace does not support transitive pin trace."
         );

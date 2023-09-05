@@ -8,5 +8,5 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkSweep<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, MarkSweep<VM>, DEFAULT_TRACE>;
-    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+    type TPProcessEdges = PlanProcessEdges<Self::VM, MarkSweep<VM>, DEFAULT_TRACE>;
 }

@@ -118,14 +118,6 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     /// * `nodes`: A vector of references to objects pointed by root edges.
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
 
-    /// Create work packets to handle root edges.
-    ///
-    /// The work packet must not update the edges transitively found from any of the root edges.
-    ///
-    /// Arguments:
-    /// * `edges`: A vector of edges.
-    fn create_process_tpinned_edge_roots_work(&mut self, edges: Vec<ES>);
-
     /// Create work packets to handle transitively pinning (TP) roots.
     ///
     /// Similar to `create_process_pinning_roots_work`, this work packet will not move objects in `nodes`.

@@ -744,24 +744,16 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
     }
 
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
-        // Will process roots within the NodeRootsTrace bucket
+        // Will process roots within the PinningRootsTrace bucket
         // And put work in the Closure bucket
         crate::memory_manager::add_work_packet(
             self.mmtk,
-            WorkBucketStage::PinnedRootsTrace,
+            WorkBucketStage::PinningRootsTrace,
             ProcessRootNode::<VM, I, E>::new(nodes, WorkBucketStage::Closure),
         );
     }
 
-    fn create_process_tpinned_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
-        crate::memory_manager::add_work_packet(
-            self.mmtk,
-            WorkBucketStage::TPinningClosure,
-            I::new(edges, true, self.mmtk, WorkBucketStage::TPinningClosure),
-        );
-    }
-
-    fn create_process_tpinned_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::TPinningClosure,
@@ -820,7 +812,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         _mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
     ) {
         let tls = worker.tls;
-        assert!(!self.roots());
+        debug_assert!(!self.roots());
 
         // Scan the nodes in the buffer.
         let objects_to_scan = buffer;
@@ -1079,15 +1071,18 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
     }
 }
 
-struct ProcessRootNode<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>>
-{
-    phantom: PhantomData<(VM, E1, E2)>,
+/// This creates work for processing pinning roots. In particular it traces the objects in these roots using I,
+/// but creates the work to scan these objects using E. This is necessary to guarantee that these objects do not move
+/// (`I` should trace them without moving) as we do not have the information about the edges pointing to them.
+
+struct ProcessRootNode<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> {
+    phantom: PhantomData<(VM, I, E)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>>
-    ProcessRootNode<VM, E1, E2>
+impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>>
+    ProcessRootNode<VM, I, E>
 {
     pub fn new(nodes: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
@@ -1098,8 +1093,8 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
     }
 }
 
-impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>> GCWork<VM>
-    for ProcessRootNode<VM, E1, E2>
+impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> GCWork<VM>
+    for ProcessRootNode<VM, I, E>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("ProcessRootNode");
@@ -1126,7 +1121,7 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
         let scanned_root_objects = {
             // We create an instance of E to use its `trace_object` method and its object queue.
             let mut process_edges_work =
-                E1::new(vec![], true, mmtk, WorkBucketStage::PinnedRootsTrace);
+                I::new(vec![], true, mmtk, WorkBucketStage::PinningRootsTrace);
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {
@@ -1143,7 +1138,7 @@ impl<VM: VMBinding, E1: ProcessEdgesWork<VM = VM>, E2: ProcessEdgesWork<VM = VM>
             process_edges_work.nodes.take()
         };
 
-        let process_edges_work = E2::new(vec![], false, mmtk, self.bucket);
+        let process_edges_work = E::new(vec![], false, mmtk, self.bucket);
         let work = process_edges_work.create_scan_work(scanned_root_objects, false);
         crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
 
