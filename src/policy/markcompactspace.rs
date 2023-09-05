@@ -337,7 +337,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     /// Iterate over all contiguous memory regions in this space.
     /// For contiguous space, this iterator should yield only once, and returning a contiguous memory region covering the whole space.
-    fn iterate_contiguous_regions<'a>(&'a self) -> impl Iterator<Item = (Address, Address)> + 'a {
+    fn iterate_contiguous_regions(&self) -> impl Iterator<Item = (Address, Address)> + '_ {
         struct Iter<'a, VM: VMBinding> {
             space: &'a MarkCompactSpace<VM>,
             contiguous_space: Option<Range<Address>>,
