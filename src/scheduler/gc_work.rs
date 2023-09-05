@@ -454,10 +454,10 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
         let base = mmtk.get_plan().base();
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
-        C::VM,
-        C::ProcessEdgesWorkType,
-        C::TPProcessEdges,
-    >::new(mmtk);
+            C::VM,
+            C::ProcessEdgesWorkType,
+            C::TPProcessEdges,
+        >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
