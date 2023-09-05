@@ -36,10 +36,16 @@ pub struct UpdateReferences<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.get_plan().base().prepare_for_stack_scanning();
+        // Prepare common and base spaces for the 2nd round of transitive closure
+        let plan = mmtk.get_plan().downcast_ref::<MarkCompact<VM>>().unwrap();
+        #[allow(clippy::cast_ref_to_mut)]
+        let plan_mut = unsafe { &mut *(plan as *const MarkCompact<VM> as *mut MarkCompact<VM>) };
+        plan_mut.common.release(worker.tls, true);
+        plan_mut.common.prepare(worker.tls, true);
         #[cfg(feature = "extreme_assertions")]
         mmtk.edge_logger.reset();
 
