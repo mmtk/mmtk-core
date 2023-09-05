@@ -433,7 +433,7 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
             }
         }
         None => {
-            panic!("Invalid Metadata Spec!");
+            panic!("Invalid Metadata Spec: {}", metadata_spec.name);
         }
     }
 }

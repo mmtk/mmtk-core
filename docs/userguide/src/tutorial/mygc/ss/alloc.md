@@ -66,13 +66,16 @@ Finished code (step 2):
 {{#include ../../code/mygc_semispace/global.rs:plan_def}}
 ```
 
-Note that we have attributes on some fields. These attributes tell MMTk's macros on
-how to generate code to trace objects in this plan. Although there are other approaches that
-you can implement object tracing, in this tutorial we use the macros, as it is the simplest.
-Make sure you import the macros. We will discuss on what those attributes mean in later sections.
+Note that `MyGC` now also derives `PlanTraceObject` besides `HasSpaces`, and we
+have attributes on some fields. These attributes tell MMTk's macros how to
+generate code to visit each space of this plan as well as trace objects in this
+plan.  Although there are other approaches that you can implement object
+tracing, in this tutorial we use the macros, as it is the simplest.  Make sure
+you import the macros. We will discuss on what those attributes mean in later
+sections.
 
 ```rust
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 ```
 
 ### Implement the Plan trait for MyGC

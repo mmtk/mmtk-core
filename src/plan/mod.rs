@@ -24,6 +24,7 @@ pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
 pub use global::AllocationSemantics;
 pub(crate) use global::GcStatus;
+pub(crate) use global::HasSpaces;
 pub use global::Plan;
 pub(crate) use global::PlanTraceObject;
 

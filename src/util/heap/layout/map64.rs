@@ -56,7 +56,9 @@ impl Map64 {
                 // elide the storing of 0 for each of the element.  Using standard vector creation,
                 // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
                 // slowdown during start-up.
-                descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks()) },
+                descriptor_map: unsafe {
+                    new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks())
+                },
                 high_water,
                 base_address,
                 fl_page_resources: vec![None; MAX_SPACES],
