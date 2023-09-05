@@ -9,7 +9,6 @@ use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::vm_layout::LOG_BYTES_IN_CHUNK;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
 use crate::util::{Address, ObjectReference};
@@ -322,69 +321,26 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     /// Linear scan all the live objects in the given memory region
-    fn linear_scan_objects(
-        &self,
-        range: Range<Address>,
-        to_be_compacted_only: bool,
-    ) -> impl Iterator<Item = ObjectReference> {
-        let linear_scan = crate::util::linear_scan::ObjectIterator::<
-            VM,
-            MarkCompactObjectSize<VM>,
-            true,
-        >::new(range.start, range.end);
-        linear_scan.filter(move |obj| !to_be_compacted_only || Self::to_be_compacted(*obj))
-    }
-
-    /// Iterate over all contiguous memory regions in this space.
-    /// For contiguous space, this iterator should yield only once, and returning a contiguous memory region covering the whole space.
-    fn iterate_contiguous_regions(&self) -> impl Iterator<Item = (Address, Address)> + '_ {
-        struct Iter<'a, VM: VMBinding> {
-            space: &'a MarkCompactSpace<VM>,
-            contiguous_space: Option<Range<Address>>,
-            discontiguous_start: Address,
-        }
-        impl<VM: VMBinding> Iterator for Iter<'_, VM> {
-            type Item = (Address, Address);
-            fn next(&mut self) -> Option<Self::Item> {
-                if let Some(range) = self.contiguous_space.take() {
-                    Some((range.start, range.end))
-                } else if self.discontiguous_start.is_zero() {
-                    None
-                } else {
-                    let start = self.discontiguous_start;
-                    self.discontiguous_start =
-                        self.space.common.vm_map.get_next_contiguous_region(start);
-                    let end = start
-                        + (self.space.common.vm_map.get_contiguous_region_chunks(start)
-                            << LOG_BYTES_IN_CHUNK);
-                    Some((start, end))
-                }
-            }
-        }
-        if self.common.contiguous {
-            Iter {
-                space: self,
-                contiguous_space: Some(self.common.start..self.pr.cursor()),
-                discontiguous_start: Address::ZERO,
-            }
-        } else {
-            let discontiguous_start = self.pr.common().get_head_discontiguous_region();
-            Iter {
-                space: self,
-                contiguous_space: None,
-                discontiguous_start,
-            }
-        }
+    fn linear_scan_objects(&self, range: Range<Address>) -> impl Iterator<Item = ObjectReference> {
+        crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
+            range.start,
+            range.end,
+        )
     }
 
     pub fn calculate_forwarding_pointer(&self) {
-        let mut to_iter = self.iterate_contiguous_regions();
-        let Some((mut to_cursor, mut to_end)) = to_iter.next() else {
+        let mut to_iter = self.pr.iterate_allocated_regions();
+        let Some((mut to_cursor, mut to_size)) = to_iter.next() else {
             return;
         };
-        for (from_start, from_end) in self.iterate_contiguous_regions() {
+        let mut to_end = to_cursor + to_size;
+        for (from_start, size) in self.pr.iterate_allocated_regions() {
+            let from_end = from_start + size;
             // linear scan the contiguous region
-            for obj in self.linear_scan_objects(from_start..from_end, true) {
+            for obj in self
+                .linear_scan_objects(from_start..from_end)
+                .filter(|o| Self::to_be_compacted(*o))
+            {
                 let copied_size =
                     VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
                 let align = VM::VMObjectModel::get_align_when_copied(obj);
@@ -393,7 +349,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
                 // move to next to-block if there is no sufficient memory in current region
                 if to_cursor + copied_size > to_end {
-                    (to_cursor, to_end) = to_iter.next().unwrap();
+                    (to_cursor, to_size) = to_iter.next().unwrap();
+                    to_end = to_cursor + to_size;
                     to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
                     debug_assert!(to_cursor + copied_size <= to_end);
                 }
@@ -419,8 +376,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn compact(&self) {
         let mut to = Address::ZERO;
-        for (from_start, from_end) in self.iterate_contiguous_regions() {
-            for obj in self.linear_scan_objects(from_start..from_end, false) {
+        for (from_start, size) in self.pr.iterate_allocated_regions() {
+            let from_end = from_start + size;
+            for obj in self.linear_scan_objects(from_start..from_end) {
                 let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 // clear the VO bit
                 vo_bit::unset_vo_bit::<VM>(obj);

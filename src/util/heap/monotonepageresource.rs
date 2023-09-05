@@ -3,6 +3,7 @@ use crate::policy::space::required_chunks;
 use crate::util::address::Address;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions::*;
+use std::ops::Range;
 use std::sync::{Mutex, MutexGuard};
 
 use crate::util::alloc::embedded_meta_data::*;
@@ -324,28 +325,45 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
-    /// Iterate through allocated regions, and invoke the given function for each region.
-    pub fn for_allocated_regions<F>(&self, mut f: F)
-    where
-        F: FnMut(Address, usize),
-    {
+    /// Iterate over all contiguous memory regions in this space.
+    /// For contiguous space, this iterator should yield only once, and returning a contiguous memory region covering the whole space.
+    pub fn iterate_allocated_regions(&self) -> impl Iterator<Item = (Address, usize)> + '_ {
+        struct Iter<'a, VM: VMBinding> {
+            pr: &'a MonotonePageResource<VM>,
+            contiguous_space: Option<Range<Address>>,
+            discontiguous_start: Address,
+        }
+        impl<VM: VMBinding> Iterator for Iter<'_, VM> {
+            type Item = (Address, usize);
+            fn next(&mut self) -> Option<Self::Item> {
+                if let Some(range) = self.contiguous_space.take() {
+                    Some((range.start, range.end - range.start))
+                } else if self.discontiguous_start.is_zero() {
+                    None
+                } else {
+                    let start = self.discontiguous_start;
+                    self.discontiguous_start = self.pr.vm_map().get_next_contiguous_region(start);
+                    let size = self.pr.vm_map().get_contiguous_region_size(start);
+                    Some((start, size))
+                }
+            }
+        }
         let sync = self.sync.lock().unwrap();
         match sync.conditional {
             MonotonePageResourceConditional::Contiguous { start, .. } => {
-                let end = sync.cursor.align_up(BYTES_IN_CHUNK);
-                f(start, end - start);
+                let cursor = sync.cursor.align_up(BYTES_IN_CHUNK);
+                Iter {
+                    pr: self,
+                    contiguous_space: Some(start..cursor),
+                    discontiguous_start: Address::ZERO,
+                }
             }
             MonotonePageResourceConditional::Discontiguous => {
-                if !sync.cursor.is_zero() {
-                    f(sync.current_chunk, sync.cursor - sync.current_chunk);
-
-                    let mut chunk = self.vm_map().get_next_contiguous_region(sync.current_chunk);
-                    while !chunk.is_zero() {
-                        let size = self.vm_map().get_contiguous_region_size(chunk);
-                        f(chunk, size);
-
-                        chunk = self.vm_map().get_next_contiguous_region(chunk);
-                    }
+                let discontiguous_start = self.common.get_head_discontiguous_region();
+                Iter {
+                    pr: self,
+                    contiguous_space: None,
+                    discontiguous_start,
                 }
             }
         }
