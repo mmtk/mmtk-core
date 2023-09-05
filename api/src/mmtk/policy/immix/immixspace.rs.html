@@ -1109,12 +1109,14 @@
 <a href="#1109" id="1109">1109</a>
 <a href="#1110" id="1110">1110</a>
 <a href="#1111" id="1111">1111</a>
+<a href="#1112" id="1112">1112</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
+<span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::SFTMap;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
@@ -1283,8 +1285,8 @@
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonSpace&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.common
     }
-    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.common().initialize_sft(<span class="self">self</span>.as_sft())
+    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>SFTMap) {
+        <span class="self">self</span>.common().initialize_sft(<span class="self">self</span>.as_sft(), sft_map)
     }
     <span class="kw">fn </span>release_multiple_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _start: Address) {
         <span class="macro">panic!</span>(<span class="string">&quot;immixspace only releases pages enmasse&quot;</span>)

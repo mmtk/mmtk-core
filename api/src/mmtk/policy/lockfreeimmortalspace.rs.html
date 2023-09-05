@@ -219,13 +219,11 @@
 <a href="#219" id="219">219</a>
 <a href="#220" id="220">220</a>
 <a href="#221" id="221">221</a>
-<a href="#222" id="222">222</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
-<span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
@@ -326,8 +324,8 @@
         <span class="macro">panic!</span>(<span class="string">&quot;immortalspace only releases pages enmasse&quot;</span>)
     }
 
-    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">unsafe </span>{ SFT_MAP.update(<span class="self">self</span>.as_sft(), <span class="self">self</span>.start, <span class="self">self</span>.extent) };
+    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {
+        <span class="kw">unsafe </span>{ sft_map.eager_initialize(<span class="self">self</span>.as_sft(), <span class="self">self</span>.start, <span class="self">self</span>.extent) };
     }
 
     <span class="kw">fn </span>reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

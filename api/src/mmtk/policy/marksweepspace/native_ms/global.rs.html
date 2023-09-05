@@ -539,8 +539,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.pr
     }
 
-    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.common().initialize_sft(<span class="self">self</span>.as_sft())
+    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {
+        <span class="self">self</span>.common().initialize_sft(<span class="self">self</span>.as_sft(), sft_map)
     }
 
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonSpace&lt;VM&gt; {

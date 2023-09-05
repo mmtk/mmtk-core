@@ -964,7 +964,7 @@
         <span class="self">self</span>.gc_trigger.as_ref()
     }
 
-    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, _sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {
         <span class="comment">// Do nothing - we will set sft when we get new results from malloc
     </span>}
 

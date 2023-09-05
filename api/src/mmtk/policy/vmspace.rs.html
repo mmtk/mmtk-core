@@ -269,8 +269,6 @@
 <a href="#269" id="269">269</a>
 <a href="#270" id="270">270</a>
 <a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -364,20 +362,27 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.common
     }
 
-    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {
         <span class="comment">// Initialize sft for current external pages. This method is called at the end of plan creation.
         // So we only set SFT for VM regions that are set by options (we skipped sft initialization for them earlier).
-        </span><span class="kw">for </span>external_pages <span class="kw">in </span><span class="self">self</span>.pr.get_external_pages().iter() {
+        </span><span class="kw">let </span>vm_regions = <span class="self">self</span>.pr.get_external_pages();
+        <span class="comment">// We should have at most one region at this point (set by the option). If we allow setting multiple VM spaces through options,
+        // we can remove this assertion.
+        </span><span class="macro">assert!</span>(vm_regions.len() &lt;= <span class="number">1</span>);
+        <span class="kw">for </span>external_pages <span class="kw">in </span>vm_regions.iter() {
             <span class="comment">// Chunk align things.
             </span><span class="kw">let </span>start = external_pages.start.align_down(BYTES_IN_CHUNK);
             <span class="kw">let </span>size = external_pages.end.align_up(BYTES_IN_CHUNK) - start;
             <span class="comment">// The region should be empty in SFT map -- if they were set before this point, there could be invalid SFT pointers.
             </span><span class="macro">debug_assert_eq!</span>(
-                SFT_MAP.get_checked(start).name(),
+                sft_map.get_checked(start).name(),
                 <span class="kw">crate</span>::policy::sft::EMPTY_SFT_NAME
             );
             <span class="comment">// Set SFT
-            </span><span class="self">self</span>.set_sft_for_vm_region(start, size);
+            </span><span class="macro">assert!</span>(sft_map.has_sft_entry(start), <span class="string">&quot;The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.&quot;</span>, start);
+            <span class="kw">unsafe </span>{
+                sft_map.eager_initialize(<span class="self">self</span>.as_sft(), start, size);
+            }
         }
     }
 
@@ -491,25 +496,16 @@
         // self.common.vm_map.insert(chunk_start, chunk_size, self.common.descriptor);
         // Set SFT if we should
         </span><span class="kw">if </span>set_sft {
-            <span class="self">self</span>.set_sft_for_vm_region(chunk_start, chunk_size);
+            <span class="macro">assert!</span>(SFT_MAP.has_sft_entry(chunk_start), <span class="string">&quot;The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.&quot;</span>, chunk_start);
+            <span class="kw">unsafe </span>{
+                SFT_MAP.update(<span class="self">self</span>.as_sft(), chunk_start, chunk_size);
+            }
         }
 
         <span class="self">self</span>.pr.add_new_external_pages(ExternalPages {
             start: start.align_down(BYTES_IN_PAGE),
             end: end.align_up(BYTES_IN_PAGE),
         });
-    }
-
-    <span class="kw">fn </span>set_sft_for_vm_region(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk_start: Address, chunk_size: usize) {
-        <span class="macro">assert!</span>(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
-        <span class="macro">assert!</span>(<span class="kw">crate</span>::util::conversions::raw_is_aligned(
-            chunk_size,
-            BYTES_IN_CHUNK
-        ));
-        <span class="macro">assert!</span>(SFT_MAP.has_sft_entry(chunk_start), <span class="string">&quot;The VM space start (aligned to {}) does not have a valid SFT entry. Possibly the address range is not in the address range we use.&quot;</span>, chunk_start);
-        <span class="kw">unsafe </span>{
-            SFT_MAP.eager_initialize(<span class="self">self</span>.as_sft(), chunk_start, chunk_size);
-        }
     }
 
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
