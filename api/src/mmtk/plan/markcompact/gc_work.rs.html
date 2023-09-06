@@ -93,6 +93,16 @@
 <a href="#93" id="93">93</a>
 <a href="#94" id="94">94</a>
 <a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::global::MarkCompact;
 <span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
@@ -127,14 +137,21 @@
 <span class="doccomment">/// create another round of root scanning work packets
 /// to update object references
 </span><span class="kw">pub struct </span>UpdateReferences&lt;VM: VMBinding&gt; {
+    plan: <span class="kw-2">*const </span>MarkCompact&lt;VM&gt;,
     p: PhantomData&lt;VM&gt;,
 }
 
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>UpdateReferences&lt;VM&gt; {}
+
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>UpdateReferences&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="comment">// The following needs to be done right before the second round of root scanning
         </span>VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.get_plan().base().prepare_for_stack_scanning();
+        <span class="comment">// Prepare common and base spaces for the 2nd round of transitive closure
+        </span><span class="kw">let </span>plan_mut = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*mut </span>MarkCompact&lt;VM&gt;) };
+        plan_mut.common.release(worker.tls, <span class="bool-val">true</span>);
+        plan_mut.common.prepare(worker.tls, <span class="bool-val">true</span>);
         <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
         </span>mmtk.edge_logger.reset();
 
@@ -155,8 +172,11 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; UpdateReferences&lt;VM&gt; {
-    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-        <span class="self">Self </span>{ p: PhantomData }
+    <span class="kw">pub fn </span>new(plan: <span class="kw-2">&amp;</span>MarkCompact&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            plan,
+            p: PhantomData,
+        }
     }
 }
 

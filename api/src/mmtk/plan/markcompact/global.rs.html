@@ -317,7 +317,7 @@
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.mc_space));
         <span class="comment">// do another trace to update references
-        </span>scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::&lt;VM&gt;::new());
+        </span>scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::&lt;VM&gt;::new(<span class="self">self</span>));
         scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::&lt;VM&gt;::new(<span class="kw-2">&amp;</span><span class="self">self</span>.mc_space));
 
         <span class="comment">// Release global/collectors/mutators
