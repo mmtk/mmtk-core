@@ -145,7 +145,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         self.gc_trigger.as_ref()
     }
 
-    fn initialize_sft(&self) {
+    fn initialize_sft(&self, _sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         // Do nothing - we will set sft when we get new results from malloc
     }
 

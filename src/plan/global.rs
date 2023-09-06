@@ -127,7 +127,12 @@ pub fn create_plan<VM: VMBinding>(
     }
 
     // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
-    plan.for_each_space(&mut |s| s.initialize_sft());
+    let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
+        unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
+    plan.for_each_space(&mut |s| {
+        sft_map.notify_space_creation(s.as_sft());
+        s.initialize_sft(sft_map);
+    });
 
     plan
 }
