@@ -32,14 +32,21 @@ impl<VM: VMBinding> CalculateForwardingAddress<VM> {
 /// create another round of root scanning work packets
 /// to update object references
 pub struct UpdateReferences<VM: VMBinding> {
+    plan: *const MarkCompact<VM>,
     p: PhantomData<VM>,
 }
 
+unsafe impl<VM: VMBinding> Send for UpdateReferences<VM> {}
+
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.get_plan().base().prepare_for_stack_scanning();
+        // Prepare common and base spaces for the 2nd round of transitive closure
+        let plan_mut = unsafe { &mut *(self.plan as *mut MarkCompact<VM>) };
+        plan_mut.common.release(worker.tls, true);
+        plan_mut.common.prepare(worker.tls, true);
         #[cfg(feature = "extreme_assertions")]
         mmtk.edge_logger.reset();
 
@@ -60,8 +67,11 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
 }
 
 impl<VM: VMBinding> UpdateReferences<VM> {
-    pub fn new() -> Self {
-        Self { p: PhantomData }
+    pub fn new(plan: &MarkCompact<VM>) -> Self {
+        Self {
+            plan,
+            p: PhantomData,
+        }
     }
 }
 
