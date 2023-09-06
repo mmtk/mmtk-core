@@ -147,7 +147,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-        if self.protect_memory_on_release && !new_chunk {
+        if self.protect_memory_on_release && (!self.common().contiguous || !new_chunk) {
             // This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
             // See https://github.com/mmtk/mmtk-core/issues/400.
             // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
@@ -158,8 +158,13 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
             // If we want to improve and get rid of this loop, we need to move this munprotect to anywhere after the ensure_mapped() call
             // in Space.acquire(). We can either move it the option of 'protect_on_release' to space, or have a call to page resource
             // after ensure_mapped(). However, I think this is sufficient given that this option is only used for PageProtect for debugging use.
-            while !MMAPPER.is_mapped_address(rtn) {}
-            self.munprotect(rtn, self.free_list.size(page_offset as _) as _)
+            while !new_chunk && !MMAPPER.is_mapped_address(rtn) {}
+            // Don't unprotect if this is a new unmapped discontiguous chunk
+            // For a new mapped discontiguous chunk, this should previously be released and protected by us.
+            // We still need to unprotect it.
+            if !new_chunk || MMAPPER.is_mapped_address(rtn) {
+                self.munprotect(rtn, self.free_list.size(page_offset as _) as _)
+            }
         };
         Result::Ok(PRAllocResult {
             start: rtn,
