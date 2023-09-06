@@ -1,8 +1,8 @@
+use super::gc_work::MarkCompactGCWorkContext;
 use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
-use super::gc_work::{MarkCompactForwardingGCWorkContext, MarkCompactGCWorkContext};
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
