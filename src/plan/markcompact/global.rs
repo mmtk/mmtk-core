@@ -92,7 +92,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MarkCompactForwardingGCWorkContext<VM>>::new());
+            .add(StopMutators::<MarkCompactGCWorkContext<VM>>::new());
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
