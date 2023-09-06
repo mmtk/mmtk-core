@@ -1,6 +1,7 @@
 # MMTk
 
 [![crates.io](https://img.shields.io/crates/v/mmtk.svg)](https://crates.io/crates/mmtk)
+![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmmtk%2Fmmtk-core%2Fmaster%2FCargo.toml&query=%24.package%5B%22rust-version%22%5D&label=MSRV)
 [![docs.rs](https://docs.rs/mmtk/badge.svg)](https://docs.rs/mmtk/)
 [![project chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://mmtk.zulipchat.com/)
 
@@ -20,7 +21,8 @@ We maintain an up to date list of the prerequisite for building MMTk and its bin
 
 ## Build
 
-MMTk can build with a stable Rust toolchain. The minimal supported Rust version is 1.61.0, and MMTk is tested with 1.66.1.
+MMTk can build with a stable Rust toolchain. We pin to a specific Rust version using [the `rust-toolchain` file](rust-toolchain), and we specify the minimal supported Rust
+version (MSRV) in [`Cargo.toml`](Cargo.toml#L13).
 
 ```console
 $ cargo build
