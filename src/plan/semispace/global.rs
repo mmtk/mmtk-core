@@ -2,7 +2,7 @@ use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
+use crate::global_state::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -66,8 +66,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<SSGCWorkContext<VM>>(self);
     }
 
@@ -100,7 +98,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+        false
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -111,12 +109,12 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.tospace().reserved_pages() + self.common.get_used_pages()
     }
 
-    fn get_available_pages(&self) -> usize {
-        (self
-            .get_total_pages()
-            .saturating_sub(self.get_reserved_pages()))
-            >> 1
-    }
+    // fn get_available_pages(&self) -> usize {
+    //     (self
+    //         .get_total_pages()
+    //         .saturating_sub(self.get_reserved_pages()))
+    //         >> 1
+    // }
 
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base

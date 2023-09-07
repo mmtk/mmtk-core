@@ -2,7 +2,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
+use crate::global_state::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -48,8 +48,6 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
 
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
     }
 
@@ -68,7 +66,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+        false
     }
 
     fn get_used_pages(&self) -> usize {

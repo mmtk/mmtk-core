@@ -46,9 +46,9 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             ),
             true,
         );
+        let full_heap_gc_count = args.global_args.stats.new_event_counter("majorGC", true, true);
         let common = CommonPlan::new(args);
 
-        let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 
         CommonGenPlan {
             nursery,
@@ -127,7 +127,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
 
-        self.common.base.collection_required(plan, space_full)
+        false
     }
 
     pub fn force_full_heap_collection(&self) {
@@ -151,7 +151,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         } else if self
             .common
             .base
-            .user_triggered_collection
+            .global_state.user_triggered_collection
             .load(Ordering::SeqCst)
             && *self.common.base.options.full_heap_system_gc
         {
@@ -162,7 +162,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             || self
                 .common
                 .base
-                .cur_collection_attempts
+                .global_state.cur_collection_attempts
                 .load(Ordering::SeqCst)
                 > 1
         {
@@ -171,7 +171,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
                 self.next_gc_full_heap.load(Ordering::SeqCst),
                 self.common
                     .base
-                    .cur_collection_attempts
+                    .global_state.cur_collection_attempts
                     .load(Ordering::SeqCst)
             );
             // Forces full heap collection

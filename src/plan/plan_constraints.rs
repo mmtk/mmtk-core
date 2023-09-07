@@ -8,6 +8,8 @@ use crate::util::constants::*;
 /// and use the constant wherever possible. However, for plan-neutral implementations,
 /// these constraints are not constant.
 pub struct PlanConstraints {
+    /// Does the plan collect garbage? Obviously most plans do, but NoGC does not collect.
+    pub collects_garbage: bool,
     pub moves_objects: bool,
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
@@ -38,6 +40,7 @@ pub struct PlanConstraints {
 impl PlanConstraints {
     pub const fn default() -> Self {
         PlanConstraints {
+            collects_garbage: true,
             moves_objects: false,
             gc_header_bits: 0,
             gc_header_words: 0,

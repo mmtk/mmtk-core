@@ -4,7 +4,7 @@ use super::gc_work::{
     UpdateReferences,
 };
 use crate::plan::global::CommonPlan;
-use crate::plan::global::GcStatus;
+use crate::global_state::GcStatus;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -79,9 +79,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
-
         // TODO use schedule_common once it can work with markcompact
         // self.common()
         //     .schedule_common::<Self, MarkingProcessEdges<VM>, NoCopy<VM>>(
@@ -165,7 +162,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+        false
     }
 
     fn get_used_pages(&self) -> usize {

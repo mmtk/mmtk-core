@@ -197,7 +197,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let tls = self.get_tls();
         let plan = self.get_plan().base();
         let is_mutator = VM::VMActivePlan::is_mutator(tls);
-        let stress_test = plan.is_stress_test_gc_enabled();
+        let stress_test = plan.options.is_stress_test_gc_enabled();
 
         // Information about the previous collection.
         let mut emergency_collection = false;
@@ -205,7 +205,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
         loop {
             // Try to allocate using the slow path
-            let result = if is_mutator && stress_test && plan.is_precise_stress() {
+            let result = if is_mutator && stress_test && *plan.options.precise_stress {
                 // If we are doing precise stress GC, we invoke the special allow_slow_once call.
                 // alloc_slow_once_precise_stress() should make sure that every allocation goes
                 // to the slowpath (here) so we can check the allocation bytes and decide
@@ -214,7 +214,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // If we should do a stress GC now, we tell the alloc_slow_once_precise_stress()
                 // so they would avoid try any thread local allocation, and directly call
                 // global acquire and do a poll.
-                let need_poll = is_mutator && plan.should_do_stress_gc();
+                let need_poll = is_mutator && plan.gc_trigger.should_do_stress_gc();
                 self.alloc_slow_once_precise_stress(size, align, offset, need_poll)
             } else {
                 // If we are not doing precise stress GC, just call the normal alloc_slow_once().
@@ -229,14 +229,14 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
-                if !plan.allocation_success.load(Ordering::Relaxed) {
-                    plan.allocation_success.store(true, Ordering::SeqCst);
+                if !plan.global_state.allocation_success.load(Ordering::Relaxed) {
+                    plan.global_state.allocation_success.store(true, Ordering::SeqCst);
                 }
 
                 // Only update the allocation bytes if we haven't failed a previous allocation in this loop
                 if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
                     let allocated_size =
-                        if plan.is_precise_stress() || !self.does_thread_local_allocation() {
+                        if *plan.options.precise_stress || !self.does_thread_local_allocation() {
                             // For precise stress test, or for allocators that do not have thread local buffer,
                             // we know exactly how many bytes we allocate.
                             size
@@ -247,7 +247,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                                 self.get_thread_local_buffer_granularity(),
                             )
                         };
-                    let _allocation_bytes = plan.increase_allocation_bytes_by(allocated_size);
+                    let _allocation_bytes = plan.global_state.increase_allocation_bytes_by(allocated_size);
 
                     // This is the allocation hook for the analysis trait. If you want to call
                     // an analysis counter specific allocation hook, then here is the place to do so
@@ -273,17 +273,17 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // the second GC, which is not emergency. In such case, we will give a false OOM.
             // We cannot just rely on the local var. Instead, we get the emergency collection value again,
             // and check both.
-            if emergency_collection && self.get_plan().is_emergency_collection() {
+            if emergency_collection && plan.global_state.is_emergency_collection() {
                 trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
-                let fail_with_oom = !plan.allocation_success.swap(true, Ordering::SeqCst);
+                let fail_with_oom = !plan.global_state.allocation_success.swap(true, Ordering::SeqCst);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
-                    plan.allocation_success.swap(false, Ordering::SeqCst);
+                    plan.global_state.allocation_success.swap(false, Ordering::SeqCst);
                     return result;
                 }
             }
@@ -300,7 +300,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             // Record whether last collection was an Emergency collection. If so, we make one more
             // attempt to allocate before we signal an OOM.
-            emergency_collection = self.get_plan().is_emergency_collection();
+            emergency_collection = self.get_plan().base().global_state.is_emergency_collection();
             trace!("Got emergency collection as {}", emergency_collection);
             previous_result_zero = true;
         }

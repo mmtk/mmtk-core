@@ -84,7 +84,7 @@ impl ReferenceProcessors {
     pub fn scan_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
         // For soft refs, it is up to the VM to decide when to reclaim this.
         // If this is not an emergency collection, we have no heap stress. We simply retain soft refs.
-        if !mmtk.get_plan().is_emergency_collection() {
+        if !mmtk.state.is_emergency_collection() {
             // This step only retains the referents (keep the referents alive), it does not update its addresses.
             // We will call soft.scan() again with retain=false to update its addresses based on liveness.
             self.soft.retain::<E>(trace, is_nursery_gc(mmtk.get_plan()));

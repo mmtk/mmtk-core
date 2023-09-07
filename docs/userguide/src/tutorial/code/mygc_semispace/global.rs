@@ -1,7 +1,7 @@
 // ANCHOR: imports_no_gc_work
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
-use crate::plan::global::GcStatus; // Add
+use crate::global_state::GcStatus; // Add
 use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;

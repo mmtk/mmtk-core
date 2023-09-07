@@ -218,8 +218,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             // recyclable line.  Hence, we bring the "if we're in stress test" check up a level and
             // directly call `alloc_slow_inline()` which will properly account for the allocation
             // request as well as allocate from the newly recycled line
-            let stress_test = self.plan.base().is_stress_test_gc_enabled();
-            let precise_stress = self.plan.base().is_precise_stress();
+            let stress_test = self.plan.base().options.is_stress_test_gc_enabled();
+            let precise_stress = *self.plan.base().options.precise_stress;
             if unlikely(stress_test && precise_stress) {
                 self.alloc_slow_inline(size, align, offset)
             } else {

@@ -3,7 +3,7 @@ use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
-use crate::plan::GcStatus;
+use crate::global_state::GcStatus;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::sft::SFT;
@@ -80,9 +80,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
-
         let is_full_heap = self.requires_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
@@ -287,6 +284,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
 
 impl<VM: VMBinding> StickyImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let full_heap_gc_count = args.stats.new_event_counter("majorGC", true, true);
         let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &STICKY_IMMIX_CONSTRAINTS,
@@ -294,7 +292,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 &crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
             ),
         };
-
+        
         let immix = immix::Immix::new_with_args(
             plan_args,
             crate::policy::immix::ImmixSpaceArgs {
@@ -309,7 +307,6 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 mixed_age: true,
             },
         );
-        let full_heap_gc_count = immix.base().stats.new_event_counter("majorGC", true, true);
         Self {
             immix,
             gc_full_heap: AtomicBool::new(false),
@@ -325,7 +322,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
             .immix
             .common
             .base
-            .user_triggered_collection
+            .global_state.user_triggered_collection
             .load(Ordering::SeqCst)
             && *self.immix.common.base.options.full_heap_system_gc
         {
@@ -336,7 +333,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 .immix
                 .common
                 .base
-                .cur_collection_attempts
+                .global_state.cur_collection_attempts
                 .load(Ordering::SeqCst)
                 > 1
         {

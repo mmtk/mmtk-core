@@ -58,7 +58,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                 // We succeeded in fastpath alloc, this cannot be precise stress test
                 debug_assert!(
                     !(*self.plan.options().precise_stress
-                        && self.plan.base().is_stress_test_gc_enabled())
+                        && self.plan.options().is_stress_test_gc_enabled())
                 );
 
                 let res = allocator::align_allocation::<VM>(cell, align, offset);
@@ -238,7 +238,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     /// method may add the block to available_blocks, or available_blocks_stress.
     fn add_to_available_blocks(&mut self, bin: usize, block: Block, stress: bool) {
         if stress {
-            debug_assert!(self.plan.base().is_precise_stress());
+            debug_assert!(*self.plan.options().precise_stress);
             self.available_blocks_stress[bin].push(block);
         } else {
             self.available_blocks[bin].push(block);
@@ -268,7 +268,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         self.add_to_available_blocks(
                             bin,
                             block,
-                            self.plan.base().is_stress_test_gc_enabled(),
+                            self.plan.options().is_stress_test_gc_enabled(),
                         );
                         return Some(block);
                     } else {

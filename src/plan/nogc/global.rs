@@ -42,7 +42,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+        false
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -76,14 +76,14 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             + self.base.get_used_pages()
     }
 
-    fn handle_user_collection_request(
-        &self,
-        _tls: VMMutatorThread,
-        _force: bool,
-        _exhaustive: bool,
-    ) {
-        warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
-    }
+    // fn handle_user_collection_request(
+    //     &self,
+    //     _tls: VMMutatorThread,
+    //     _force: bool,
+    //     _exhaustive: bool,
+    // ) {
+    //     warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+    // }
 }
 
 impl<VM: VMBinding> NoGC<VM> {

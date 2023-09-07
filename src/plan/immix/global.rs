@@ -4,7 +4,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
+use crate::global_state::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -48,7 +48,7 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 
 impl<VM: VMBinding> Plan for Immix<VM> {
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
+        false
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
@@ -72,8 +72,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         Self::schedule_immix_full_heap_collection::<
             Immix<VM>,
             ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
@@ -165,10 +163,10 @@ impl<VM: VMBinding> Immix<VM> {
         scheduler: &GCWorkScheduler<VM>,
     ) {
         let in_defrag = immix_space.decide_whether_to_defrag(
-            plan.is_emergency_collection(),
+            plan.base().global_state.is_emergency_collection(),
             true,
-            plan.base().cur_collection_attempts.load(Ordering::SeqCst),
-            plan.base().is_user_triggered_collection(),
+            plan.base().global_state.cur_collection_attempts.load(Ordering::SeqCst),
+            plan.base().global_state.is_user_triggered_collection(),
             *plan.base().options.full_heap_system_gc,
         );
 

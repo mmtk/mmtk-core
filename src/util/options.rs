@@ -446,6 +446,13 @@ impl Options {
     pub fn get_min_nursery_pages(&self) -> usize {
         crate::util::conversions::bytes_to_pages_up(self.nursery.min)
     }
+
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
+    pub fn is_stress_test_gc_enabled(&self) -> bool {
+        *self.stress_factor != DEFAULT_STRESS_FACTOR
+            || *self.analysis_factor != DEFAULT_STRESS_FACTOR
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
