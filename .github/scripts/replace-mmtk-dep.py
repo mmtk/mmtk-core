@@ -19,10 +19,15 @@ with open(args.toml_path, "rt") as f:
 
 mmtk_node = toml_data["dependencies"]["mmtk"]
 
-print("Deleting dependencies.mmtk.git")
-if "git" in mmtk_node:
-    del mmtk_node["git"]
+# These keys may specify the locations of the dependency. Remove them.
+for key in ["git", "branch", "version", "registry"]:
+    if key in mmtk_node:
+        print("Deleting dependencies.mmtk.{}".format(key))
+        del mmtk_node[key]
+    else:
+        print("Key dependencies.mmtk.{} does not exist.  Ignored.".format(key))
 
+# Use mmtk-core from the specified local directory.
 mmtk_repo_path = os.path.realpath(args.mmtk_core_path)
 print("Setting dependencies.mmtk.path to {}".format(mmtk_repo_path))
 mmtk_node["path"] = mmtk_repo_path
