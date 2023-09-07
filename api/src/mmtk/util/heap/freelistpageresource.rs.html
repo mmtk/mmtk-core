@@ -414,6 +414,15 @@
 <a href="#414" id="414">414</a>
 <a href="#415" id="415">415</a>
 <a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::ops::{Deref, DerefMut};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
@@ -563,19 +572,28 @@
         <span class="kw">let </span>rtn = <span class="self">self</span>.start + conversions::pages_to_bytes(page_offset <span class="kw">as _</span>);
         <span class="comment">// The meta-data portion of reserved Pages was committed above.
         </span><span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
-        <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release &amp;&amp; !new_chunk {
-            <span class="comment">// This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
-            // See https://github.com/mmtk/mmtk-core/issues/400.
-            // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
-            // has not yet call ensure_mapped() for it. So the chunk is not yet mmapped. At this point, if another thread calls
-            // this function, and get a few more pages from the same chunk, it is no longer seen as &#39;new_chunk&#39;, and we
-            // will try to munprotect on it. But the chunk may not yet be mapped.
-            //
-            // If we want to improve and get rid of this loop, we need to move this munprotect to anywhere after the ensure_mapped() call
-            // in Space.acquire(). We can either move it the option of &#39;protect_on_release&#39; to space, or have a call to page resource
-            // after ensure_mapped(). However, I think this is sufficient given that this option is only used for PageProtect for debugging use.
-            </span><span class="kw">while </span>!MMAPPER.is_mapped_address(rtn) {}
-            <span class="self">self</span>.munprotect(rtn, <span class="self">self</span>.free_list.size(page_offset <span class="kw">as _</span>) <span class="kw">as _</span>)
+        <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release {
+            <span class="kw">if </span>!new_chunk {
+                <span class="comment">// This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
+                // See https://github.com/mmtk/mmtk-core/issues/400.
+                // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
+                // has not yet call ensure_mapped() for it. So the chunk is not yet mmapped. At this point, if another thread calls
+                // this function, and get a few more pages from the same chunk, it is no longer seen as &#39;new_chunk&#39;, and we
+                // will try to munprotect on it. But the chunk may not yet be mapped.
+                //
+                // If we want to improve and get rid of this loop, we need to move this munprotect to anywhere after the ensure_mapped() call
+                // in Space.acquire(). We can either move it the option of &#39;protect_on_release&#39; to space, or have a call to page resource
+                // after ensure_mapped(). However, I think this is sufficient given that this option is only used for PageProtect for debugging use.
+                </span><span class="kw">while </span>!new_chunk &amp;&amp; !MMAPPER.is_mapped_address(rtn) {}
+                <span class="self">self</span>.munprotect(rtn, <span class="self">self</span>.free_list.size(page_offset <span class="kw">as _</span>) <span class="kw">as _</span>)
+            } <span class="kw">else if </span>!<span class="self">self</span>.common().contiguous &amp;&amp; new_chunk {
+                <span class="comment">// Don&#39;t unprotect if this is a new unmapped discontiguous chunk
+                // For a new mapped discontiguous chunk, this should previously be released and protected by us.
+                // We still need to unprotect it.
+                </span><span class="kw">if </span>MMAPPER.is_mapped_address(rtn) {
+                    <span class="self">self</span>.munprotect(rtn, <span class="self">self</span>.free_list.size(page_offset <span class="kw">as _</span>) <span class="kw">as _</span>)
+                }
+            }
         };
         Result::Ok(PRAllocResult {
             start: rtn,
