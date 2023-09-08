@@ -124,7 +124,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
-            self.immix_space.prepare(full_heap);
+            self.immix_space.prepare(
+                full_heap,
+                crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
+            );
         }
     }
 

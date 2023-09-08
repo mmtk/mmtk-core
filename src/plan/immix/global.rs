@@ -84,7 +84,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare(true);
+        self.immix_space.prepare(
+            true,
+            crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
+        );
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
