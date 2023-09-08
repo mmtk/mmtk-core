@@ -2,6 +2,7 @@ use atomic::Ordering;
 
 use crate::global_state::GlobalState;
 use crate::plan::Plan;
+use crate::plan::gc_requester::GCRequester;
 use crate::policy::space::Space;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options};
@@ -21,12 +22,13 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
+    gc_requester: Arc<GCRequester<VM>>,
     options: Arc<Options>,
     state: Arc<GlobalState>,
 }
 
 impl<VM: VMBinding> GCTrigger<VM> {
-    pub fn new(options: Arc<Options>, state: Arc<GlobalState>) -> Self {
+    pub fn new(options: Arc<Options>, gc_requester: Arc<GCRequester<VM>>, state: Arc<GlobalState>) -> Self {
         GCTrigger {
             plan: MaybeUninit::uninit(),
             policy: match *options.gc_trigger {
@@ -40,6 +42,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 GCTriggerSelector::Delegated => unimplemented!(),
             },
             options,
+            gc_requester,
             state,
         }
     }
@@ -70,7 +73,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            plan.base().gc_requester.request();
+            self.gc_requester.request();
             return true;
         }
         false

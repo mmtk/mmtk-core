@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
@@ -6,14 +8,16 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 use crate::Plan;
 
+use super::allocator::AllocatorContext;
+
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static MallocSpace<VM>,
-    /// [`Plan`] instance that this allocator instance is associated with.
-    plan: &'static dyn Plan<VM = VM>,
+    context: Arc<AllocatorContext<VM>>,
+    _pad: usize,
 }
 
 impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
@@ -21,8 +25,8 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         self.space as &'static dyn Space<VM>
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.plan
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.context
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
@@ -43,11 +47,11 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
 }
 
 impl<VM: VMBinding> MallocAllocator<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: &'static MallocSpace<VM>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
     ) -> Self {
-        MallocAllocator { tls, space, plan }
+        MallocAllocator { tls, space, context, _pad: 0 }
     }
 }

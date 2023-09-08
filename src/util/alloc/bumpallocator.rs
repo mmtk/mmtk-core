@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
@@ -20,8 +22,8 @@ pub struct BumpAllocator<VM: VMBinding> {
     pub(in crate::util::alloc) bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static dyn Space<VM>,
-    /// [`Plan`] instance that this allocator instance is associated with.
-    plan: &'static dyn Plan<VM = VM>,
+    pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
+    _pad: usize,
 }
 
 /// A common fast-path bump-pointer allocator shared across different allocator implementations
@@ -65,13 +67,15 @@ impl<VM: VMBinding> BumpAllocator<VM> {
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::alloc::fill_alignment_gap;
 
+use super::allocator::AllocatorContext;
+
 impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     fn get_space(&self) -> &'static dyn Space<VM> {
         self.space
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.plan
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.context
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -158,16 +162,17 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: &'static dyn Space<VM>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         BumpAllocator {
             tls,
             bump_pointer: unsafe { BumpPointer::new(Address::zero(), Address::zero()) },
             space,
-            plan,
+            context,
+            _pad: 0,
         }
     }
 

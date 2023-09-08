@@ -1,10 +1,11 @@
 //! MMTk instance.
-use crate::global_state::GlobalState;
+use crate::global_state::{GlobalState, GcStatus};
 use crate::plan::Plan;
 use crate::plan::gc_requester::GCRequester;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
+use crate::util::alloc::allocator::AllocatorContext;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
@@ -17,6 +18,8 @@ use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::AnalysisManager;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
@@ -106,11 +109,14 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) edge_logger: EdgeLogger<VM::VMEdge>,
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
-    pub(crate) stats: Stats,
+    pub(crate) stats: Arc<Stats>,
     pub(crate) heap: HeapMeta,
     inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
+    /// Wrapper around analysis counters
+    #[cfg(feature = "analysis")]
+    pub(crate) analysis_manager: Arc<AnalysisManager<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
@@ -132,12 +138,13 @@ impl<VM: VMBinding> MMTK<VM> {
         let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
 
         let state = Arc::new(GlobalState::new(&options));
-
-        let gc_trigger = Arc::new(GCTrigger::new(options.clone(), state.clone()));
-
+        
         let gc_requester = Arc::new(GCRequester::new());
 
-        let stats = Stats::new(&options);
+        let gc_trigger = Arc::new(GCTrigger::new(options.clone(), gc_requester.clone(), state.clone()));
+
+
+        let stats = Arc::new(Stats::new(&options));
 
         let mut heap = HeapMeta::new();
 
@@ -191,6 +198,8 @@ impl<VM: VMBinding> MMTK<VM> {
             inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
             edge_logger: EdgeLogger::new(),
+            #[cfg(feature = "analysis")]
+            analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,
             gc_requester,
             stats,
@@ -225,6 +234,30 @@ impl<VM: VMBinding> MMTK<VM> {
     #[cfg(feature = "sanity")]
     pub(crate) fn is_in_sanity(&self) -> bool {
         self.inside_sanity.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn set_gc_status(&self, s: GcStatus) {
+        let mut gc_status = self.state.gc_status.lock().unwrap();
+        if *gc_status == GcStatus::NotInGC {
+            self.state.stacks_prepared.store(false, Ordering::SeqCst);
+            // FIXME stats
+            self.stats.start_gc();
+        }
+        *gc_status = s;
+        if *gc_status == GcStatus::NotInGC {
+            // FIXME stats
+            if self.stats.get_gathering_stats() {
+                self.stats.end_gc();
+            }
+        }
+    }
+
+    pub fn gc_in_progress(&self) -> bool {
+        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+    }
+
+    pub fn gc_in_progress_proper(&self) -> bool {
+        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
     /// The application code has requested a collection. This is just a GC hint, and

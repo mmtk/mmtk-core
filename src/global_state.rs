@@ -22,7 +22,6 @@ pub struct GlobalState {
     // Current collection attempt
     pub cur_collection_attempts: AtomicUsize,
     // pub gc_requester: Arc<GCRequester<VM>>, ???
-    pub stats: Stats,
     // pub vm_map: &'static dyn Map,
     // pub options: Arc<Options>, ???
     // pub heap: HeapMeta, ???
@@ -41,9 +40,6 @@ pub struct GlobalState {
     /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
     #[cfg(feature = "count_live_bytes_in_gc")]
     pub live_bytes_in_last_gc: AtomicUsize,
-    /// Wrapper around analysis counters
-    #[cfg(feature = "analysis")]
-    pub analysis_manager: AnalysisManager<VM>,
 }
 
 impl GlobalState {
@@ -61,7 +57,6 @@ impl GlobalState {
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
             // gc_requester: Arc::new(GCRequester::new()),
-            stats: Stats::new(&options),
             // heap: args.global_args.heap,
             // gc_trigger: args.global_args.gc_trigger,
             // options: args.global_args.options,
@@ -73,33 +68,16 @@ impl GlobalState {
             malloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "count_live_bytes_in_gc")]
             live_bytes_in_last_gc: AtomicUsize::new(0),
-            #[cfg(feature = "analysis")]
-            analysis_manager,      
         }
     }
 
-    pub(crate) fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
-            self.stacks_prepared.store(false, Ordering::SeqCst);
-            // FIXME stats
-            self.stats.start_gc();
-        }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
-            // FIXME stats
-            if self.stats.get_gathering_stats() {
-                self.stats.end_gc();
-            }
-        }
+    pub fn is_initialized(&self) -> bool {
+        self.initialized.load(Ordering::SeqCst)
     }
 
-    pub fn gc_in_progress(&self) -> bool {
-        *self.gc_status.lock().unwrap() != GcStatus::NotInGC
-    }
-
-    pub fn gc_in_progress_proper(&self) -> bool {
-        *self.gc_status.lock().unwrap() == GcStatus::GcProper
+    pub fn should_trigger_gc_when_heap_is_full(&self) -> bool {
+        self.trigger_gc_when_heap_is_full
+            .load(Ordering::SeqCst)
     }
 
     pub fn set_collection_kind(&self, last_collection_was_exhaustive: bool, heap_can_grow: bool) -> bool {

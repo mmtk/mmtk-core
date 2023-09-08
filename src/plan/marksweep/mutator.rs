@@ -1,3 +1,4 @@
+use crate::MMTK;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::create_allocator_mapping;
@@ -111,20 +112,20 @@ pub use native_mark_sweep::*;
 
 pub fn create_ms_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
-        space_mapping: create_space_mapping(plan),
+        space_mapping: create_space_mapping(mmtk.get_plan()),
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: mmtk.get_plan(),
     }
 }

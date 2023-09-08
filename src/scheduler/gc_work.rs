@@ -19,7 +19,7 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
             mmtk.get_plan().notify_emergency_collection();
         }
 
-        mmtk.state.set_gc_status(GcStatus::GcPrepare);
+        mmtk.set_gc_status(GcStatus::GcPrepare);
 
         mmtk.get_plan().schedule_collection(worker.scheduler());
 
@@ -251,7 +251,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.edge_logger.reset();
         }
 
-        mmtk.state.set_gc_status(GcStatus::NotInGC);
+        mmtk.set_gc_status(GcStatus::NotInGC);
 
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
@@ -463,7 +463,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanMutatorRoots<E> {
             <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
-            mmtk.state.set_gc_status(GcStatus::GcProper);
+            mmtk.set_gc_status(GcStatus::GcProper);
         }
     }
 }

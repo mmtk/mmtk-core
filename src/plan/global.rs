@@ -31,6 +31,7 @@ use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -42,9 +43,9 @@ pub fn create_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
-        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk.get_plan()),
+        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
         PlanSelector::SemiSpace => {
-            crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk.get_plan())
+            crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk)
         }
         PlanSelector::GenCopy => {
             crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
@@ -53,16 +54,16 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
         }
         PlanSelector::MarkSweep => {
-            crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk.get_plan())
+            crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk)
         }
         PlanSelector::Immix => {
-            crate::plan::immix::mutator::create_immix_mutator(tls, mmtk.get_plan())
+            crate::plan::immix::mutator::create_immix_mutator(tls, mmtk)
         }
         PlanSelector::PageProtect => {
-            crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk.get_plan())
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
         }
         PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk.get_plan())
+            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
         }
         PlanSelector::StickyImmix => {
             crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
@@ -149,7 +150,7 @@ pub fn create_gc_worker_context<VM: VMBinding>(
     tls: VMWorkerThread,
     mmtk: &'static MMTK<VM>,
 ) -> GCWorkerCopyContext<VM> {
-    GCWorkerCopyContext::<VM>::new(tls, mmtk.get_plan(), mmtk.get_plan().create_copy_config())
+    GCWorkerCopyContext::<VM>::new(tls, mmtk, mmtk.get_plan().create_copy_config())
 }
 
 /// A plan describes the global core functionality for all memory management schemes.
@@ -204,16 +205,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
-
-    fn is_initialized(&self) -> bool {
-        self.base().global_state.initialized.load(Ordering::SeqCst)
-    }
-
-    fn should_trigger_gc_when_heap_is_full(&self) -> bool {
-        self.base().global_state
-            .trigger_gc_when_heap_is_full
-            .load(Ordering::SeqCst)
-    }
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -354,13 +345,13 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         true
     }
 
-    fn modify_check(&self, object: ObjectReference) {
-        assert!(
-            !(self.base().global_state.gc_in_progress_proper() && object.is_movable()),
-            "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
-            object
-        );
-    }
+    // fn modify_check(&self, object: ObjectReference) {
+    //     assert!(
+    //         !(self.base().global_state.gc_in_progress_proper() && object.is_movable()),
+    //         "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
+    //         object
+    //     );
+    // }
 
     /// An object is firstly reached by a sanity GC. So the object is reachable
     /// in the current GC, and all the GC work has been done for the object (such as
@@ -413,7 +404,7 @@ pub struct BasePlan<VM: VMBinding> {
     // pub max_collection_attempts: AtomicUsize,
     // Current collection attempt
     // pub cur_collection_attempts: AtomicUsize,
-    pub gc_requester: Arc<GCRequester<VM>>,
+    // pub gc_requester: Arc<GCRequester<VM>>,
     // pub stats: Stats,
     // pub vm_map: &'static dyn Map,
     pub options: Arc<Options>,
@@ -434,8 +425,8 @@ pub struct BasePlan<VM: VMBinding> {
     // #[cfg(feature = "count_live_bytes_in_gc")]
     // pub live_bytes_in_last_gc: AtomicUsize,
     /// Wrapper around analysis counters
-    #[cfg(feature = "analysis")]
-    pub analysis_manager: AnalysisManager<VM>,
+    // #[cfg(feature = "analysis")]
+    // pub analysis_manager: AnalysisManager<VM>,
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
@@ -508,6 +499,7 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
             gc_trigger: self.global_args.gc_trigger.clone(),
             scheduler: self.global_args.scheduler.clone(),
             options: &self.global_args.options,
+            global_state: self.global_args.state.clone(),
         }
     }
 }
@@ -515,9 +507,6 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
-        // Initializing the analysis manager and routines
-        #[cfg(feature = "analysis")]
-        let analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
             #[cfg(feature = "code_space")]
             code_space: ImmortalSpace::new(args.get_space_args(
@@ -558,7 +547,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             // allocation_success: AtomicBool::new(false),
             // max_collection_attempts: AtomicUsize::new(0),
             // cur_collection_attempts: AtomicUsize::new(0),
-            gc_requester: Arc::new(GCRequester::new()),
+            // gc_requester: Arc::new(GCRequester::new()),
             // stats,
             // heap: args.global_args.heap,
             gc_trigger: args.global_args.gc_trigger,
@@ -571,8 +560,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             // malloc_bytes: AtomicUsize::new(0),
             // #[cfg(feature = "count_live_bytes_in_gc")]
             // live_bytes_in_last_gc: AtomicUsize::new(0),
-            #[cfg(feature = "analysis")]
-            analysis_manager,
+            // #[cfg(feature = "analysis")]
+            // analysis_manager,
         }
     }
 

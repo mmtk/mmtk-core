@@ -1,3 +1,4 @@
+use crate::MMTK;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -42,23 +43,24 @@ pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWork
 
 pub fn create_nogc_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
+    let plan = mmtk.get_plan().downcast_ref::<NoGC<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, plan);
             vec.push((
                 AllocatorSelector::BumpPointer(0),
-                &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
+                &plan.nogc_space,
             ));
             vec.push((
                 AllocatorSelector::BumpPointer(1),
-                &plan.downcast_ref::<NoGC<VM>>().unwrap().immortal,
+                &plan.immortal,
             ));
             vec.push((
                 AllocatorSelector::BumpPointer(2),
-                &plan.downcast_ref::<NoGC<VM>>().unwrap().los,
+                &plan.los,
             ));
             vec
         }),
@@ -67,7 +69,7 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,

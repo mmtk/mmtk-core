@@ -425,10 +425,9 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
         "gc_poll() can only be called by a mutator thread."
     );
 
-    let plan = mmtk.get_plan();
-    if plan.should_trigger_gc_when_heap_is_full() && plan.base().gc_trigger.poll(false, None) {
+    if mmtk.state.should_trigger_gc_when_heap_is_full() && mmtk.gc_trigger.poll(false, None) {
         debug!("Collection required");
-        assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+        assert!(mmtk.state.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
         VM::VMCollection::block_for_gc(tls);
     }
 }
@@ -474,7 +473,7 @@ pub fn start_worker<VM: VMBinding>(
 ///   Collection::spawn_gc_thread() so that the VM knows the context.
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     assert!(
-        !mmtk.get_plan().is_initialized(),
+        !mmtk.state.is_initialized(),
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
@@ -491,7 +490,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        !mmtk.get_plan().should_trigger_gc_when_heap_is_full(),
+        !mmtk.state.should_trigger_gc_when_heap_is_full(),
         "enable_collection() is called when GC is already enabled."
     );
     mmtk.state.trigger_gc_when_heap_is_full
@@ -510,7 +509,7 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        mmtk.get_plan().should_trigger_gc_when_heap_is_full(),
+        mmtk.state.should_trigger_gc_when_heap_is_full(),
         "disable_collection() is called when GC is not enabled."
     );
     mmtk.state.trigger_gc_when_heap_is_full
@@ -703,16 +702,16 @@ pub fn is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }
 
-/// Check that if a garbage collection is in progress and if the given
-/// object is not movable.  If it is movable error messages are
-/// logged and the system exits.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-/// * `object`: The object to check.
-pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
-    mmtk.get_plan().modify_check(object);
-}
+// /// Check that if a garbage collection is in progress and if the given
+// /// object is not movable.  If it is movable error messages are
+// /// logged and the system exits.
+// ///
+// /// Arguments:
+// /// * `mmtk`: A reference to an MMTk instance.
+// /// * `object`: The object to check.
+// pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
+//     mmtk.get_plan().modify_check(object);
+// }
 
 /// Add a reference to the list of weak references. A binding may
 /// call this either when a weak reference is created, or when a weak reference is traced during GC.

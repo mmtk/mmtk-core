@@ -1,4 +1,5 @@
 use super::SemiSpace;
+use crate::MMTK;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -50,13 +51,13 @@ lazy_static! {
 
 pub fn create_ss_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let ss = plan.downcast_ref::<SemiSpace<VM>>().unwrap();
+    let ss = mmtk.get_plan().downcast_ref::<SemiSpace<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, ss);
             vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));
             vec
         }),
@@ -65,10 +66,10 @@ pub fn create_ss_mutator<VM: VMBinding>(
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: ss,
     }
 }

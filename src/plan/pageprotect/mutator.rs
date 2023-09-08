@@ -1,4 +1,5 @@
 use super::PageProtect;
+use crate::MMTK;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
@@ -37,13 +38,13 @@ lazy_static! {
 /// Every object is allocated to LOS.
 pub fn create_pp_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let page = plan.downcast_ref::<PageProtect<VM>>().unwrap();
+    let page = mmtk.get_plan().downcast_ref::<PageProtect<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, page);
             vec.push((AllocatorSelector::LargeObject(0), &page.space));
             vec
         }),
@@ -52,10 +53,10 @@ pub fn create_pp_mutator<VM: VMBinding>(
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: page,
     }
 }
