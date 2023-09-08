@@ -413,6 +413,11 @@ pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: u
     crate::util::malloc::free_with_size(mmtk, addr, old_size)
 }
 
+#[cfg(feature = "malloc_counted_size")]
+pub fn get_malloc_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
+    mmtk.state.malloc_bytes.load(Ordering::SeqCst)
+}
+
 /// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block
 /// the current thread, and trigger a GC. Otherwise, it will simply return.
 /// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.
@@ -477,8 +482,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.state.initialized
-        .store(true, Ordering::SeqCst);
+    mmtk.state.initialized.store(true, Ordering::SeqCst);
     probe!(mmtk, collection_initialized);
 }
 
@@ -493,7 +497,8 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
         !mmtk.state.should_trigger_gc_when_heap_is_full(),
         "enable_collection() is called when GC is already enabled."
     );
-    mmtk.state.trigger_gc_when_heap_is_full
+    mmtk.state
+        .trigger_gc_when_heap_is_full
         .store(true, Ordering::SeqCst);
 }
 
@@ -512,7 +517,8 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
         mmtk.state.should_trigger_gc_when_heap_is_full(),
         "disable_collection() is called when GC is not enabled."
     );
-    mmtk.state.trigger_gc_when_heap_is_full
+    mmtk.state
+        .trigger_gc_when_heap_is_full
         .store(false, Ordering::SeqCst);
 }
 
@@ -561,8 +567,7 @@ pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 #[cfg(feature = "count_live_bytes_in_gc")]
 pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.state.live_bytes_in_last_gc
-        .load(Ordering::SeqCst)
+    mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
 }
 
 /// Return the starting address of the heap. *Note that currently MMTk uses

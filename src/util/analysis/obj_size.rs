@@ -1,7 +1,7 @@
 use crate::util::analysis::RtAnalysis;
 use crate::util::statistics::counter::EventCounter;
-use crate::vm::{ActivePlan, VMBinding};
 use crate::util::statistics::stats::Stats;
+use crate::vm::VMBinding;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

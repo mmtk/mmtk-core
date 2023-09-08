@@ -4,7 +4,6 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::global_state::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -47,7 +46,7 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for Immix<VM> {
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
         false
     }
 
@@ -165,7 +164,10 @@ impl<VM: VMBinding> Immix<VM> {
         let in_defrag = immix_space.decide_whether_to_defrag(
             plan.base().global_state.is_emergency_collection(),
             true,
-            plan.base().global_state.cur_collection_attempts.load(Ordering::SeqCst),
+            plan.base()
+                .global_state
+                .cur_collection_attempts
+                .load(Ordering::SeqCst),
             plan.base().global_state.is_user_triggered_collection(),
             *plan.base().options.full_heap_system_gc,
         );

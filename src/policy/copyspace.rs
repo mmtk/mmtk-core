@@ -14,8 +14,8 @@ use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
@@ -290,7 +290,6 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 }
 
-use crate::plan::Plan;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::VMWorkerThread;

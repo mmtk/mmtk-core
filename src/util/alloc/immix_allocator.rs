@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 use super::BumpPointer;
-use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
@@ -52,7 +51,6 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     fn get_context(&self) -> &AllocatorContext<VM> {
         &self.context
     }
-
 
     fn does_thread_local_allocation(&self) -> bool {
         true

@@ -1,15 +1,14 @@
 use super::Immix;
-use crate::MMTK;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::ImmixAllocator;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use crate::{
     plan::barriers::NoBarrier,
     util::opaque_pointer::{VMMutatorThread, VMWorkerThread},

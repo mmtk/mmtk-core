@@ -1,8 +1,5 @@
-use crate::util::statistics::stats::Stats;
-use crate::util::options::Options;
-
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
@@ -21,11 +18,6 @@ pub struct GlobalState {
     pub max_collection_attempts: AtomicUsize,
     // Current collection attempt
     pub cur_collection_attempts: AtomicUsize,
-    // pub gc_requester: Arc<GCRequester<VM>>, ???
-    // pub vm_map: &'static dyn Map,
-    // pub options: Arc<Options>, ???
-    // pub heap: HeapMeta, ???
-    // pub gc_trigger: Arc<GCTrigger<VM>>, ???
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
     /// A counter for per-mutator stack scanning
@@ -43,44 +35,19 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
-    pub fn new(options: &Options) -> Self {
-        Self {
-            initialized: AtomicBool::new(false),
-            trigger_gc_when_heap_is_full: AtomicBool::new(true),
-            gc_status: Mutex::new(GcStatus::NotInGC),
-            stacks_prepared: AtomicBool::new(false),
-            emergency_collection: AtomicBool::new(false),
-            user_triggered_collection: AtomicBool::new(false),
-            internal_triggered_collection: AtomicBool::new(false),
-            last_internal_triggered_collection: AtomicBool::new(false),
-            allocation_success: AtomicBool::new(false),
-            max_collection_attempts: AtomicUsize::new(0),
-            cur_collection_attempts: AtomicUsize::new(0),
-            // gc_requester: Arc::new(GCRequester::new()),
-            // heap: args.global_args.heap,
-            // gc_trigger: args.global_args.gc_trigger,
-            // options: args.global_args.options,
-            #[cfg(feature = "sanity")]
-            inside_sanity: AtomicBool::new(false),
-            scanned_stacks: AtomicUsize::new(0),
-            allocation_bytes: AtomicUsize::new(0),
-            #[cfg(feature = "malloc_counted_size")]
-            malloc_bytes: AtomicUsize::new(0),
-            #[cfg(feature = "count_live_bytes_in_gc")]
-            live_bytes_in_last_gc: AtomicUsize::new(0),
-        }
-    }
-
     pub fn is_initialized(&self) -> bool {
         self.initialized.load(Ordering::SeqCst)
     }
 
     pub fn should_trigger_gc_when_heap_is_full(&self) -> bool {
-        self.trigger_gc_when_heap_is_full
-            .load(Ordering::SeqCst)
+        self.trigger_gc_when_heap_is_full.load(Ordering::SeqCst)
     }
 
-    pub fn set_collection_kind(&self, last_collection_was_exhaustive: bool, heap_can_grow: bool) -> bool {
+    pub fn set_collection_kind(
+        &self,
+        last_collection_was_exhaustive: bool,
+        heap_can_grow: bool,
+    ) -> bool {
         self.cur_collection_attempts.store(
             if self.user_triggered_collection.load(Ordering::Relaxed) {
                 1
@@ -210,6 +177,32 @@ impl GlobalState {
     #[cfg(feature = "count_live_bytes_in_gc")]
     pub fn set_live_bytes_in_last_gc(&self, size: usize) {
         self.live_bytes_in_last_gc.store(size, Ordering::SeqCst);
+    }
+}
+
+impl Default for GlobalState {
+    fn default() -> Self {
+        Self {
+            initialized: AtomicBool::new(false),
+            trigger_gc_when_heap_is_full: AtomicBool::new(true),
+            gc_status: Mutex::new(GcStatus::NotInGC),
+            stacks_prepared: AtomicBool::new(false),
+            emergency_collection: AtomicBool::new(false),
+            user_triggered_collection: AtomicBool::new(false),
+            internal_triggered_collection: AtomicBool::new(false),
+            last_internal_triggered_collection: AtomicBool::new(false),
+            allocation_success: AtomicBool::new(false),
+            max_collection_attempts: AtomicUsize::new(0),
+            cur_collection_attempts: AtomicUsize::new(0),
+            #[cfg(feature = "sanity")]
+            inside_sanity: AtomicBool::new(false),
+            scanned_stacks: AtomicUsize::new(0),
+            allocation_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "malloc_counted_size")]
+            malloc_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_in_gc")]
+            live_bytes_in_last_gc: AtomicUsize::new(0),
+        }
     }
 }
 

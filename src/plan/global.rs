@@ -1,6 +1,5 @@
 //! The global part of a plan implementation.
 
-use super::gc_requester::GCRequester;
 use super::PlanConstraints;
 use crate::global_state::GlobalState;
 use crate::mmtk::MMTK;
@@ -13,8 +12,6 @@ use crate::policy::space::{PlanCreateSpaceArgs, Space};
 use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::AnalysisManager;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::Mmapper;
@@ -31,10 +28,7 @@ use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
-use std::marker::PhantomData;
-use std::mem::MaybeUninit;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
 
@@ -44,21 +38,15 @@ pub fn create_mutator<VM: VMBinding>(
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
         PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
-        PlanSelector::SemiSpace => {
-            crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk)
-        }
+        PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk),
         PlanSelector::GenCopy => {
             crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
         }
         PlanSelector::GenImmix => {
             crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
         }
-        PlanSelector::MarkSweep => {
-            crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk)
-        }
-        PlanSelector::Immix => {
-            crate::plan::immix::mutator::create_immix_mutator(tls, mmtk)
-        }
+        PlanSelector::MarkSweep => crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk),
+        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, mmtk),
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
         }
@@ -73,26 +61,8 @@ pub fn create_mutator<VM: VMBinding>(
 
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
-    vm_map: &'static dyn VMMap,
-    mmapper: &'static dyn Mmapper,
-    options: Arc<Options>,
-    state: Arc<GlobalState>,
-    gc_trigger: Arc<GCTrigger<VM>>,
-    scheduler: Arc<GCWorkScheduler<VM>>,
-    stats: &Stats,
-    heap: &mut HeapMeta,
+    args: CreateGeneralPlanArgs<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
-    let args = CreateGeneralPlanArgs {
-        vm_map,
-        mmapper,
-        options,
-        state,
-        gc_trigger,
-        scheduler,
-        stats,
-        heap,
-    };
-
     let plan = match plan {
         PlanSelector::NoGC => {
             Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
@@ -386,47 +356,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct BasePlan<VM: VMBinding> {
     pub(crate) global_state: Arc<GlobalState>,
-
-    // /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
-    // pub initialized: AtomicBool,
-    // /// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow
-    // /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
-    // pub trigger_gc_when_heap_is_full: AtomicBool,
-    // pub gc_status: Mutex<GcStatus>,
-    // pub last_stress_pages: AtomicUsize,
-    // pub emergency_collection: AtomicBool,
-    // pub user_triggered_collection: AtomicBool,
-    // pub internal_triggered_collection: AtomicBool,
-    // pub last_internal_triggered_collection: AtomicBool,
-    // Has an allocation succeeded since the emergency collection?
-    // pub allocation_success: AtomicBool,
-    // Maximum number of failed attempts by a single thread
-    // pub max_collection_attempts: AtomicUsize,
-    // Current collection attempt
-    // pub cur_collection_attempts: AtomicUsize,
-    // pub gc_requester: Arc<GCRequester<VM>>,
-    // pub stats: Stats,
-    // pub vm_map: &'static dyn Map,
     pub options: Arc<Options>,
-    // pub heap: HeapMeta,
     pub gc_trigger: Arc<GCTrigger<VM>>,
-    // #[cfg(feature = "sanity")]
-    // pub inside_sanity: AtomicBool,
-    // /// A counter for per-mutator stack scanning
-    // scanned_stacks: AtomicUsize,
-    // /// Have we scanned all the stacks?
-    // stacks_prepared: AtomicBool,
-    // /// A counter that keeps tracks of the number of bytes allocated since last stress test
-    // allocation_bytes: AtomicUsize,
-    // /// A counteer that keeps tracks of the number of bytes allocated by malloc
-    // #[cfg(feature = "malloc_counted_size")]
-    // malloc_bytes: AtomicUsize,
-    /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
-    // #[cfg(feature = "count_live_bytes_in_gc")]
-    // pub live_bytes_in_last_gc: AtomicUsize,
-    /// Wrapper around analysis counters
-    // #[cfg(feature = "analysis")]
-    // pub analysis_manager: AnalysisManager<VM>,
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
@@ -494,7 +425,7 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
             mmapper: self.global_args.mmapper,
-            heap: &mut self.global_args.heap,
+            heap: self.global_args.heap,
             constraints: self.constraints,
             gc_trigger: self.global_args.gc_trigger.clone(),
             scheduler: self.global_args.scheduler.clone(),

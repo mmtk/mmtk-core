@@ -14,7 +14,10 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let is_emergency = mmtk.state.set_collection_kind(mmtk.get_plan().last_collection_was_exhaustive(), mmtk.gc_trigger.policy.can_heap_size_grow());
+        let is_emergency = mmtk.state.set_collection_kind(
+            mmtk.get_plan().last_collection_was_exhaustive(),
+            mmtk.gc_trigger.policy.can_heap_size_grow(),
+        );
         if is_emergency {
             mmtk.get_plan().notify_emergency_collection();
         }
@@ -449,7 +452,6 @@ pub struct ScanMutatorRoots<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Ed
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanMutatorRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanMutatorRoots for mutator {:?}", self.0.get_tls());
-        let base = mmtk.get_plan().base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
         <E::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(

@@ -4,8 +4,6 @@ use std::sync::Arc;
 
 use memoffset::offset_of;
 
-use crate::MMTK;
-use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
@@ -16,10 +14,11 @@ use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::Mutator;
+use crate::MMTK;
 
+use super::allocator::AllocatorContext;
 use super::FreeListAllocator;
 use super::MarkCompactAllocator;
-use super::allocator::AllocatorContext;
 
 pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
 pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;

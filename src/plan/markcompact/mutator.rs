@@ -1,4 +1,5 @@
-use super::MarkCompact; use crate::MMTK;
+use super::MarkCompact;
+use crate::MMTK;
 // Add
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::create_allocator_mapping;
@@ -11,7 +12,6 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::MarkCompactAllocator;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use crate::Plan;
 use enum_map::EnumMap;
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {

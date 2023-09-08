@@ -1,16 +1,14 @@
-use crate::MMTK;
 use crate::global_state::GlobalState;
 use crate::util::address::Address;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::options::Options;
+use crate::MMTK;
 
-use std::marker::PhantomData;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
-use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
@@ -235,7 +233,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
         loop {
             // Try to allocate using the slow path
-            let result = if is_mutator && stress_test && *self.get_context().options.precise_stress {
+            let result = if is_mutator && stress_test && *self.get_context().options.precise_stress
+            {
                 // If we are doing precise stress GC, we invoke the special allow_slow_once call.
                 // alloc_slow_once_precise_stress() should make sure that every allocation goes
                 // to the slowpath (here) so we can check the allocation bytes and decide
@@ -259,25 +258,38 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
-                if !self.get_context().state.allocation_success.load(Ordering::Relaxed) {
-                    self.get_context().state.allocation_success.store(true, Ordering::SeqCst);
+                if !self
+                    .get_context()
+                    .state
+                    .allocation_success
+                    .load(Ordering::Relaxed)
+                {
+                    self.get_context()
+                        .state
+                        .allocation_success
+                        .store(true, Ordering::SeqCst);
                 }
 
                 // Only update the allocation bytes if we haven't failed a previous allocation in this loop
-                if stress_test && self.get_context().state.is_initialized() && !previous_result_zero {
-                    let allocated_size =
-                        if *self.get_context().options.precise_stress || !self.does_thread_local_allocation() {
-                            // For precise stress test, or for allocators that do not have thread local buffer,
-                            // we know exactly how many bytes we allocate.
-                            size
-                        } else {
-                            // For normal stress test, we count the entire thread local buffer size as allocated.
-                            crate::util::conversions::raw_align_up(
-                                size,
-                                self.get_thread_local_buffer_granularity(),
-                            )
-                        };
-                    let _allocation_bytes = self.get_context().state.increase_allocation_bytes_by(allocated_size);
+                if stress_test && self.get_context().state.is_initialized() && !previous_result_zero
+                {
+                    let allocated_size = if *self.get_context().options.precise_stress
+                        || !self.does_thread_local_allocation()
+                    {
+                        // For precise stress test, or for allocators that do not have thread local buffer,
+                        // we know exactly how many bytes we allocate.
+                        size
+                    } else {
+                        // For normal stress test, we count the entire thread local buffer size as allocated.
+                        crate::util::conversions::raw_align_up(
+                            size,
+                            self.get_thread_local_buffer_granularity(),
+                        )
+                    };
+                    let _allocation_bytes = self
+                        .get_context()
+                        .state
+                        .increase_allocation_bytes_by(allocated_size);
 
                     // This is the allocation hook for the analysis trait. If you want to call
                     // an analysis counter specific allocation hook, then here is the place to do so
@@ -289,7 +301,9 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                             *self.get_context().options.analysis_factor
                         );
 
-                        self.get_context().analysis_manager.alloc_hook(size, align, offset);
+                        self.get_context()
+                            .analysis_manager
+                            .alloc_hook(size, align, offset);
                     }
                 }
 
@@ -307,13 +321,20 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
-                let fail_with_oom = !self.get_context().state.allocation_success.swap(true, Ordering::SeqCst);
+                let fail_with_oom = !self
+                    .get_context()
+                    .state
+                    .allocation_success
+                    .swap(true, Ordering::SeqCst);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
-                    self.get_context().state.allocation_success.swap(false, Ordering::SeqCst);
+                    self.get_context()
+                        .state
+                        .allocation_success
+                        .swap(false, Ordering::SeqCst);
                     return result;
                 }
             }

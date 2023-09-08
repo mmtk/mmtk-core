@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};
@@ -65,6 +64,11 @@ impl<VM: VMBinding> LargeObjectAllocator<VM> {
         space: &'static LargeObjectSpace<VM>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
-        LargeObjectAllocator { tls, space, context, _pad: 0 }
+        LargeObjectAllocator {
+            tls,
+            space,
+            context,
+            _pad: 0,
+        }
     }
 }

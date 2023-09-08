@@ -1,8 +1,6 @@
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
-use crate::MMTK;
-use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::copyspace::CopySpace;
@@ -15,6 +13,7 @@ use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use std::sync::atomic::Ordering;
 
 use enum_map::Enum;
@@ -179,11 +178,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
     /// * `worker_tls`: The worker thread for this copy context.
     /// * `plan`: A reference to the current plan.
     /// * `config`: The configuration for the copy context.
-    pub fn new(
-        worker_tls: VMWorkerThread,
-        mmtk: &MMTK<VM>,
-        config: CopyConfig<VM>,
-    ) -> Self {
+    pub fn new(worker_tls: VMWorkerThread, mmtk: &MMTK<VM>, config: CopyConfig<VM>) -> Self {
         let mut ret = GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },

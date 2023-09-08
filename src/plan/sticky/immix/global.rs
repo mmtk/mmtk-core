@@ -3,7 +3,6 @@ use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
-use crate::global_state::GcStatus;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::sft::SFT;
@@ -292,7 +291,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 &crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
             ),
         };
-        
+
         let immix = immix::Immix::new_with_args(
             plan_args,
             crate::policy::immix::ImmixSpaceArgs {
@@ -322,7 +321,8 @@ impl<VM: VMBinding> StickyImmix<VM> {
             .immix
             .common
             .base
-            .global_state.user_triggered_collection
+            .global_state
+            .user_triggered_collection
             .load(Ordering::SeqCst)
             && *self.immix.common.base.options.full_heap_system_gc
         {
@@ -333,7 +333,8 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 .immix
                 .common
                 .base
-                .global_state.cur_collection_attempts
+                .global_state
+                .cur_collection_attempts
                 .load(Ordering::SeqCst)
                 > 1
         {

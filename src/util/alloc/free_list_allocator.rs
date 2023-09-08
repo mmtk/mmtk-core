@@ -9,7 +9,6 @@ use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
-use crate::Plan;
 
 use super::allocator::AllocatorContext;
 
@@ -467,9 +466,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
             self.consumed_blocks[bin].sweep_blocks(self.space);
-            if self.plan.base().is_precise_stress() && self.plan.base().is_stress_test_gc_enabled()
+            if *self.context.options.precise_stress
+                && self.context.options.is_stress_test_gc_enabled()
             {
-                debug_assert!(self.plan.base().is_precise_stress());
+                debug_assert!(*self.context.options.precise_stress);
                 self.available_blocks_stress[bin].append(&mut self.consumed_blocks[bin]);
             } else {
                 self.available_blocks[bin].append(&mut self.consumed_blocks[bin]);

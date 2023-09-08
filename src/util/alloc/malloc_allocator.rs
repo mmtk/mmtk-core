@@ -6,7 +6,6 @@ use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
-use crate::Plan;
 
 use super::allocator::AllocatorContext;
 
@@ -52,6 +51,11 @@ impl<VM: VMBinding> MallocAllocator<VM> {
         space: &'static MallocSpace<VM>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
-        MallocAllocator { tls, space, context, _pad: 0 }
+        MallocAllocator {
+            tls,
+            space,
+            context,
+            _pad: 0,
+        }
     }
 }

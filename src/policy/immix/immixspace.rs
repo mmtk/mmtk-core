@@ -954,7 +954,6 @@ impl<VM: VMBinding> FlushPageResource<VM> {
     }
 }
 
-use crate::plan::Plan;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;

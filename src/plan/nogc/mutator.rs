@@ -1,4 +1,3 @@
-use crate::MMTK;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -7,10 +6,10 @@ use crate::plan::mutator_context::{
 };
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
+use crate::MMTK;
 use enum_map::{enum_map, EnumMap};
 
 /// We use three bump allocators when enabling nogc_multi_space.
@@ -50,18 +49,9 @@ pub fn create_nogc_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, plan);
-            vec.push((
-                AllocatorSelector::BumpPointer(0),
-                &plan.nogc_space,
-            ));
-            vec.push((
-                AllocatorSelector::BumpPointer(1),
-                &plan.immortal,
-            ));
-            vec.push((
-                AllocatorSelector::BumpPointer(2),
-                &plan.los,
-            ));
+            vec.push((AllocatorSelector::BumpPointer(0), &plan.nogc_space));
+            vec.push((AllocatorSelector::BumpPointer(1), &plan.immortal));
+            vec.push((AllocatorSelector::BumpPointer(2), &plan.los));
             vec
         }),
         prepare_func: &nogc_mutator_noop,

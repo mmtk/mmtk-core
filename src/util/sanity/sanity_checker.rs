@@ -7,7 +7,6 @@ use crate::MMTK;
 use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
 pub struct SanityChecker<ES: Edge> {
@@ -71,8 +70,7 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         #[cfg(feature = "extreme_assertions")]
         mmtk.edge_logger.reset();
 
-        mmtk.sanity_begin()
-;        // Stop & scan mutators (mutator scanning can happen before STW)
+        mmtk.sanity_begin(); // Stop & scan mutators (mutator scanning can happen before STW)
 
         // We use the cached roots for sanity gc, based on the assumption that
         // the stack scanning triggered by the selected plan is correct and precise.
@@ -153,7 +151,7 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-            .add(ReleaseMutator::<P::VM>::new(mutator));
+                .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group.workers_shared {
             let result = w.designated_work.push(Box::new(ReleaseCollector));

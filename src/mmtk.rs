@@ -1,25 +1,25 @@
 //! MMTk instance.
-use crate::global_state::{GlobalState, GcStatus};
-use crate::plan::Plan;
+use crate::global_state::{GcStatus, GlobalState};
 use crate::plan::gc_requester::GCRequester;
+use crate::plan::CreateGeneralPlanArgs;
+use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
-use crate::util::alloc::allocator::AllocatorContext;
+#[cfg(feature = "analysis")]
+use crate::util::analysis::AnalysisManager;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
+use crate::util::heap::HeapMeta;
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::AnalysisManager;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
@@ -110,7 +110,6 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
-    pub(crate) heap: HeapMeta,
     inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
@@ -137,33 +136,41 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
 
-        let state = Arc::new(GlobalState::new(&options));
-        
+        let state = Arc::new(GlobalState::default());
+
         let gc_requester = Arc::new(GCRequester::new());
 
-        let gc_trigger = Arc::new(GCTrigger::new(options.clone(), gc_requester.clone(), state.clone()));
-
+        let gc_trigger = Arc::new(GCTrigger::new(
+            options.clone(),
+            gc_requester.clone(),
+            state.clone(),
+        ));
 
         let stats = Arc::new(Stats::new(&options));
 
+        // We need this during creating spaces, but we do not use this once the MMTk instance is created.
+        // So we do not save it in MMTK. This may change in the future.
         let mut heap = HeapMeta::new();
 
         let plan = crate::plan::create_plan(
             *options.plan,
-            VM_MAP.as_ref(),
-            MMAPPER.as_ref(),
-            options.clone(),
-            state.clone(),
-            gc_trigger.clone(),
-            scheduler.clone(),
-            &stats,
-            &mut heap,
+            CreateGeneralPlanArgs {
+                vm_map: VM_MAP.as_ref(),
+                mmapper: MMAPPER.as_ref(),
+                options: options.clone(),
+                state: state.clone(),
+                gc_trigger: gc_trigger.clone(),
+                scheduler: scheduler.clone(),
+                stats: &stats,
+                heap: &mut heap,
+            },
         );
 
         // We haven't finished creating MMTk. No one is using the GC trigger. We cast the arc into a mutable reference.
         {
             // TODO: use Arc::get_mut_unchecked() when it is availble.
-            let gc_trigger: &mut GCTrigger<VM> = unsafe { &mut *(Arc::as_ptr(&gc_trigger) as *mut _) };
+            let gc_trigger: &mut GCTrigger<VM> =
+                unsafe { &mut *(Arc::as_ptr(&gc_trigger) as *mut _) };
             // We know the plan address will not change. Cast it to a static reference.
             let static_plan: &'static dyn Plan<VM = VM> = unsafe { &*(&*plan as *const _) };
             // Set the plan so we can trigger GC and check GC condition without using plan
@@ -173,10 +180,7 @@ impl<VM: VMBinding> MMTK<VM> {
         // TODO: This probably does not work if we have multiple MMTk instances.
         VM_MAP.boot();
         // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        VM_MAP.finalize_static_space_map(
-            heap.get_discontig_start(),
-            heap.get_discontig_end(),
-        );
+        VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
@@ -203,7 +207,6 @@ impl<VM: VMBinding> MMTK<VM> {
             gc_trigger,
             gc_requester,
             stats,
-            heap,
         }
     }
 
@@ -267,7 +270,12 @@ impl<VM: VMBinding> MMTK<VM> {
     /// * `tls`: The mutator thread that requests the GC
     /// * `force`: The request cannot be ignored (except for NoGC)
     /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
-    pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool, exhaustive: bool) {
+    pub fn handle_user_collection_request(
+        &self,
+        tls: VMMutatorThread,
+        force: bool,
+        exhaustive: bool,
+    ) {
         use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
             warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
@@ -282,7 +290,8 @@ impl<VM: VMBinding> MMTK<VM> {
                 }
             }
 
-            self.state.user_triggered_collection
+            self.state
+                .user_triggered_collection
                 .store(true, Ordering::Relaxed);
             self.gc_requester.request();
             VM::VMCollection::block_for_gc(tls);
@@ -293,9 +302,11 @@ impl<VM: VMBinding> MMTK<VM> {
     // This is not used, as we do not have a concurrent plan.
     #[allow(unused)]
     pub fn trigger_internal_collection_request(&self) {
-        self.state.last_internal_triggered_collection
+        self.state
+            .last_internal_triggered_collection
             .store(true, Ordering::Relaxed);
-        self.state.internal_triggered_collection
+        self.state
+            .internal_triggered_collection
             .store(true, Ordering::Relaxed);
         self.gc_requester.request();
     }

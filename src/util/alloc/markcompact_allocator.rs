@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use super::BumpAllocator;
 use super::allocator::AllocatorContext;
-use crate::plan::Plan;
+use super::BumpAllocator;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;

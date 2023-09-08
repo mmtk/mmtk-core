@@ -1,16 +1,16 @@
 use atomic::Ordering;
 
 use crate::global_state::GlobalState;
-use crate::plan::Plan;
 use crate::plan::gc_requester::GCRequester;
+use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions;
 use crate::util::options::{GCTriggerSelector, Options};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -28,7 +28,11 @@ pub struct GCTrigger<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCTrigger<VM> {
-    pub fn new(options: Arc<Options>, gc_requester: Arc<GCRequester<VM>>, state: Arc<GlobalState>) -> Self {
+    pub fn new(
+        options: Arc<Options>,
+        gc_requester: Arc<GCRequester<VM>>,
+        state: Arc<GlobalState>,
+    ) -> Self {
         GCTrigger {
             plan: MaybeUninit::uninit(),
             policy: match *options.gc_trigger {
@@ -104,7 +108,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     pub fn should_do_stress_gc(&self) -> bool {
         self.state.initialized.load(Ordering::SeqCst)
             && (self.state.allocation_bytes.load(Ordering::SeqCst) > *self.options.stress_factor)
-    }    
+    }
 
     /// Check if the heap is full
     pub fn is_heap_full(&self) -> bool {

@@ -4,7 +4,6 @@ use crate::util::Address;
 
 use crate::util::alloc::Allocator;
 
-use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::opaque_pointer::*;
