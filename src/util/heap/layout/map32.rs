@@ -13,11 +13,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 pub struct Map32 {
-    sync: Mutex<Map32Inner>,
+    sync: Mutex<Map32Sync>,
 }
 
 #[doc(hidden)]
-pub struct Map32Inner {
+struct Map32Sync {
     prev_link: Vec<i32>,
     next_link: Vec<i32>,
     region_map: IntArrayFreeList,
@@ -41,7 +41,7 @@ impl Map32 {
     pub fn new() -> Self {
         let max_chunks = vm_layout().max_chunks();
         Map32 {
-            sync: Mutex::new(Map32Inner {
+            sync: Mutex::new(Map32Sync {
                 prev_link: vec![0; max_chunks],
                 next_link: vec![0; max_chunks],
                 region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
@@ -58,8 +58,6 @@ impl Map32 {
 
 impl VMMap for Map32 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
-        // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
-        // as each space will update different indices.
         let mut sync = self.sync();
         sync.insert_no_lock(start, extent, descriptor)
     }
@@ -193,10 +191,6 @@ impl VMMap for Map32 {
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
         sync.global_page_map.resize_freelist(pages, pages as _);
-        // TODO: Clippy favors using iter().flatten() rather than iter() with if-let.
-        // https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
-        // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
-        // there is no test to ensure the refactoring will be correct.
 
         update_starts(start_address);
 
@@ -253,12 +247,12 @@ impl VMMap for Map32 {
 }
 
 impl Map32 {
-    fn sync(&self) -> MutexGuard<Map32Inner> {
+    fn sync(&self) -> MutexGuard<Map32Sync> {
         self.sync.lock().unwrap()
     }
 }
 
-impl Map32Inner {
+impl Map32Sync {
     fn insert_no_lock(&mut self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         let mut e = 0;
         while e < extent {
@@ -303,7 +297,6 @@ impl Map32Inner {
     }
 
     fn get_discontig_freelist_pr_ordinal(&mut self) -> usize {
-        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         self.shared_discontig_fl_count += 1;
         self.shared_discontig_fl_count
     }
