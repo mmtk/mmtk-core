@@ -1,8 +1,41 @@
 use proc_macro2::TokenStream as TokenStream2;
+use proc_macro_error::abort_call_site;
 use quote::quote;
-use syn::{Field, TypeGenerics};
+use syn::{DeriveInput, Expr, Field, TypeGenerics};
 
 use crate::util;
+
+pub(crate) fn derive(input: DeriveInput) -> TokenStream2 {
+    let ident = input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let syn::Data::Struct(syn::DataStruct {
+        fields: syn::Fields::Named(ref fields),
+        ..
+    }) = input.data
+    else {
+        abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.");
+    };
+
+    let spaces = util::get_fields_with_attribute(fields, "space");
+    let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
+    let parent = util::get_unique_field_with_attribute(fields, "parent");
+
+    let trace_object_function = generate_trace_object(&spaces, &parent, &ty_generics);
+    let post_scan_object_function =
+        generate_post_scan_object(&post_scan_spaces, &parent, &ty_generics);
+    let may_move_objects_function = generate_may_move_objects(&spaces, &parent, &ty_generics);
+
+    quote! {
+        impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
+            #trace_object_function
+
+            #post_scan_object_function
+
+            #may_move_objects_function
+        }
+    }
+}
 
 pub(crate) fn generate_trace_object<'a>(
     space_fields: &[&'a Field],
@@ -15,21 +48,26 @@ pub(crate) fn generate_trace_object<'a>(
         let f_ty = &f.ty;
 
         // Figure out copy
-        let trace_attr = util::get_field_attribute(f, "trace").unwrap();
-        let copy = if !trace_attr.tokens.is_empty() {
-            use syn::Token;
-            use syn::NestedMeta;
-            use syn::punctuated::Punctuated;
-
-            let args = trace_attr.parse_args_with(Punctuated::<NestedMeta, Token![,]>::parse_terminated).unwrap();
-            // CopySemantics::X is a path.
-            if let Some(NestedMeta::Meta(syn::Meta::Path(p))) = args.first() {
-                quote!{ Some(#p) }
-            } else {
-                quote!{ None }
+        let maybe_copy_semantics_attr = util::get_field_attribute(f, "copy_semantics");
+        let copy = match maybe_copy_semantics_attr {
+            None => quote!{ None },
+            Some(attr) => match &attr.meta {
+                syn::Meta::Path(_) => {
+                    // #[copy_semantics]
+                    abort_call_site!("The `#[copy_semantics(expr)]` macro needs an argument.");
+                },
+                syn::Meta::List(list) => {
+                    // #[copy_semantics(BlahBlah)]
+                    let copy_semantics = list.parse_args::<Expr>().unwrap_or_else(|_| {
+                        abort_call_site!("In `#[copy_semantics(expr)]`, expr must be an expression.");
+                    });
+                    quote!{ Some(#copy_semantics) }
+                },
+                syn::Meta::NameValue(_) => {
+                    // #[copy_semantics = BlahBlah]
+                    abort_call_site!("The #[copy_semantics] macro does not support the name-value form.");
+                },
             }
-        } else {
-            quote!{ None }
         };
 
         quote! {

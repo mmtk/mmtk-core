@@ -18,12 +18,13 @@ use crate::{
 };
 use enum_map::EnumMap;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct PageProtect<VM: VMBinding> {
-    #[trace]
+    #[space]
     pub space: LargeObjectSpace<VM>,
+    #[parent]
     pub common: CommonPlan<VM>,
 }
 
@@ -33,21 +34,8 @@ pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for PageProtect<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &CONSTRAINTS
-    }
-
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.space);
-        ret
-    }
-
-    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
-        self.common.for_each_space_mut(f);
-        f(&mut self.space)
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -119,16 +107,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            use crate::util::metadata::side_metadata::SideMetadataSanity;
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            ret.common
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            ret.space
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
+        ret.verify_side_metadata_sanity();
 
         ret
     }

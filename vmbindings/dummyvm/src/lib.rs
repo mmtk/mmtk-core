@@ -14,6 +14,8 @@ pub mod object_model;
 pub mod reference_glue;
 pub mod scanning;
 
+pub mod test_fixtures;
+
 mod edges;
 #[cfg(test)]
 mod tests;

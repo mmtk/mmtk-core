@@ -17,7 +17,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 #[cfg(not(feature = "vo_bit"))]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
@@ -25,13 +25,14 @@ use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {
-    #[trace(CopySemantics::DefaultCopy)]
+    #[space]
+    #[copy_semantics(CopySemantics::DefaultCopy)]
     pub mc_space: MarkCompactSpace<VM>,
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan<VM>,
 }
 
@@ -41,25 +42,14 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 1,
     num_specialized_scans: 2,
     needs_forward_after_liveness: true,
+    max_non_los_default_alloc_bytes:
+        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     ..PlanConstraints::default()
 };
 
 impl<VM: VMBinding> Plan for MarkCompact<VM> {
-    type VM = VM;
-
     fn constraints(&self) -> &'static PlanConstraints {
         &MARKCOMPACT_CONSTRAINTS
-    }
-
-    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.mc_space);
-        ret
-    }
-
-    fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<Self::VM>)) {
-        self.common.for_each_space_mut(f);
-        f(&mut self.mc_space);
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -102,7 +92,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
         // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MarkingProcessEdges<VM>>::new());
+            .add(StopMutators::<MarkCompactGCWorkContext<VM>>::new());
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
@@ -111,7 +101,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
-        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
         scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
 
         // Release global/collectors/mutators
@@ -213,13 +203,7 @@ impl<VM: VMBinding> MarkCompact<VM> {
             common: CommonPlan::new(plan_args),
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.common
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.mc_space
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.verify_side_metadata_sanity();
 
         res
     }

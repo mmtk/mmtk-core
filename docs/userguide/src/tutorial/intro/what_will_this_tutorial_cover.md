@@ -20,5 +20,5 @@ finished code provided.
 Furthermore, please note that this code may not be identical to the main code
 of the MMTk. It is deliberately kept separate as a simpler stable
 version. Make sure to refer to the 
-[provided tutorial code](https://github.com/mmtk/mmtk-core/tree/master/docs/tutorial/code) 
+[provided tutorial code](https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code) 
 and not the main collector code during the tutorial. 

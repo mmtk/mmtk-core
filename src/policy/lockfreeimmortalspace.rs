@@ -3,7 +3,6 @@ use atomic::Atomic;
 use std::marker::PhantomData;
 use std::sync::atomic::Ordering;
 
-use crate::mmtk::SFT_MAP;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
@@ -108,8 +107,8 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         panic!("immortalspace only releases pages enmasse")
     }
 
-    fn initialize_sft(&self) {
-        unsafe { SFT_MAP.update(self.as_sft(), self.start, self.extent) };
+    fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
+        unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.extent) };
     }
 
     fn reserved_pages(&self) -> usize {

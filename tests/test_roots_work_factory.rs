@@ -66,7 +66,11 @@ impl RootsWorkFactory<Address> for MockFactory {
         }
     }
 
-    fn create_process_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
+    fn create_process_pinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
+        unimplemented!();
+    }
+
+    fn create_process_tpinning_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         unimplemented!();
     }
 }

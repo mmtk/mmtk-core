@@ -75,13 +75,15 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<EdgeOf<E>>,
     pub(crate) worker: &'a mut GCWorker<E::VM>,
+    bucket: WorkBucketStage,
 }
 
 impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
-    pub fn new(worker: &'a mut GCWorker<E::VM>) -> Self {
+    pub fn new(worker: &'a mut GCWorker<E::VM>, bucket: WorkBucketStage) -> Self {
         Self {
             buffer: VectorQueue::new(),
             worker,
+            bucket,
         }
     }
 
@@ -89,8 +91,8 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
         let buf = self.buffer.take();
         if !buf.is_empty() {
             self.worker.add_work(
-                WorkBucketStage::Closure,
-                E::new(buf, false, self.worker.mmtk),
+                self.bucket,
+                E::new(buf, false, self.worker.mmtk, self.bucket),
             );
         }
     }

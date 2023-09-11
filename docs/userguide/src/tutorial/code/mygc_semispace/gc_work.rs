@@ -1,6 +1,6 @@
 // ANCHOR: imports
 use super::global::MyGC;
-use crate::scheduler::gc_work::*;
+use crate::scheduler::{gc_work::*, WorkBucketStage};
 use crate::vm::VMBinding;
 use std::ops::{Deref, DerefMut};
 // ANCHOR_END: imports
@@ -11,24 +11,26 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = SFTProcessEdges<Self::VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR_END: workcontext_sft
 
 // ANCHOR: workcontext_plan
-use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
+use crate::scheduler::gc_work::PlanProcessEdges;
 pub struct MyGCWorkContext2<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
+    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
-// ANCHOR: workcontext_plan
+// ANCHOR_END: workcontext_plan
 
-use crate::util::ObjectReference;
-use crate::util::copy::CopySemantics;
-use crate::MMTK;
 use crate::policy::space::Space;
+use crate::util::copy::CopySemantics;
+use crate::util::ObjectReference;
+use crate::MMTK;
 
 // ANCHOR: mygc_process_edges
 pub struct MyGCProcessEdges<VM: VMBinding> {
@@ -38,12 +40,17 @@ pub struct MyGCProcessEdges<VM: VMBinding> {
 // ANCHOR_END: mygc_process_edges
 
 // ANCHOR: mygc_process_edges_impl
-impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
+impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        bucket: WorkBucketStage,
+    ) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
         Self { base, plan }
     }
@@ -74,7 +81,7 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     }
 
     fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
-        ScanObjects::<Self>::new(nodes, false, roots)
+        ScanObjects::<Self>::new(nodes, false, roots, self.bucket)
     }
 }
 // ANCHOR_END: mygc_process_edges_impl
@@ -100,5 +107,6 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext3<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
     type ProcessEdgesWorkType = MyGCProcessEdges<Self::VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR: workcontext_mygc

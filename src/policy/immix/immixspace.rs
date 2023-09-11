@@ -1,9 +1,10 @@
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
-use crate::policy::gc_work::TraceKind;
+use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
+use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::*;
@@ -175,8 +176,8 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }
-    fn initialize_sft(&self) {
-        self.common().initialize_sft(self.as_sft())
+    fn initialize_sft(&self, sft_map: &mut dyn SFTMap) {
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
@@ -194,7 +195,9 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        if KIND == TRACE_KIND_DEFRAG {
+        if KIND == TRACE_KIND_TRANSITIVE_PIN {
+            self.trace_object_without_moving(queue, object)
+        } else if KIND == TRACE_KIND_DEFRAG {
             if Block::containing::<VM>(object).is_defrag_source() {
                 debug_assert!(self.in_defrag());
                 debug_assert!(
@@ -229,7 +232,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
-        } else if KIND == TRACE_KIND_FAST {
+        } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
             false
         } else {
             unreachable!()
@@ -621,11 +624,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else if self.is_marked(object) {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
-            debug_assert!(
-                nursery_collection || self.defrag.space_exhausted() || self.is_pinned(object),
-                "Forwarded object is the same as original object {} even though it should have been copied",
-                object,
-            );
             ForwardingWord::clear_forwarding_bits::<VM>(object);
             object
         } else {

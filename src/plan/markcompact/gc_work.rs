@@ -32,14 +32,21 @@ impl<VM: VMBinding> CalculateForwardingAddress<VM> {
 /// create another round of root scanning work packets
 /// to update object references
 pub struct UpdateReferences<VM: VMBinding> {
+    plan: *const MarkCompact<VM>,
     p: PhantomData<VM>,
 }
 
+unsafe impl<VM: VMBinding> Send for UpdateReferences<VM> {}
+
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.get_plan().base().prepare_for_stack_scanning();
+        // Prepare common and base spaces for the 2nd round of transitive closure
+        let plan_mut = unsafe { &mut *(self.plan as *mut MarkCompact<VM>) };
+        plan_mut.common.release(worker.tls, true);
+        plan_mut.common.prepare(worker.tls, true);
         #[cfg(feature = "extreme_assertions")]
         mmtk.edge_logger.reset();
 
@@ -50,18 +57,22 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
             .get_and_clear_worker_live_bytes();
 
         for mutator in VM::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-                .add(ScanMutatorRoots::<ForwardingProcessEdges<VM>>(mutator));
+            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
+                MarkCompactForwardingGCWorkContext<VM>,
+            >(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-            .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
+            .add(ScanVMSpecificRoots::<MarkCompactForwardingGCWorkContext<VM>>::new());
     }
 }
 
 impl<VM: VMBinding> UpdateReferences<VM> {
-    pub fn new() -> Self {
-        Self { p: PhantomData }
+    pub fn new(plan: &MarkCompact<VM>) -> Self {
+        Self {
+            plan,
+            p: PhantomData,
+        }
     }
 }
 
@@ -92,4 +103,13 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext
     type VM = VM;
     type PlanType = MarkCompact<VM>;
     type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+}
+
+pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MarkCompact<VM>;
+    type ProcessEdgesWorkType = ForwardingProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }

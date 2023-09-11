@@ -6,6 +6,7 @@ use std::vec::Vec;
 
 use crate::plan::is_nursery_gc;
 use crate::scheduler::ProcessEdgesWork;
+use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::ReferenceGlue;
@@ -482,7 +483,7 @@ use std::marker::PhantomData;
 pub struct SoftRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::new(vec![], false, mmtk);
+        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::SoftRefClosure);
         w.set_worker(worker);
         mmtk.reference_processors.scan_soft_refs(&mut w, mmtk);
         w.flush();
@@ -498,7 +499,7 @@ impl<E: ProcessEdgesWork> SoftRefProcessing<E> {
 pub struct WeakRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for WeakRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::new(vec![], false, mmtk);
+        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::WeakRefClosure);
         w.set_worker(worker);
         mmtk.reference_processors.scan_weak_refs(&mut w, mmtk);
         w.flush();
@@ -514,7 +515,7 @@ impl<E: ProcessEdgesWork> WeakRefProcessing<E> {
 pub struct PhantomRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for PhantomRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::new(vec![], false, mmtk);
+        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::PhantomRefClosure);
         w.set_worker(worker);
         mmtk.reference_processors.scan_phantom_refs(&mut w, mmtk);
         w.flush();
@@ -530,7 +531,7 @@ impl<E: ProcessEdgesWork> PhantomRefProcessing<E> {
 pub struct RefForwarding<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for RefForwarding<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut w = E::new(vec![], false, mmtk);
+        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::RefForwarding);
         w.set_worker(worker);
         mmtk.reference_processors.forward_refs(&mut w, mmtk);
         w.flush();

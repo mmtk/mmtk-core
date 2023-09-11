@@ -29,6 +29,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
 use crate::vm::VMBinding;
+
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -48,7 +49,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// Initialize entires in SFT map for the space. This is called when the Space object
     /// has a non-moving address, as we will use the address to set sft.
     /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
-    fn initialize_sft(&self);
+    fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap);
 
     /// A check for the obvious out-of-memory case: if the requested size is larger than
     /// the heap size, it is definitely an OOM. We would like to identify that, and
@@ -427,7 +428,6 @@ pub struct CommonSpace<VM: VMBinding> {
 
     pub start: Address,
     pub extent: usize,
-    pub head_discontiguous_region: Address,
 
     pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
@@ -499,7 +499,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
             zeroed: args.plan_args.zeroed,
             start: unsafe { Address::zero() },
             extent: 0,
-            head_discontiguous_region: unsafe { Address::zero() },
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
@@ -598,16 +597,19 @@ impl<VM: VMBinding> CommonSpace<VM> {
         rtn
     }
 
-    pub fn initialize_sft(&self, sft: &(dyn SFT + Sync + 'static)) {
-        // For contiguous space, we eagerly initialize SFT map based on its address range.
+    pub fn initialize_sft(
+        &self,
+        sft: &(dyn SFT + Sync + 'static),
+        sft_map: &mut dyn crate::policy::sft_map::SFTMap,
+    ) {
+        // We have to keep this for now: if a space is contiguous, our page resource will NOT consider newly allocated chunks
+        // as new chunks (new_chunks = true). In that case, in grow_space(), we do not set SFT when new_chunks = false.
+        // We can fix this by either of these:
+        // * fix page resource, so it propelry returns new_chunk
+        // * change grow_space() so it sets SFT no matter what the new_chunks value is.
+        // FIXME: eagerly initializing SFT is not a good idea.
         if self.contiguous {
-            // We have to keep this for now: if a space is contiguous, our page resource will NOT consider newly allocated chunks
-            // as new chunks (new_chunks = true). In that case, in grow_space(), we do not set SFT when new_chunks = false.
-            // We can fix this by either of these:
-            // * fix page resource, so it propelry returns new_chunk
-            // * change grow_space() so it sets SFT no matter what the new_chunks value is.
-            // FIXME: eagerly initializing SFT is not a good idea.
-            unsafe { SFT_MAP.eager_initialize(sft, self.start, self.extent) };
+            unsafe { sft_map.eager_initialize(sft, self.start, self.extent) };
         }
     }
 

@@ -13,7 +13,6 @@ mod barrier_slow_path_assertion;
 #[cfg(feature = "is_mmtk_object")]
 mod conservatism;
 mod edges_test;
-mod fixtures;
 #[cfg(target_os = "linux")]
 mod handle_mmap_conflict;
 mod handle_mmap_oom;

@@ -1,7 +1,7 @@
 // GITHUB-CI: FEATURES=malloc_counted_size
 
 use crate::api::*;
-use crate::tests::fixtures::{MMTKSingleton, SerialFixture};
+use crate::test_fixtures::{MMTKSingleton, SerialFixture};
 
 lazy_static! {
     static ref MMTK_SINGLETON: SerialFixture<MMTKSingleton> = SerialFixture::new();

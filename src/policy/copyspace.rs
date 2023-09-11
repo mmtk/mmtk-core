@@ -1,5 +1,6 @@
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
+use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
@@ -109,8 +110,8 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.common
     }
 
-    fn initialize_sft(&self) {
-        self.common().initialize_sft(self.as_sft())
+    fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
+        self.common().initialize_sft(self.as_sft(), sft_map)
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -130,6 +131,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        debug_assert!(
+            KIND != TRACE_KIND_TRANSITIVE_PIN,
+            "Copyspace does not support transitive pin trace."
+        );
         self.trace_object(queue, object, copy, worker)
     }
 
@@ -196,7 +201,9 @@ impl<VM: VMBinding> CopySpace<VM> {
                 );
             }
         } else {
-            unimplemented!();
+            for (start, size) in self.pr.iterate_allocated_regions() {
+                crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
+            }
         }
     }
 

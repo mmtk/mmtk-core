@@ -4,7 +4,7 @@ use mmtk::util::heap::vm_layout::VMLayout;
 
 pub fn test_with_vm_layout(layout: Option<VMLayout>) {
     use crate::api;
-    use crate::tests::fixtures::VMLayoutFixture;
+    use crate::test_fixtures::VMLayoutFixture;
     use mmtk::plan::AllocationSemantics;
     use mmtk::vm::ObjectModel;
 

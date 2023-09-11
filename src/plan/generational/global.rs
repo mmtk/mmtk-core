@@ -7,7 +7,6 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -17,17 +16,18 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
-use mmtk_macros::PlanTraceObject;
+use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
-#[derive(PlanTraceObject)]
+#[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
-    #[trace(CopySemantics::PromoteToMature)]
+    #[space]
+    #[copy_semantics(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
     /// The common plan.
-    #[fallback_trace]
+    #[parent]
     pub common: CommonPlan<VM>,
     /// Is this GC full heap?
     pub gc_full_heap: AtomicBool,
@@ -57,24 +57,6 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             next_gc_full_heap: AtomicBool::new(false),
             full_heap_gc_count,
         }
-    }
-
-    /// Verify side metadata specs used in the spaces in Gen.
-    pub fn verify_side_metadata_sanity(&self, sanity: &mut SideMetadataSanity) {
-        self.common.verify_side_metadata_sanity(sanity);
-        self.nursery.verify_side_metadata_sanity(sanity);
-    }
-
-    /// Get spaces in generation plans
-    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        let mut ret = self.common.get_spaces();
-        ret.push(&self.nursery);
-        ret
-    }
-
-    pub(crate) fn for_each_space_mut(&mut self, f: &mut dyn FnMut(&mut dyn Space<VM>)) {
-        self.common.for_each_space_mut(f);
-        f(&mut self.nursery);
     }
 
     /// Prepare Gen. This should be called by a single thread in GC prepare work.

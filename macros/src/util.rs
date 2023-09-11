@@ -5,11 +5,11 @@ pub fn get_field_attribute<'f>(field: &'f Field, attr_name: &str) -> Option<&'f 
     let attrs = field
         .attrs
         .iter()
-        .filter(|a| a.path.is_ident(attr_name))
+        .filter(|a| a.path().is_ident(attr_name))
         .collect::<Vec<_>>();
     if attrs.len() > 1 {
         let second_attr = attrs.get(1).unwrap();
-        abort! { second_attr.path.span(), "Duplicated attribute: #[{}]", attr_name }
+        abort! { second_attr.path().span(), "Duplicated attribute: #[{}]", attr_name }
     };
 
     attrs.get(0).cloned()
@@ -35,7 +35,7 @@ pub fn get_unique_field_with_attribute<'f>(
                 result = Some(field);
                 continue;
             } else {
-                let span = attr.path.span();
+                let span = attr.path().span();
                 abort! { span, "At most one field in a struct can have the #[{}] attribute.", attr_name };
             }
         }
