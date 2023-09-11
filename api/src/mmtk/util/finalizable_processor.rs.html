@@ -185,7 +185,7 @@
 <a href="#185" id="185">185</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::is_nursery_gc;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker};
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker, WorkBucketStage};
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::Finalizable;
@@ -332,7 +332,7 @@
             finalizable_processor.ready_for_finalize.len()
         );
 
-        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk);
+        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::FinalRefClosure);
         w.set_worker(worker);
         finalizable_processor.scan(worker.tls, <span class="kw-2">&amp;mut </span>w, is_nursery_gc(mmtk.get_plan()));
         <span class="macro">debug!</span>(
@@ -355,7 +355,7 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;Forward finalization&quot;</span>);
         <span class="kw">let </span><span class="kw-2">mut </span>finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
-        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk);
+        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::FinalizableForwarding);
         w.set_worker(worker);
         finalizable_processor.forward_candidate(<span class="kw-2">&amp;mut </span>w, is_nursery_gc(mmtk.get_plan()));
 

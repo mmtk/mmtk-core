@@ -308,7 +308,7 @@
 
         // Stop &amp; scan mutators (mutator scanning can happen before STW)
         </span>scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
+            .add(StopMutators::&lt;MarkCompactGCWorkContext&lt;VM&gt;&gt;::new());
 
         <span class="comment">// Prepare global/collectors/mutators
         </span>scheduler.work_buckets[WorkBucketStage::Prepare]

@@ -18,18 +18,21 @@
 <a href="#18" id="18">18</a>
 <a href="#19" id="19">19</a>
 <a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::global::GenCopy;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::gc_work::GenNurseryProcessEdges;
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::DEFAULT_TRACE;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::PlanProcessEdges;
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::{PlanProcessEdges, UnsupportedProcessEdges};
 
 <span class="kw">pub struct </span>GenCopyNurseryGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::scheduler::GCWorkContext <span class="kw">for </span>GenCopyNurseryGCWorkContext&lt;VM&gt; {
     <span class="kw">type </span>VM = VM;
     <span class="kw">type </span>PlanType = GenCopy&lt;VM&gt;;
     <span class="kw">type </span>ProcessEdgesWorkType = GenNurseryProcessEdges&lt;<span class="self">Self</span>::VM, <span class="self">Self</span>::PlanType&gt;;
+    <span class="kw">type </span>TPProcessEdges = UnsupportedProcessEdges&lt;VM&gt;;
 }
 
 <span class="kw">pub struct </span>GenCopyGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
@@ -37,5 +40,6 @@
     <span class="kw">type </span>VM = VM;
     <span class="kw">type </span>PlanType = GenCopy&lt;VM&gt;;
     <span class="kw">type </span>ProcessEdgesWorkType = PlanProcessEdges&lt;<span class="self">Self</span>::VM, GenCopy&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    <span class="kw">type </span>TPProcessEdges = UnsupportedProcessEdges&lt;VM&gt;;
 }
 </code></pre></div></section></main></body></html>

@@ -1107,13 +1107,10 @@
 <a href="#1107" id="1107">1107</a>
 <a href="#1108" id="1108">1108</a>
 <a href="#1109" id="1109">1109</a>
-<a href="#1110" id="1110">1110</a>
-<a href="#1111" id="1111">1111</a>
-<a href="#1112" id="1112">1112</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
-<span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
+<span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::SFTMap;
@@ -1304,7 +1301,9 @@
         copy: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;,
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
-        <span class="kw">if </span>KIND == TRACE_KIND_DEFRAG {
+        <span class="kw">if </span>KIND == TRACE_KIND_TRANSITIVE_PIN {
+            <span class="self">self</span>.trace_object_without_moving(queue, object)
+        } <span class="kw">else if </span>KIND == TRACE_KIND_DEFRAG {
             <span class="kw">if </span>Block::containing::&lt;VM&gt;(object).is_defrag_source() {
                 <span class="macro">debug_assert!</span>(<span class="self">self</span>.in_defrag());
                 <span class="macro">debug_assert!</span>(
@@ -1339,7 +1338,7 @@
     <span class="kw">fn </span>may_move_objects&lt;<span class="kw">const </span>KIND: TraceKind&gt;() -&gt; bool {
         <span class="kw">if </span>KIND == TRACE_KIND_DEFRAG {
             <span class="bool-val">true
-        </span>} <span class="kw">else if </span>KIND == TRACE_KIND_FAST {
+        </span>} <span class="kw">else if </span>KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_TRANSITIVE_PIN {
             <span class="bool-val">false
         </span>} <span class="kw">else </span>{
             <span class="macro">unreachable!</span>()
@@ -1731,12 +1730,7 @@
         } <span class="kw">else if </span><span class="self">self</span>.is_marked(object) {
             <span class="comment">// We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
-            </span><span class="macro">debug_assert!</span>(
-                nursery_collection || <span class="self">self</span>.defrag.space_exhausted() || <span class="self">self</span>.is_pinned(object),
-                <span class="string">&quot;Forwarded object is the same as original object {} even though it should have been copied&quot;</span>,
-                object,
-            );
-            ForwardingWord::clear_forwarding_bits::&lt;VM&gt;(object);
+            </span>ForwardingWord::clear_forwarding_bits::&lt;VM&gt;(object);
             object
         } <span class="kw">else </span>{
             <span class="comment">// We won the forwarding race; actually forward and copy the object if it is not pinned

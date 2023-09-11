@@ -57,6 +57,12 @@
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -109,11 +115,17 @@
 /// needs this trait to schedule different work packets. For certain plans,
 /// they may need to provide several types that implement this trait, e.g. one for
 /// nursery GC, one for mature GC.
-</span><span class="kw">pub trait </span>GCWorkContext {
+///
+/// Note: Because `GCWorkContext` is often used as parameters of implementations of `GCWork`, we
+/// let GCWorkContext require `Send + &#39;static`.  Since `GCWorkContext` is just a group of
+/// associated types, its implementations should not have any actual fields other than
+/// `PhantomData`, and will automatically have `Send + &#39;static`.
+</span><span class="kw">pub trait </span>GCWorkContext: Send + <span class="lifetime">&#39;static </span>{
     <span class="kw">type </span>VM: VMBinding;
     <span class="kw">type </span>PlanType: Plan&lt;VM = <span class="self">Self</span>::VM&gt;;
     <span class="comment">// We should use SFTProcessEdges as the default value for this associate type. However, this requires
     // `associated_type_defaults` which has not yet been stablized.
     </span><span class="kw">type </span>ProcessEdgesWorkType: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
+    <span class="kw">type </span>TPProcessEdges: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
 }
 </code></pre></div></section></main></body></html>

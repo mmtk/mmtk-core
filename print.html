@@ -962,6 +962,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = SFTProcessEdges&lt;Self::VM&gt;;
+    type TPProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
@@ -1138,13 +1139,14 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
 <p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>ProcessEdgesWorkType</code> in your GC work context:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use crate::scheduler::gc_work::PlanProcessEdges;
-use crate::policy::gc_work::DEFAULT_TRACE;
+</span>use crate::policy::gc_work::DEFAULT_TRACE;
+use crate::scheduler::gc_work::PlanProcessEdges;
 pub struct MyGCWorkContext2&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext2&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    type TPProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="approach-3-implement-your-own-processedgeswork"><a class="header" href="#approach-3-implement-your-own-processedgeswork">Approach 3: Implement your own <code>ProcessEdgesWork</code></a></h3>
@@ -1170,12 +1172,17 @@ which space the object is in, and invoke <code>trace_object()</code> for the obj
 object is not in any of the semi spaces in the plan, we forward the call to <code>CommonPlan</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
+</span>impl&lt;VM: VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
 
-    fn new(edges: Vec&lt;EdgeOf&lt;Self&gt;&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+    fn new(
+        edges: Vec&lt;EdgeOf&lt;Self&gt;&gt;,
+        roots: bool,
+        mmtk: &amp;'static MMTK&lt;VM&gt;,
+        bucket: WorkBucketStage,
+    ) -&gt; Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self { base, plan }
     }
@@ -1206,7 +1213,7 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
     }
 
     fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
-        ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
+        ScanObjects::&lt;Self&gt;::new(nodes, false, roots, self.bucket)
     }
 }
 <span class="boring">}</span></code></pre></pre>
@@ -1235,6 +1242,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&l
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = MyGCProcessEdges&lt;Self::VM&gt;;
+    type TPProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>

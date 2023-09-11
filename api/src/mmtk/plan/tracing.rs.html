@@ -119,6 +119,8 @@
 <a href="#119" id="119">119</a>
 <a href="#120" id="120">120</a>
 <a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
@@ -196,13 +198,15 @@
 </span><span class="kw">pub struct </span>ObjectsClosure&lt;<span class="lifetime">&#39;a</span>, E: ProcessEdgesWork&gt; {
     buffer: VectorQueue&lt;EdgeOf&lt;E&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) worker: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>GCWorker&lt;E::VM&gt;,
+    bucket: WorkBucketStage,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, E: ProcessEdgesWork&gt; ObjectsClosure&lt;<span class="lifetime">&#39;a</span>, E&gt; {
-    <span class="kw">pub fn </span>new(worker: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>GCWorker&lt;E::VM&gt;) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(worker: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>GCWorker&lt;E::VM&gt;, bucket: WorkBucketStage) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             buffer: VectorQueue::new(),
             worker,
+            bucket,
         }
     }
 
@@ -210,8 +214,8 @@
         <span class="kw">let </span>buf = <span class="self">self</span>.buffer.take();
         <span class="kw">if </span>!buf.is_empty() {
             <span class="self">self</span>.worker.add_work(
-                WorkBucketStage::Closure,
-                E::new(buf, <span class="bool-val">false</span>, <span class="self">self</span>.worker.mmtk),
+                <span class="self">self</span>.bucket,
+                E::new(buf, <span class="bool-val">false</span>, <span class="self">self</span>.worker.mmtk, <span class="self">self</span>.bucket),
             );
         }
     }

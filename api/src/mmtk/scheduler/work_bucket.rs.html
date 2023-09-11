@@ -282,6 +282,11 @@
 <a href="#282" id="282">282</a>
 <a href="#283" id="283">283</a>
 <a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerMonitor;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -516,6 +521,11 @@
     <span class="doccomment">/// Clear the VO bit metadata.  Mainly used by ImmixSpace.
     </span><span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
     </span>ClearVOBits,
+    <span class="doccomment">/// Compute the transtive closure starting from transitively pinning (TP) roots following only strong references.
+    /// No objects in this closure are allow to move.
+    </span>TPinningClosure,
+    <span class="doccomment">/// Trace (non-transitively) pinning roots. Objects pointed by those roots must not move, but their children may. To ensure correctness, these must be processed after TPinningClosure
+    </span>PinningRootsTrace,
     <span class="doccomment">/// Compute the transtive closure following only strong references.
     </span>Closure,
     <span class="doccomment">/// Handle Java-style soft references, and potentially expand the transitive closure.

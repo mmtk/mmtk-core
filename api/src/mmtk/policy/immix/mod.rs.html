@@ -48,6 +48,7 @@
 <a href="#48" id="48">48</a>
 <a href="#49" id="49">49</a>
 <a href="#50" id="50">50</a>
+<a href="#51" id="51">51</a>
 </pre></div><pre class="rust"><code><span class="kw">pub mod </span>block;
 <span class="kw">pub mod </span>defrag;
 <span class="kw">pub mod </span>immixspace;
@@ -75,7 +76,8 @@
 </span><span class="kw">pub const </span>DEFRAG_EVERY_BLOCK: bool = <span class="bool-val">false</span>;
 
 <span class="doccomment">/// If Immix is used as a nursery space, do we prefer copy?
-</span><span class="kw">pub const </span>PREFER_COPY_ON_NURSERY_GC: bool = !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_non_moving&quot;</span>); <span class="comment">// copy nursery objects if we are allowed to move.
+</span><span class="kw">pub const </span>PREFER_COPY_ON_NURSERY_GC: bool =
+    !<span class="macro">cfg!</span>(feature = <span class="string">&quot;immix_non_moving&quot;</span>) &amp;&amp; !<span class="macro">cfg!</span>(feature = <span class="string">&quot;sticky_immix_non_moving_nursery&quot;</span>); <span class="comment">// copy nursery objects if we are allowed to move.
 
 </span><span class="doccomment">/// In some cases/settings, Immix may never move objects.
 /// Currently we only have two cases where we move objects: 1. defrag, 2. nursery copy.

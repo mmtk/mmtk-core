@@ -241,6 +241,19 @@
 <a href="#241" id="241">241</a>
 <a href="#242" id="242">242</a>
 <a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -332,15 +345,23 @@
             <span class="kw">let </span>sanity_checker = mmtk.sanity_checker.lock().unwrap();
             <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_edges {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(
-                    SanityGCProcessEdges::&lt;P::VM&gt;::new(roots.clone(), <span class="bool-val">true</span>, mmtk),
+                    SanityGCProcessEdges::&lt;P::VM&gt;::new(
+                        roots.clone(),
+                        <span class="bool-val">true</span>,
+                        mmtk,
+                        WorkBucketStage::Closure,
+                    ),
                 );
             }
             <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_nodes {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(ScanObjects::&lt;
                     SanityGCProcessEdges&lt;P::VM&gt;,
                 &gt;::new(
-                    roots.clone(), <span class="bool-val">false</span>, <span class="bool-val">true
-                </span>));
+                    roots.clone(),
+                    <span class="bool-val">false</span>,
+                    <span class="bool-val">true</span>,
+                    WorkBucketStage::Closure,
+                ));
             }
         }
         <span class="comment">// Prepare global/collectors/mutators
@@ -430,9 +451,14 @@
     <span class="kw">type </span>ScanObjectsWorkType = ScanObjects&lt;<span class="self">Self</span>&gt;;
 
     <span class="kw">const </span>OVERWRITE_REFERENCE: bool = <span class="bool-val">false</span>;
-    <span class="kw">fn </span>new(edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;, roots: bool, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+    <span class="kw">fn </span>new(
+        edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
+        roots: bool,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        bucket: WorkBucketStage,
+    ) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            base: ProcessEdgesBase::new(edges, roots, mmtk),
+            base: ProcessEdgesBase::new(edges, roots, mmtk, bucket),
             <span class="comment">// ..Default::default()
         </span>}
     }
@@ -481,7 +507,7 @@
         nodes: Vec&lt;ObjectReference&gt;,
         roots: bool,
     ) -&gt; <span class="self">Self</span>::ScanObjectsWorkType {
-        ScanObjects::&lt;<span class="self">Self</span>&gt;::new(nodes, <span class="bool-val">false</span>, roots)
+        ScanObjects::&lt;<span class="self">Self</span>&gt;::new(nodes, <span class="bool-val">false</span>, roots, WorkBucketStage::Closure)
     }
 }
 </code></pre></div></section></main></body></html>

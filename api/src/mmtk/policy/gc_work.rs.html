@@ -37,11 +37,13 @@
 <a href="#37" id="37">37</a>
 <a href="#38" id="38">38</a>
 <a href="#39" id="39">39</a>
+<a href="#40" id="40">40</a>
 </pre></div><pre class="rust"><code><span class="doccomment">/// Used to identify the trace if a policy has different kinds of traces. For example, defrag vs fast trace for Immix,
 /// mark vs forward trace for mark compact.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>TraceKind = u8;
 
 <span class="kw">pub const </span>DEFAULT_TRACE: u8 = u8::MAX;
+<span class="kw">pub const </span>TRACE_KIND_TRANSITIVE_PIN: u8 = DEFAULT_TRACE - <span class="number">1</span>;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;

@@ -342,8 +342,8 @@
     /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>schedule_immix_full_heap_collection&lt;
         PlanType: Plan&lt;VM = VM&gt;,
-        FastContext: <span class="lifetime">&#39;static </span>+ GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
-        DefragContext: <span class="lifetime">&#39;static </span>+ GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
+        FastContext: GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
+        DefragContext: GCWorkContext&lt;VM = VM, PlanType = PlanType&gt;,
     &gt;(
         plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>DefragContext::PlanType,
         immix_space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;,

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["DEFAULT_TRACE"],"trait":["PolicyTraceObject"],"type":["TraceKind"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_TRACE","TRACE_KIND_TRANSITIVE_PIN"],"trait":["PolicyTraceObject"],"type":["TraceKind"]};
