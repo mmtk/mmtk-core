@@ -61,22 +61,7 @@ impl VMMap for Map32 {
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
         let mut sync = self.sync();
-        let mut e = 0;
-        while e < extent {
-            let index = (start + e).chunk_index();
-            assert!(
-                sync.descriptor_map[index].is_empty(),
-                "Conflicting virtual address request"
-            );
-            debug!(
-                "Set descriptor {:?} for Chunk {}",
-                descriptor,
-                conversions::chunk_index_to_address(index)
-            );
-            sync.descriptor_map[index] = descriptor;
-            //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
-            e += BYTES_IN_CHUNK;
-        }
+        sync.insert_no_lock(start, extent, descriptor)
     }
 
     fn create_freelist(&self, _start: Address) -> CreateFreeListResult {
@@ -120,7 +105,7 @@ impl VMMap for Map32 {
         }
         sync.total_available_discontiguous_chunks -= chunks;
         let rtn = conversions::chunk_index_to_address(chunk as _);
-        self.insert(rtn, chunks << LOG_BYTES_IN_CHUNK, descriptor);
+        sync.insert_no_lock(rtn, chunks << LOG_BYTES_IN_CHUNK, descriptor);
         if head.is_zero() {
             debug_assert!(sync.next_link[chunk as usize] == 0);
         } else {
@@ -274,6 +259,24 @@ impl Map32 {
 }
 
 impl Map32Inner {
+    fn insert_no_lock(&mut self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
+        let mut e = 0;
+        while e < extent {
+            let index = (start + e).chunk_index();
+            assert!(
+                self.descriptor_map[index].is_empty(),
+                "Conflicting virtual address request"
+            );
+            debug!(
+                "Set descriptor {:?} for Chunk {}",
+                descriptor,
+                conversions::chunk_index_to_address(index)
+            );
+            self.descriptor_map[index] = descriptor;
+            //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
+            e += BYTES_IN_CHUNK;
+        }
+    }
     fn free_contiguous_chunks_no_lock(&mut self, chunk: i32) -> usize {
         unsafe {
             let chunks = self.region_map.free(chunk, false);

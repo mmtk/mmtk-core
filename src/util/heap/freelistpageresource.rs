@@ -65,11 +65,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     fn update_discontiguous_start(&mut self, start: Address) {
         // Only discontiguous FreeListPageResource needs adjustment.
         if !self.common.contiguous {
-            assert!(
-                !cfg!(target_pointer_width = "64"),
-                "We shouldn't have discontiguous free-list page resources on 64-bit systems."
-            );
-
             // Note: since we have a `&mut self`, we must have exclusive access to self.
             // So We don't need to hold the lock.
             self.sync.get_mut().unwrap().start = start;
@@ -189,10 +184,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
-        assert!(
-            !cfg!(target_pointer_width = "64"),
-            "We shouldn't use discontiguous spaces on 64-bit system"
-        );
         let start = vm_layout().available_start();
         let CreateFreeListResult {
             free_list,
