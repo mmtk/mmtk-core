@@ -25,7 +25,8 @@ pub const STRESS_DEFRAG: bool = false;
 pub const DEFRAG_EVERY_BLOCK: bool = false;
 
 /// If Immix is used as a nursery space, do we prefer copy?
-pub const PREFER_COPY_ON_NURSERY_GC: bool = !cfg!(feature = "immix_non_moving"); // copy nursery objects if we are allowed to move.
+pub const PREFER_COPY_ON_NURSERY_GC: bool =
+    !cfg!(feature = "immix_non_moving") && !cfg!(feature = "sticky_immix_non_moving_nursery"); // copy nursery objects if we are allowed to move.
 
 /// In some cases/settings, Immix may never move objects.
 /// Currently we only have two cases where we move objects: 1. defrag, 2. nursery copy.

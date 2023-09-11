@@ -3,7 +3,7 @@ use std::ops::Range;
 use super::sft::SFT;
 use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
-use crate::policy::gc_work::TraceKind;
+use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
@@ -130,6 +130,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        debug_assert!(
+            KIND != TRACE_KIND_TRANSITIVE_PIN,
+            "MarkCompact does not support transitive pin trace."
+        );
         if KIND == TRACE_KIND_MARK {
             self.trace_mark_object(queue, object)
         } else if KIND == TRACE_KIND_FORWARD {

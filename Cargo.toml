@@ -105,6 +105,12 @@ object_pinning = []
 # Disable any object copying in Immix. This makes Immix a non-moving policy.
 immix_non_moving = []
 
+# Disable any object copying in nursery GC for Sticky Immix while allowing other kinds of copying.
+# `immix_non_moving` disables all kinds of copying in Immix, so this feature is not needed
+# if `immix_non_moving` is in use.
+sticky_immix_non_moving_nursery = []
+
+
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
 # Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.

@@ -50,10 +50,16 @@ use crate::plan::Plan;
 /// needs this trait to schedule different work packets. For certain plans,
 /// they may need to provide several types that implement this trait, e.g. one for
 /// nursery GC, one for mature GC.
-pub trait GCWorkContext {
+///
+/// Note: Because `GCWorkContext` is often used as parameters of implementations of `GCWork`, we
+/// let GCWorkContext require `Send + 'static`.  Since `GCWorkContext` is just a group of
+/// associated types, its implementations should not have any actual fields other than
+/// `PhantomData`, and will automatically have `Send + 'static`.
+pub trait GCWorkContext: Send + 'static {
     type VM: VMBinding;
     type PlanType: Plan<VM = Self::VM>;
     // We should use SFTProcessEdges as the default value for this associate type. However, this requires
     // `associated_type_defaults` which has not yet been stablized.
     type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM>;
+    type TPProcessEdges: ProcessEdgesWork<VM = Self::VM>;
 }

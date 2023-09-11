@@ -157,8 +157,8 @@ impl<VM: VMBinding> Immix<VM> {
     /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
     pub(crate) fn schedule_immix_full_heap_collection<
         PlanType: Plan<VM = VM>,
-        FastContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
-        DefragContext: 'static + GCWorkContext<VM = VM, PlanType = PlanType>,
+        FastContext: GCWorkContext<VM = VM, PlanType = PlanType>,
+        DefragContext: GCWorkContext<VM = VM, PlanType = PlanType>,
     >(
         plan: &'static DefragContext::PlanType,
         immix_space: &ImmixSpace<VM>,

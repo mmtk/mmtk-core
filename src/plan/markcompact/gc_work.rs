@@ -57,12 +57,13 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
             .get_and_clear_worker_live_bytes();
 
         for mutator in VM::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-                .add(ScanMutatorRoots::<ForwardingProcessEdges<VM>>(mutator));
+            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
+                MarkCompactForwardingGCWorkContext<VM>,
+            >(mutator));
         }
 
         mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
-            .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
+            .add(ScanVMSpecificRoots::<MarkCompactForwardingGCWorkContext<VM>>::new());
     }
 }
 
@@ -102,4 +103,13 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext
     type VM = VM;
     type PlanType = MarkCompact<VM>;
     type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+}
+
+pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MarkCompact<VM>;
+    type ProcessEdgesWorkType = ForwardingProcessEdges<VM>;
+    type TPProcessEdges = UnsupportedProcessEdges<VM>;
 }
