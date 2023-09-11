@@ -197,7 +197,9 @@ impl<VM: VMBinding> CopySpace<VM> {
                 );
             }
         } else {
-            unimplemented!();
+            for (start, size) in self.pr.iterate_allocated_regions() {
+                crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
+            }
         }
     }
 
