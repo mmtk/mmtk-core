@@ -41,7 +41,7 @@ impl IntArrayFreeList {
         iafl.initialize_heap(units as _, grain);
         iafl
     }
-    pub fn from_parent(parent: &IntArrayFreeList, ordinal: i32) -> Self {
+    pub fn from_parent(parent: &mut IntArrayFreeList, ordinal: i32) -> Self {
         let iafl = IntArrayFreeList {
             head: -(1 + ordinal),
             heads: parent.heads,
@@ -356,9 +356,9 @@ mod tests {
 
     #[test]
     fn multi_heads_alloc_free() {
-        let parent = IntArrayFreeList::new(LIST_SIZE, 1, 2);
-        let mut child1 = IntArrayFreeList::from_parent(&parent, 0);
-        let child2 = IntArrayFreeList::from_parent(&parent, 1);
+        let mut parent = IntArrayFreeList::new(LIST_SIZE, 1, 2);
+        let mut child1 = IntArrayFreeList::from_parent(&mut parent, 0);
+        let child2 = IntArrayFreeList::from_parent(&mut parent, 1);
 
         // child1 alloc
         let res = child1.alloc(1);
@@ -377,9 +377,9 @@ mod tests {
     #[test]
     #[should_panic]
     fn multi_heads_exceed_heads() {
-        let parent = IntArrayFreeList::new(LIST_SIZE, 1, 2);
-        let _child1 = IntArrayFreeList::from_parent(&parent, 0);
-        let _child2 = IntArrayFreeList::from_parent(&parent, 1);
-        let _child3 = IntArrayFreeList::from_parent(&parent, 2);
+        let mut parent = IntArrayFreeList::new(LIST_SIZE, 1, 2);
+        let _child1 = IntArrayFreeList::from_parent(&mut parent, 0);
+        let _child2 = IntArrayFreeList::from_parent(&mut parent, 1);
+        let _child3 = IntArrayFreeList::from_parent(&mut parent, 2);
     }
 }
