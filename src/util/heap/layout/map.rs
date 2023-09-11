@@ -1,7 +1,7 @@
 use crate::util::freelist::FreeList;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::Address;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
+use crate::util::Address;
 
 /// The result of creating free lists
 pub struct CreateFreeListResult {
@@ -22,8 +22,12 @@ pub trait VMMap: Sync {
     fn create_freelist(&self, start: Address) -> CreateFreeListResult;
 
     /// Create a free-list for a contiguous space. Must only be called at boot time.
-    fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
-        -> CreateFreeListResult;
+    fn create_parent_freelist(
+        &self,
+        start: Address,
+        units: usize,
+        grain: i32,
+    ) -> CreateFreeListResult;
 
     /// # Safety
     ///
