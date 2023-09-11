@@ -339,6 +339,8 @@
 <a href="#339" id="339">339</a>
 <a href="#340" id="340">340</a>
 <a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -538,7 +540,9 @@
                 );
             }
         } <span class="kw">else </span>{
-            <span class="macro">unimplemented!</span>();
+            <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+                <span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(start, size);
+            }
         }
     }
 
