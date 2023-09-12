@@ -87,6 +87,9 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        Some(&mut self.pr)
+    }
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }

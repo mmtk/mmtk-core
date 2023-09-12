@@ -190,10 +190,18 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
+        let free_list = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
+        let actual_start = if let Some(rmfl) = free_list.downcast_ref::<RawMemoryFreeList>() {
+            // If `vm_map` created a `RawMemoryFreeList`, it will be placed in the beginning of the
+            // space.  We adjust the start address of the current page resource.
+            conversions::chunk_align_up(rmfl.get_limit())
+        } else {
+            start
+        };
         let common_flpr = {
             let common_flpr = Box::new(CommonFreeListPageResource {
-                free_list: vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _),
-                start,
+                free_list,
+                start: actual_start,
             });
             common_flpr
         };
@@ -215,10 +223,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
         let common_flpr = {
             let start = vm_layout().available_start();
-            let common_flpr = Box::new(CommonFreeListPageResource {
-                free_list: vm_map.create_freelist(start),
-                start,
-            });
+            let free_list = vm_map.create_freelist(start);
+            debug_assert!(
+                free_list.downcast_ref::<RawMemoryFreeList>().is_none(),
+                "We can't allocate RawMemoryFreeList for discontiguous spaces."
+            );
+            let common_flpr = Box::new(CommonFreeListPageResource { free_list, start });
             common_flpr
         };
         FreeListPageResource {
@@ -308,7 +318,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     ) -> i32 {
         let mut rtn = freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
-        let maybe_rmfl = self.inner_mut().free_list.downcast_mut::<RawMemoryFreeList>();
+        let maybe_rmfl = self
+            .inner_mut()
+            .free_list
+            .downcast_mut::<RawMemoryFreeList>();
         let region = self.inner().common.grow_discontiguous_space(
             space_descriptor,
             required_chunks,

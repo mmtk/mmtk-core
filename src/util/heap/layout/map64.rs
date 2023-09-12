@@ -2,7 +2,6 @@ use super::map::VMMap;
 use crate::util::constants::*;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
@@ -11,7 +10,6 @@ use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::cell::UnsafeCell;
-use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const NON_MAP_FRACTION: f64 = 1.0 - 8.0 / 4096.0;
@@ -98,7 +96,7 @@ impl VMMap for Map64 {
 
         let heads = 1;
         let pages_per_block = RawMemoryFreeList::default_block_size(units as _, heads);
-        let mut list = Box::new(RawMemoryFreeList::new(
+        let list = Box::new(RawMemoryFreeList::new(
             start,
             start + list_extent,
             pages_per_block,
@@ -179,21 +177,14 @@ impl VMMap for Map64 {
 
     fn finalize_static_space_map(
         &self,
-        from: Address,
-        to: Address,
-        on_discontig_start_determined: &mut dyn FnMut(Address),
+        _from: Address,
+        _to: Address,
+        _on_discontig_start_determined: &mut dyn FnMut(Address),
     ) {
         // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Map64Inner = unsafe { self.mut_self() };
-        for pr in 0..MAX_SPACES {
-            if let Some(mut fl) = self_mut.fl_page_resources[pr] {
-                let fl_mut = unsafe { fl.as_mut() };
-                fl_mut.resize_freelist(conversions::chunk_align_up(unsafe {
-                    self.inner().fl_map[pr].unwrap().as_ref().get_limit()
-                }));
-            }
-        }
+        // We used to adjust the starting addresses of spaces here.  Not we do nothing.
         self_mut.finalized = true;
     }
 
