@@ -2,14 +2,13 @@ use super::map::VMMap;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
 use crate::util::freelist::FreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
+use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use std::cell::UnsafeCell;
-use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
@@ -25,7 +24,6 @@ pub struct Map32Inner {
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    shared_fl_map: Vec<Option<NonNull<CommonFreeListPageResource>>>,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
@@ -50,7 +48,6 @@ impl Map32 {
                 region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
                 global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
                 shared_discontig_fl_count: 0,
-                shared_fl_map: vec![None; MAX_SPACES],
                 total_available_discontiguous_chunks: 0,
                 finalized: false,
                 descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
@@ -107,21 +104,12 @@ impl VMMap for Map32 {
         Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
-    unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource) {
-        let ordinal: usize = (*pr)
-            .free_list
-            .downcast_ref::<IntArrayFreeList>()
-            .unwrap()
-            .get_ordinal() as usize;
-        let self_mut: &mut Map32Inner = self.mut_self();
-        self_mut.shared_fl_map[ordinal] = Some(NonNull::new_unchecked(pr as *mut _));
-    }
-
     unsafe fn allocate_contiguous_chunks(
         &self,
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
+        _maybe_rmfl: Option<&mut RawMemoryFreeList>,
     ) -> Address {
         let (_sync, self_mut) = self.mut_self_with_sync();
         let chunk = self_mut.region_map.alloc(chunks as _);
@@ -197,7 +185,12 @@ impl VMMap for Map32 {
         self.free_contiguous_chunks_no_lock(chunk as _)
     }
 
-    fn finalize_static_space_map(&self, from: Address, to: Address) {
+    fn finalize_static_space_map(
+        &self,
+        from: Address,
+        to: Address,
+        on_discontig_start_determined: &mut dyn FnMut(Address),
+    ) {
         // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
@@ -211,17 +204,9 @@ impl VMMap for Map32 {
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
         self_mut.global_page_map.resize_freelist(pages, pages as _);
-        // TODO: Clippy favors using iter().flatten() rather than iter() with if-let.
-        // https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
-        // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
-        // there is no test to ensure the refactoring will be correct.
-        #[allow(clippy::manual_flatten)]
-        for fl in self_mut.shared_fl_map.iter().copied() {
-            if let Some(mut fl) = fl {
-                let fl_mut = unsafe { fl.as_mut() };
-                fl_mut.resize_freelist(start_address);
-            }
-        }
+
+        on_discontig_start_determined(start_address);
+
         // [
         //  2: -1073741825
         //  3: -1073741825

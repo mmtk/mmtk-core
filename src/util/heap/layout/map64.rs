@@ -21,8 +21,6 @@ pub struct Map64 {
 }
 
 struct Map64Inner {
-    fl_page_resources: Vec<Option<NonNull<CommonFreeListPageResource>>>,
-    fl_map: Vec<Option<NonNull<RawMemoryFreeList>>>,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
@@ -61,8 +59,6 @@ impl Map64 {
                 },
                 high_water,
                 base_address,
-                fl_page_resources: vec![None; MAX_SPACES],
-                fl_map: vec![None; MAX_SPACES],
                 finalized: false,
                 cumulative_committed_pages: AtomicUsize::new(0),
             }),
@@ -112,22 +108,12 @@ impl VMMap for Map64 {
             MmapStrategy::Normal,
         ));
 
-        /*self_mut.fl_map[index] =
-            Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
-        */
-        self_mut.fl_map[index] = unsafe { Some(NonNull::new_unchecked(&mut *list)) };
         /* Adjust the base address and highwater to account for the allocated chunks for the map */
         let base = conversions::chunk_align_up(start + list_extent);
 
         self_mut.high_water[index] = base;
         self_mut.base_address[index] = base;
         list
-    }
-
-    unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource) {
-        let index = Self::space_index((*pr).get_start()).unwrap();
-        let self_mut = self.mut_self();
-        self_mut.fl_page_resources[index] = Some(NonNull::new_unchecked(pr as _));
     }
 
     /// # Safety
@@ -138,6 +124,7 @@ impl VMMap for Map64 {
         descriptor: SpaceDescriptor,
         chunks: usize,
         _head: Address,
+        maybe_rmfl: Option<&mut RawMemoryFreeList>,
     ) -> Address {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
@@ -150,9 +137,7 @@ impl VMMap for Map64 {
         self_mut.high_water[index] = rtn + extent;
 
         /* Grow the free list to accommodate the new chunks */
-        let free_list = self.inner().fl_map[Self::space_index(descriptor.get_start()).unwrap()];
-        if let Some(mut free_list) = free_list {
-            let free_list = free_list.as_mut();
+        if let Some(free_list) = maybe_rmfl {
             free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
             let base_page = conversions::bytes_to_pages(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
@@ -192,19 +177,12 @@ impl VMMap for Map64 {
         unreachable!()
     }
 
-    fn boot(&self) {
-        // This is only called during boot process by a single thread.
-        // It is fine to get a mutable reference.
-        let self_mut: &mut Map64Inner = unsafe { self.mut_self() };
-        for pr in 0..MAX_SPACES {
-            if let Some(mut fl) = self_mut.fl_map[pr] {
-                let fl_mut: &mut RawMemoryFreeList = unsafe { fl.as_mut() };
-                fl_mut.grow_freelist(0);
-            }
-        }
-    }
-
-    fn finalize_static_space_map(&self, _from: Address, _to: Address) {
+    fn finalize_static_space_map(
+        &self,
+        from: Address,
+        to: Address,
+        on_discontig_start_determined: &mut dyn FnMut(Address),
+    ) {
         // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Map64Inner = unsafe { self.mut_self() };

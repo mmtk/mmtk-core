@@ -17,6 +17,7 @@ use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory;
 use crate::util::opaque_pointer::*;
+use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::vm::*;
 use std::marker::PhantomData;
 
@@ -92,6 +93,14 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     }
     fn common_mut(&mut self) -> &mut CommonPageResource {
         &mut self.inner.get_mut().common
+    }
+    fn update_discontiguous_start(&mut self, start: Address) {
+        // Only discontiguous FreeListPageResource needs adjustment.
+        if !self.common().contiguous {
+            unsafe { self.inner_mut() }
+                .common_flpr
+                .resize_freelist(start);
+        }
     }
 
     fn get_available_physical_pages(&self) -> usize {
@@ -186,12 +195,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 free_list: vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _),
                 start,
             });
-            // `CommonFreeListPageResource` lives as a member in space instances.
-            // Since `Space` instances are always stored as global variables, so it is okay here
-            // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
-            unsafe {
-                vm_map.bind_freelist(&*(&common_flpr as &CommonFreeListPageResource as *const _));
-            }
             common_flpr
         };
         let growable = cfg!(target_pointer_width = "64");
@@ -216,12 +219,6 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 free_list: vm_map.create_freelist(start),
                 start,
             });
-            // `CommonFreeListPageResource` lives as a member in space instances.
-            // Since `Space` instances are always stored as global variables, so it is okay here
-            // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
-            unsafe {
-                vm_map.bind_freelist(&*(&common_flpr as &CommonFreeListPageResource as *const _));
-            }
             common_flpr
         };
         FreeListPageResource {
@@ -311,10 +308,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     ) -> i32 {
         let mut rtn = freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
-        let region = self
-            .inner()
-            .common
-            .grow_discontiguous_space(space_descriptor, required_chunks);
+        let maybe_rmfl = self.inner_mut().free_list.downcast_mut::<RawMemoryFreeList>();
+        let region = self.inner().common.grow_discontiguous_space(
+            space_descriptor,
+            required_chunks,
+            maybe_rmfl,
+        );
 
         if !region.is_zero() {
             let region_start = conversions::bytes_to_pages(region - self.start);
