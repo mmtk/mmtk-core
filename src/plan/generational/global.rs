@@ -92,14 +92,8 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             > plan.get_mature_physical_pages_available()
     }
 
-    /// Check if we need a GC based on the nursery space usage. This method may mark
-    /// the following GC as a full heap GC.
-    pub fn collection_required<P: Plan<VM = VM>>(
-        &self,
-        plan: &P,
-        space_full: bool,
-        space: Option<&dyn Space<VM>>,
-    ) -> bool {
+    /// Check if we need a GC based on the nursery space usage.
+    pub fn collection_required<P: Plan<VM = VM>>(&self, plan: &P) -> bool {
         let cur_nursery = self.nursery.reserved_pages();
         let max_nursery = self.common.base.options.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
@@ -116,17 +110,6 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
 
         if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             return true;
-        }
-
-        // Is the GC triggered by nursery?
-        // - if space is none, it is not. Return false immediately.
-        // - if space is some, we further check its descriptor.
-        let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.common().descriptor == self.nursery.common().descriptor
-        });
-        // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
-        if space_full && !is_triggered_by_nursery {
-            self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
 
         false
@@ -301,6 +284,9 @@ pub trait GenerationalPlan: Plan {
 
     /// Is the object in the nursery?
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
+
+    /// Is the given space the nursery space?
+    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool;
 
     /// Is the address in the nursery? As we only know addresses rather than object references, the
     /// implementation cannot access per-object metadata. If the plan does not have knowledge whether

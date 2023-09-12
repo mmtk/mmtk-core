@@ -46,10 +46,6 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 };
 
 impl<VM: VMBinding> Plan for Immix<VM> {
-    fn collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        false
-    }
-
     fn last_collection_was_exhaustive(&self) -> bool {
         ImmixSpace::<VM>::is_last_gc_exhaustive(self.last_gc_was_defrag.load(Ordering::Relaxed))
     }

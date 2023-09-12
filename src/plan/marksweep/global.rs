@@ -64,10 +64,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.release(tls, true);
     }
 
-    fn collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        false
-    }
-
     fn get_used_pages(&self) -> usize {
         self.common.get_used_pages() + self.ms.reserved_pages()
     }

@@ -85,9 +85,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     fn is_gc_required(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
         let plan = unsafe { self.plan.assume_init() };
-        if plan.collection_required(space_full, space) {
-            return true;
-        }
 
         let stress_gc = self.should_do_stress_gc();
         if stress_gc {
@@ -100,7 +97,13 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state.allocation_bytes.store(0, Ordering::SeqCst);
         }
 
-        space_full || self.is_heap_full()
+        let collection_required =
+            space_full || self.is_heap_full() || plan.collection_required() || stress_gc;
+        if collection_required {
+            plan.notify_collection_required(space_full, space);
+        }
+
+        collection_required
     }
 
     /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds

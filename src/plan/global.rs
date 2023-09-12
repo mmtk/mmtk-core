@@ -203,12 +203,20 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// periodically during allocation. This method only needs to do plan-specific checks to see if it requires a GC,
     /// and the return value indicates if the plan would like to require a GC.
     /// If the method returns false, the GC trigger may still trigger a GC based on some general checks.
-    /// General checks are done in [`crate::util::heap::gc_trigger::GCTrigger::is_gc_required`].
+    /// General checks are done in `crate::util::heap::gc_trigger::GCTrigger::is_gc_required`.
+    fn collection_required(&self) -> bool {
+        false
+    }
+
+    /// Notify a plan that a collection will be triggered. This is called when the GC trigger decides to trigger
+    /// a GC.
     ///
     /// # Arguments
     /// * `space_full`: the allocation to a specific space failed, must recover pages within 'space'.
     /// * `space`: an option to indicate if there is a space that has failed in an allocation.
-    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool;
+    fn notify_collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) {
+        // Do nothing.
+    }
 
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods

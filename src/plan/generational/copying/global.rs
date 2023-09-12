@@ -63,11 +63,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
-    where
-        Self: Sized,
-    {
-        self.gen.collection_required(self, space_full, space)
+    fn collection_required(&self) -> bool {
+        self.gen.collection_required(self)
+    }
+
+    fn notify_collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) {
+        if space_full && space.is_some() && self.is_nursery_space(space.unwrap()) {
+            self.force_full_heap_collection();
+        }
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -157,6 +160,10 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
 
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
         self.gen.nursery.in_space(object)
+    }
+
+    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
+        space.common().descriptor == self.gen.nursery.common().descriptor
     }
 
     fn is_address_in_nursery(&self, addr: Address) -> bool {

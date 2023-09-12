@@ -55,10 +55,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.space.release(true);
     }
 
-    fn collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        false
-    }
-
     fn get_used_pages(&self) -> usize {
         self.space.reserved_pages() + self.common.get_used_pages()
     }

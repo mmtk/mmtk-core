@@ -96,10 +96,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.fromspace().release();
     }
 
-    fn collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        false
-    }
-
     fn get_collection_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
     }
