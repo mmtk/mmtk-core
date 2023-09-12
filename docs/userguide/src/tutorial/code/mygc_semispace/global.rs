@@ -1,7 +1,6 @@
 // ANCHOR: imports_no_gc_work
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
-use crate::global_state::GcStatus; // Add
 use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
@@ -77,17 +76,9 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // Modify
     // ANCHOR: schedule_collection
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
     }
     // ANCHOR_END: schedule_collection
-
-    // ANCHOR: collection_required()
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
-        self.base().collection_required(self, space_full)
-    }
-    // ANCHOR_END: collection_required()
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
