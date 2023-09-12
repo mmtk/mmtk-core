@@ -180,11 +180,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         debug_assert_eq!(SFT_MAP.get_checked(res.start).name(), self.get_name());
                         // The start address is in our space.
                         debug_assert!(self.address_in_space(res.start));
-                        // The descriptor should be correct.
-                        debug_assert_eq!(
-                            self.common().vm_map().get_descriptor_for_address(res.start),
-                            self.common().descriptor
-                        );
 
                         // --- Assert the last byte in the allocated region ---
                         let last_byte = res.start + bytes - 1;
@@ -192,11 +187,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         debug_assert_eq!(SFT_MAP.get_checked(last_byte).name(), self.get_name());
                         // The last byte in the allocated memory should be in this space.
                         debug_assert!(self.address_in_space(last_byte));
-                        // The descriptor for the last byte should be correct.
-                        debug_assert_eq!(
-                            self.common().vm_map().get_descriptor_for_address(last_byte),
-                            self.common().descriptor
-                        );
                     }
 
                     debug!("Space.acquire(), returned = {}", res.start);
@@ -229,7 +219,16 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn address_in_space(&self, start: Address) -> bool {
         if !self.common().descriptor.is_contiguous() {
-            self.common().vm_map().get_descriptor_for_address(start) == self.common().descriptor
+            // If the space is not contiguous, we use `SFT_MAP` to check.
+            //
+            // Note: When comparing references (`&T`) using `==`, it compares by values.
+            // To compare by identities, we need to compare pointers.
+            //
+            // TODO: For `DenseChunkMap`, it is possible to reduce one level of dereferencing by
+            // letting each space remember its index in `DenseChunkMap::index_map`.
+            let self_ptr = self as *const _ as *const ();
+            let other_ptr = SFT_MAP.get_checked(start) as *const _ as *const ();
+            self_ptr == other_ptr
         } else {
             start >= self.common().start && start < self.common().start + self.common().extent
         }
@@ -554,22 +553,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // FIXME
         rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
         // VM.memory.setHeapRange(index, start, start.plus(extent));
-
-        // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
-        // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
-        // insert into our vm map if the range overlaps with our heap.
-        {
-            use crate::util::heap::layout;
-            let overlap =
-                Address::range_intersection(&(start..start + extent), &layout::available_range());
-            if !overlap.is_empty() {
-                args.plan_args.vm_map.insert(
-                    overlap.start,
-                    overlap.end - overlap.start,
-                    rtn.descriptor,
-                );
-            }
-        }
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
         if rtn

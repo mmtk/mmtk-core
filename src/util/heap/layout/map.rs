@@ -4,8 +4,6 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
 
 pub trait VMMap: Sync {
-    fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
-
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
     /// bind_freelist() must be called by the caller after this method.
     fn create_freelist(&self, start: Address) -> Box<dyn FreeList>;
@@ -60,8 +58,6 @@ pub trait VMMap: Sync {
     fn finalize_static_space_map(&self, from: Address, to: Address);
 
     fn is_finalized(&self) -> bool;
-
-    fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
     fn add_to_cumulative_committed_pages(&self, pages: usize);
 }

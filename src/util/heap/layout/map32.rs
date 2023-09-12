@@ -28,7 +28,6 @@ pub struct Map32Inner {
     shared_fl_map: Vec<Option<NonNull<CommonFreeListPageResource>>>,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
-    descriptor_map: Vec<SpaceDescriptor>,
 
     // TODO: Is this the right place for this field?
     // This used to be a global variable. When we remove global states, this needs to be put somewhere.
@@ -53,7 +52,6 @@ impl Map32 {
                 shared_fl_map: vec![None; MAX_SPACES],
                 total_available_discontiguous_chunks: 0,
                 finalized: false,
-                descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
                 cumulative_committed_pages: AtomicUsize::new(0),
             }),
             sync: Mutex::new(()),
@@ -69,28 +67,6 @@ impl std::ops::Deref for Map32 {
 }
 
 impl VMMap for Map32 {
-    fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
-        // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
-        // as each space will update different indices.
-        let self_mut: &mut Map32Inner = unsafe { self.mut_self() };
-        let mut e = 0;
-        while e < extent {
-            let index = (start + e).chunk_index();
-            assert!(
-                self.descriptor_map[index].is_empty(),
-                "Conflicting virtual address request"
-            );
-            debug!(
-                "Set descriptor {:?} for Chunk {}",
-                descriptor,
-                conversions::chunk_index_to_address(index)
-            );
-            self_mut.descriptor_map[index] = descriptor;
-            //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
-            e += BYTES_IN_CHUNK;
-        }
-    }
-
     fn create_freelist(&self, _start: Address) -> Box<dyn FreeList> {
         Box::new(IntArrayFreeList::from_parent(
             &self.global_page_map,
@@ -119,7 +95,7 @@ impl VMMap for Map32 {
 
     unsafe fn allocate_contiguous_chunks(
         &self,
-        descriptor: SpaceDescriptor,
+        _descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
     ) -> Address {
@@ -131,7 +107,6 @@ impl VMMap for Map32 {
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
         let rtn = conversions::chunk_index_to_address(chunk as _);
-        self.insert(rtn, chunks << LOG_BYTES_IN_CHUNK, descriptor);
         if head.is_zero() {
             debug_assert!(self.next_link[chunk as usize] == 0);
         } else {
@@ -260,11 +235,6 @@ impl VMMap for Map32 {
         self.finalized
     }
 
-    fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        let index = address.chunk_index();
-        self.descriptor_map[index]
-    }
-
     fn add_to_cumulative_committed_pages(&self, pages: usize) {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
@@ -304,8 +274,6 @@ impl Map32 {
             for offset in 0..chunks {
                 let index = (chunk + offset) as usize;
                 let chunk_start = conversions::chunk_index_to_address(index);
-                debug!("Clear descriptor for Chunk {}", chunk_start);
-                self.mut_self().descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
                 SFT_MAP.clear(chunk_start);
             }
             chunks as _

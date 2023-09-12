@@ -8,7 +8,6 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory::MmapStrategy;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
-use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::cell::UnsafeCell;
 use std::ptr::NonNull;
@@ -24,7 +23,6 @@ struct Map64Inner {
     fl_page_resources: Vec<Option<NonNull<CommonFreeListPageResource>>>,
     fl_map: Vec<Option<NonNull<RawMemoryFreeList>>>,
     finalized: bool,
-    descriptor_map: Vec<SpaceDescriptor>,
     base_address: Vec<Address>,
     high_water: Vec<Address>,
 
@@ -51,14 +49,6 @@ impl Map64 {
 
         Self {
             inner: UnsafeCell::new(Map64Inner {
-                // Note: descriptor_map is very large. Although it is initialized to
-                // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
-                // elide the storing of 0 for each of the element.  Using standard vector creation,
-                // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
-                // slowdown during start-up.
-                descriptor_map: unsafe {
-                    new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks())
-                },
                 high_water,
                 base_address,
                 fl_page_resources: vec![None; MAX_SPACES],
@@ -71,16 +61,6 @@ impl Map64 {
 }
 
 impl VMMap for Map64 {
-    fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
-        debug_assert!(Self::is_space_start(start));
-        debug_assert!(extent <= vm_layout().space_size_64());
-        // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
-        // as each space will update different indices.
-        let self_mut = unsafe { self.mut_self() };
-        let index = Self::space_index(start).unwrap();
-        self_mut.descriptor_map[index] = descriptor;
-    }
-
     fn create_freelist(&self, start: Address) -> Box<dyn FreeList> {
         let units = vm_layout().space_size_64() >> LOG_BYTES_IN_PAGE;
         self.create_parent_freelist(start, units, units as _)
@@ -221,11 +201,6 @@ impl VMMap for Map64 {
 
     fn is_finalized(&self) -> bool {
         self.inner().finalized
-    }
-
-    fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        let index = Self::space_index(address).unwrap();
-        self.inner().descriptor_map[index]
     }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize) {
