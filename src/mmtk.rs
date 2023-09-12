@@ -138,7 +138,7 @@ impl<VM: VMBinding> MMTK<VM> {
                         pr.update_discontiguous_start(start_address);
                     }
                 })
-            }
+            },
         );
 
         if *options.transparent_hugepages {

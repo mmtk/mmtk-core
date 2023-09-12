@@ -1,7 +1,7 @@
 use crate::util::freelist::FreeList;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::Address;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
+use crate::util::Address;
 
 pub trait VMMap: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
