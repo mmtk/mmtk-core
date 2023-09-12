@@ -83,6 +83,9 @@ impl<VM: VMBinding> GCTrigger<VM> {
         false
     }
 
+    /// Check if we should do a GC now. This method does some general checks, and
+    /// also calls to a plan to see if the plan would have any plan-specific check.
+    /// This method also informs the plan if a GC is required.
     fn is_gc_required(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
         let plan = unsafe { self.plan.assume_init() };
 
@@ -97,8 +100,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
             self.state.allocation_bytes.store(0, Ordering::SeqCst);
         }
 
+        // We need a GC if any condition is true.
         let collection_required =
             space_full || self.is_heap_full() || plan.collection_required() || stress_gc;
+        // Inform the plan that we will do a GC.
         if collection_required {
             plan.notify_collection_required(space_full, space);
         }
@@ -109,7 +114,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
     /// the stress factor, we should do a stress GC.
     pub fn should_do_stress_gc(&self) -> bool {
-        self.state.initialized.load(Ordering::SeqCst)
+        self.state.is_initialized()
             && (self.state.allocation_bytes.load(Ordering::SeqCst) > *self.options.stress_factor)
     }
 
@@ -160,17 +165,6 @@ pub struct FixedHeapSizeTrigger {
     total_pages: usize,
 }
 impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
-    // fn is_gc_required(
-    //     &self,
-    //     space_full: bool,
-    //     space: Option<&dyn Space<VM>>,
-    //     plan: &dyn Plan<VM = VM>,
-    // ) -> bool {
-    //     // Let the plan decide
-    //     let heap_full = self.is_heap_full(plan);
-    //     plan.collection_required(space_full, heap_full, space)
-    // }
-
     fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the total pages, the heap is full.
         plan.get_reserved_pages() > self.total_pages
@@ -428,16 +422,6 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         // Clear pending allocation pages at the end of GC, no matter we used it or not.
         self.pending_pages.store(0, Ordering::SeqCst);
     }
-
-    // fn is_gc_required(
-    //     &self,
-    //     space_full: bool,
-    //     space: Option<&dyn Space<VM>>,
-    //     plan: &dyn Plan<VM = VM>,
-    // ) -> bool {
-    //     // Let the plan decide
-    //     plan.collection_required(space_full, self.is_heap_full(plan), space)
-    // }
 
     fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the current heap size, the heap is full.

@@ -71,15 +71,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             + self.los.reserved_pages()
             + self.base.get_used_pages()
     }
-
-    // fn handle_user_collection_request(
-    //     &self,
-    //     _tls: VMMutatorThread,
-    //     _force: bool,
-    //     _exhaustive: bool,
-    // ) {
-    //     warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
-    // }
 }
 
 impl<VM: VMBinding> NoGC<VM> {

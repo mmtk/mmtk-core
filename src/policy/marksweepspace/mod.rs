@@ -9,7 +9,7 @@
 
 // TODO: we should extract the code about mark sweep, and make both implementation use the same mark sweep code.
 
-// We will only use one of the two depends on the enabled feature.
+// We will only use one of the two mark sweep implementations, depending on the enabled feature.
 #![allow(dead_code)]
 
 /// Malloc mark sweep. This uses `MallocSpace` and `MallocAllocator`.

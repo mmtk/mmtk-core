@@ -1,48 +1,66 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
+/// This stores some global states for an MMTK instance.
+/// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
+// This used to be a part of the `BasePlan`. In that case, any component that accesses
+// the states needs a reference to the plan. It makes it harder for us to reason about the access pattern
+// for the plan, as many components hold references to the plan. Besides, the states
+// actually are not related with a plan, they are just global states for MMTK. So we refactored
+// those fields to this separate struct. For components that access the state, they just need
+// a reference to the struct, and are no longer dependent on the plan.
+// We may consider further break down the fields into smaller structs. 
 pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
-    pub initialized: AtomicBool,
+    pub(crate) initialized: AtomicBool,
     /// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow
     /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
-    pub trigger_gc_when_heap_is_full: AtomicBool,
-    pub gc_status: Mutex<GcStatus>,
-    pub emergency_collection: AtomicBool,
-    pub user_triggered_collection: AtomicBool,
-    pub internal_triggered_collection: AtomicBool,
-    pub last_internal_triggered_collection: AtomicBool,
+    pub(crate) trigger_gc_when_heap_is_full: AtomicBool,
+    /// The current GC status.
+    pub(crate) gc_status: Mutex<GcStatus>,
+    /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
+    /// attempt to collect as much as we can.
+    pub(crate) emergency_collection: AtomicBool,
+    /// Is the current GC triggered by the user?
+    pub(crate) user_triggered_collection: AtomicBool,
+    /// Is the current GC triggered internally by MMTK? This is unused for now. We may have internally triggered GC
+    /// for a concurrent plan.
+    pub(crate) internal_triggered_collection: AtomicBool,
+    /// Is the last GC internally triggered?
+    pub(crate) last_internal_triggered_collection: AtomicBool,
     // Has an allocation succeeded since the emergency collection?
-    pub allocation_success: AtomicBool,
+    pub(crate) allocation_success: AtomicBool,
     // Maximum number of failed attempts by a single thread
-    pub max_collection_attempts: AtomicUsize,
+    pub(crate) max_collection_attempts: AtomicUsize,
     // Current collection attempt
-    pub cur_collection_attempts: AtomicUsize,
-    #[cfg(feature = "sanity")]
-    pub inside_sanity: AtomicBool,
+    pub(crate) cur_collection_attempts: AtomicUsize,
     /// A counter for per-mutator stack scanning
-    pub scanned_stacks: AtomicUsize,
+    pub(crate) scanned_stacks: AtomicUsize,
     /// Have we scanned all the stacks?
-    pub stacks_prepared: AtomicBool,
+    pub(crate) stacks_prepared: AtomicBool,
     /// A counter that keeps tracks of the number of bytes allocated since last stress test
-    pub allocation_bytes: AtomicUsize,
+    pub(crate) allocation_bytes: AtomicUsize,
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
-    pub malloc_bytes: AtomicUsize,
+    pub(crate) malloc_bytes: AtomicUsize,
     /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
     #[cfg(feature = "count_live_bytes_in_gc")]
-    pub live_bytes_in_last_gc: AtomicUsize,
+    pub(crate) live_bytes_in_last_gc: AtomicUsize,
 }
 
 impl GlobalState {
+    /// Is MMTk initialized?
     pub fn is_initialized(&self) -> bool {
         self.initialized.load(Ordering::SeqCst)
     }
 
+    /// Should MMTK trigger GC when heap is full? If GC is disabled, we wont trigger GC even if the heap is full.
     pub fn should_trigger_gc_when_heap_is_full(&self) -> bool {
         self.trigger_gc_when_heap_is_full.load(Ordering::SeqCst)
     }
 
+    /// Set the collection kind for the current GC. This is called before
+    /// scheduling collection to determin what kind of collection it will be.
     pub fn set_collection_kind(
         &self,
         last_collection_was_exhaustive: bool,
@@ -194,8 +212,6 @@ impl Default for GlobalState {
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
-            #[cfg(feature = "sanity")]
-            inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "malloc_counted_size")]

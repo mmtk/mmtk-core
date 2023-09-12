@@ -113,7 +113,7 @@ pub struct MMTK<VM: VMBinding> {
     inside_harness: AtomicBool,
     #[cfg(feature = "sanity")]
     inside_sanity: AtomicBool,
-    /// Wrapper around analysis counters
+    /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
     #[cfg(feature = "analysis")]
     pub(crate) analysis_manager: Arc<AnalysisManager<VM>>,
 }

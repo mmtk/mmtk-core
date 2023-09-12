@@ -254,11 +254,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.edge_logger.reset();
         }
 
-        mmtk.set_gc_status(GcStatus::NotInGC);
-
         // Reset the triggering information.
         mmtk.state.reset_collection_trigger();
 
+        // Set to NotInGC after everything, and right before resuming mutators.
+        mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }

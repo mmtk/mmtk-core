@@ -707,17 +707,6 @@ pub fn is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }
 
-// /// Check that if a garbage collection is in progress and if the given
-// /// object is not movable.  If it is movable error messages are
-// /// logged and the system exits.
-// ///
-// /// Arguments:
-// /// * `mmtk`: A reference to an MMTk instance.
-// /// * `object`: The object to check.
-// pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
-//     mmtk.get_plan().modify_check(object);
-// }
-
 /// Add a reference to the list of weak references. A binding may
 /// call this either when a weak reference is created, or when a weak reference is traced during GC.
 ///

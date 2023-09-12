@@ -129,6 +129,7 @@ pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
     }
 }
 
+/// The context an allocator needs to access in order to perform allocation.
 pub struct AllocatorContext<VM: VMBinding> {
     pub state: Arc<GlobalState>,
     pub options: Arc<Options>,
@@ -157,9 +158,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     fn get_space(&self) -> &'static dyn Space<VM>;
 
-    // /// Return the [`Plan`] instance that this allocator instance is associated with.
-    // fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
-
+    // Return the context for the allocator.
     fn get_context(&self) -> &AllocatorContext<VM>;
 
     /// Return if this allocator can do thread local allocation. If an allocator does not do thread

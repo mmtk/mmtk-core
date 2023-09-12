@@ -92,18 +92,6 @@ pub fn create_plan<VM: VMBinding>(
     };
 
     // We have created Plan in the heap, and we won't explicitly move it.
-
-    // The plan has a fixed address. Set plan in gc_trigger
-    // {
-    //     // We haven't finished creating the plan. No one is using the GC trigger. We cast the arc into a mutable reference.
-    //     // TODO: use Arc::get_mut_unchecked() when it is availble.
-    //     let gc_trigger: &mut GCTrigger<VM> = unsafe { &mut *(Arc::as_ptr(&gc_trigger) as *mut _) };
-    //     // We know the plan address will not change. Cast it to a static reference.
-    //     let static_plan: &'static dyn Plan<VM = VM> = unsafe { &*(&*plan as *const _) };
-    //     // Set the plan so we can trigger GC and check GC condition without using plan
-    //     gc_trigger.set_plan(static_plan);
-    // }
-
     // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
     let sft_map: &mut dyn crate::policy::sft_map::SFTMap =
         unsafe { crate::mmtk::SFT_MAP.get_mut() }.as_mut();
@@ -294,42 +282,12 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         self.get_total_pages() - self.get_used_pages()
     }
 
-    // fn is_emergency_collection(&self) -> bool {
-    //     self.base().emergency_collection.load(Ordering::Relaxed)
-    // }
-
-    // /// The application code has requested a collection. This is just a GC hint, and
-    // /// we may ignore it.
-    // ///
-    // /// # Arguments
-    // /// * `tls`: The mutator thread that requests the GC
-    // /// * `force`: The request cannot be ignored (except for NoGC)
-    // /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
-    // fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool, exhaustive: bool) {
-    //     // For exhaustive on generational plans, we force a full heap GC.
-    //     // A plan may implement this method themselves to handle the exhaustive GC.
-    //     if exhaustive {
-    //         if let Some(gen) = self.generational() {
-    //             gen.force_full_heap_collection();
-    //         }
-    //     }
-    //     self.base().handle_user_collection_request(tls, force)
-    // }
-
     /// Return whether last GC was an exhaustive attempt to collect the heap.
     /// For example, for generational GCs, minor collection is not an exhaustive collection.
     /// For example, for Immix, fast collection (no defragmentation) is not an exhaustive collection.
     fn last_collection_was_exhaustive(&self) -> bool {
         true
     }
-
-    // fn modify_check(&self, object: ObjectReference) {
-    //     assert!(
-    //         !(self.base().global_state.gc_in_progress_proper() && object.is_movable()),
-    //         "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
-    //         object
-    //     );
-    // }
 
     /// An object is firstly reached by a sanity GC. So the object is reachable
     /// in the current GC, and all the GC work has been done for the object (such as
@@ -350,13 +308,6 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 }
 
 impl_downcast!(Plan assoc VM);
-
-// #[derive(PartialEq)]
-// pub enum GcStatus {
-//     NotInGC,
-//     GcPrepare,
-//     GcProper,
-// }
 
 /**
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
@@ -473,70 +424,10 @@ impl<VM: VMBinding> BasePlan<VM> {
             )),
 
             global_state: args.global_args.state.clone(),
-
-            // initialized: AtomicBool::new(false),
-            // trigger_gc_when_heap_is_full: AtomicBool::new(true),
-            // gc_status: Mutex::new(GcStatus::NotInGC),
-            // last_stress_pages: AtomicUsize::new(0),
-            // stacks_prepared: AtomicBool::new(false),
-            // emergency_collection: AtomicBool::new(false),
-            // user_triggered_collection: AtomicBool::new(false),
-            // internal_triggered_collection: AtomicBool::new(false),
-            // last_internal_triggered_collection: AtomicBool::new(false),
-            // allocation_success: AtomicBool::new(false),
-            // max_collection_attempts: AtomicUsize::new(0),
-            // cur_collection_attempts: AtomicUsize::new(0),
-            // gc_requester: Arc::new(GCRequester::new()),
-            // stats,
-            // heap: args.global_args.heap,
             gc_trigger: args.global_args.gc_trigger,
             options: args.global_args.options,
-            // #[cfg(feature = "sanity")]
-            // inside_sanity: AtomicBool::new(false),
-            // scanned_stacks: AtomicUsize::new(0),
-            // allocation_bytes: AtomicUsize::new(0),
-            // #[cfg(feature = "malloc_counted_size")]
-            // malloc_bytes: AtomicUsize::new(0),
-            // #[cfg(feature = "count_live_bytes_in_gc")]
-            // live_bytes_in_last_gc: AtomicUsize::new(0),
-            // #[cfg(feature = "analysis")]
-            // analysis_manager,
         }
     }
-
-    // /// The application code has requested a collection.
-    // pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
-    //     if force || !*self.options.ignore_system_gc {
-    //         info!("User triggering collection");
-    //         self.user_triggered_collection
-    //             .store(true, Ordering::Relaxed);
-    //         self.gc_requester.request();
-    //         VM::VMCollection::block_for_gc(tls);
-    //     }
-    // }
-
-    // /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
-    // // This is not used, as we do not have a concurrent plan.
-    // #[allow(unused)]
-    // pub fn trigger_internal_collection_request(&self) {
-    //     self.last_internal_triggered_collection
-    //         .store(true, Ordering::Relaxed);
-    //     self.internal_triggered_collection
-    //         .store(true, Ordering::Relaxed);
-    //     self.gc_requester.request();
-    // }
-
-    // /// Reset collection state information.
-    // pub fn reset_collection_trigger(&self) {
-    //     self.last_internal_triggered_collection.store(
-    //         self.internal_triggered_collection.load(Ordering::SeqCst),
-    //         Ordering::Relaxed,
-    //     );
-    //     self.internal_triggered_collection
-    //         .store(false, Ordering::SeqCst);
-    //     self.user_triggered_collection
-    //         .store(false, Ordering::Relaxed);
-    // }
 
     // Depends on what base spaces we use, unsync may be unused.
     pub fn get_used_pages(&self) -> usize {
@@ -619,176 +510,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "vm_space")]
         self.vm_space.release();
     }
-
-    // pub fn set_collection_kind<P: Plan>(&self, plan: &P) {
-    //     self.cur_collection_attempts.store(
-    //         if self.is_user_triggered_collection() {
-    //             1
-    //         } else {
-    //             self.determine_collection_attempts()
-    //         },
-    //         Ordering::Relaxed,
-    //     );
-
-    //     let emergency_collection = !self.is_internal_triggered_collection()
-    //         && plan.last_collection_was_exhaustive()
-    //         && self.cur_collection_attempts.load(Ordering::Relaxed) > 1
-    //         && !self.gc_trigger.policy.can_heap_size_grow();
-    //     self.emergency_collection
-    //         .store(emergency_collection, Ordering::Relaxed);
-
-    //     if emergency_collection {
-    //         if let Some(gen) = plan.generational() {
-    //             gen.force_full_heap_collection();
-    //         }
-    //     }
-    // }
-
-    // pub fn set_gc_status(&self, s: GcStatus) {
-    //     let mut gc_status = self.gc_status.lock().unwrap();
-    //     if *gc_status == GcStatus::NotInGC {
-    //         self.stacks_prepared.store(false, Ordering::SeqCst);
-    //         // FIXME stats
-    //         self.stats.start_gc();
-    //     }
-    //     *gc_status = s;
-    //     if *gc_status == GcStatus::NotInGC {
-    //         // FIXME stats
-    //         if self.stats.get_gathering_stats() {
-    //             self.stats.end_gc();
-    //         }
-    //     }
-    // }
-
-    // /// Are the stacks scanned?
-    // pub fn stacks_prepared(&self) -> bool {
-    //     self.stacks_prepared.load(Ordering::SeqCst)
-    // }
-
-    // /// Prepare for stack scanning. This is usually used with `inform_stack_scanned()`.
-    // /// This should be called before doing stack scanning.
-    // pub fn prepare_for_stack_scanning(&self) {
-    //     self.scanned_stacks.store(0, Ordering::SeqCst);
-    //     self.stacks_prepared.store(false, Ordering::SeqCst);
-    // }
-
-    // /// Inform that 1 stack has been scanned. The argument `n_mutators` indicates the
-    // /// total stacks we should scan. This method returns true if the number of scanned
-    // /// stacks equals the total mutator count. Otherwise it returns false. This method
-    // /// is thread safe and we guarantee only one thread will return true.
-    // pub fn inform_stack_scanned(&self, n_mutators: usize) -> bool {
-    //     let old = self.scanned_stacks.fetch_add(1, Ordering::SeqCst);
-    //     debug_assert!(
-    //         old < n_mutators,
-    //         "The number of scanned stacks ({}) is more than the number of mutators ({})",
-    //         old,
-    //         n_mutators
-    //     );
-    //     let scanning_done = old + 1 == n_mutators;
-    //     if scanning_done {
-    //         self.stacks_prepared.store(true, Ordering::SeqCst);
-    //     }
-    //     scanning_done
-    // }
-
-    // pub fn gc_in_progress(&self) -> bool {
-    //     *self.gc_status.lock().unwrap() != GcStatus::NotInGC
-    // }
-
-    // pub fn gc_in_progress_proper(&self) -> bool {
-    //     *self.gc_status.lock().unwrap() == GcStatus::GcProper
-    // }
-
-    // fn determine_collection_attempts(&self) -> usize {
-    //     if !self.allocation_success.load(Ordering::Relaxed) {
-    //         self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
-    //     } else {
-    //         self.allocation_success.store(false, Ordering::Relaxed);
-    //         self.max_collection_attempts.store(1, Ordering::Relaxed);
-    //     }
-
-    //     self.max_collection_attempts.load(Ordering::Relaxed)
-    // }
-
-    // /// Return true if this collection was triggered internally.
-    // pub fn is_internal_triggered_collection(&self) -> bool {
-    //     let is_internal_triggered = self
-    //         .last_internal_triggered_collection
-    //         .load(Ordering::SeqCst);
-    //     // Remove this assertion when we have concurrent GC.
-    //     assert!(
-    //         !is_internal_triggered,
-    //         "We have no concurrent GC implemented. We should not have internally triggered GC"
-    //     );
-    //     is_internal_triggered
-    // }
-
-    // /// Increase the allocation bytes and return the current allocation bytes after increasing
-    // pub fn increase_allocation_bytes_by(&self, size: usize) -> usize {
-    //     let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
-    //     trace!(
-    //         "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
-    //         old_allocation_bytes,
-    //         size,
-    //         self.allocation_bytes.load(Ordering::Relaxed),
-    //     );
-    //     old_allocation_bytes + size
-    // }
-
-    // /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
-    // /// we should do stress GC.
-    // pub fn is_stress_test_gc_enabled(&self) -> bool {
-    //     use crate::util::constants::DEFAULT_STRESS_FACTOR;
-    //     *self.options.stress_factor != DEFAULT_STRESS_FACTOR
-    //         || *self.options.analysis_factor != DEFAULT_STRESS_FACTOR
-    // }
-
-    // /// Check if we should do precise stress test. If so, we need to check for stress GCs for every allocation.
-    // /// Otherwise, we only check in the allocation slow path.
-    // pub fn is_precise_stress(&self) -> bool {
-    //     *self.options.precise_stress
-    // }
-
-    // /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
-    // /// the stress factor, we should do a stress GC.
-    // pub fn should_do_stress_gc(&self) -> bool {
-    //     self.global_state.initialized.load(Ordering::SeqCst)
-    //         && (self.allocation_bytes.load(Ordering::SeqCst) > *self.options.stress_factor)
-    // }
-
-    // pub(super) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
-    //     let stress_force_gc = self.should_do_stress_gc();
-    //     if stress_force_gc {
-    //         debug!(
-    //             "Stress GC: allocation_bytes = {}, stress_factor = {}",
-    //             self.global_state.allocation_bytes.load(Ordering::Relaxed),
-    //             *self.options.stress_factor
-    //         );
-    //         debug!("Doing stress GC");
-    //         self.global_state.allocation_bytes.store(0, Ordering::SeqCst);
-    //     }
-
-    //     debug!(
-    //         "self.get_reserved_pages()={}, self.get_total_pages()={}",
-    //         plan.get_reserved_pages(),
-    //         plan.get_total_pages()
-    //     );
-
-    //     space_full || stress_force_gc
-    // }
-
-    // #[cfg(feature = "malloc_counted_size")]
-    // pub(crate) fn increase_malloc_bytes_by(&self, size: usize) {
-    //     self.malloc_bytes.fetch_add(size, Ordering::SeqCst);
-    // }
-    // #[cfg(feature = "malloc_counted_size")]
-    // pub(crate) fn decrease_malloc_bytes_by(&self, size: usize) {
-    //     self.malloc_bytes.fetch_sub(size, Ordering::SeqCst);
-    // }
-    // #[cfg(feature = "malloc_counted_size")]
-    // pub fn get_malloc_bytes(&self) -> usize {
-    //     self.malloc_bytes.load(Ordering::SeqCst)
-    // }
 }
 
 /**
@@ -869,10 +590,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.nonmoving.release();
         self.base.release(tls, full_heap)
     }
-
-    // pub fn stacks_prepared(&self) -> bool {
-    //     self.base.stacks_prepared()
-    // }
 
     pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
         &self.immortal
