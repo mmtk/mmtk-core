@@ -116,6 +116,8 @@ pub struct MMTKOption<T: Debug + Clone> {
     from_env_var: bool,
     /// Can we set this option through command line options/API?
     from_command_line: bool,
+    /// Is this a default value and has never been modified by the user?
+    pub is_default: bool,
 }
 
 impl<T: Debug + Clone> MMTKOption<T> {
@@ -143,11 +145,14 @@ impl<T: Debug + Clone> MMTKOption<T> {
             validator,
             from_env_var,
             from_command_line,
+            is_default: true,
         }
     }
 
     /// Set the option to the given value. Returns true if the value is valid, and we set the option to the value.
     pub fn set(&mut self, value: T) -> bool {
+        assert!(self.is_default, "Cannot set a value twice!");
+        self.is_default = false;
         if (self.validator)(&value) {
             self.value = value;
             return true;
