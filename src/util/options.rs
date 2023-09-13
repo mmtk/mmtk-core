@@ -151,7 +151,6 @@ impl<T: Debug + Clone> MMTKOption<T> {
 
     /// Set the option to the given value. Returns true if the value is valid, and we set the option to the value.
     pub fn set(&mut self, value: T) -> bool {
-        assert!(self.is_default, "Cannot set a value twice!");
         self.is_default = false;
         if (self.validator)(&value) {
             self.value = value;
