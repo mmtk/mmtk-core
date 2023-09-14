@@ -237,7 +237,7 @@ macro_rules! options {
             }
 
             /// Create an `Options` instance with built-in default settings.
-            pub fn new() -> Self {
+            fn new() -> Self {
                 Options {
                     $($name: MMTKOption::new($default, $validator, $env_var, $command_line)),*
                 }
@@ -263,6 +263,7 @@ macro_rules! options {
         }
 
         impl Default for Options {
+            /// By default, `Options` instance is created with built-in default settings.
             fn default() -> Self {
                 Self::new()
             }
