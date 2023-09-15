@@ -49,8 +49,17 @@ pub struct MMTKBuilder {
 }
 
 impl MMTKBuilder {
-    /// Create an MMTK builder with default options
+    /// Create an MMTK builder with options read from environment variables, or using built-in
+    /// default if not overridden by environment variables.
     pub fn new() -> Self {
+        let mut builder = Self::new_no_env_vars();
+        builder.options.read_env_var_settings();
+        builder
+    }
+
+    /// Create an MMTK builder with build-in default options, but without reading options from
+    /// environment variables.
+    pub fn new_no_env_vars() -> Self {
         MMTKBuilder {
             options: Options::default(),
         }

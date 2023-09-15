@@ -235,27 +235,37 @@ macro_rules! options {
                     _ => panic!("Invalid Options key: {}", s)
                 }
             }
-        }
-        impl Default for Options {
-            fn default() -> Self {
-                let mut options = Options {
-                    $($name: MMTKOption::new($default, $validator, $env_var,$command_line)),*
-                };
 
-                // If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),
-                // we set the option to its value (if it is a valid value). Otherwise, use the default value.
+            /// Create an `Options` instance with built-in default settings.
+            fn new() -> Self {
+                Options {
+                    $($name: MMTKOption::new($default, $validator, $env_var, $command_line)),*
+                }
+            }
+
+            /// Read options from environment variables, and apply those settings to self.
+            ///
+            /// If we have environment variables that start with `MMTK_` and match any option (such
+            /// as `MMTK_STRESS_FACTOR`), we set the option to its value (if it is a valid value).
+            pub fn read_env_var_settings(&mut self) {
                 const PREFIX: &str = "MMTK_";
                 for (key, val) in std::env::vars() {
                     // strip the prefix, and get the lower case string
                     if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
                         let lowercase: &str = &rest_of_key.to_lowercase();
                         match lowercase {
-                            $(stringify!($name) => { options.set_from_env_var(lowercase, &val); },)*
+                            $(stringify!($name) => { self.set_from_env_var(lowercase, &val); },)*
                             _ => {}
                         }
                     }
                 }
-                return options;
+            }
+        }
+
+        impl Default for Options {
+            /// By default, `Options` instance is created with built-in default settings.
+            fn default() -> Self {
+                Self::new()
             }
         }
     ]
@@ -747,7 +757,8 @@ mod tests {
     #[test]
     fn no_env_var() {
         serial_test(|| {
-            let options = Options::default();
+            let mut options = Options::default();
+            options.read_env_var_settings();
             assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
         })
     }
@@ -759,7 +770,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_STRESS_FACTOR", "4096");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, 4096);
                 },
                 || {
@@ -777,7 +789,8 @@ mod tests {
                     std::env::set_var("MMTK_STRESS_FACTOR", "4096");
                     std::env::set_var("MMTK_NO_FINALIZER", "true");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, 4096);
                     assert!(*options.no_finalizer);
                 },
@@ -797,7 +810,8 @@ mod tests {
                     // invalid value, we cannot parse the value, so use the default value
                     std::env::set_var("MMTK_STRESS_FACTOR", "abc");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
@@ -815,11 +829,30 @@ mod tests {
                     // invalid value, we cannot parse the value, so use the default value
                     std::env::set_var("MMTK_ABC", "42");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var("MMTK_ABC");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn ignore_env_var() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_STRESS_FACTOR", "42");
+
+                    let options = Options::default();
+                    // Not calling read_env_var_settings here.
+                    assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
                 },
             )
         })
@@ -844,7 +877,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(
                         *options.work_perf_events,
                         PerfEventOptions {
@@ -868,7 +902,8 @@ mod tests {
                     // The option needs to start with "hello", otherwise it is invalid.
                     std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     // invalid value from env var, use default.
                     assert_eq!(
                         *options.work_perf_events,
@@ -891,7 +926,8 @@ mod tests {
                     // We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
                     std::env::set_var("MMTK_PHASE_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     // invalid value from env var, use default.
                     assert_eq!(
                         *options.work_perf_events,
@@ -912,7 +948,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_THREAD_AFFINITY", "0-");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     // invalid value from env var, use default.
                     assert_eq!(*options.thread_affinity, AffinityKind::OsDefault);
                 },
@@ -931,7 +968,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_THREAD_AFFINITY", "0");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(
                         *options.thread_affinity,
                         AffinityKind::RoundRobin(vec![0_u16])
@@ -961,7 +999,8 @@ mod tests {
                     }
 
                     std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec));
                 },
                 || {
