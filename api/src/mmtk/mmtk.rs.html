@@ -188,6 +188,15 @@
 <a href="#188" id="188">188</a>
 <a href="#189" id="189">189</a>
 <a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::{create_sft_map, SFTMap};
@@ -239,8 +248,17 @@
 }
 
 <span class="kw">impl </span>MMTKBuilder {
-    <span class="doccomment">/// Create an MMTK builder with default options
+    <span class="doccomment">/// Create an MMTK builder with options read from environment variables, or using built-in
+    /// default if not overridden by environment variables.
     </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>builder = <span class="self">Self</span>::new_no_env_vars();
+        builder.options.read_env_var_settings();
+        builder
+    }
+
+    <span class="doccomment">/// Create an MMTK builder with build-in default options, but without reading options from
+    /// environment variables.
+    </span><span class="kw">pub fn </span>new_no_env_vars() -&gt; <span class="self">Self </span>{
         MMTKBuilder {
             options: Options::default(),
         }

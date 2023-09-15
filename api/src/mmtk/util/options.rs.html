@@ -1116,6 +1116,45 @@
 <a href="#1116" id="1116">1116</a>
 <a href="#1117" id="1117">1117</a>
 <a href="#1118" id="1118">1118</a>
+<a href="#1119" id="1119">1119</a>
+<a href="#1120" id="1120">1120</a>
+<a href="#1121" id="1121">1121</a>
+<a href="#1122" id="1122">1122</a>
+<a href="#1123" id="1123">1123</a>
+<a href="#1124" id="1124">1124</a>
+<a href="#1125" id="1125">1125</a>
+<a href="#1126" id="1126">1126</a>
+<a href="#1127" id="1127">1127</a>
+<a href="#1128" id="1128">1128</a>
+<a href="#1129" id="1129">1129</a>
+<a href="#1130" id="1130">1130</a>
+<a href="#1131" id="1131">1131</a>
+<a href="#1132" id="1132">1132</a>
+<a href="#1133" id="1133">1133</a>
+<a href="#1134" id="1134">1134</a>
+<a href="#1135" id="1135">1135</a>
+<a href="#1136" id="1136">1136</a>
+<a href="#1137" id="1137">1137</a>
+<a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
+<a href="#1149" id="1149">1149</a>
+<a href="#1150" id="1150">1150</a>
+<a href="#1151" id="1151">1151</a>
+<a href="#1152" id="1152">1152</a>
+<a href="#1153" id="1153">1153</a>
+<a href="#1154" id="1154">1154</a>
+<a href="#1155" id="1155">1155</a>
+<a href="#1156" id="1156">1156</a>
+<a href="#1157" id="1157">1157</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -1353,27 +1392,37 @@
                     <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Options key: {}&quot;</span>, s)
                 }
             }
-        }
-        <span class="kw">impl </span>Default <span class="kw">for </span>Options {
-            <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-                <span class="kw">let </span><span class="kw-2">mut </span>options = Options {
-                    $(<span class="macro-nonterminal">$name</span>: MMTKOption::new(<span class="macro-nonterminal">$default</span>, <span class="macro-nonterminal">$validator</span>, <span class="macro-nonterminal">$env_var</span>,<span class="macro-nonterminal">$command_line</span>)),*
-                };
 
-                <span class="comment">// If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),
-                // we set the option to its value (if it is a valid value). Otherwise, use the default value.
-                </span><span class="kw">const </span>PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">&quot;MMTK_&quot;</span>;
+            <span class="doccomment">/// Create an `Options` instance with built-in default settings.
+            </span><span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
+                Options {
+                    $(<span class="macro-nonterminal">$name</span>: MMTKOption::new(<span class="macro-nonterminal">$default</span>, <span class="macro-nonterminal">$validator</span>, <span class="macro-nonterminal">$env_var</span>, <span class="macro-nonterminal">$command_line</span>)),*
+                }
+            }
+
+            <span class="doccomment">/// Read options from environment variables, and apply those settings to self.
+            ///
+            /// If we have environment variables that start with `MMTK_` and match any option (such
+            /// as `MMTK_STRESS_FACTOR`), we set the option to its value (if it is a valid value).
+            </span><span class="kw">pub fn </span>read_env_var_settings(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+                <span class="kw">const </span>PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">&quot;MMTK_&quot;</span>;
                 <span class="kw">for </span>(key, val) <span class="kw">in </span>std::env::vars() {
                     <span class="comment">// strip the prefix, and get the lower case string
                     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(rest_of_key) = key.strip_prefix(PREFIX) {
                         <span class="kw">let </span>lowercase: <span class="kw-2">&amp;</span>str = <span class="kw-2">&amp;</span>rest_of_key.to_lowercase();
                         <span class="kw">match </span>lowercase {
-                            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; { options.set_from_env_var(lowercase, <span class="kw-2">&amp;</span>val); },)*
+                            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; { <span class="self">self</span>.set_from_env_var(lowercase, <span class="kw-2">&amp;</span>val); },)*
                             <span class="kw">_ </span>=&gt; {}
                         }
                     }
                 }
-                <span class="kw">return </span>options;
+            }
+        }
+
+        <span class="kw">impl </span>Default <span class="kw">for </span>Options {
+            <span class="doccomment">/// By default, `Options` instance is created with built-in default settings.
+            </span><span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+                <span class="self">Self</span>::new()
             }
         }
     ]
@@ -1865,7 +1914,8 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>no_env_var() {
         serial_test(|| {
-            <span class="kw">let </span>options = Options::default();
+            <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+            options.read_env_var_settings();
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
         })
     }
@@ -1877,7 +1927,8 @@
                 || {
                     std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;4096&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">4096</span>);
                 },
                 || {
@@ -1895,7 +1946,8 @@
                     std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;4096&quot;</span>);
                     std::env::set_var(<span class="string">&quot;MMTK_NO_FINALIZER&quot;</span>, <span class="string">&quot;true&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">4096</span>);
                     <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
                 },
@@ -1915,7 +1967,8 @@
                     <span class="comment">// invalid value, we cannot parse the value, so use the default value
                     </span>std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;abc&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
@@ -1933,11 +1986,30 @@
                     <span class="comment">// invalid value, we cannot parse the value, so use the default value
                     </span>std::env::set_var(<span class="string">&quot;MMTK_ABC&quot;</span>, <span class="string">&quot;42&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var(<span class="string">&quot;MMTK_ABC&quot;</span>);
+                },
+            )
+        })
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>ignore_env_var() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;42&quot;</span>);
+
+                    <span class="kw">let </span>options = Options::default();
+                    <span class="comment">// Not calling read_env_var_settings here.
+                    </span><span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
                 },
             )
         })
@@ -1962,7 +2034,8 @@
                 || {
                     std::env::set_var(<span class="string">&quot;MMTK_WORK_PERF_EVENTS&quot;</span>, <span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES,0,-1&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(
                         <span class="kw-2">*</span>options.work_perf_events,
                         PerfEventOptions {
@@ -1986,7 +2059,8 @@
                     <span class="comment">// The option needs to start with &quot;hello&quot;, otherwise it is invalid.
                     </span>std::env::set_var(<span class="string">&quot;MMTK_WORK_PERF_EVENTS&quot;</span>, <span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="comment">// invalid value from env var, use default.
                     </span><span class="macro">assert_eq!</span>(
                         <span class="kw-2">*</span>options.work_perf_events,
@@ -2009,7 +2083,8 @@
                     <span class="comment">// We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
                     </span>std::env::set_var(<span class="string">&quot;MMTK_PHASE_PERF_EVENTS&quot;</span>, <span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES,0,-1&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="comment">// invalid value from env var, use default.
                     </span><span class="macro">assert_eq!</span>(
                         <span class="kw-2">*</span>options.work_perf_events,
@@ -2030,7 +2105,8 @@
                 || {
                     std::env::set_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>, <span class="string">&quot;0-&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="comment">// invalid value from env var, use default.
                     </span><span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.thread_affinity, AffinityKind::OsDefault);
                 },
@@ -2049,7 +2125,8 @@
                 || {
                     std::env::set_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>, <span class="string">&quot;0&quot;</span>);
 
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(
                         <span class="kw-2">*</span>options.thread_affinity,
                         AffinityKind::RoundRobin(<span class="macro">vec!</span>[<span class="number">0_u16</span>])
@@ -2079,7 +2156,8 @@
                     }
 
                     std::env::set_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>, cpu_list);
-                    <span class="kw">let </span>options = Options::default();
+                    <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
+                    options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.thread_affinity, AffinityKind::RoundRobin(vec));
                 },
                 || {
