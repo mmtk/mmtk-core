@@ -14,6 +14,9 @@
 //! If such an allocation happens during start-up, the delay will be noticeable to light-weight
 //! scripting languages, such as Ruby.
 //!
+//! *(Note: We no longer allocate such large vecs at start-up.  We keep this module in case we need
+//! to allocate large vectors in the future.)*
+//!
 //! We implement our own fast allocation of large zeroed vectors in this module.  If one day Rust
 //! provides a standard way to optimize for zeroed allocation of vectors of composite types, we
 //! can switch to the standard mechanism.
