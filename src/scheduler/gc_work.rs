@@ -14,7 +14,11 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.get_plan().schedule_collection(worker.scheduler());
+        let plan = mmtk.get_plan();
+        plan.base().set_collection_kind(plan);
+        plan.base().set_gc_status(GcStatus::GcPrepare);
+
+        plan.schedule_collection(worker.scheduler());
 
         // Tell GC trigger that GC started.
         // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
