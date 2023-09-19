@@ -28,6 +28,7 @@ use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use mmtk_macros::{HasSpaces, PlanTraceObject};
@@ -187,24 +188,14 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         }
     }
 
-    /// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method will be called
-    /// periodically during allocation. This method only needs to do plan-specific checks to see if it requires a GC,
-    /// and the return value indicates if the plan would like to require a GC.
-    /// If the method returns false, the GC trigger may still trigger a GC based on some general checks.
-    /// General checks are done in `crate::util::heap::gc_trigger::GCTrigger::is_gc_required`.
-    fn collection_required(&self) -> bool {
-        false
-    }
-
-    /// Notify a plan that a collection will be triggered. This is called when the GC trigger decides to trigger
-    /// a GC.
+    /// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method is called
+    /// periodically during allocation. However, MMTk may delegate the GC triggering decision to the runtime,
+    /// in which case, this method may not be called. This method returns true to trigger a collection.
     ///
     /// # Arguments
     /// * `space_full`: the allocation to a specific space failed, must recover pages within 'space'.
     /// * `space`: an option to indicate if there is a space that has failed in an allocation.
-    fn notify_collection_required(&self, _space_full: bool, _space: Option<&dyn Space<Self::VM>>) {
-        // Do nothing.
-    }
+    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool;
 
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
@@ -509,6 +500,36 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.ro_space.release();
         #[cfg(feature = "vm_space")]
         self.vm_space.release();
+    }
+
+    pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
+        let stress_force_gc =
+            crate::util::heap::gc_trigger::GCTrigger::<VM>::should_do_stress_gc_inner(
+                &self.global_state,
+                &self.options,
+            );
+        if stress_force_gc {
+            debug!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.global_state.allocation_bytes.load(Ordering::Relaxed),
+                *self.options.stress_factor
+            );
+            debug!("Doing stress GC");
+            self.global_state
+                .allocation_bytes
+                .store(0, Ordering::SeqCst);
+        }
+
+        debug!(
+            "self.get_reserved_pages()={}, self.get_total_pages()={}",
+            plan.get_reserved_pages(),
+            plan.get_total_pages()
+        );
+        // Check if we reserved more pages (including the collection copy reserve)
+        // than the heap's total pages. In that case, we will have to do a GC.
+        let heap_full = plan.base().gc_trigger.is_heap_full();
+
+        space_full || stress_force_gc || heap_full
     }
 }
 

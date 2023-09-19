@@ -63,14 +63,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn collection_required(&self) -> bool {
-        self.gen.collection_required(self)
-    }
-
-    fn notify_collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) {
-        if space_full && space.is_some() && self.is_nursery_space(space.unwrap()) {
-            self.force_full_heap_collection();
-        }
+    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
+    where
+        Self: Sized,
+    {
+        self.gen.collection_required(self, space_full, space)
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {

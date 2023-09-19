@@ -137,16 +137,17 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             .store(next_gc_full_heap, Ordering::Relaxed);
     }
 
-    fn collection_required(&self) -> bool {
+    fn collection_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn crate::policy::space::Space<Self::VM>>,
+    ) -> bool {
         let nursery_full =
             self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
-        self.immix.collection_required() || nursery_full
-    }
-
-    fn notify_collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) {
-        if space_full && space.is_some() && self.is_nursery_space(space.unwrap()) {
-            self.force_full_heap_collection();
+        if space_full && space.is_some() && space.unwrap().name() != self.immix.immix_space.name() {
+            self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
+        self.immix.collection_required(space_full, space) || nursery_full
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {

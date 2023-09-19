@@ -80,6 +80,12 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
     // ANCHOR_END: schedule_collection
 
+    // ANCHOR: collection_required()
+    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+        self.base().collection_required(self, space_full)
+    }
+    // ANCHOR_END: collection_required()
+
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &*ALLOCATOR_MAPPING
     }

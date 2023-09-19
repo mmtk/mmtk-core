@@ -139,6 +139,14 @@ base plan *through* the common plan.
 {{#include ../../code/mygc_semispace/global.rs:plan_base}}
 ```
 
+The trait `Plan` requires `collection_required()` method to know when
+we should trigger a collection. We can just use the implementation
+in the `BasePlan`.
+
+```rust
+{{#include ../../code/mygc_semispace/global.rs:collection_required}}
+```
+
 Find the method `get_pages_used`. Replace the current body with 
 `self.tospace().reserved_pages() + self.common.get_pages_used()`, to 
 correctly count the pages contained in the tospace and the common plan 

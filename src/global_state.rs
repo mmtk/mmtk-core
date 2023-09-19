@@ -9,7 +9,7 @@ use std::sync::Mutex;
 // actually are not related with a plan, they are just global states for MMTK. So we refactored
 // those fields to this separate struct. For components that access the state, they just need
 // a reference to the struct, and are no longer dependent on the plan.
-// We may consider further break down the fields into smaller structs. 
+// We may consider further break down the fields into smaller structs.
 pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub(crate) initialized: AtomicBool,

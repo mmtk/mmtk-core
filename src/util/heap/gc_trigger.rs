@@ -65,7 +65,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
         let plan = unsafe { self.plan.assume_init() };
-        if self.is_gc_required(space_full, space) {
+        if self.policy.is_gc_required(space_full, space, plan) {
             info!(
                 "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {
@@ -83,39 +83,15 @@ impl<VM: VMBinding> GCTrigger<VM> {
         false
     }
 
-    /// Check if we should do a GC now. This method does some general checks, and
-    /// also calls to a plan to see if the plan would have any plan-specific check.
-    /// This method also informs the plan if a GC is required.
-    fn is_gc_required(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
-        let plan = unsafe { self.plan.assume_init() };
-
-        let stress_gc = self.should_do_stress_gc();
-        if stress_gc {
-            debug!(
-                "Stress GC: allocation_bytes = {}, stress_factor = {}",
-                self.state.allocation_bytes.load(Ordering::Relaxed),
-                *self.options.stress_factor
-            );
-            debug!("Doing stress GC");
-            self.state.allocation_bytes.store(0, Ordering::SeqCst);
-        }
-
-        // We need a GC if any condition is true.
-        let collection_required =
-            space_full || self.is_heap_full() || plan.collection_required() || stress_gc;
-        // Inform the plan that we will do a GC.
-        if collection_required {
-            plan.notify_collection_required(space_full, space);
-        }
-
-        collection_required
+    pub fn should_do_stress_gc(&self) -> bool {
+        Self::should_do_stress_gc_inner(&self.state, &self.options)
     }
 
     /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
     /// the stress factor, we should do a stress GC.
-    pub fn should_do_stress_gc(&self) -> bool {
-        self.state.is_initialized()
-            && (self.state.allocation_bytes.load(Ordering::SeqCst) > *self.options.stress_factor)
+    pub(crate) fn should_do_stress_gc_inner(state: &GlobalState, options: &Options) -> bool {
+        state.is_initialized()
+            && (state.allocation_bytes.load(Ordering::SeqCst) > *options.stress_factor)
     }
 
     /// Check if the heap is full
@@ -143,13 +119,13 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     fn on_gc_release(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC ends.
     fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
-    // /// Is a GC required now?
-    // fn is_gc_required(
-    //     &self,
-    //     space_full: bool,
-    //     space: Option<&dyn Space<VM>>,
-    //     plan: &dyn Plan<VM = VM>,
-    // ) -> bool;
+    /// Is a GC required now?
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool;
     /// Is current heap full?
     fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool;
     /// Return the current heap size (in pages)
@@ -165,6 +141,16 @@ pub struct FixedHeapSizeTrigger {
     total_pages: usize,
 }
 impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
+        // Let the plan decide
+        plan.collection_required(space_full, space)
+    }
+
     fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the total pages, the heap is full.
         plan.get_reserved_pages() > self.total_pages
@@ -354,6 +340,16 @@ impl MemBalancerStats {
 }
 
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
+        // Let the plan decide
+        plan.collection_required(space_full, space)
+    }
+
     fn on_pending_allocation(&self, pages: usize) {
         self.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }

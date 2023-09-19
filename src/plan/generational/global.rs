@@ -92,8 +92,14 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             > plan.get_mature_physical_pages_available()
     }
 
-    /// Check if we need a GC based on the nursery space usage.
-    pub fn collection_required<P: Plan<VM = VM>>(&self, plan: &P) -> bool {
+    /// Check if we need a GC based on the nursery space usage. This method may mark
+    /// the following GC as a full heap GC.
+    pub fn collection_required<P: Plan<VM = VM>>(
+        &self,
+        plan: &P,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+    ) -> bool {
         let cur_nursery = self.nursery.reserved_pages();
         let max_nursery = self.common.base.options.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
@@ -103,16 +109,25 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             cur_nursery,
             max_nursery,
         );
-
         if nursery_full {
             return true;
         }
-
         if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             return true;
         }
 
-        false
+        // Is the GC triggered by nursery?
+        // - if space is none, it is not. Return false immediately.
+        // - if space is some, we further check its descriptor.
+        let is_triggered_by_nursery = space.map_or(false, |s| {
+            s.common().descriptor == self.nursery.common().descriptor
+        });
+        // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
+        if space_full && !is_triggered_by_nursery {
+            self.next_gc_full_heap.store(true, Ordering::SeqCst);
+        }
+
+        self.common.base.collection_required(plan, space_full)
     }
 
     pub fn force_full_heap_collection(&self) {
