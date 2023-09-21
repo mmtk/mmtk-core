@@ -24,6 +24,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
+use crate::util::statistics::counter::EventCounter;
 use crate::util::statistics::stats::Stats;
 use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -436,6 +437,8 @@ pub struct BasePlan<VM: VMBinding> {
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
 
+    pub emergency_gc_count: Arc<Mutex<EventCounter>>,
+
     // Spaces in base plan
     #[cfg(feature = "code_space")]
     #[space]
@@ -516,6 +519,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
         let analysis_manager = AnalysisManager::new(&stats);
+        let emergency_gc_count = stats.new_event_counter("emergencyGC", true, true);
         BasePlan {
             #[cfg(feature = "code_space")]
             code_space: ImmortalSpace::new(args.get_space_args(
@@ -570,6 +574,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             live_bytes_in_last_gc: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
+            emergency_gc_count,
         }
     }
 

@@ -16,6 +16,15 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         mmtk.get_plan().schedule_collection(worker.scheduler());
 
+        if mmtk.get_plan().is_emergency_collection() {
+            mmtk.get_plan()
+                .base()
+                .emergency_gc_count
+                .lock()
+                .unwrap()
+                .inc();
+        }
+
         // Tell GC trigger that GC started.
         // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
         // TODO: Depending on the OS scheduling, other workers can run so fast that they can finish
