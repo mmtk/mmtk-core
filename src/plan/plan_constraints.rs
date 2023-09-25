@@ -33,6 +33,10 @@ pub struct PlanConstraints {
     /// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.
     /// For plans that use those policies, they should set this as true.
     pub needs_forward_after_liveness: bool,
+    /// Some (in fact, most) plans do nothing when preparing mutators before tracing (i.e. in
+    /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
+    /// `PrepareMutator` work packets will not be created at all.
+    pub needs_prepare_mutator: bool,
 }
 
 impl PlanConstraints {
@@ -51,6 +55,7 @@ impl PlanConstraints {
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
+            needs_prepare_mutator: true,
         }
     }
 }

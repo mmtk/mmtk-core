@@ -6,13 +6,12 @@ use crate::plan::generational::immix::GenImmix;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
+use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
-
-pub fn genimmix_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 pub fn genimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // reset nursery allocator
@@ -37,7 +36,7 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
             mmtk.get_plan(),
             &genimmix.gen.nursery,
         )),
-        prepare_func: &genimmix_mutator_prepare,
+        prepare_func: &unreachable_prepare_func,
         release_func: &genimmix_mutator_release,
     };
 

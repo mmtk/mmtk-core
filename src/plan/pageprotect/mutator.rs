@@ -1,4 +1,6 @@
 use super::PageProtect;
+use crate::plan::mutator_context::no_op_release_func;
+use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
@@ -8,17 +10,8 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::vm::VMBinding;
-use crate::{
-    plan::barriers::NoBarrier,
-    util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
-};
+use crate::{plan::barriers::NoBarrier, util::opaque_pointer::VMMutatorThread};
 use enum_map::EnumMap;
-
-/// Prepare mutator. Do nothing.
-fn pp_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
-
-/// Release mutator. Do nothing.
-fn pp_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_large_object: 1,
@@ -47,8 +40,8 @@ pub fn create_pp_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::LargeObject(0), &page.space));
             vec
         }),
-        prepare_func: &pp_mutator_prepare,
-        release_func: &pp_mutator_release,
+        prepare_func: &unreachable_prepare_func,
+        release_func: &no_op_release_func,
     };
 
     Mutator {
