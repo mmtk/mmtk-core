@@ -37,7 +37,9 @@ use std::sync::Mutex;
 
 use downcast_rs::Downcast;
 
-pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
+pub struct SpaceAllocFail;
+
+pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Send + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
@@ -75,7 +77,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         false
     }
 
-    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
+    fn acquire(&self, tls: VMThread, pages: usize) -> Result<Address, SpaceAllocFail> {
         trace!("Space.acquire, tls={:?}", tls);
 
         debug_assert!(
@@ -111,8 +113,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .policy
                 .on_pending_allocation(pages_reserved);
 
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-            unsafe { Address::zero() }
+            // VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            Err(SpaceAllocFail)
         } else {
             debug!("Collection not required");
 
@@ -204,7 +206,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     }
 
                     debug!("Space.acquire(), returned = {}", res.start);
-                    res.start
+                    Ok(res.start)
                 }
                 Err(_) => {
                     drop(lock); // drop the lock immediately
@@ -224,8 +226,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         .policy
                         .on_pending_allocation(pages_reserved);
 
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
-                    unsafe { Address::zero() }
+                    // VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
+                    Err(SpaceAllocFail)
                 }
             }
         }

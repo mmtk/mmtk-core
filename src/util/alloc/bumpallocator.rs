@@ -5,6 +5,7 @@ use crate::util::Address;
 use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
+use crate::policy::space_ref::SpaceRef;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -20,7 +21,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// Bump-pointer itself.
     pub(in crate::util::alloc) bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: &'static dyn Space<VM>,
+    space: SpaceRef<dyn Space<VM>>,
     pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -57,7 +58,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         self.bump_pointer.reset(zero, zero);
     }
 
-    pub fn rebind(&mut self, space: &'static dyn Space<VM>) {
+    pub fn rebind(&mut self, space: SpaceRef<dyn Space<VM>>) {
         self.reset();
         self.space = space;
     }
@@ -69,10 +70,6 @@ use crate::util::alloc::fill_alignment_gap;
 use super::allocator::AllocatorContext;
 
 impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
-    fn get_space(&self) -> &'static dyn Space<VM> {
-        self.space
-    }
-
     fn get_context(&self) -> &AllocatorContext<VM> {
         &self.context
     }
@@ -163,7 +160,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: &'static dyn Space<VM>,
+        space: SpaceRef<dyn Space<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         BumpAllocator {
@@ -182,34 +179,39 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         offset: usize,
         stress_test: bool,
     ) -> Address {
-        if self.space.will_oom_on_acquire(self.tls, size) {
+        if crate::space_ref_read!(&self.space).will_oom_on_acquire(self.tls, size) {
             return Address::ZERO;
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self.space.acquire(self.tls, bytes_to_pages(block_size));
-        if acquired_start.is_zero() {
-            trace!("Failed to acquire a new block");
-            acquired_start
-        } else {
-            trace!(
-                "Acquired a new block of size {} with start address {}",
-                block_size,
-                acquired_start
-            );
-            if !stress_test {
-                self.set_limit(acquired_start, acquired_start + block_size);
-                self.alloc(size, align, offset)
-            } else {
-                // For a stress test, we artificially make the fastpath fail by
-                // manipulating the limit as below.
-                // The assumption here is that we use an address range such that
-                // cursor > block_size always.
-                self.set_limit(acquired_start, unsafe { Address::from_usize(block_size) });
-                // Note that we have just acquired a new block so we know that we don't have to go
-                // through the entire allocation sequence again, we can directly call the slow path
-                // allocation.
-                self.alloc_slow_once_precise_stress(size, align, offset, false)
+        let acquire_res = crate::space_ref_read!(&self.space).acquire(self.tls, bytes_to_pages(block_size));
+        match acquire_res {
+            Ok(acquired_start) => {
+                trace!(
+                    "Acquired a new block of size {} with start address {}",
+                    block_size,
+                    acquired_start
+                );
+                if !stress_test {
+                    self.set_limit(acquired_start, acquired_start + block_size);
+                    self.alloc(size, align, offset)
+                } else {
+                    // For a stress test, we artificially make the fastpath fail by
+                    // manipulating the limit as below.
+                    // The assumption here is that we use an address range such that
+                    // cursor > block_size always.
+                    self.set_limit(acquired_start, unsafe { Address::from_usize(block_size) });
+                    // Note that we have just acquired a new block so we know that we don't have to go
+                    // through the entire allocation sequence again, we can directly call the slow path
+                    // allocation.
+                    self.alloc_slow_once_precise_stress(size, align, offset, false)
+                }
+            }
+            Err(_) => {
+                use crate::vm::Collection;
+                trace!("Failed to acquire a new block");
+                VM::VMCollection::block_for_gc(VMMutatorThread(self.tls));
+                Address::ZERO
             }
         }
     }

@@ -6,6 +6,7 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
+use crate::policy::space::SpaceAllocFail;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::PageResource;
@@ -327,12 +328,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: usize) -> Address {
+    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: usize) -> Result<Address, SpaceAllocFail> {
         // TODO: Should refactor this and Space.acquire()
         if self.get_gc_trigger().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls));
-            return unsafe { Address::zero() };
+            return Err(SpaceAllocFail);
         }
 
         let (address, is_offset_malloc) = alloc::<VM>(size, align, offset);
@@ -363,7 +363,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             }
         }
 
-        address
+        Ok(address)
     }
 
     pub fn free(&self, addr: Address) {

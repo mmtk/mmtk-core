@@ -4,6 +4,7 @@ use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
+use crate::policy::space_ref::SpaceRef;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
@@ -25,7 +26,7 @@ pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
     #[space]
     #[copy_semantics(CopySemantics::PromoteToMature)]
-    pub nursery: CopySpace<VM>,
+    pub nursery: SpaceRef<CopySpace<VM>>,
     /// The common plan.
     #[parent]
     pub common: CommonPlan<VM>,
@@ -53,7 +54,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let common = CommonPlan::new(args);
 
         CommonGenPlan {
-            nursery,
+            nursery: crate::policy::space_ref::new(nursery),
             common,
             gc_full_heap: AtomicBool::default(),
             next_gc_full_heap: AtomicBool::new(false),
@@ -68,16 +69,17 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             self.full_heap_gc_count.lock().unwrap().inc();
         }
         self.common.prepare(tls, full_heap);
-        self.nursery.prepare(true);
-        self.nursery
-            .set_copy_for_sft_trace(Some(CopySemantics::PromoteToMature));
+        let mut nursery = crate::space_ref_write!(&self.nursery);
+        nursery.prepare(true);
+        nursery.set_copy_for_sft_trace(Some(CopySemantics::PromoteToMature));
     }
 
     /// Release Gen. This should be called by a single thread in GC release work.
     pub fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
         self.common.release(tls, full_heap);
-        self.nursery.release();
+        let nursery = crate::space_ref_write!(&self.nursery);
+        nursery.release();
     }
 
     /// Independent of how many pages remain in the page budget (a function of heap size), we must
@@ -100,7 +102,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         space_full: bool,
         space: Option<&dyn Space<VM>>,
     ) -> bool {
-        let cur_nursery = self.nursery.reserved_pages();
+        let cur_nursery = crate::space_ref_read!(&self.nursery).reserved_pages();
         let max_nursery = self.common.base.options.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
         trace!(
@@ -120,7 +122,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
         let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.common().descriptor == self.nursery.common().descriptor
+            s.common().descriptor == crate::space_ref_read!(&self.nursery).common().descriptor
         });
         // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         if space_full && !is_triggered_by_nursery {
@@ -213,13 +215,16 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<Q>(
-                queue,
-                object,
-                Some(CopySemantics::PromoteToMature),
-                worker,
-            );
+        {
+            let nursery = crate::space_ref_read!(&self.nursery);
+            if nursery.in_space(object) {
+                return nursery.trace_object::<Q>(
+                    queue,
+                    object,
+                    Some(CopySemantics::PromoteToMature),
+                    worker,
+                );
+            }
         }
         self.common.trace_object::<Q>(queue, object, worker)
     }
@@ -232,17 +237,23 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         // Evacuate nursery objects
-        if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<Q>(
-                queue,
-                object,
-                Some(CopySemantics::PromoteToMature),
-                worker,
-            );
+        {
+            let nursery = crate::space_ref_read!(&self.nursery);
+            if nursery.in_space(object) {
+                return nursery.trace_object::<Q>(
+                    queue,
+                    object,
+                    Some(CopySemantics::PromoteToMature),
+                    worker,
+                );
+            }
         }
         // We may alloc large object into LOS as nursery objects. Trace them here.
-        if self.common.get_los().in_space(object) {
-            return self.common.get_los().trace_object::<Q>(queue, object);
+        {
+            let los = crate::space_ref_read!(&self.common.los);
+            if los.in_space(object) {
+                return los.trace_object::<Q>(queue, object);
+            }
         }
         object
     }
@@ -280,13 +291,13 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// Get pages reserved for the collection by a generational plan. A generational plan should
     /// add their own reservation with the value returned by this method.
     pub fn get_collection_reserved_pages(&self) -> usize {
-        self.nursery.reserved_pages()
+        crate::space_ref_read!(&self.nursery).reserved_pages()
     }
 
     /// Get pages used by a generational plan. A generational plan should add their own used pages
     /// with the value returned by this method.
     pub fn get_used_pages(&self) -> usize {
-        self.nursery.reserved_pages() + self.common.get_used_pages()
+        crate::space_ref_read!(&self.nursery).reserved_pages() + self.common.get_used_pages()
     }
 }
 

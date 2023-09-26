@@ -8,6 +8,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
+use crate::policy::space_ref::SpaceRef;
 use crate::util::alloc::AllocatorSelector;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -21,10 +22,10 @@ use super::mutator_context::ReservedAllocators;
 // Generational plans:
 
 pub mod barrier;
-/// Generational copying (GenCopy)
-pub mod copying;
-/// Generational immix (GenImmix)
-pub mod immix;
+// /// Generational copying (GenCopy)
+// pub mod copying;
+// /// Generational immix (GenImmix)
+// pub mod immix;
 
 // Common generational code
 
@@ -84,8 +85,8 @@ lazy_static! {
 
 fn create_gen_space_mapping<VM: VMBinding>(
     plan: &'static dyn Plan<VM = VM>,
-    nursery: &'static CopySpace<VM>,
-) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    nursery: SpaceRef<CopySpace<VM>>,
+) -> Vec<(AllocatorSelector, SpaceRef<dyn Space<VM> + Send>)> {
     let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
     vec.push((AllocatorSelector::BumpPointer(0), nursery));
     vec

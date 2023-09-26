@@ -4,6 +4,7 @@ use crate::plan::barriers::Barrier;
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
+use crate::policy::space_ref::SpaceRef;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -11,7 +12,7 @@ use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
-pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
+pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, SpaceRef<dyn Space<VM> + Send>)>;
 
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
@@ -34,13 +35,13 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
         f.write_str("MutatorConfig:\n")?;
         f.write_str("Semantics mapping:\n")?;
         for (semantic, selector) in self.allocator_mapping.iter() {
-            let space_name: &str = match self
+            let space_name = match self
                 .space_mapping
                 .iter()
                 .find(|(selector_to_find, _)| selector_to_find == selector)
             {
-                Some((_, space)) => space.name(),
-                None => "!!!missing space here!!!",
+                Some((_, space)) => crate::space_ref_read!(&space).name().to_owned(),
+                None => "!!!missing space here!!!".to_string(),
             };
             f.write_fmt(format_args!(
                 "- {:?} = {:?} ({:?})\n",
@@ -49,7 +50,7 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
         }
         f.write_str("Space mapping:\n")?;
         for (selector, space) in self.space_mapping.iter() {
-            f.write_fmt(format_args!("- {:?} = {:?}\n", selector, space.name()))?;
+            f.write_fmt(format_args!("- {:?} = {:?}\n", selector, crate::space_ref_read!(&space).name()))?;
         }
         Ok(())
     }
@@ -103,12 +104,13 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         _bytes: usize,
         allocator: AllocationSemantics,
     ) {
-        unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        }
-        .get_space()
-        .initialize_object_metadata(refer, true)
+        // unsafe {
+        //     self.allocators
+        //         .get_allocator_mut(self.config.allocator_mapping[allocator])
+        // }
+        // .get_space()
+        // .read().initialize_object_metadata(refer, true)
+        unsafe { crate::mmtk::SFT_MAP.get_unchecked(refer.to_address::<VM>()) }.initialize_object_metadata(refer, true)
     }
 
     fn get_tls(&self) -> VMMutatorThread {
@@ -301,12 +303,12 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
     mut reserved: ReservedAllocators,
     include_common_plan: bool,
     plan: &'static dyn Plan<VM = VM>,
-) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+) -> Vec<(AllocatorSelector, SpaceRef<dyn Space<VM> + Send>)> {
     // If we need to add new allocators, or new spaces, we need to make sure the allocator we assign here matches the allocator
     // we used in create_space_mapping(). The easiest way is to add the space/allocator mapping in the same order. So for any modification to this
     // function, please check the other function.
 
-    let mut vec: Vec<(AllocatorSelector, &'static dyn Space<VM>)> = vec![];
+    let mut vec: Vec<(AllocatorSelector, SpaceRef<dyn Space<VM> + Send>)> = vec![];
 
     // spaces in BasePlan
 
@@ -314,12 +316,12 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
     {
         vec.push((
             AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            &plan.base().code_space,
+            plan.base().code_space.clone(),
         ));
         reserved.n_bump_pointer += 1;
         vec.push((
             AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            &plan.base().code_lo_space,
+            plan.base().code_lo_space.clone(),
         ));
         reserved.n_bump_pointer += 1;
     }
@@ -328,7 +330,7 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
     {
         vec.push((
             AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            &plan.base().ro_space,
+            plan.base().ro_space.clone(),
         ));
         reserved.n_bump_pointer += 1;
     }
@@ -338,18 +340,18 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
     if include_common_plan {
         vec.push((
             AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            plan.common().get_immortal(),
+            plan.common().immortal.clone(),
         ));
         reserved.n_bump_pointer += 1;
         vec.push((
             AllocatorSelector::LargeObject(reserved.n_large_object),
-            plan.common().get_los(),
+            plan.common().los.clone(),
         ));
         reserved.n_large_object += 1;
         // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
         vec.push((
             AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
-            plan.common().get_nonmoving(),
+            plan.common().nonmoving.clone(),
         ));
         reserved.n_bump_pointer += 1;
     }

@@ -17,6 +17,8 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use crate::policy::space_ref::SpaceRef;
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use atomic::Ordering;
@@ -29,7 +31,7 @@ pub struct Immix<VM: VMBinding> {
     #[post_scan]
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub immix_space: ImmixSpace<VM>,
+    pub immix_space: SpaceRef<ImmixSpace<VM>>,
     #[parent]
     pub common: CommonPlan<VM>,
     last_gc_was_defrag: AtomicBool,
@@ -65,7 +67,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
                 CopySemantics::DefaultCopy => CopySelector::Immix(0),
                 _ => CopySelector::Unused,
             },
-            space_mapping: vec![(CopySelector::Immix(0), &self.immix_space)],
+            space_mapping: vec![(CopySelector::Immix(0), self.immix_space.clone())],
             constraints: &IMMIX_CONSTRAINTS,
         }
     }
@@ -75,7 +77,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             Immix<VM>,
             ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
             ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-        >(self, &self.immix_space, scheduler)
+        >(self, &*crate::space_ref_read!(self.immix_space), scheduler)
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -84,25 +86,26 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare(
-            true,
-            crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
-        );
+        let stats_for_defrag = crate::policy::immix::defrag::PlanStatsForDefrag::collect(self);
+        let mut space = crate::space_ref_write!(&self.immix_space);
+        space.prepare(true, stats_for_defrag);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
+        let mut space = crate::space_ref_write!(&self.immix_space);
+        let defrag_gc = space.release(true);
         self.last_gc_was_defrag
-            .store(self.immix_space.release(true), Ordering::Relaxed);
+            .store(defrag_gc, Ordering::Relaxed);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
-        self.immix_space.defrag_headroom_pages()
+        crate::space_ref_read!(&self.immix_space).defrag_headroom_pages()
     }
 
     fn get_used_pages(&self) -> usize {
-        self.immix_space.reserved_pages() + self.common.get_used_pages()
+        crate::space_ref_read!(&self.immix_space).reserved_pages() + self.common.get_used_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -140,10 +143,10 @@ impl<VM: VMBinding> Immix<VM> {
         space_args: ImmixSpaceArgs,
     ) -> Self {
         let immix = Immix {
-            immix_space: ImmixSpace::new(
+            immix_space: crate::policy::space_ref::new(ImmixSpace::new(
                 plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
                 space_args,
-            ),
+            )),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };

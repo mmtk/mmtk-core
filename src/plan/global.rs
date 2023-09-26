@@ -8,6 +8,7 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
+use crate::policy::space_ref::SpaceRef;
 #[cfg(feature = "vm_space")]
 use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
@@ -38,25 +39,26 @@ pub fn create_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
-        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
-        PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk),
-        PlanSelector::GenCopy => {
-            crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
-        }
-        PlanSelector::GenImmix => {
-            crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
-        }
-        PlanSelector::MarkSweep => crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk),
+        // PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
+        // PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk),
+        // PlanSelector::GenCopy => {
+        //     crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
+        // }
+        // PlanSelector::GenImmix => {
+        //     crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
+        // }
+        // PlanSelector::MarkSweep => crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk),
         PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, mmtk),
-        PlanSelector::PageProtect => {
-            crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
-        }
-        PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
-        }
-        PlanSelector::StickyImmix => {
-            crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
-        }
+        // PlanSelector::PageProtect => {
+        //     crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
+        // }
+        // PlanSelector::MarkCompact => {
+        //     crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
+        // }
+        // PlanSelector::StickyImmix => {
+        //     crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
+        // }
+        _ => unimplemented!()
     })
 }
 
@@ -65,31 +67,32 @@ pub fn create_plan<VM: VMBinding>(
     args: CreateGeneralPlanArgs<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
     let plan = match plan {
-        PlanSelector::NoGC => {
-            Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
-        }
-        PlanSelector::SemiSpace => {
-            Box::new(crate::plan::semispace::SemiSpace::new(args)) as Box<dyn Plan<VM = VM>>
-        }
-        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(args))
-            as Box<dyn Plan<VM = VM>>,
-        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(args))
-            as Box<dyn Plan<VM = VM>>,
-        PlanSelector::MarkSweep => {
-            Box::new(crate::plan::marksweep::MarkSweep::new(args)) as Box<dyn Plan<VM = VM>>
-        }
+        // PlanSelector::NoGC => {
+        //     Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
+        // }
+        // PlanSelector::SemiSpace => {
+        //     Box::new(crate::plan::semispace::SemiSpace::new(args)) as Box<dyn Plan<VM = VM>>
+        // }
+        // PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(args))
+        //     as Box<dyn Plan<VM = VM>>,
+        // PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(args))
+        //     as Box<dyn Plan<VM = VM>>,
+        // PlanSelector::MarkSweep => {
+        //     Box::new(crate::plan::marksweep::MarkSweep::new(args)) as Box<dyn Plan<VM = VM>>
+        // }
         PlanSelector::Immix => {
             Box::new(crate::plan::immix::Immix::new(args)) as Box<dyn Plan<VM = VM>>
         }
-        PlanSelector::PageProtect => {
-            Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
-        }
-        PlanSelector::MarkCompact => {
-            Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
-        }
-        PlanSelector::StickyImmix => {
-            Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
-        }
+        // PlanSelector::PageProtect => {
+        //     Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
+        // }
+        // PlanSelector::MarkCompact => {
+        //     Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
+        // }
+        // PlanSelector::StickyImmix => {
+        //     Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
+        // }
+        _ => unimplemented!()
     };
 
     // We have created Plan in the heap, and we won't explicitly move it.
@@ -539,12 +542,12 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
     #[space]
-    pub immortal: ImmortalSpace<VM>,
+    pub immortal: SpaceRef<ImmortalSpace<VM>>,
     #[space]
-    pub los: LargeObjectSpace<VM>,
+    pub los: SpaceRef<LargeObjectSpace<VM>>,
     // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: ImmortalSpace<VM>,
+    pub nonmoving: SpaceRef<ImmortalSpace<VM>>,
     #[parent]
     pub base: BasePlan<VM>,
 }
@@ -552,28 +555,28 @@ pub struct CommonPlan<VM: VMBinding> {
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
         CommonPlan {
-            immortal: ImmortalSpace::new(args.get_space_args(
+            immortal: crate::policy::space_ref::new(ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
-            )),
-            los: LargeObjectSpace::new(
+            ))),
+            los: crate::policy::space_ref::new(LargeObjectSpace::new(
                 args.get_space_args("los", true, VMRequest::discontiguous()),
                 false,
-            ),
-            nonmoving: ImmortalSpace::new(args.get_space_args(
+            )),
+            nonmoving: crate::policy::space_ref::new(ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             base: BasePlan::new(args),
         }
     }
 
     pub fn get_used_pages(&self) -> usize {
-        self.immortal.reserved_pages()
-            + self.los.reserved_pages()
-            + self.nonmoving.reserved_pages()
+        crate::space_ref_read!(&self.immortal).reserved_pages()
+            + crate::space_ref_read!(&self.los).reserved_pages()
+            + crate::space_ref_read!(&self.nonmoving).reserved_pages()
             + self.base.get_used_pages()
     }
 
@@ -583,45 +586,60 @@ impl<VM: VMBinding> CommonPlan<VM> {
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(queue, object);
+        {
+            let space = crate::space_ref_read!(&self.immortal);
+            if space.in_space(object) {
+                trace!("trace_object: object in immortal space");
+                return space.trace_object(queue, object);
+            }
         }
-        if self.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return self.los.trace_object(queue, object);
+        {
+            let space = crate::space_ref_read!(&self.los);
+            if space.in_space(object) {
+                trace!("trace_object: object in los space");
+                return space.trace_object(queue, object);
+            }
         }
-        if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
-            return self.nonmoving.trace_object(queue, object);
+        {
+            let space = crate::space_ref_read!(&self.nonmoving);
+            if space.in_space(object) {
+                trace!("trace_object: object in nonmoving space");
+                return space.trace_object(queue, object);
+            }
         }
         self.base.trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.prepare();
-        self.los.prepare(full_heap);
-        self.nonmoving.prepare();
+        {
+            let mut space = crate::space_ref_write!(&self.immortal);
+            space.prepare();
+        }
+        {
+            let mut space = crate::space_ref_write!(&self.los);
+            space.prepare(full_heap);
+        }
+        {
+            let mut space = crate::space_ref_write!(&self.nonmoving);
+            space.prepare();
+        }
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.release();
-        self.los.release(full_heap);
-        self.nonmoving.release();
+        {
+            let mut space = crate::space_ref_write!(&self.immortal);
+            space.release();
+        }
+        {
+            let mut space = crate::space_ref_write!(&self.los);
+            space.release(full_heap);
+        }
+        {
+            let mut space = crate::space_ref_write!(&self.nonmoving);
+            space.release();
+        }
         self.base.release(tls, full_heap)
-    }
-
-    pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
-        &self.immortal
-    }
-
-    pub fn get_los(&self) -> &LargeObjectSpace<VM> {
-        &self.los
-    }
-
-    pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
-        &self.nonmoving
     }
 }
 
@@ -656,7 +674,7 @@ pub trait HasSpaces {
     ///
     /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
-    fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
+    fn for_each_space_mut(&self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.

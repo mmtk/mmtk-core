@@ -301,6 +301,8 @@ use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::VMWorkerThread;
 
+use crate::policy::space_ref::SpaceRef;
+
 /// Copy allocator for CopySpace
 pub struct CopySpaceCopyContext<VM: VMBinding> {
     copy_allocator: BumpAllocator<VM>,
@@ -328,7 +330,7 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub(crate) fn new(
         tls: VMWorkerThread,
         context: Arc<AllocatorContext<VM>>,
-        tospace: &'static CopySpace<VM>,
+        tospace: SpaceRef<CopySpace<VM>>,
     ) -> Self {
         CopySpaceCopyContext {
             copy_allocator: BumpAllocator::new(tls.0, tospace, context),
@@ -337,8 +339,8 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
-    pub fn rebind(&mut self, space: &CopySpace<VM>) {
+    pub fn rebind(&mut self, space: SpaceRef<CopySpace<VM>>) {
         self.copy_allocator
-            .rebind(unsafe { &*{ space as *const _ } });
+            .rebind(space);
     }
 }

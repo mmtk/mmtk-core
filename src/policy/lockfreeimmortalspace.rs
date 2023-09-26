@@ -114,7 +114,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         data_pages + meta_pages
     }
 
-    fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, pages: usize) -> Result<Address, SpaceAllocFail> {
         let bytes = conversions::pages_to_bytes(pages);
         let start = self
             .cursor
@@ -128,7 +128,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);
         }
-        start
+        Ok(start)
     }
 
     /// Get the name of the space
@@ -150,6 +150,8 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
+
+use super::space::SpaceAllocFail;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
+use crate::policy::space_ref::SpaceRef;
 use crate::util::alloc::{allocator, Allocator};
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
@@ -14,7 +15,7 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: &'static LargeObjectSpace<VM>,
+    space: SpaceRef<LargeObjectSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -26,11 +27,6 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
 
     fn get_context(&self) -> &AllocatorContext<VM> {
         &self.context
-    }
-
-    fn get_space(&self) -> &'static dyn Space<VM> {
-        // Casting the interior of the Option: from &LargeObjectSpace to &dyn Space
-        self.space as &'static dyn Space<VM>
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -48,20 +44,28 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        if self.space.will_oom_on_acquire(self.tls, size) {
+        if crate::space_ref_read!(&self.space).will_oom_on_acquire(self.tls, size) {
             return Address::ZERO;
         }
 
         let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
-        self.space.allocate_pages(self.tls, pages)
+        let alloc_res = crate::space_ref_read!(&self.space).allocate_pages(self.tls, pages);
+        match alloc_res {
+            Ok(addr) => addr,
+            Err(_) => {
+                use crate::vm::Collection;
+                VM::VMCollection::block_for_gc(VMMutatorThread(self.tls));
+                Address::ZERO
+            }
+        }
     }
 }
 
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: &'static LargeObjectSpace<VM>,
+        space: SpaceRef<LargeObjectSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         LargeObjectAllocator {

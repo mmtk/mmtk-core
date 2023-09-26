@@ -1,4 +1,5 @@
 use crate::global_state::GlobalState;
+use crate::policy::space_ref::SpaceRef;
 use crate::util::address::Address;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
@@ -154,9 +155,6 @@ impl<VM: VMBinding> AllocatorContext<VM> {
 pub trait Allocator<VM: VMBinding>: Downcast {
     /// Return the [`VMThread`] associated with this allocator instance.
     fn get_tls(&self) -> VMThread;
-
-    /// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    fn get_space(&self) -> &'static dyn Space<VM>;
 
     // Return the context for the allocator.
     fn get_context(&self) -> &AllocatorContext<VM>;

@@ -45,11 +45,13 @@ pub(crate) fn generate_impl_items<'a>(
         let f_ident = f.ident.as_ref().unwrap();
 
         let visitor = quote! {
-            __func(&self.#f_ident);
+            let space = crate::space_ref_read!(&self.#f_ident);
+            __func(&*space);
         };
 
         let visitor_mut = quote! {
-            __func(&mut self.#f_ident);
+            let mut space = crate::space_ref_write!(&self.#f_ident);
+            __func(&mut *space);
         };
 
         space_visitors.push(visitor);
@@ -75,7 +77,7 @@ pub(crate) fn generate_impl_items<'a>(
             #parent_visitor
         }
 
-        fn for_each_space_mut(&mut self, __func: &mut dyn FnMut(&mut dyn Space<VM>)) {
+        fn for_each_space_mut(&self, __func: &mut dyn FnMut(&mut dyn Space<VM>)) {
             #(#space_visitors_mut)*
             #parent_visitor_mut
         }
