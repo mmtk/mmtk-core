@@ -33,7 +33,7 @@ itertools = "0.10.5"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
-log = { version = "0.4", features = ["max_level_trace"] }
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros
@@ -50,8 +50,8 @@ strum = "0.24"
 strum_macros = "0.24"
 sysinfo = "0.29"
 
-parking_lot = { version = "0.12", features = ["deadlock_detection"] }
-peace-lock = { version = "0.1.2", features = ["check"] }
+parking_lot = { version = "0.12", features = [] }
+peace-lock = { version = "0.1.2", features = [] }
 
 [dev-dependencies]
 paste = "1.0.8"
@@ -74,6 +74,9 @@ perf_counter = ["pfm"]
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Non mutually exclusive features --
+
+# Turn on checks in peace-lock to check race conditions
+peace_lock_race_check = ["peace-lock/check"]
 
 # spaces with different semantics
 

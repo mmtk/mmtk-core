@@ -3,12 +3,12 @@ use std::sync::Arc;
 use crate::vm::VMBinding;
 use crate::policy::space::Space;
 
-pub use parking_lot_impl::SpaceRef;
-pub use parking_lot_impl::downcast;
-pub use parking_lot_impl::new;
-// pub use peace_lock_impl::SpaceRef;
-// pub use peace_lock_impl::downcast;
-// pub use peace_lock_impl::new;
+// pub use parking_lot_impl::SpaceRef;
+// pub use parking_lot_impl::downcast;
+// pub use parking_lot_impl::new;
+pub use peace_lock_impl::SpaceRef;
+pub use peace_lock_impl::downcast;
+pub use peace_lock_impl::new;
 
 #[macro_export]
 macro_rules! space_ref_write {
