@@ -51,7 +51,8 @@ strum_macros = "0.24"
 sysinfo = "0.29"
 
 parking_lot = { version = "0.12", features = [] }
-peace-lock = { version = "0.1.2", features = [] }
+peace-lock = { git = "https://github.com/qinsoon/peace-lock.git", rev = "b91104c295ff60f815a931c670a69858dfdafbe5" }
+# peace-lock = { path = "../peace-lock" }
 
 [dev-dependencies]
 paste = "1.0.8"
