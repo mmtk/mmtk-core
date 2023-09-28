@@ -5,7 +5,7 @@ use super::BumpPointer;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
@@ -20,7 +20,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
     pub(in crate::util::alloc) bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    pub(crate) space: SpaceRef<ImmixSpace<VM>>,
+    pub(crate) space: SharedRef<ImmixSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
     /// *unused*
@@ -164,7 +164,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 impl<VM: VMBinding> ImmixAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SpaceRef<ImmixSpace<VM>>,
+        space: SharedRef<ImmixSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
         copy: bool,
     ) -> Self {
@@ -229,7 +229,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: usize) -> bool {
         while self.line.is_some() || self.acquire_recyclable_block() {
             let line = self.line.unwrap();
-            if let Some((start_line, end_line)) = crate::space_ref_read!(&self.space).get_next_available_lines(line)
+            if let Some((start_line, end_line)) = self.space.read().get_next_available_lines(line)
             {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.bump_pointer.cursor = start_line.start();
@@ -269,7 +269,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     /// Get a recyclable block from ImmixSpace.
     fn acquire_recyclable_block(&mut self) -> bool {
-        match crate::space_ref_read!(&self.space).get_reusable_block(self.copy) {
+        match self.space.read().get_reusable_block(self.copy) {
             Some(block) => {
                 trace!("{:?}: acquire_recyclable_block -> {:?}", self.tls, block);
                 // Set the hole-searching cursor to the start of this block.
@@ -282,7 +282,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     // Get a clean block from ImmixSpace.
     fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        let alloc_res = crate::space_ref_read!(&self.space).get_clean_block(self.tls, self.copy);
+        let alloc_res = self.space.read().get_clean_block(self.tls, self.copy);
         match alloc_res {
             Ok(block) => {
                 trace!(

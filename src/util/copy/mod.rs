@@ -8,7 +8,7 @@ use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::{ImmixCopyContext, ImmixHybridCopyContext};
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
@@ -26,7 +26,7 @@ const MAX_COPYSPACE_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_HYBRID_COPY_ALLOCATORS: usize = 1;
 
-type CopySpaceMapping<VM> = Vec<(CopySelector, SpaceRef<dyn Space<VM>>)>;
+type CopySpaceMapping<VM> = Vec<(CopySelector, SharedRef<dyn Space<VM>>)>;
 
 /// A configuration for GCWorkerCopyContext.
 /// Similar to a `MutatorConfig`,
@@ -196,21 +196,21 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
                     ret.copy[*index as usize].write(CopySpaceCopyContext::new(
                         worker_tls,
                         context.clone(),
-                        crate::policy::space_ref::downcast::<VM,CopySpace<VM>>(space),
+                        space.downcast(),
                     ));
                 }
                 CopySelector::Immix(index) => {
                     ret.immix[*index as usize].write(ImmixCopyContext::new(
                         worker_tls,
                         context.clone(),
-                        crate::policy::space_ref::downcast::<VM,ImmixSpace<VM>>(space),
+                        space.downcast(),
                     ));
                 }
                 CopySelector::ImmixHybrid(index) => {
                     ret.immix_hybrid[*index as usize].write(ImmixHybridCopyContext::new(
                         worker_tls,
                         context.clone(),
-                        crate::policy::space_ref::downcast::<VM,ImmixSpace<VM>>(space),
+                        space.downcast(),
                     ));
                 }
                 CopySelector::Unused => unreachable!(),

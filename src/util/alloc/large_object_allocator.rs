@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::{allocator, Allocator};
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
@@ -15,7 +15,7 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: SpaceRef<LargeObjectSpace<VM>>,
+    space: SharedRef<LargeObjectSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -44,13 +44,13 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: usize) -> Address {
-        if crate::space_ref_read!(&self.space).will_oom_on_acquire(self.tls, size) {
+        if self.space.read().will_oom_on_acquire(self.tls, size) {
             return Address::ZERO;
         }
 
         let maxbytes = allocator::get_maximum_aligned_size::<VM>(size, align);
         let pages = crate::util::conversions::bytes_to_pages_up(maxbytes);
-        let alloc_res = crate::space_ref_read!(&self.space).allocate_pages(self.tls, pages);
+        let alloc_res = self.space.read().allocate_pages(self.tls, pages);
         match alloc_res {
             Ok(addr) => addr,
             Err(_) => {
@@ -65,7 +65,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SpaceRef<LargeObjectSpace<VM>>,
+        space: SharedRef<LargeObjectSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         LargeObjectAllocator {

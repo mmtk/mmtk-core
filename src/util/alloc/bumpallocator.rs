@@ -5,7 +5,7 @@ use crate::util::Address;
 use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -21,7 +21,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// Bump-pointer itself.
     pub(in crate::util::alloc) bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: SpaceRef<dyn Space<VM>>,
+    space: SharedRef<dyn Space<VM>>,
     pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -58,7 +58,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         self.bump_pointer.reset(zero, zero);
     }
 
-    pub fn rebind(&mut self, space: SpaceRef<dyn Space<VM>>) {
+    pub fn rebind(&mut self, space: SharedRef<dyn Space<VM>>) {
         self.reset();
         self.space = space;
     }
@@ -160,7 +160,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SpaceRef<dyn Space<VM>>,
+        space: SharedRef<dyn Space<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         BumpAllocator {
@@ -179,12 +179,12 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         offset: usize,
         stress_test: bool,
     ) -> Address {
-        if crate::space_ref_read!(&self.space).will_oom_on_acquire(self.tls, size) {
+        if self.space.read().will_oom_on_acquire(self.tls, size) {
             return Address::ZERO;
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquire_res = crate::space_ref_read!(&self.space).acquire(self.tls, bytes_to_pages(block_size));
+        let acquire_res = self.space.read().acquire(self.tls, bytes_to_pages(block_size));
         match acquire_res {
             Ok(acquired_start) => {
                 trace!(

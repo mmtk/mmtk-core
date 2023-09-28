@@ -9,7 +9,7 @@ use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
@@ -90,7 +90,7 @@ impl<VM: VMBinding> Allocators<VM> {
     pub fn new(
         mutator_tls: VMMutatorThread,
         mmtk: &MMTK<VM>,
-        space_mapping: &[(AllocatorSelector, SpaceRef<dyn Space<VM> + Send>)],
+        space_mapping: &[(AllocatorSelector, SharedRef<dyn Space<VM>>)],
     ) -> Self {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
@@ -115,21 +115,21 @@ impl<VM: VMBinding> Allocators<VM> {
                 AllocatorSelector::LargeObject(index) => {
                     ret.large_object[*index as usize].write(LargeObjectAllocator::new(
                         mutator_tls.0,
-                        crate::policy::space_ref::downcast::<VM, LargeObjectSpace<VM>>(space),
+                        space.downcast(),
                         context.clone(),
                     ));
                 }
                 AllocatorSelector::Malloc(index) => {
                     ret.malloc[*index as usize].write(MallocAllocator::new(
                         mutator_tls.0,
-                        crate::policy::space_ref::downcast::<VM, MallocSpace<VM>>(space),
+                        space.downcast(),
                         context.clone(),
                     ));
                 }
                 AllocatorSelector::Immix(index) => {
                     ret.immix[*index as usize].write(ImmixAllocator::new(
                         mutator_tls.0,
-                        crate::policy::space_ref::downcast::<VM, ImmixSpace<VM>>(space),
+                        space.downcast(),
                         context.clone(),
                         false,
                     ));
@@ -137,7 +137,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 AllocatorSelector::FreeList(index) => {
                     ret.free_list[*index as usize].write(FreeListAllocator::new(
                         mutator_tls.0,
-                        crate::policy::space_ref::downcast::<VM, MarkSweepSpace<VM>>(space),
+                        space.downcast(),
                         context.clone(),
                     ));
                 }

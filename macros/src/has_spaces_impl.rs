@@ -45,12 +45,12 @@ pub(crate) fn generate_impl_items<'a>(
         let f_ident = f.ident.as_ref().unwrap();
 
         let visitor = quote! {
-            let space = crate::space_ref_read!(&self.#f_ident);
+            let space = self.#f_ident.read();
             __func(&*space);
         };
 
         let visitor_mut = quote! {
-            let mut space = crate::space_ref_write!(&self.#f_ident);
+            let mut space = self.#f_ident.write();
             __func(&mut *space);
         };
 

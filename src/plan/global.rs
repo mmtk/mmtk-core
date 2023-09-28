@@ -8,7 +8,7 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 #[cfg(feature = "vm_space")]
 use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
@@ -542,12 +542,12 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
     #[space]
-    pub immortal: SpaceRef<ImmortalSpace<VM>>,
+    pub immortal: SharedRef<ImmortalSpace<VM>>,
     #[space]
-    pub los: SpaceRef<LargeObjectSpace<VM>>,
+    pub los: SharedRef<LargeObjectSpace<VM>>,
     // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: SpaceRef<ImmortalSpace<VM>>,
+    pub nonmoving: SharedRef<ImmortalSpace<VM>>,
     #[parent]
     pub base: BasePlan<VM>,
 }
@@ -555,16 +555,16 @@ pub struct CommonPlan<VM: VMBinding> {
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
         CommonPlan {
-            immortal: crate::policy::space_ref::new(ImmortalSpace::new(args.get_space_args(
+            immortal: SharedRef::new(ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
             ))),
-            los: crate::policy::space_ref::new(LargeObjectSpace::new(
+            los: SharedRef::new(LargeObjectSpace::new(
                 args.get_space_args("los", true, VMRequest::discontiguous()),
                 false,
             )),
-            nonmoving: crate::policy::space_ref::new(ImmortalSpace::new(args.get_space_args(
+            nonmoving: SharedRef::new(ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
                 VMRequest::discontiguous(),
@@ -574,9 +574,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     pub fn get_used_pages(&self) -> usize {
-        crate::space_ref_read!(&self.immortal).reserved_pages()
-            + crate::space_ref_read!(&self.los).reserved_pages()
-            + crate::space_ref_read!(&self.nonmoving).reserved_pages()
+        self.immortal.read().reserved_pages()
+            + self.los.read().reserved_pages()
+            + self.nonmoving.read().reserved_pages()
             + self.base.get_used_pages()
     }
 
@@ -587,21 +587,21 @@ impl<VM: VMBinding> CommonPlan<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         {
-            let space = crate::space_ref_read!(&self.immortal);
+            let space = self.immortal.read();
             if space.in_space(object) {
                 trace!("trace_object: object in immortal space");
                 return space.trace_object(queue, object);
             }
         }
         {
-            let space = crate::space_ref_read!(&self.los);
+            let space = self.los.read();
             if space.in_space(object) {
                 trace!("trace_object: object in los space");
                 return space.trace_object(queue, object);
             }
         }
         {
-            let space = crate::space_ref_read!(&self.nonmoving);
+            let space = self.nonmoving.read();
             if space.in_space(object) {
                 trace!("trace_object: object in nonmoving space");
                 return space.trace_object(queue, object);
@@ -612,15 +612,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         {
-            let mut space = crate::space_ref_write!(&self.immortal);
+            let mut space = self.immortal.write();
             space.prepare();
         }
         {
-            let mut space = crate::space_ref_write!(&self.los);
+            let mut space = self.los.write();
             space.prepare(full_heap);
         }
         {
-            let mut space = crate::space_ref_write!(&self.nonmoving);
+            let mut space = self.nonmoving.write();
             space.prepare();
         }
         self.base.prepare(tls, full_heap)
@@ -628,15 +628,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         {
-            let mut space = crate::space_ref_write!(&self.immortal);
+            let mut space = self.immortal.write();
             space.release();
         }
         {
-            let mut space = crate::space_ref_write!(&self.los);
+            let mut space = self.los.write();
             space.release(full_heap);
         }
         {
-            let mut space = crate::space_ref_write!(&self.nonmoving);
+            let mut space = self.nonmoving.write();
             space.release();
         }
         self.base.release(tls, full_heap)

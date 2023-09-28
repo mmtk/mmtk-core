@@ -8,7 +8,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::AllocatorSelector;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -85,9 +85,9 @@ lazy_static! {
 
 fn create_gen_space_mapping<VM: VMBinding>(
     plan: &'static dyn Plan<VM = VM>,
-    nursery: SpaceRef<CopySpace<VM>>,
-) -> Vec<(AllocatorSelector, SpaceRef<dyn Space<VM> + Send>)> {
+    nursery: SharedRef<CopySpace<VM>>,
+) -> Vec<(AllocatorSelector, SharedRef<dyn Space<VM>>)> {
     let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
-    vec.push((AllocatorSelector::BumpPointer(0), nursery));
+    vec.push((AllocatorSelector::BumpPointer(0), nursery.to_dyn_space()));
     vec
 }

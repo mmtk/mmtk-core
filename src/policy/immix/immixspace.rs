@@ -7,7 +7,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space, SpaceAllocFail};
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::*;
@@ -981,7 +981,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         self.allocator.alloc(bytes, align, offset)
     }
     fn post_copy(&mut self, obj: ObjectReference, bytes: usize) {
-        crate::space_ref_read!(&self.allocator.space).post_copy(obj, bytes)
+        self.allocator.space.read().post_copy(obj, bytes)
     }
 }
 
@@ -989,7 +989,7 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub(crate) fn new(
         tls: VMWorkerThread,
         context: Arc<AllocatorContext<VM>>,
-        space: SpaceRef<ImmixSpace<VM>>,
+        space: SharedRef<ImmixSpace<VM>>,
     ) -> Self {
         ImmixCopyContext {
             allocator: ImmixAllocator::new(tls.0, space, context, true),
@@ -1023,14 +1023,14 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixHybridCopyContext<VM> {
         align: usize,
         offset: usize,
     ) -> Address {
-        if crate::space_ref_read!(&self.get_space()).in_defrag() {
+        if self.get_space().read().in_defrag() {
             self.defrag_allocator.alloc(bytes, align, offset)
         } else {
             self.copy_allocator.alloc(bytes, align, offset)
         }
     }
     fn post_copy(&mut self, obj: ObjectReference, bytes: usize) {
-        crate::space_ref_read!(&self.get_space()).post_copy(obj, bytes)
+        self.get_space().read().post_copy(obj, bytes)
     }
 }
 
@@ -1038,7 +1038,7 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
     pub(crate) fn new(
         tls: VMWorkerThread,
         context: Arc<AllocatorContext<VM>>,
-        space: SpaceRef<ImmixSpace<VM>>,
+        space: SharedRef<ImmixSpace<VM>>,
     ) -> Self {
         ImmixHybridCopyContext {
             copy_allocator: ImmixAllocator::new(tls.0, space.clone(), context.clone(), false),
@@ -1046,11 +1046,11 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
         }
     }
 
-    fn get_space(&self) -> &SpaceRef<ImmixSpace<VM>> {
+    fn get_space(&self) -> &SharedRef<ImmixSpace<VM>> {
         // Both copy allocators should point to the same space.
         debug_assert_eq!(
-            crate::space_ref_read!(&self.defrag_allocator.space).common().descriptor,
-            crate::space_ref_read!(&self.copy_allocator.space).common().descriptor
+            self.defrag_allocator.space.read().common().descriptor,
+            self.copy_allocator.space.read().common().descriptor
         );
         // Just get the space from either allocator
         &self.defrag_allocator.space

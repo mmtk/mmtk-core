@@ -72,7 +72,7 @@ pub(crate) fn generate_trace_object<'a>(
 
         quote! {
             {
-                let space = crate::space_ref_read!(&self.#f_ident);
+                let space = self.#f_ident.read();
                 if space.in_space(__mmtk_objref) {
                     return PolicyTraceObject::trace_object::<Q, KIND>(&*space, __mmtk_queue, __mmtk_objref, #copy, __mmtk_worker);
                 }
@@ -115,7 +115,7 @@ pub(crate) fn generate_post_scan_object<'a>(
 
         quote! {
             {
-                let space = crate::space_ref_read!(&self.#f_ident);
+                let space = self.#f_ident.read();
                 if space.in_space(__mmtk_objref) {
                     use crate::policy::gc_work::PolicyTraceObject;
                     PolicyTraceObject::post_scan_object(&*space, __mmtk_objref);
@@ -157,26 +157,27 @@ pub(crate) fn generate_may_move_objects<'a>(
         use syn::{parse_macro_input, Field, Type, PathArguments, Data, DeriveInput};
         if let Type::Path(type_path) = &f.ty {
             // Check the outer type (Arc)
-            if type_path.path.segments[0].ident == "Arc" {
-                if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {
-                    if let GenericArgument::Type(Type::Path(inner_type_path)) = &angle_bracketed_args.args.first().unwrap() {
-                        // Check the inner type (RwLock)
-                        if let PathArguments::AngleBracketed(inner_angle_bracketed_args) = &inner_type_path.path.segments[0].arguments {
-                            let inner_type = &inner_angle_bracketed_args.args.first().unwrap();
-                            // `inner_type` is now the type T inside Arc<RwLock<T>>
-                            quote! {
-                                || <#inner_type as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
-                            }
-                        } else {
-                            unreachable!("5 {:?}", f)
-                        }
-                    } else {
-                        unreachable!("4 {:?}", f)
-                    }
-                } else {
-                    unreachable!("3 {:?}", f)
-                }
-            } else if type_path.path.segments[0].ident == "SpaceRef" {
+            // if type_path.path.segments[0].ident == "Arc" {
+            //     if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {
+            //         if let GenericArgument::Type(Type::Path(inner_type_path)) = &angle_bracketed_args.args.first().unwrap() {
+            //             // Check the inner type (RwLock)
+            //             if let PathArguments::AngleBracketed(inner_angle_bracketed_args) = &inner_type_path.path.segments[0].arguments {
+            //                 let inner_type = &inner_angle_bracketed_args.args.first().unwrap();
+            //                 // `inner_type` is now the type T inside Arc<RwLock<T>>
+            //                 quote! {
+            //                     || <#inner_type as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
+            //                 }
+            //             } else {
+            //                 unreachable!("5 {:?}", f)
+            //             }
+            //         } else {
+            //             unreachable!("4 {:?}", f)
+            //         }
+            //     } else {
+            //         unreachable!("3 {:?}", f)
+            //     }
+            // } else 
+            if type_path.path.segments[0].ident == "SharedRef" {
                 if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {
                     let inner_type = &angle_bracketed_args.args.first().unwrap();
                     quote! {

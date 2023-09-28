@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::policy::marksweepspace::native_ms::*;
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::VMMutatorThread;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
@@ -19,7 +19,7 @@ use super::allocator::AllocatorContext;
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
-    space: SpaceRef<MarkSweepSpace<VM>>,
+    space: SharedRef<MarkSweepSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
     /// blocks with free space
@@ -130,7 +130,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // New free list allcoator
     pub(crate) fn new(
         tls: VMThread,
-        space: SpaceRef<MarkSweepSpace<VM>>,
+        space: SharedRef<MarkSweepSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         FreeListAllocator {
@@ -295,7 +295,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     ) -> Option<Block> {
         let bin = mi_bin::<VM>(size, align);
         loop {
-            let block = crate::space_ref_read!(&self.space).acquire_block(self.tls, size, align);
+            let block = self.space.read().acquire_block(self.tls, size, align);
             match block {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
                     // GC
@@ -336,7 +336,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn init_block(&self, block: Block, cell_size: usize) {
-        crate::space_ref_read!(&self.space).record_new_block(block);
+        self.space.read().record_new_block(block);
 
         // construct free list
         let block_end = block.start() + Block::BYTES;
@@ -487,7 +487,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn abandon_blocks(&mut self) {
-        let space = crate::space_ref_read!(&self.space);
+        let space = self.space.read();
         let mut abandoned = space.abandoned.lock().unwrap();
         for i in 0..MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();

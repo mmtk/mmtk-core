@@ -4,7 +4,7 @@ use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::policy::space_ref::SpaceRef;
+use crate::util::rust_util::shared_ref::SharedRef;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
@@ -26,7 +26,7 @@ pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
     #[space]
     #[copy_semantics(CopySemantics::PromoteToMature)]
-    pub nursery: SpaceRef<CopySpace<VM>>,
+    pub nursery: SharedRef<CopySpace<VM>>,
     /// The common plan.
     #[parent]
     pub common: CommonPlan<VM>,
@@ -54,7 +54,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let common = CommonPlan::new(args);
 
         CommonGenPlan {
-            nursery: crate::policy::space_ref::new(nursery),
+            nursery: SharedRef::new(nursery),
             common,
             gc_full_heap: AtomicBool::default(),
             next_gc_full_heap: AtomicBool::new(false),
@@ -69,7 +69,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             self.full_heap_gc_count.lock().unwrap().inc();
         }
         self.common.prepare(tls, full_heap);
-        let mut nursery = crate::space_ref_write!(&self.nursery);
+        let mut nursery = self.nursery.write();
         nursery.prepare(true);
         nursery.set_copy_for_sft_trace(Some(CopySemantics::PromoteToMature));
     }
@@ -78,8 +78,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
         self.common.release(tls, full_heap);
-        let nursery = crate::space_ref_write!(&self.nursery);
-        nursery.release();
+        self.nursery.write().release();
     }
 
     /// Independent of how many pages remain in the page budget (a function of heap size), we must
@@ -102,7 +101,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         space_full: bool,
         space: Option<&dyn Space<VM>>,
     ) -> bool {
-        let cur_nursery = crate::space_ref_read!(&self.nursery).reserved_pages();
+        let cur_nursery = self.nursery.read().reserved_pages();
         let max_nursery = self.common.base.options.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
         trace!(
@@ -122,7 +121,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
         let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.common().descriptor == crate::space_ref_read!(&self.nursery).common().descriptor
+            s.common().descriptor == self.nursery.read().common().descriptor
         });
         // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         if space_full && !is_triggered_by_nursery {
@@ -216,7 +215,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         {
-            let nursery = crate::space_ref_read!(&self.nursery);
+            let nursery = self.nursery.read();
             if nursery.in_space(object) {
                 return nursery.trace_object::<Q>(
                     queue,
@@ -238,7 +237,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     ) -> ObjectReference {
         // Evacuate nursery objects
         {
-            let nursery = crate::space_ref_read!(&self.nursery);
+            let nursery = self.nursery.read();
             if nursery.in_space(object) {
                 return nursery.trace_object::<Q>(
                     queue,
@@ -250,7 +249,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         }
         // We may alloc large object into LOS as nursery objects. Trace them here.
         {
-            let los = crate::space_ref_read!(&self.common.los);
+            let los = self.common.los.read();
             if los.in_space(object) {
                 return los.trace_object::<Q>(queue, object);
             }
@@ -291,13 +290,13 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// Get pages reserved for the collection by a generational plan. A generational plan should
     /// add their own reservation with the value returned by this method.
     pub fn get_collection_reserved_pages(&self) -> usize {
-        crate::space_ref_read!(&self.nursery).reserved_pages()
+        self.nursery.read().reserved_pages()
     }
 
     /// Get pages used by a generational plan. A generational plan should add their own used pages
     /// with the value returned by this method.
     pub fn get_used_pages(&self) -> usize {
-        crate::space_ref_read!(&self.nursery).reserved_pages() + self.common.get_used_pages()
+        self.nursery.read().reserved_pages() + self.common.get_used_pages()
     }
 }
 
