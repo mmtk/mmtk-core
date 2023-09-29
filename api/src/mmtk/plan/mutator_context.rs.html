@@ -357,6 +357,28 @@
 <a href="#357" id="357">357</a>
 <a href="#358" id="358">358</a>
 <a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::Barrier;
@@ -371,6 +393,28 @@
 <span class="kw">use </span>enum_map::EnumMap;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>SpaceMapping&lt;VM&gt; = Vec&lt;(AllocatorSelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)&gt;;
+
+<span class="doccomment">/// A place-holder implementation for `MutatorConfig::prepare_func` that should not be called.
+/// It is the most often used by plans that sets `PlanConstraints::needs_prepare_mutator` to
+/// `false`.  It is also used by `NoGC` because it must not trigger GC.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unreachable_prepare_func&lt;VM: VMBinding&gt;(
+    _mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
+    _tls: VMWorkerThread,
+) {
+    <span class="macro">unreachable!</span>(<span class="string">&quot;`MutatorConfig::prepare_func` must not be called for the current plan.&quot;</span>)
+}
+
+<span class="doccomment">/// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
+/// Currently only used by `NoGC`.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>unreachable_release_func&lt;VM: VMBinding&gt;(
+    _mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
+    _tls: VMWorkerThread,
+) {
+    <span class="macro">unreachable!</span>(<span class="string">&quot;`MutatorConfig::release_func` must not be called for the current plan.&quot;</span>)
+}
+
+<span class="doccomment">/// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>no_op_release_func&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {}
 
 <span class="comment">// This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.

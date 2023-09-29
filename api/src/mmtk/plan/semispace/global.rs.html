@@ -189,6 +189,7 @@
 <a href="#189" id="189">189</a>
 <a href="#190" id="190">190</a>
 <a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::SSGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -233,6 +234,7 @@
     num_specialized_scans: <span class="number">1</span>,
     max_non_los_default_alloc_bytes:
         <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 

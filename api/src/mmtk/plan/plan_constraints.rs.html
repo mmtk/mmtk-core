@@ -59,6 +59,11 @@
 <a href="#59" id="59">59</a>
 <a href="#60" id="60">60</a>
 <a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSelector;
@@ -94,6 +99,10 @@
     <span class="doccomment">/// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.
     /// For plans that use those policies, they should set this as true.
     </span><span class="kw">pub </span>needs_forward_after_liveness: bool,
+    <span class="doccomment">/// Some (in fact, most) plans do nothing when preparing mutators before tracing (i.e. in
+    /// `MutatorConfig::prepare_func`).  Those plans can set this to `false` so that the
+    /// `PrepareMutator` work packets will not be created at all.
+    </span><span class="kw">pub </span>needs_prepare_mutator: bool,
 }
 
 <span class="kw">impl </span>PlanConstraints {
@@ -112,6 +121,7 @@
             needs_forward_after_liveness: <span class="bool-val">false</span>,
             needs_log_bit: <span class="bool-val">false</span>,
             barrier: BarrierSelector::NoBarrier,
+            needs_prepare_mutator: <span class="bool-val">true</span>,
         }
     }
 }

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["create_genimmix_mutator","genimmix_mutator_prepare","genimmix_mutator_release"]};
+window.SIDEBAR_ITEMS = {"fn":["create_genimmix_mutator","genimmix_mutator_release"]};

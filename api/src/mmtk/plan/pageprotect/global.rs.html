@@ -112,6 +112,7 @@
 <a href="#112" id="112">112</a>
 <a href="#113" id="113">113</a>
 <a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::PPGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -144,6 +145,7 @@
 
 <span class="kw">pub const </span>CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="bool-val">false</span>,
+    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 

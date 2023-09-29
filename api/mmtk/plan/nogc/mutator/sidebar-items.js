@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["MULTI_SPACE_RESERVED_ALLOCATORS"],"fn":["create_nogc_mutator","nogc_mutator_noop"],"struct":["ALLOCATOR_MAPPING","ALLOCATOR_MAPPING_SINGLE_SPACE"]};
+window.SIDEBAR_ITEMS = {"constant":["MULTI_SPACE_RESERVED_ALLOCATORS"],"fn":["create_nogc_mutator"],"struct":["ALLOCATOR_MAPPING","ALLOCATOR_MAPPING_SINGLE_SPACE"]};

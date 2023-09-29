@@ -1195,6 +1195,8 @@
 <a href="#1195" id="1195">1195</a>
 <a href="#1196" id="1196">1196</a>
 <a href="#1197" id="1197">1197</a>
+<a href="#1198" id="1198">1198</a>
+<a href="#1199" id="1199">1199</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
@@ -1248,9 +1250,11 @@
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
         plan_mut.prepare(worker.tls);
 
-        <span class="kw">for </span>mutator <span class="kw">in </span>&lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(PrepareMutator::&lt;C::VM&gt;::new(mutator));
+        <span class="kw">if </span>plan_mut.constraints().needs_prepare_mutator {
+            <span class="kw">for </span>mutator <span class="kw">in </span>&lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators() {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                    .add(PrepareMutator::&lt;C::VM&gt;::new(mutator));
+            }
         }
         <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
             <span class="kw">let </span>result = w.designated_work.push(Box::new(PrepareCollector));

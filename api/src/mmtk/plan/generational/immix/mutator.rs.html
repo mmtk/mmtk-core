@@ -50,12 +50,12 @@
 <a href="#50" id="50">50</a>
 <a href="#51" id="51">51</a>
 <a href="#52" id="52">52</a>
-<a href="#53" id="53">53</a>
 </pre></div><pre class="rust"><code><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="kw">super</span>::<span class="kw">super</span>::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::barriers::ObjectBarrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::barrier::GenObjectBarrierSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::create_gen_space_mapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::immix::GenImmix;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
@@ -64,8 +64,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
-
-<span class="kw">pub fn </span>genimmix_mutator_prepare&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {}
 
 <span class="kw">pub fn </span>genimmix_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
     <span class="comment">// reset nursery allocator
@@ -90,7 +88,7 @@
             mmtk.get_plan(),
             <span class="kw-2">&amp;</span>genimmix.gen.nursery,
         )),
-        prepare_func: <span class="kw-2">&amp;</span>genimmix_mutator_prepare,
+        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
         release_func: <span class="kw-2">&amp;</span>genimmix_mutator_release,
     };
 

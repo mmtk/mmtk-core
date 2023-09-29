@@ -121,6 +121,8 @@
 <a href="#121" id="121">121</a>
 <a href="#122" id="122">122</a>
 <a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -166,6 +168,8 @@
     num_specialized_scans: <span class="number">1</span>,
     max_non_los_default_alloc_bytes: MAX_OBJECT_SIZE,
     may_trace_duplicate_edges: <span class="bool-val">true</span>,
+    needs_prepare_mutator: !<span class="macro">cfg!</span>(feature = <span class="string">&quot;malloc_mark_sweep&quot;</span>)
+        &amp;&amp; !<span class="macro">cfg!</span>(feature = <span class="string">&quot;eager_sweeping&quot;</span>),
     ..PlanConstraints::default()
 };
 

@@ -72,9 +72,9 @@
 <a href="#72" id="72">72</a>
 <a href="#73" id="73">73</a>
 <a href="#74" id="74">74</a>
-<a href="#75" id="75">75</a>
-<a href="#76" id="76">76</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_release_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
@@ -84,7 +84,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
-<span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
+<span class="kw">use </span><span class="kw">crate</span>::util::VMMutatorThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>enum_map::{enum_map, EnumMap};
 
@@ -112,10 +112,6 @@
     };
 }
 
-<span class="kw">pub fn </span>nogc_mutator_noop&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
-    <span class="macro">unreachable!</span>();
-}
-
 <span class="kw">pub fn </span>create_nogc_mutator&lt;VM: VMBinding&gt;(
     mutator_tls: VMMutatorThread,
     plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
@@ -138,8 +134,8 @@
             ));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>nogc_mutator_noop,
-        release_func: <span class="kw-2">&amp;</span>nogc_mutator_noop,
+        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
+        release_func: <span class="kw-2">&amp;</span>unreachable_release_func,
     };
 
     Mutator {

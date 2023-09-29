@@ -214,6 +214,7 @@
 <a href="#214" id="214">214</a>
 <a href="#215" id="215">215</a>
 <a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
@@ -260,6 +261,7 @@
     needs_forward_after_liveness: <span class="bool-val">true</span>,
     max_non_los_default_alloc_bytes:
         <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+    needs_prepare_mutator: <span class="bool-val">false</span>,
     ..PlanConstraints::default()
 };
 

@@ -66,15 +66,11 @@
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
-<a href="#69" id="69">69</a>
-<a href="#70" id="70">70</a>
-<a href="#71" id="71">71</a>
-<a href="#72" id="72">72</a>
-<a href="#73" id="73">73</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::MarkCompact; <span class="comment">// Add
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_space_mapping;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::ReservedAllocators;
@@ -111,7 +107,7 @@
             vec.push((AllocatorSelector::MarkCompact(<span class="number">0</span>), markcompact.mc_space()));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>markcompact_mutator_prepare,
+        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
         release_func: <span class="kw-2">&amp;</span>markcompact_mutator_release,
     };
 
@@ -122,12 +118,6 @@
         config,
         plan,
     }
-}
-
-<span class="kw">pub fn </span>markcompact_mutator_prepare&lt;VM: VMBinding&gt;(
-    _mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
-    _tls: VMWorkerThread,
-) {
 }
 
 <span class="kw">pub fn </span>markcompact_mutator_release&lt;VM: VMBinding&gt;(

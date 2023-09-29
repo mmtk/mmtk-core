@@ -69,11 +69,9 @@
 <a href="#69" id="69">69</a>
 <a href="#70" id="70">70</a>
 <a href="#71" id="71">71</a>
-<a href="#72" id="72">72</a>
-<a href="#73" id="73">73</a>
-<a href="#74" id="74">74</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SemiSpace;
 <span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
@@ -86,10 +84,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>enum_map::EnumMap;
-
-<span class="kw">pub fn </span>ss_mutator_prepare&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
-    <span class="comment">// Do nothing
-</span>}
 
 <span class="kw">pub fn </span>ss_mutator_release&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {
     <span class="comment">// rebind the allocation bump pointer to the appropriate semispace
@@ -134,7 +128,7 @@
             vec.push((AllocatorSelector::BumpPointer(<span class="number">0</span>), ss.tospace()));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>ss_mutator_prepare,
+        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
         release_func: <span class="kw-2">&amp;</span>ss_mutator_release,
     };
 

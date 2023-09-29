@@ -52,14 +52,9 @@
 <a href="#52" id="52">52</a>
 <a href="#53" id="53">53</a>
 <a href="#54" id="54">54</a>
-<a href="#55" id="55">55</a>
-<a href="#56" id="56">56</a>
-<a href="#57" id="57">57</a>
-<a href="#58" id="58">58</a>
-<a href="#59" id="59">59</a>
-<a href="#60" id="60">60</a>
-<a href="#61" id="61">61</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::PageProtect;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::no_op_release_func;
+<span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::{
@@ -69,17 +64,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<span class="kw">use crate</span>::{
-    plan::barriers::NoBarrier,
-    util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
-};
+<span class="kw">use crate</span>::{plan::barriers::NoBarrier, util::opaque_pointer::VMMutatorThread};
 <span class="kw">use </span>enum_map::EnumMap;
-
-<span class="doccomment">/// Prepare mutator. Do nothing.
-</span><span class="kw">fn </span>pp_mutator_prepare&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {}
-
-<span class="doccomment">/// Release mutator. Do nothing.
-</span><span class="kw">fn </span>pp_mutator_release&lt;VM: VMBinding&gt;(_mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;, _tls: VMWorkerThread) {}
 
 <span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_large_object: <span class="number">1</span>,
@@ -108,8 +94,8 @@
             vec.push((AllocatorSelector::LargeObject(<span class="number">0</span>), <span class="kw-2">&amp;</span>page.space));
             vec
         }),
-        prepare_func: <span class="kw-2">&amp;</span>pp_mutator_prepare,
-        release_func: <span class="kw-2">&amp;</span>pp_mutator_release,
+        prepare_func: <span class="kw-2">&amp;</span>unreachable_prepare_func,
+        release_func: <span class="kw-2">&amp;</span>no_op_release_func,
     };
 
     Mutator {

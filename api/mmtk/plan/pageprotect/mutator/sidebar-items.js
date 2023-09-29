@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_pp_mutator","pp_mutator_prepare","pp_mutator_release"],"struct":["ALLOCATOR_MAPPING"]};
+window.SIDEBAR_ITEMS = {"constant":["RESERVED_ALLOCATORS"],"fn":["create_pp_mutator"],"struct":["ALLOCATOR_MAPPING"]};
