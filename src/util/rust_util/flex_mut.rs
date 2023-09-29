@@ -182,6 +182,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::redundant_clone)] // Allow redundant clone for testing the count
     #[test]
     fn create_clone_drop() {
         let r = ArcFlexMut::new(Foo(42));
@@ -236,6 +237,7 @@ mod tests {
         assert_eq!(read2.get(), 42);
     }
 
+    #[allow(clippy::redundant_clone)] // Allow redundant clone for testing the count
     #[test]
     fn write() {
         let r = ArcFlexMut::new(Foo(42));
