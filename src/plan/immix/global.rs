@@ -15,10 +15,9 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
-use crate::util::rust_util::shared_ref::SharedRef;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use atomic::Ordering;
@@ -31,7 +30,7 @@ pub struct Immix<VM: VMBinding> {
     #[post_scan]
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub immix_space: SharedRef<ImmixSpace<VM>>,
+    pub immix_space: ArcFlexMut<ImmixSpace<VM>>,
     #[parent]
     pub common: CommonPlan<VM>,
     last_gc_was_defrag: AtomicBool,
@@ -67,7 +66,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
                 CopySemantics::DefaultCopy => CopySelector::Immix(0),
                 _ => CopySelector::Unused,
             },
-            space_mapping: vec![(CopySelector::Immix(0), self.immix_space.clone().to_dyn_space())],
+            space_mapping: vec![(
+                CopySelector::Immix(0),
+                self.immix_space.clone().into_dyn_space(),
+            )],
             constraints: &IMMIX_CONSTRAINTS,
         }
     }
@@ -96,8 +98,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // release the collected region
         let mut space = self.immix_space.write();
         let defrag_gc = space.release(true);
-        self.last_gc_was_defrag
-            .store(defrag_gc, Ordering::Relaxed);
+        self.last_gc_was_defrag.store(defrag_gc, Ordering::Relaxed);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -143,7 +144,7 @@ impl<VM: VMBinding> Immix<VM> {
         space_args: ImmixSpaceArgs,
     ) -> Self {
         let immix = Immix {
-            immix_space: SharedRef::new(ImmixSpace::new(
+            immix_space: ArcFlexMut::new(ImmixSpace::new(
                 plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
                 space_args,
             )),

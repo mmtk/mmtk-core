@@ -31,7 +31,9 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
             .plan
             .downcast_ref::<SemiSpace<VM>>()
             .unwrap()
-            .tospace(),
+            .tospace()
+            .clone()
+            .into_dyn_space(),
     );
 }
 
@@ -57,7 +59,10 @@ pub fn create_ss_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, ss);
-            vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));
+            vec.push((
+                AllocatorSelector::BumpPointer(0),
+                ss.tospace().clone().into_dyn_space(),
+            ));
             vec
         }),
         prepare_func: &ss_mutator_prepare,

@@ -5,9 +5,9 @@ use crate::util::Address;
 use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::VMBinding;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
@@ -21,7 +21,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// Bump-pointer itself.
     pub(in crate::util::alloc) bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: SharedRef<dyn Space<VM>>,
+    space: ArcFlexMut<dyn Space<VM>>,
     pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -58,7 +58,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         self.bump_pointer.reset(zero, zero);
     }
 
-    pub fn rebind(&mut self, space: SharedRef<dyn Space<VM>>) {
+    pub fn rebind(&mut self, space: ArcFlexMut<dyn Space<VM>>) {
         self.reset();
         self.space = space;
     }
@@ -160,7 +160,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SharedRef<dyn Space<VM>>,
+        space: ArcFlexMut<dyn Space<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         BumpAllocator {
@@ -184,7 +184,10 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquire_res = self.space.read().acquire(self.tls, bytes_to_pages(block_size));
+        let acquire_res = self
+            .space
+            .read()
+            .acquire(self.tls, bytes_to_pages(block_size));
         match acquire_res {
             Ok(acquired_start) => {
                 trace!(

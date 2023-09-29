@@ -21,7 +21,7 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, Collection, ObjectModel};
+use crate::vm::{ActivePlan, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK};
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
@@ -328,7 +328,13 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: usize) -> Result<Address, SpaceAllocFail> {
+    pub fn alloc(
+        &self,
+        tls: VMThread,
+        size: usize,
+        align: usize,
+        offset: usize,
+    ) -> Result<Address, SpaceAllocFail> {
         // TODO: Should refactor this and Space.acquire()
         if self.get_gc_trigger().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");

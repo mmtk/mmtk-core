@@ -1,5 +1,4 @@
 use crate::global_state::GlobalState;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::address::Address;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
@@ -10,7 +9,6 @@ use crate::MMTK;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;

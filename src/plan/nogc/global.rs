@@ -13,6 +13,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::HasSpaces;
@@ -27,11 +28,11 @@ pub struct NoGC<VM: VMBinding> {
     #[parent]
     pub base: BasePlan<VM>,
     #[space]
-    pub nogc_space: NoGCImmortalSpace<VM>,
+    pub nogc_space: ArcFlexMut<NoGCImmortalSpace<VM>>,
     #[space]
-    pub immortal: ImmortalSpace<VM>,
+    pub immortal: ArcFlexMut<ImmortalSpace<VM>>,
     #[space]
-    pub los: ImmortalSpace<VM>,
+    pub los: ArcFlexMut<ImmortalSpace<VM>>,
 }
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -70,9 +71,9 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.nogc_space.reserved_pages()
-            + self.immortal.reserved_pages()
-            + self.los.reserved_pages()
+        self.nogc_space.read().reserved_pages()
+            + self.immortal.read().reserved_pages()
+            + self.los.read().reserved_pages()
             + self.base.get_used_pages()
     }
 }
@@ -86,21 +87,21 @@ impl<VM: VMBinding> NoGC<VM> {
         };
 
         let res = NoGC {
-            nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
+            nogc_space: ArcFlexMut::new(NoGCImmortalSpace::new(plan_args.get_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
                 VMRequest::discontiguous(),
-            )),
-            immortal: ImmortalSpace::new(plan_args.get_space_args(
+            ))),
+            immortal: ArcFlexMut::new(ImmortalSpace::new(plan_args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
-            )),
-            los: ImmortalSpace::new(plan_args.get_space_args(
+            ))),
+            los: ArcFlexMut::new(ImmortalSpace::new(plan_args.get_space_args(
                 "los",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             base: BasePlan::new(plan_args),
         };
 

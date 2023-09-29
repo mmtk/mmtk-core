@@ -59,7 +59,10 @@ pub fn create_immix_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, immix);
-            vec.push((AllocatorSelector::Immix(0), immix.immix_space.clone().to_dyn_space()));
+            vec.push((
+                AllocatorSelector::Immix(0),
+                immix.immix_space.clone().into_dyn_space(),
+            ));
             vec
         }),
         prepare_func: &immix_mutator_prepare,

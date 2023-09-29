@@ -20,6 +20,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 #[cfg(not(feature = "vo_bit"))]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
@@ -30,7 +31,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 pub struct MarkCompact<VM: VMBinding> {
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub mc_space: MarkCompactSpace<VM>,
+    pub mc_space: ArcFlexMut<MarkCompactSpace<VM>>,
     #[parent]
     pub common: CommonPlan<VM>,
 }
@@ -65,12 +66,12 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
     fn prepare(&mut self, _tls: VMWorkerThread) {
         self.common.prepare(_tls, true);
-        self.mc_space.prepare();
+        self.mc_space.read().prepare();
     }
 
     fn release(&mut self, _tls: VMWorkerThread) {
         self.common.release(_tls, true);
-        self.mc_space.release();
+        self.mc_space.read().release();
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -95,10 +96,11 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
 
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
-            .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
+            .add(CalculateForwardingAddress::<VM>::new(self.mc_space.clone()));
         // do another trace to update references
         scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
+        scheduler.work_buckets[WorkBucketStage::Compact]
+            .add(Compact::<VM>::new(self.mc_space.clone()));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
@@ -165,7 +167,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.mc_space.reserved_pages() + self.common.get_used_pages()
+        self.mc_space.read().reserved_pages() + self.common.get_used_pages()
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -191,8 +193,11 @@ impl<VM: VMBinding> MarkCompact<VM> {
             global_side_metadata_specs,
         };
 
-        let mc_space =
-            MarkCompactSpace::new(plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
+        let mc_space = ArcFlexMut::new(MarkCompactSpace::new(plan_args.get_space_args(
+            "mc",
+            true,
+            VMRequest::discontiguous(),
+        )));
 
         let res = MarkCompact {
             mc_space,
@@ -206,7 +211,7 @@ impl<VM: VMBinding> MarkCompact<VM> {
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn mc_space(&self) -> &MarkCompactSpace<VM> {
+    pub fn mc_space(&self) -> &ArcFlexMut<MarkCompactSpace<VM>> {
         &self.mc_space
     }
 }

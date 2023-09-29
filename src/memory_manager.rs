@@ -95,6 +95,7 @@ pub fn set_vm_space<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, start: Address, 
     unsafe { mmtk.get_plan_mut() }
         .base_mut()
         .vm_space
+        .write()
         .set_vm_region(start, size);
 }
 

@@ -6,6 +6,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
@@ -14,17 +15,17 @@ use std::marker::PhantomData;
 
 /// iterate through the heap and calculate the new location of live objects
 pub struct CalculateForwardingAddress<VM: VMBinding> {
-    mc_space: &'static MarkCompactSpace<VM>,
+    mc_space: ArcFlexMut<MarkCompactSpace<VM>>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.mc_space.calculate_forwarding_pointer();
+        self.mc_space.read().calculate_forwarding_pointer();
     }
 }
 
 impl<VM: VMBinding> CalculateForwardingAddress<VM> {
-    pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
+    pub fn new(mc_space: ArcFlexMut<MarkCompactSpace<VM>>) -> Self {
         Self { mc_space }
     }
 }
@@ -78,17 +79,17 @@ impl<VM: VMBinding> UpdateReferences<VM> {
 
 /// compact live objects based on forwarding pointers calculated before
 pub struct Compact<VM: VMBinding> {
-    mc_space: &'static MarkCompactSpace<VM>,
+    mc_space: ArcFlexMut<MarkCompactSpace<VM>>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.mc_space.compact();
+        self.mc_space.read().compact();
     }
 }
 
 impl<VM: VMBinding> Compact<VM> {
-    pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
+    pub fn new(mc_space: ArcFlexMut<MarkCompactSpace<VM>>) -> Self {
         Self { mc_space }
     }
 }

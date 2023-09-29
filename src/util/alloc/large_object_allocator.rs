@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::{allocator, Allocator};
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
@@ -15,7 +15,7 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: SharedRef<LargeObjectSpace<VM>>,
+    space: ArcFlexMut<LargeObjectSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -65,7 +65,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SharedRef<LargeObjectSpace<VM>>,
+        space: ArcFlexMut<LargeObjectSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         LargeObjectAllocator {

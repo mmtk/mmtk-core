@@ -12,6 +12,7 @@ use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -32,7 +33,7 @@ pub struct MarkSweep<VM: VMBinding> {
     #[parent]
     common: CommonPlan<VM>,
     #[space]
-    ms: MarkSweepSpace<VM>,
+    ms: ArcFlexMut<MarkSweepSpace<VM>>,
 }
 
 pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -56,11 +57,11 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.ms.prepare();
+        self.ms.write().prepare();
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        self.ms.release();
+        self.ms.write().release();
         self.common.release(tls, true);
     }
 
@@ -69,7 +70,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.common.get_used_pages() + self.ms.reserved_pages()
+        self.common.get_used_pages() + self.ms.read().reserved_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -101,11 +102,11 @@ impl<VM: VMBinding> MarkSweep<VM> {
         };
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(plan_args.get_space_args(
+            ms: ArcFlexMut::new(MarkSweepSpace::new(plan_args.get_space_args(
                 "ms",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             common: CommonPlan::new(plan_args),
         };
 
@@ -114,7 +115,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         res
     }
 
-    pub fn ms_space(&self) -> &MarkSweepSpace<VM> {
+    pub fn ms_space(&self) -> &ArcFlexMut<MarkSweepSpace<VM>> {
         &self.ms
     }
 }

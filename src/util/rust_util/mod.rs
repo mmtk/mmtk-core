@@ -2,9 +2,9 @@
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
 
+pub mod flex_mut;
 pub mod rev_group;
 pub mod zeroed_alloc;
-pub mod shared_ref;
 
 /// Const function for min value of two usize numbers.
 pub const fn min_of_usize(a: usize, b: usize) -> usize {

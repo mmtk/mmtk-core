@@ -49,9 +49,18 @@ pub fn create_nogc_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, plan);
-            vec.push((AllocatorSelector::BumpPointer(0), &plan.nogc_space));
-            vec.push((AllocatorSelector::BumpPointer(1), &plan.immortal));
-            vec.push((AllocatorSelector::BumpPointer(2), &plan.los));
+            vec.push((
+                AllocatorSelector::BumpPointer(0),
+                plan.nogc_space.clone().into_dyn_space(),
+            ));
+            vec.push((
+                AllocatorSelector::BumpPointer(1),
+                plan.immortal.clone().into_dyn_space(),
+            ));
+            vec.push((
+                AllocatorSelector::BumpPointer(2),
+                plan.los.clone().into_dyn_space(),
+            ));
             vec
         }),
         prepare_func: &nogc_mutator_noop,

@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::abort_call_site;
 use quote::quote;
-use syn::{DeriveInput, Expr, Field, TypeGenerics, GenericArgument};
+use syn::{DeriveInput, Expr, Field, TypeGenerics};
 
 use crate::util;
 
@@ -45,7 +45,6 @@ pub(crate) fn generate_trace_object<'a>(
     // Generate a check with early return for each space
     let space_field_handler = space_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
-        let f_ty = &f.ty;
 
         // Figure out copy
         let maybe_copy_semantics_attr = util::get_field_attribute(f, "copy_semantics");
@@ -111,7 +110,6 @@ pub(crate) fn generate_post_scan_object<'a>(
 ) -> TokenStream2 {
     let scan_field_handler = post_scan_object_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
-        let f_ty = &f.ty;
 
         quote! {
             {
@@ -154,43 +152,22 @@ pub(crate) fn generate_may_move_objects<'a>(
 ) -> TokenStream2 {
     // If any space or the parent may move objects, the plan may move objects
     let space_handlers = space_fields.iter().map(|f| {
-        use syn::{parse_macro_input, Field, Type, PathArguments, Data, DeriveInput};
+        use syn::{Type, PathArguments};
         if let Type::Path(type_path) = &f.ty {
-            // Check the outer type (Arc)
-            // if type_path.path.segments[0].ident == "Arc" {
-            //     if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {
-            //         if let GenericArgument::Type(Type::Path(inner_type_path)) = &angle_bracketed_args.args.first().unwrap() {
-            //             // Check the inner type (RwLock)
-            //             if let PathArguments::AngleBracketed(inner_angle_bracketed_args) = &inner_type_path.path.segments[0].arguments {
-            //                 let inner_type = &inner_angle_bracketed_args.args.first().unwrap();
-            //                 // `inner_type` is now the type T inside Arc<RwLock<T>>
-            //                 quote! {
-            //                     || <#inner_type as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
-            //                 }
-            //             } else {
-            //                 unreachable!("5 {:?}", f)
-            //             }
-            //         } else {
-            //             unreachable!("4 {:?}", f)
-            //         }
-            //     } else {
-            //         unreachable!("3 {:?}", f)
-            //     }
-            // } else 
-            if type_path.path.segments[0].ident == "SharedRef" {
+            if type_path.path.segments[0].ident == "ArcFlexMut" {
                 if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {
                     let inner_type = &angle_bracketed_args.args.first().unwrap();
                     quote! {
                         || <#inner_type as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
                     }
                 } else {
-                    unreachable!()
+                    unreachable!("Failed to get the inner type of ArcFlexMut: {:?}", f.ty)
                 }
             } else {
-                unreachable!()
+                panic!("Expected a space to be ArcFlexMut<T>, found {:?}", f.ty)
             }
         } else {
-            unreachable!()
+            panic!("Failed to get the type of a space: {:?}", f.ty)
         }
     });
 

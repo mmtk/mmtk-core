@@ -44,7 +44,10 @@ pub fn create_pp_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, page);
-            vec.push((AllocatorSelector::LargeObject(0), &page.space));
+            vec.push((
+                AllocatorSelector::LargeObject(0),
+                page.space.clone().into_dyn_space(),
+            ));
             vec
         }),
         prepare_func: &pp_mutator_prepare,

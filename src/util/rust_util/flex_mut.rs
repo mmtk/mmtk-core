@@ -1,25 +1,26 @@
-use crate::vm::VMBinding;
 use crate::policy::space::Space;
+use crate::vm::VMBinding;
 
-use std::{sync::Arc, ops::Deref, ops::DerefMut};
 use downcast_rs::Downcast;
+use std::{ops::Deref, ops::DerefMut, sync::Arc};
 
 macro_rules! to_trait_object {
-    ($self: expr, $trait: ty) => {
-        {
-            let inner = $self.inner;
-            let raw = Arc::into_raw(inner);
-            let new_inner = unsafe { Arc::from_raw(raw as *const peace_lock::RwLock<$trait>) };
-            SharedRef { inner: new_inner }
-        }
-    }
+    ($self: expr, $trait: ty) => {{
+        let inner = $self.inner;
+        let raw = Arc::into_raw(inner);
+        let new_inner = unsafe { Arc::from_raw(raw as *const peace_lock::RwLock<$trait>) };
+        ArcFlexMut { inner: new_inner }
+    }};
 }
 
-pub struct SharedRef<T> where T: ?Sized {
+pub struct ArcFlexMut<T>
+where
+    T: ?Sized,
+{
     inner: Arc<peace_lock::RwLock<T>>,
 }
 
-impl<T> SharedRef<T> {
+impl<T> ArcFlexMut<T> {
     pub fn new(v: T) -> Self {
         Self {
             inner: Arc::new(peace_lock::RwLock::new(v)),
@@ -27,54 +28,68 @@ impl<T> SharedRef<T> {
     }
 }
 
-impl<T> SharedRef<T> {
-    pub fn to_dyn_space<VM: VMBinding>(self) -> SharedRef<dyn Space<VM>> where T: 'static + Space<VM> {
+impl<T> ArcFlexMut<T> {
+    pub fn into_dyn_space<VM: VMBinding>(self) -> ArcFlexMut<dyn Space<VM>>
+    where
+        T: 'static + Space<VM>,
+    {
         to_trait_object!(self, dyn Space<VM>)
     }
 }
 
-impl<T: ?Sized> SharedRef<T> {
-    pub fn read<'a>(&'a self) -> SharedRefReadGuard<'a, T> {
-        SharedRefReadGuard { inner: self.inner.read() }
+impl<T: ?Sized> ArcFlexMut<T> {
+    pub fn read(&self) -> ArcFlexMutReadGuard<'_, T> {
+        ArcFlexMutReadGuard {
+            inner: self.inner.read(),
+        }
     }
 
-    pub fn write<'a>(&'a self) -> SharedRefWriteGuard<'a, T> {
-        SharedRefWriteGuard { inner: self.inner.write() }
+    pub fn write(&self) -> ArcFlexMutWriteGuard<'_, T> {
+        ArcFlexMutWriteGuard {
+            inner: self.inner.write(),
+        }
     }
 }
 
-impl<T: 'static + Downcast + ?Sized> SharedRef<T> {
+impl<T: 'static + Downcast + ?Sized> ArcFlexMut<T> {
     fn can_downcast<S: 'static>(&self) -> bool {
         let lock = self.inner.read();
-        (&*lock).as_any().downcast_ref::<S>().is_some()
+        (*lock).as_any().downcast_ref::<S>().is_some()
     }
 
-    pub fn downcast<S: 'static>(self) -> SharedRef<S> {
+    pub fn downcast<S: 'static>(self) -> ArcFlexMut<S> {
         if self.can_downcast::<S>() {
             let raw = Arc::into_raw(self.inner);
             let new_inner = unsafe { Arc::from_raw(raw as *const peace_lock::RwLock<S>) };
-            SharedRef {
-                inner: new_inner,
-            }
+            ArcFlexMut { inner: new_inner }
         } else {
             panic!("Failed to downcast")
         }
     }
 }
 
-impl<T> Clone for SharedRef<T> where T: ?Sized {
+impl<T> Clone for ArcFlexMut<T>
+where
+    T: ?Sized,
+{
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone()
+            inner: self.inner.clone(),
         }
     }
 }
 
-pub struct SharedRefReadGuard<'a, T> where T: ?Sized {
+pub struct ArcFlexMutReadGuard<'a, T>
+where
+    T: ?Sized,
+{
     inner: peace_lock::RwLockReadGuard<'a, T>,
 }
 
-impl<T> Deref for SharedRefReadGuard<'_, T> where T: ?Sized {
+impl<T> Deref for ArcFlexMutReadGuard<'_, T>
+where
+    T: ?Sized,
+{
     type Target = T;
 
     #[inline]
@@ -83,11 +98,17 @@ impl<T> Deref for SharedRefReadGuard<'_, T> where T: ?Sized {
     }
 }
 
-pub struct SharedRefWriteGuard<'a, T> where T: ?Sized {
+pub struct ArcFlexMutWriteGuard<'a, T>
+where
+    T: ?Sized,
+{
     inner: peace_lock::RwLockWriteGuard<'a, T>,
 }
 
-impl<T> Deref for SharedRefWriteGuard<'_, T> where T: ?Sized {
+impl<T> Deref for ArcFlexMutWriteGuard<'_, T>
+where
+    T: ?Sized,
+{
     type Target = T;
 
     #[inline]
@@ -96,7 +117,10 @@ impl<T> Deref for SharedRefWriteGuard<'_, T> where T: ?Sized {
     }
 }
 
-impl<T> DerefMut for SharedRefWriteGuard<'_, T> where T: ?Sized {
+impl<T> DerefMut for ArcFlexMutWriteGuard<'_, T>
+where
+    T: ?Sized,
+{
     #[inline]
     fn deref_mut(&mut self) -> &mut T {
         self.inner.deref_mut()
@@ -121,15 +145,18 @@ mod tests {
         }
     }
 
-    impl<T> SharedRef<T> {
-        fn to_dyn_bar(self) -> SharedRef<dyn Bar> where T: 'static + Bar {
+    impl<T> ArcFlexMut<T> {
+        fn into_dyn_bar(self) -> ArcFlexMut<dyn Bar>
+        where
+            T: 'static + Bar,
+        {
             to_trait_object!(self, dyn Bar)
         }
     }
 
     #[test]
     fn create_clone_drop() {
-        let r = SharedRef::new(Foo(42));
+        let r = ArcFlexMut::new(Foo(42));
         assert_eq!(Arc::strong_count(&r.inner), 1);
 
         {
@@ -142,10 +169,10 @@ mod tests {
 
     #[test]
     fn to_trait_object() {
-        let r: SharedRef<Foo> = SharedRef::new(Foo(42));
+        let r: ArcFlexMut<Foo> = ArcFlexMut::new(Foo(42));
         assert_eq!(Arc::strong_count(&r.inner), 1);
 
-        let trait_obj: SharedRef<dyn Bar> = r.clone().to_dyn_bar();
+        let trait_obj: ArcFlexMut<dyn Bar> = r.clone().into_dyn_bar();
         assert_eq!(Arc::strong_count(&r.inner), 2);
         assert_eq!(r.inner.read().get(), 42);
         assert_eq!(Arc::strong_count(&trait_obj.inner), 2);
@@ -157,14 +184,14 @@ mod tests {
 
     #[test]
     fn downcast() {
-        let r = SharedRef::new(Foo(42));
-        let trait_obj: SharedRef<dyn Bar> = r.to_dyn_bar();
+        let r = ArcFlexMut::new(Foo(42));
+        let trait_obj: ArcFlexMut<dyn Bar> = r.into_dyn_bar();
         assert_eq!(Arc::strong_count(&trait_obj.inner), 1);
 
         let trait_obj_clone = trait_obj.clone();
         assert_eq!(Arc::strong_count(&trait_obj.inner), 2);
 
-        let downcast: SharedRef<Foo> = trait_obj_clone.downcast::<Foo>();
+        let downcast: ArcFlexMut<Foo> = trait_obj_clone.downcast::<Foo>();
         assert_eq!(Arc::strong_count(&trait_obj.inner), 2);
         assert_eq!(Arc::strong_count(&downcast.inner), 2);
         assert_eq!(downcast.inner.read().get(), 42);
@@ -172,7 +199,7 @@ mod tests {
 
     #[test]
     fn read() {
-        let r = SharedRef::new(Foo(42));
+        let r = ArcFlexMut::new(Foo(42));
         assert_eq!(r.read().get(), 42);
 
         let read1 = r.read();
@@ -183,9 +210,9 @@ mod tests {
 
     #[test]
     fn write() {
-        let r = SharedRef::new(Foo(42));
+        let r = ArcFlexMut::new(Foo(42));
         let r2 = r.clone();
-        let trait_obj = r.clone().to_dyn_bar();
+        let trait_obj = r.clone().into_dyn_bar();
         let downcast = trait_obj.clone().downcast::<Foo>();
         assert_eq!(Arc::strong_count(&r.inner), 4);
 
@@ -198,7 +225,7 @@ mod tests {
 
     #[test]
     fn multiple_readers() {
-        let r = SharedRef::new(Foo(42));
+        let r = ArcFlexMut::new(Foo(42));
         let read1 = r.read();
         let read2 = r.read();
         assert_eq!(read1.get(), 42);
@@ -208,7 +235,7 @@ mod tests {
     #[test]
     #[cfg_attr(debug_assertions, should_panic)]
     fn multiple_writers() {
-        let r = SharedRef::new(Foo(42));
+        let r = ArcFlexMut::new(Foo(42));
         let write1 = r.write();
         let write2 = r.write();
         assert_eq!(write1.get(), 42);
@@ -218,7 +245,7 @@ mod tests {
     #[test]
     #[cfg_attr(debug_assertions, should_panic)]
     fn mix_reader_writer() {
-        let r = SharedRef::new(Foo(42));
+        let r = ArcFlexMut::new(Foo(42));
         let read = r.read();
         let write = r.write();
         assert_eq!(read.get(), 42);

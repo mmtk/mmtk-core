@@ -4,12 +4,11 @@ use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorCo
 use super::BumpPointer;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
-use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
 use crate::vm::*;
@@ -20,7 +19,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
     pub(in crate::util::alloc) bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    pub(crate) space: SharedRef<ImmixSpace<VM>>,
+    pub(crate) space: ArcFlexMut<ImmixSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
     /// *unused*
@@ -164,7 +163,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 impl<VM: VMBinding> ImmixAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SharedRef<ImmixSpace<VM>>,
+        space: ArcFlexMut<ImmixSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
         copy: bool,
     ) -> Self {
@@ -229,8 +228,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: usize) -> bool {
         while self.line.is_some() || self.acquire_recyclable_block() {
             let line = self.line.unwrap();
-            if let Some((start_line, end_line)) = self.space.read().get_next_available_lines(line)
-            {
+            if let Some((start_line, end_line)) = self.space.read().get_next_available_lines(line) {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.bump_pointer.cursor = start_line.start();
                 self.bump_pointer.limit = end_line.start();

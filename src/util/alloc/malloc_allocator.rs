@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
-use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
@@ -15,7 +14,7 @@ pub struct MallocAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: SharedRef<MallocSpace<VM>>,
+    space: ArcFlexMut<MallocSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
 }
@@ -38,18 +37,21 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        self.space.read().alloc(self.tls, size, align, offset).unwrap_or_else(|_| {
-            use crate::vm::Collection;
-            VM::VMCollection::block_for_gc(VMMutatorThread(self.tls));
-            Address::ZERO
-        })
+        self.space
+            .read()
+            .alloc(self.tls, size, align, offset)
+            .unwrap_or_else(|_| {
+                use crate::vm::Collection;
+                VM::VMCollection::block_for_gc(VMMutatorThread(self.tls));
+                Address::ZERO
+            })
     }
 }
 
 impl<VM: VMBinding> MallocAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: SharedRef<MallocSpace<VM>>,
+        space: ArcFlexMut<MallocSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         MallocAllocator {

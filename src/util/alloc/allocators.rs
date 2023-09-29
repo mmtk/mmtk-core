@@ -4,15 +4,11 @@ use std::sync::Arc;
 
 use memoffset::offset_of;
 
-use crate::policy::immix::ImmixSpace;
-use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::marksweepspace::malloc_ms::MallocSpace;
-use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::Mutator;
@@ -90,7 +86,7 @@ impl<VM: VMBinding> Allocators<VM> {
     pub fn new(
         mutator_tls: VMMutatorThread,
         mmtk: &MMTK<VM>,
-        space_mapping: &[(AllocatorSelector, SharedRef<dyn Space<VM>>)],
+        space_mapping: &[(AllocatorSelector, ArcFlexMut<dyn Space<VM>>)],
     ) -> Self {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },

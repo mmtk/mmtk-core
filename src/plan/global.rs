@@ -8,7 +8,6 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::{PlanCreateSpaceArgs, Space};
-use crate::util::rust_util::shared_ref::SharedRef;
 #[cfg(feature = "vm_space")]
 use crate::policy::vmspace::VMSpace;
 use crate::scheduler::*;
@@ -23,6 +22,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::statistics::stats::Stats;
 use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -39,26 +39,25 @@ pub fn create_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
-        // PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
-        // PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk),
-        // PlanSelector::GenCopy => {
-        //     crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
-        // }
-        // PlanSelector::GenImmix => {
-        //     crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
-        // }
-        // PlanSelector::MarkSweep => crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk),
+        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
+        PlanSelector::SemiSpace => crate::plan::semispace::mutator::create_ss_mutator(tls, mmtk),
+        PlanSelector::GenCopy => {
+            crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
+        }
+        PlanSelector::GenImmix => {
+            crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
+        }
+        PlanSelector::MarkSweep => crate::plan::marksweep::mutator::create_ms_mutator(tls, mmtk),
         PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, mmtk),
-        // PlanSelector::PageProtect => {
-        //     crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
-        // }
-        // PlanSelector::MarkCompact => {
-        //     crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
-        // }
-        // PlanSelector::StickyImmix => {
-        //     crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
-        // }
-        _ => unimplemented!()
+        PlanSelector::PageProtect => {
+            crate::plan::pageprotect::mutator::create_pp_mutator(tls, mmtk)
+        }
+        PlanSelector::MarkCompact => {
+            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, mmtk)
+        }
+        PlanSelector::StickyImmix => {
+            crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
+        }
     })
 }
 
@@ -67,32 +66,31 @@ pub fn create_plan<VM: VMBinding>(
     args: CreateGeneralPlanArgs<VM>,
 ) -> Box<dyn Plan<VM = VM>> {
     let plan = match plan {
-        // PlanSelector::NoGC => {
-        //     Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
-        // }
-        // PlanSelector::SemiSpace => {
-        //     Box::new(crate::plan::semispace::SemiSpace::new(args)) as Box<dyn Plan<VM = VM>>
-        // }
-        // PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(args))
-        //     as Box<dyn Plan<VM = VM>>,
-        // PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(args))
-        //     as Box<dyn Plan<VM = VM>>,
-        // PlanSelector::MarkSweep => {
-        //     Box::new(crate::plan::marksweep::MarkSweep::new(args)) as Box<dyn Plan<VM = VM>>
-        // }
+        PlanSelector::NoGC => {
+            Box::new(crate::plan::nogc::NoGC::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::SemiSpace => {
+            Box::new(crate::plan::semispace::SemiSpace::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(args))
+            as Box<dyn Plan<VM = VM>>,
+        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(args))
+            as Box<dyn Plan<VM = VM>>,
+        PlanSelector::MarkSweep => {
+            Box::new(crate::plan::marksweep::MarkSweep::new(args)) as Box<dyn Plan<VM = VM>>
+        }
         PlanSelector::Immix => {
             Box::new(crate::plan::immix::Immix::new(args)) as Box<dyn Plan<VM = VM>>
         }
-        // PlanSelector::PageProtect => {
-        //     Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
-        // }
-        // PlanSelector::MarkCompact => {
-        //     Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
-        // }
-        // PlanSelector::StickyImmix => {
-        //     Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
-        // }
-        _ => unimplemented!()
+        PlanSelector::PageProtect => {
+            Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::MarkCompact => {
+            Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>
+        }
+        PlanSelector::StickyImmix => {
+            Box::new(crate::plan::sticky::immix::StickyImmix::new(args)) as Box<dyn Plan<VM = VM>>
+        }
     };
 
     // We have created Plan in the heap, and we won't explicitly move it.
@@ -315,13 +313,13 @@ pub struct BasePlan<VM: VMBinding> {
     // Spaces in base plan
     #[cfg(feature = "code_space")]
     #[space]
-    pub code_space: ImmortalSpace<VM>,
+    pub code_space: ArcFlexMut<ImmortalSpace<VM>>,
     #[cfg(feature = "code_space")]
     #[space]
-    pub code_lo_space: ImmortalSpace<VM>,
+    pub code_lo_space: ArcFlexMut<ImmortalSpace<VM>>,
     #[cfg(feature = "ro_space")]
     #[space]
-    pub ro_space: ImmortalSpace<VM>,
+    pub ro_space: ArcFlexMut<ImmortalSpace<VM>>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
     /// for boot image.
@@ -337,7 +335,7 @@ pub struct BasePlan<VM: VMBinding> {
     ///     the VM space.
     #[cfg(feature = "vm_space")]
     #[space]
-    pub vm_space: VMSpace<VM>,
+    pub vm_space: ArcFlexMut<VMSpace<VM>>,
 }
 
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
@@ -393,29 +391,29 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "code_space")]
-            code_space: ImmortalSpace::new(args.get_space_args(
+            code_space: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "code_space",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             #[cfg(feature = "code_space")]
-            code_lo_space: ImmortalSpace::new(args.get_space_args(
+            code_lo_space: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             #[cfg(feature = "ro_space")]
-            ro_space: ImmortalSpace::new(args.get_space_args(
+            ro_space: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             #[cfg(feature = "vm_space")]
-            vm_space: VMSpace::new(args.get_space_args(
+            vm_space: ArcFlexMut::new(VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
                 VMRequest::discontiguous(),
-            )),
+            ))),
 
             global_state: args.global_args.state.clone(),
             gc_trigger: args.global_args.gc_trigger,
@@ -431,12 +429,12 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         #[cfg(feature = "code_space")]
         {
-            pages += self.code_space.reserved_pages();
-            pages += self.code_lo_space.reserved_pages();
+            pages += self.code_space.read().reserved_pages();
+            pages += self.code_lo_space.read().reserved_pages();
         }
         #[cfg(feature = "ro_space")]
         {
-            pages += self.ro_space.reserved_pages();
+            pages += self.ro_space.read().reserved_pages();
         }
 
         // If we need to count malloc'd size as part of our heap, we add it here.
@@ -457,27 +455,27 @@ impl<VM: VMBinding> BasePlan<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
-        if self.code_space.in_space(object) {
+        if self.code_space.read().in_space(object) {
             trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(queue, object);
+            return self.code_space.read().trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(object) {
+        if self.code_lo_space.read().in_space(object) {
             trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(queue, object);
+            return self.code_lo_space.read().trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(object) {
+        if self.ro_space.read().in_space(object) {
             trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(queue, object);
+            return self.ro_space.read().trace_object(queue, object);
         }
 
         #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(object) {
+        if self.vm_space.read().in_space(object) {
             trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(queue, object);
+            return self.vm_space.read().trace_object(queue, object);
         }
 
         VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
@@ -485,24 +483,24 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
-        self.code_space.prepare();
+        self.code_space.write().prepare();
         #[cfg(feature = "code_space")]
-        self.code_lo_space.prepare();
+        self.code_lo_space.write().prepare();
         #[cfg(feature = "ro_space")]
-        self.ro_space.prepare();
+        self.ro_space.write().prepare();
         #[cfg(feature = "vm_space")]
-        self.vm_space.prepare();
+        self.vm_space.write().prepare();
     }
 
     pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
-        self.code_space.release();
+        self.code_space.write().release();
         #[cfg(feature = "code_space")]
-        self.code_lo_space.release();
+        self.code_lo_space.write().release();
         #[cfg(feature = "ro_space")]
-        self.ro_space.release();
+        self.ro_space.write().release();
         #[cfg(feature = "vm_space")]
-        self.vm_space.release();
+        self.vm_space.write().release();
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -542,12 +540,12 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
     #[space]
-    pub immortal: SharedRef<ImmortalSpace<VM>>,
+    pub immortal: ArcFlexMut<ImmortalSpace<VM>>,
     #[space]
-    pub los: SharedRef<LargeObjectSpace<VM>>,
+    pub los: ArcFlexMut<LargeObjectSpace<VM>>,
     // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: SharedRef<ImmortalSpace<VM>>,
+    pub nonmoving: ArcFlexMut<ImmortalSpace<VM>>,
     #[parent]
     pub base: BasePlan<VM>,
 }
@@ -555,16 +553,16 @@ pub struct CommonPlan<VM: VMBinding> {
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
         CommonPlan {
-            immortal: SharedRef::new(ImmortalSpace::new(args.get_space_args(
+            immortal: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
             ))),
-            los: SharedRef::new(LargeObjectSpace::new(
+            los: ArcFlexMut::new(LargeObjectSpace::new(
                 args.get_space_args("los", true, VMRequest::discontiguous()),
                 false,
             )),
-            nonmoving: SharedRef::new(ImmortalSpace::new(args.get_space_args(
+            nonmoving: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
                 VMRequest::discontiguous(),

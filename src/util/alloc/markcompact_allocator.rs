@@ -3,9 +3,9 @@ use std::sync::Arc;
 use super::allocator::AllocatorContext;
 use super::BumpAllocator;
 use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
@@ -25,7 +25,7 @@ impl<VM: VMBinding> MarkCompactAllocator<VM> {
         self.bump_allocator.reset();
     }
 
-    pub fn rebind(&mut self, space: SharedRef<dyn Space<VM>>) {
+    pub fn rebind(&mut self, space: ArcFlexMut<dyn Space<VM>>) {
         self.bump_allocator.rebind(space);
     }
 }
@@ -90,7 +90,7 @@ impl<VM: VMBinding> MarkCompactAllocator<VM> {
         crate::policy::markcompactspace::MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES;
     pub(crate) fn new(
         tls: VMThread,
-        space: SharedRef<dyn Space<VM>>,
+        space: ArcFlexMut<dyn Space<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         MarkCompactAllocator {

@@ -11,6 +11,7 @@ use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -55,7 +56,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
                 CopySemantics::DefaultCopy => CopySelector::Immix(0),
                 _ => CopySelector::Unused,
             },
-            space_mapping: vec![(CopySelector::Immix(0), &self.immix.immix_space)],
+            space_mapping: vec![(
+                CopySelector::Immix(0),
+                self.immix.immix_space.clone().into_dyn_space(),
+            )],
             constraints: &STICKY_IMMIX_CONSTRAINTS,
         }
     }
@@ -94,7 +98,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
                 StickyImmix<VM>,
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-            >(self, &self.immix.immix_space, scheduler);
+            >(self, &self.immix.immix_space.read(), scheduler);
         }
     }
 
@@ -108,11 +112,11 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn prepare(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
             // Prepare both large object space and immix space
-            self.immix.immix_space.prepare(
+            self.immix.immix_space.write().prepare(
                 false,
                 crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
             );
-            self.immix.common.los.prepare(false);
+            self.immix.common.los.write().prepare(false);
         } else {
             self.full_heap_gc_count.lock().unwrap().inc();
             self.immix.prepare(tls);
@@ -121,10 +125,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            let was_defrag = self.immix.immix_space.release(false);
+            let was_defrag = self.immix.immix_space.write().release(false);
             self.immix
                 .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
-            self.immix.common.los.release(false);
+            self.immix.common.los.write().release(false);
         } else {
             self.immix.release(tls);
         }
@@ -142,9 +146,12 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         space_full: bool,
         space: Option<&dyn crate::policy::space::Space<Self::VM>>,
     ) -> bool {
-        let nursery_full =
-            self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
-        if space_full && space.is_some() && space.unwrap().name() != self.immix.immix_space.name() {
+        let nursery_full = self.immix.immix_space.read().get_pages_allocated()
+            > self.options().get_max_nursery_pages();
+        if space_full
+            && space.is_some()
+            && space.unwrap().name() != self.immix.immix_space.read().name()
+        {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
         self.immix.collection_required(space_full, space) || nursery_full
@@ -171,15 +178,16 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             }
 
             // Every reachable object should be marked
-            if self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
+            if self.immix.immix_space.read().in_space(object)
+                && !self.immix.immix_space.read().is_marked(object)
             {
                 error!(
                     "Object {} is not marked (all objects that have been traced should be marked)",
                     object
                 );
                 return false;
-            } else if self.immix.common.los.in_space(object)
-                && !self.immix.common.los.is_live(object)
+            } else if self.immix.common.los.read().in_space(object)
+                && !self.immix.common.los.read().is_live(object)
             {
                 error!("LOS Object {} is not marked", object);
                 return false;
@@ -195,11 +203,12 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
     }
 
     fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
-        self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
+        self.immix.immix_space.read().in_space(object)
+            && !self.immix.immix_space.read().is_marked(object)
     }
 
     fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
-        space.common().descriptor == self.immix.immix_space.common().descriptor
+        space.common().descriptor == self.immix.immix_space.read().common().descriptor
     }
 
     // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
@@ -213,11 +222,11 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {
-        self.immix.immix_space.available_physical_pages()
+        self.immix.immix_space.read().available_physical_pages()
     }
 
     fn get_mature_reserved_pages(&self) -> usize {
-        self.immix.immix_space.reserved_pages()
+        self.immix.immix_space.read().reserved_pages()
     }
 
     fn force_full_heap_collection(&self) {
@@ -236,22 +245,26 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
         object: crate::util::ObjectReference,
         worker: &mut crate::scheduler::GCWorker<VM>,
     ) -> crate::util::ObjectReference {
-        if self.immix.immix_space.in_space(object) {
+        if self.immix.immix_space.read().in_space(object) {
             if !self.is_object_in_nursery(object) {
                 // Mature object
                 trace!("Immix mature object {}, skip", object);
                 return object;
             } else {
                 let object = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
-                    let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(
-                        queue,
-                        object,
-                        // We just use default copy here. We have set args for ImmixSpace to deal with unlogged bit,
-                        // and we do not need to use CopySemantics::PromoteToMature.
-                        CopySemantics::DefaultCopy,
-                        worker,
-                        true,
-                    );
+                    let ret = self
+                        .immix
+                        .immix_space
+                        .read()
+                        .trace_object_with_opportunistic_copy(
+                            queue,
+                            object,
+                            // We just use default copy here. We have set args for ImmixSpace to deal with unlogged bit,
+                            // and we do not need to use CopySemantics::PromoteToMature.
+                            CopySemantics::DefaultCopy,
+                            worker,
+                            true,
+                        );
                     trace!(
                         "Immix nursery object {} is being traced with opportunistic copy {}",
                         object,
@@ -269,6 +282,7 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
                     );
                     self.immix
                         .immix_space
+                        .read()
                         .trace_object_without_moving(queue, object)
                 };
 
@@ -276,11 +290,12 @@ impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> f
             }
         }
 
-        if self.immix.common().get_los().in_space(object) {
+        if self.immix.common().los.read().in_space(object) {
             return self
                 .immix
                 .common()
-                .get_los()
+                .los
+                .read()
                 .trace_object::<Q>(queue, object);
         }
 
@@ -352,7 +367,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
         }
     }
 
-    pub fn get_immix_space(&self) -> &ImmixSpace<VM> {
+    pub fn get_immix_space(&self) -> &ArcFlexMut<ImmixSpace<VM>> {
         &self.immix.immix_space
     }
 }

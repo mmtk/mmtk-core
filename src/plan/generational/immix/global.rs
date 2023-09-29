@@ -18,6 +18,7 @@ use crate::scheduler::GCWorker;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -43,7 +44,7 @@ pub struct GenImmix<VM: VMBinding> {
     #[post_scan]
     #[space]
     #[copy_semantics(CopySemantics::Mature)]
-    pub immix_space: ImmixSpace<VM>,
+    pub immix_space: ArcFlexMut<ImmixSpace<VM>>,
     /// Whether the last GC was a defrag GC for the immix space.
     pub last_gc_was_defrag: AtomicBool,
     /// Whether the last GC was a full heap GC
@@ -77,7 +78,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 CopySemantics::Mature => CopySelector::ImmixHybrid(0),
                 _ => CopySelector::Unused,
             },
-            space_mapping: vec![(CopySelector::ImmixHybrid(0), &self.immix_space)],
+            space_mapping: vec![(
+                CopySelector::ImmixHybrid(0),
+                self.immix_space.clone().into_dyn_space(),
+            )],
             constraints: &GENIMMIX_CONSTRAINTS,
         }
     }
@@ -112,7 +116,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 GenImmix<VM>,
                 GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
                 GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-            >(self, &self.immix_space, scheduler);
+            >(self, &self.immix_space.read(), scheduler);
         }
     }
 
@@ -124,7 +128,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
-            self.immix_space.prepare(
+            self.immix_space.write().prepare(
                 full_heap,
                 crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
             );
@@ -135,7 +139,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
-            let did_defrag = self.immix_space.release(full_heap);
+            let did_defrag = self.immix_space.write().release(full_heap);
             self.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
         } else {
             self.last_gc_was_defrag.store(false, Ordering::Relaxed);
@@ -150,11 +154,11 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
-        self.gen.get_collection_reserved_pages() + self.immix_space.defrag_headroom_pages()
+        self.gen.get_collection_reserved_pages() + self.immix_space.read().defrag_headroom_pages()
     }
 
     fn get_used_pages(&self) -> usize {
-        self.gen.get_used_pages() + self.immix_space.reserved_pages()
+        self.gen.get_used_pages() + self.immix_space.read().reserved_pages()
     }
 
     /// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
@@ -189,23 +193,23 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
     }
 
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
-        self.gen.nursery.in_space(object)
+        self.gen.nursery.read().in_space(object)
     }
 
     fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
-        space.common().descriptor == self.gen.nursery.common().descriptor
+        space.common().descriptor == self.gen.nursery.read().common().descriptor
     }
 
     fn is_address_in_nursery(&self, addr: Address) -> bool {
-        self.gen.nursery.address_in_space(addr)
+        self.gen.nursery.read().address_in_space(addr)
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {
-        self.immix_space.available_physical_pages()
+        self.immix_space.read().available_physical_pages()
     }
 
     fn get_mature_reserved_pages(&self) -> usize {
-        self.immix_space.reserved_pages()
+        self.immix_space.read().reserved_pages()
     }
 
     fn force_full_heap_collection(&self) {
@@ -236,7 +240,7 @@ impl<VM: VMBinding> GenImmix<VM> {
             global_side_metadata_specs:
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
-        let immix_space = ImmixSpace::new(
+        let immix_space = ArcFlexMut::new(ImmixSpace::new(
             plan_args.get_space_args("immix_mature", true, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
@@ -246,7 +250,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
                 mixed_age: false,
             },
-        );
+        ));
 
         let genimmix = GenImmix {
             gen: CommonGenPlan::new(plan_args),

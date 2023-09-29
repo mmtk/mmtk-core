@@ -3,13 +3,12 @@
 use std::sync::Arc;
 
 use crate::policy::marksweepspace::native_ms::*;
-use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
-use crate::util::VMMutatorThread;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
+use crate::util::VMMutatorThread;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 
@@ -19,7 +18,7 @@ use super::allocator::AllocatorContext;
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
-    space: SharedRef<MarkSweepSpace<VM>>,
+    space: ArcFlexMut<MarkSweepSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     _pad: usize,
     /// blocks with free space
@@ -130,7 +129,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // New free list allcoator
     pub(crate) fn new(
         tls: VMThread,
-        space: SharedRef<MarkSweepSpace<VM>>,
+        space: ArcFlexMut<MarkSweepSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         FreeListAllocator {
@@ -462,12 +461,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         debug!("reset");
         // sweep all blocks and push consumed onto available list
         for bin in 0..MI_BIN_FULL {
+            let space = self.space.read();
             // Sweep available blocks
-            self.available_blocks[bin].sweep_blocks(self.space);
-            self.available_blocks_stress[bin].sweep_blocks(self.space);
+            self.available_blocks[bin].sweep_blocks(&space);
+            self.available_blocks_stress[bin].sweep_blocks(&space);
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
-            self.consumed_blocks[bin].sweep_blocks(self.space);
+            self.consumed_blocks[bin].sweep_blocks(&space);
             if *self.context.options.precise_stress
                 && self.context.options.is_stress_test_gc_enabled()
             {

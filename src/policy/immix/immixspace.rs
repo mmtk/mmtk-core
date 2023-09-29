@@ -7,7 +7,6 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space, SpaceAllocFail};
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::*;
@@ -20,6 +19,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
@@ -989,7 +989,7 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     pub(crate) fn new(
         tls: VMWorkerThread,
         context: Arc<AllocatorContext<VM>>,
-        space: SharedRef<ImmixSpace<VM>>,
+        space: ArcFlexMut<ImmixSpace<VM>>,
     ) -> Self {
         ImmixCopyContext {
             allocator: ImmixAllocator::new(tls.0, space, context, true),
@@ -1038,7 +1038,7 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
     pub(crate) fn new(
         tls: VMWorkerThread,
         context: Arc<AllocatorContext<VM>>,
-        space: SharedRef<ImmixSpace<VM>>,
+        space: ArcFlexMut<ImmixSpace<VM>>,
     ) -> Self {
         ImmixHybridCopyContext {
             copy_allocator: ImmixAllocator::new(tls.0, space.clone(), context.clone(), false),
@@ -1046,7 +1046,7 @@ impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
         }
     }
 
-    fn get_space(&self) -> &SharedRef<ImmixSpace<VM>> {
+    fn get_space(&self) -> &ArcFlexMut<ImmixSpace<VM>> {
         // Both copy allocators should point to the same space.
         debug_assert_eq!(
             self.defrag_allocator.space.read().common().descriptor,

@@ -4,10 +4,10 @@ use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -26,7 +26,7 @@ pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
     #[space]
     #[copy_semantics(CopySemantics::PromoteToMature)]
-    pub nursery: SharedRef<CopySpace<VM>>,
+    pub nursery: ArcFlexMut<CopySpace<VM>>,
     /// The common plan.
     #[parent]
     pub common: CommonPlan<VM>,
@@ -54,7 +54,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let common = CommonPlan::new(args);
 
         CommonGenPlan {
-            nursery: SharedRef::new(nursery),
+            nursery: ArcFlexMut::new(nursery),
             common,
             gc_full_heap: AtomicBool::default(),
             next_gc_full_heap: AtomicBool::new(false),

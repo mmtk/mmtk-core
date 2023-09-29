@@ -10,6 +10,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
     plan::global::CommonPlan, policy::largeobjectspace::LargeObjectSpace,
@@ -22,7 +23,7 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct PageProtect<VM: VMBinding> {
     #[space]
-    pub space: LargeObjectSpace<VM>,
+    pub space: ArcFlexMut<LargeObjectSpace<VM>>,
     #[parent]
     pub common: CommonPlan<VM>,
 }
@@ -47,12 +48,12 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.space.prepare(true);
+        self.space.write().prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        self.space.release(true);
+        self.space.write().release(true);
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
@@ -60,7 +61,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     }
 
     fn get_used_pages(&self) -> usize {
-        self.space.reserved_pages() + self.common.get_used_pages()
+        self.space.read().reserved_pages() + self.common.get_used_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -97,10 +98,10 @@ impl<VM: VMBinding> PageProtect<VM> {
         };
 
         let ret = PageProtect {
-            space: LargeObjectSpace::new(
+            space: ArcFlexMut::new(LargeObjectSpace::new(
                 plan_args.get_space_args("pageprotect", true, VMRequest::discontiguous()),
                 true,
-            ),
+            )),
             common: CommonPlan::new(plan_args),
         };
 

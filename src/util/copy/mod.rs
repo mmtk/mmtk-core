@@ -3,14 +3,12 @@ use std::sync::Arc;
 
 use crate::plan::PlanConstraints;
 use crate::policy::copy_context::PolicyCopyContext;
-use crate::policy::copyspace::CopySpace;
 use crate::policy::copyspace::CopySpaceCopyContext;
-use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::{ImmixCopyContext, ImmixHybridCopyContext};
 use crate::policy::space::Space;
-use crate::util::rust_util::shared_ref::SharedRef;
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::VMWorkerThread;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -26,7 +24,7 @@ const MAX_COPYSPACE_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_HYBRID_COPY_ALLOCATORS: usize = 1;
 
-type CopySpaceMapping<VM> = Vec<(CopySelector, SharedRef<dyn Space<VM>>)>;
+type CopySpaceMapping<VM> = Vec<(CopySelector, ArcFlexMut<dyn Space<VM>>)>;
 
 /// A configuration for GCWorkerCopyContext.
 /// Similar to a `MutatorConfig`,

@@ -333,12 +333,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 }
             }
         }
-        use crate::vm::Collection;
 
         let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
         match acquired {
             Err(_) => BlockAcquireResult::Exhausted,
-            Ok(addr) => BlockAcquireResult::Fresh(Block::from_unaligned_address(addr))
+            Ok(addr) => BlockAcquireResult::Fresh(Block::from_unaligned_address(addr)),
         }
     }
 
