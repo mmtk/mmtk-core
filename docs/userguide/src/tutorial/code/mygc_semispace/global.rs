@@ -15,6 +15,7 @@ use crate::util::copy::*;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
@@ -32,10 +33,10 @@ pub struct MyGC<VM: VMBinding> {
     pub hi: AtomicBool,
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub copyspace0: CopySpace<VM>,
+    pub copyspace0: ArcFlexMut<CopySpace<VM>>,
     #[space]
     #[copy_semantics(CopySemantics::DefaultCopy)]
-    pub copyspace1: CopySpace<VM>,
+    pub copyspace1: ArcFlexMut<CopySpace<VM>>,
     #[parent]
     pub common: CommonPlan<VM>,
 }
@@ -66,7 +67,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
             },
             space_mapping: vec![
                 // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), &self.copyspace0)
+                (CopySelector::CopySpace(0), self.copyspace0.clone().into_dyn_space())
             ],
             constraints: &MYGC_CONSTRAINTS,
         }
@@ -99,19 +100,19 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
             .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst);
         // Flips 'hi' to flip space definitions
         let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
+        self.copyspace0.read().prepare(hi);
+        self.copyspace1.read().prepare(!hi);
 
-        self.fromspace_mut()
+        self.fromspace().write()
             .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
-        self.tospace_mut().set_copy_for_sft_trace(None);
+        self.tospace().write().set_copy_for_sft_trace(None);
     }
     // ANCHOR_END: prepare
 
     // Add
     // ANCHOR: prepare_worker
     fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
-        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace().clone());
     }
     // ANCHOR_END: prepare_worker
 
@@ -119,21 +120,21 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR: release
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
-        self.fromspace().release();
+        self.fromspace().read().release();
     }
     // ANCHOR_END: release
 
     // Modify
     // ANCHOR: plan_get_collection_reserve
     fn get_collection_reserved_pages(&self) -> usize {
-        self.tospace().reserved_pages()
+        self.tospace().read().reserved_pages()
     }
     // ANCHOR_END: plan_get_collection_reserve
 
     // Modify
     // ANCHOR: plan_get_used_pages
     fn get_used_pages(&self) -> usize {
-        self.tospace().reserved_pages() + self.common.get_used_pages()
+        self.tospace().read().reserved_pages() + self.common.get_used_pages()
     }
     // ANCHOR_END: plan_get_used_pages
 
@@ -170,9 +171,9 @@ impl<VM: VMBinding> MyGC<VM> {
         let res = MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
-            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
+            copyspace0: ArcFlexMut::new(CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false)),
             // ANCHOR_END: copyspace_new
-            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
+            copyspace1: ArcFlexMut::new(CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true)),
             common: CommonPlan::new(plan_args),
         };
 
@@ -183,7 +184,7 @@ impl<VM: VMBinding> MyGC<VM> {
     // ANCHOR_END: plan_new
 
     // ANCHOR: plan_space_access
-    pub fn tospace(&self) -> &CopySpace<VM> {
+    pub fn tospace(&self) -> &ArcFlexMut<CopySpace<VM>> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace1
         } else {
@@ -191,27 +192,11 @@ impl<VM: VMBinding> MyGC<VM> {
         }
     }
 
-    pub fn fromspace(&self) -> &CopySpace<VM> {
+    pub fn fromspace(&self) -> &ArcFlexMut<CopySpace<VM>> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace0
         } else {
             &self.copyspace1
-        }
-    }
-
-    pub fn tospace_mut(&mut self) -> &mut CopySpace<VM> {
-        if self.hi.load(Ordering::SeqCst) {
-            &mut self.copyspace1
-        } else {
-            &mut self.copyspace0
-        }
-    }
-
-    pub fn fromspace_mut(&mut self) -> &mut CopySpace<VM> {
-        if self.hi.load(Ordering::SeqCst) {
-            &mut self.copyspace0
-        } else {
-            &mut self.copyspace1
         }
     }
     // ANCHOR_END: plan_space_access

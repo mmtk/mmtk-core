@@ -56,8 +56,11 @@ Change `pub struct MyGC<VM: VMBinding>` to add new instance variables.
    1. Delete the existing fields in the constructor.
    2. Add `pub hi: AtomicBool,`. This is a thread-safe bool, indicating which 
    copyspace is the tospace.
-   3. Add `pub copyspace0: CopySpace<VM>,` 
-   and `pub copyspace1: CopySpace<VM>,`. These are the two copyspaces.
+   3. Add `pub copyspace0: ArcFlexMut<CopySpace<VM>>,` 
+   and `pub copyspace1: ArcFlexMut<CopySpace<VM>>,`. These are the two copyspaces.
+   We use the type `ArcFlexMut` from `mmtk::util::rust_util::flex_mut`, which
+   allows us to share the reference among different types and allows us to
+   flexibly acquire mutable references.
    4. Add `pub common: CommonPlan<VM>,`.
     This holds an instance of the common plan.
 
