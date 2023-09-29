@@ -245,8 +245,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         }
 
         // We assume this is the only running work packet that accesses plan at the point of execution
-        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        plan_mut.end_of_gc(worker.tls);
+        mmtk.get_plan().end_of_gc(worker.tls);
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {

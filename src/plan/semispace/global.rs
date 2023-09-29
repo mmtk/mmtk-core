@@ -76,7 +76,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
 
         self.hi
@@ -96,7 +96,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             .rebind(self.tospace().clone());
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
+    fn release(&self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
         self.fromspace().read().release();

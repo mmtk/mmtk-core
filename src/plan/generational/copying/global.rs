@@ -87,7 +87,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&self, tls: VMWorkerThread) {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
@@ -109,7 +109,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             .rebind(self.tospace().clone());
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
+    fn release(&self, tls: VMWorkerThread) {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
@@ -117,7 +117,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn end_of_gc(&self, _tls: VMWorkerThread) {
         self.gen
             .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
     }

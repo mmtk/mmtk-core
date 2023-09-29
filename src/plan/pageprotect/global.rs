@@ -46,12 +46,12 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         self.space.write().prepare(true);
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
+    fn release(&self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         self.space.write().release(true);
     }

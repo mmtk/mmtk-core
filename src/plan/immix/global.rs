@@ -86,14 +86,14 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         let stats_for_defrag = crate::policy::immix::defrag::PlanStatsForDefrag::collect(self);
         let mut space = self.immix_space.write();
         space.prepare(true, stats_for_defrag);
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
+    fn release(&self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
         let mut space = self.immix_space.write();

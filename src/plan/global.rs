@@ -168,7 +168,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn prepare(&mut self, tls: VMWorkerThread);
+    fn prepare(&self, tls: VMWorkerThread);
 
     /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific
     /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
@@ -177,11 +177,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Release the plan after transitive closure. A plan can implement this method to call each policy's release,
     /// or create any work packet that should be done in release.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn release(&mut self, tls: VMWorkerThread);
+    fn release(&self, tls: VMWorkerThread);
 
     /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
+    fn end_of_gc(&self, _tls: VMWorkerThread) {}
 
     fn notify_emergency_collection(&self) {
         if let Some(gen) = self.generational() {
@@ -481,7 +481,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
     }
 
-    pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
+    pub fn prepare(&self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.write().prepare();
         #[cfg(feature = "code_space")]
@@ -492,7 +492,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.write().prepare();
     }
 
-    pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
+    pub fn release(&self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.write().release();
         #[cfg(feature = "code_space")]
@@ -608,7 +608,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object::<Q>(queue, object, worker)
     }
 
-    pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
+    pub fn prepare(&self, tls: VMWorkerThread, full_heap: bool) {
         {
             let mut space = self.immortal.write();
             space.prepare();
@@ -624,7 +624,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.prepare(tls, full_heap)
     }
 
-    pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
+    pub fn release(&self, tls: VMWorkerThread, full_heap: bool) {
         {
             let mut space = self.immortal.write();
             space.release();

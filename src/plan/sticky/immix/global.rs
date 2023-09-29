@@ -109,7 +109,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         &super::mutator::ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: crate::util::VMWorkerThread) {
+    fn prepare(&self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
             // Prepare both large object space and immix space
             self.immix.immix_space.write().prepare(
@@ -123,7 +123,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         }
     }
 
-    fn release(&mut self, tls: crate::util::VMWorkerThread) {
+    fn release(&self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
             let was_defrag = self.immix.immix_space.write().release(false);
             self.immix
@@ -134,7 +134,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, _tls: crate::util::opaque_pointer::VMWorkerThread) {
+    fn end_of_gc(&self, _tls: crate::util::opaque_pointer::VMWorkerThread) {
         let next_gc_full_heap =
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap

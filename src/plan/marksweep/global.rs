@@ -55,12 +55,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         self.ms.write().prepare();
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
+    fn release(&self, tls: VMWorkerThread) {
         self.ms.write().release();
         self.common.release(tls, true);
     }
