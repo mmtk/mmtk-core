@@ -17,7 +17,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// Bump-pointer itself.
-    pub(in crate::util::alloc) bump_pointer: BumpPointer,
+    pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static dyn Space<VM>,
     /// [`Plan`] instance that this allocator instance is associated with.

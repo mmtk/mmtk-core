@@ -9,3 +9,4 @@
     - [Next Steps](./howto/next_steps.md)
 - [Performance Tuning]()
     - [Link Time Optimization](./perf_tuning/lto.md)
+    - [Optimizing Allocation](./perf_tuning/alloc.md)
