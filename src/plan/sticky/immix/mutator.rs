@@ -1,7 +1,7 @@
 use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::immix;
-use crate::plan::mutator_context::{create_space_mapping, MutatorConfig};
+use crate::plan::mutator_context::{create_space_mapping, unreachable_prepare_func, MutatorConfig};
 use crate::plan::sticky::immix::global::StickyImmix;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::AllocatorSelector;
@@ -9,10 +9,6 @@ use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::{Mutator, MMTK};
-
-pub fn stickyimmix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
-    immix::mutator::immix_mutator_prepare(mutator, tls)
-}
 
 pub fn stickyimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     immix::mutator::immix_mutator_release(mutator, tls)
@@ -36,7 +32,7 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
             ));
             vec
         }),
-        prepare_func: &stickyimmix_mutator_prepare,
+        prepare_func: &unreachable_prepare_func,
         release_func: &stickyimmix_mutator_release,
     };
 

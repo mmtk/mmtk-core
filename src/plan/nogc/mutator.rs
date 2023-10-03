@@ -1,4 +1,6 @@
 use crate::plan::barriers::NoBarrier;
+use crate::plan::mutator_context::unreachable_prepare_func;
+use crate::plan::mutator_context::unreachable_release_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
@@ -7,7 +9,7 @@ use crate::plan::mutator_context::{
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::{VMMutatorThread, VMWorkerThread};
+use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use enum_map::{enum_map, EnumMap};
@@ -36,10 +38,6 @@ lazy_static! {
     };
 }
 
-pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    unreachable!();
-}
-
 pub fn create_nogc_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
@@ -63,8 +61,8 @@ pub fn create_nogc_mutator<VM: VMBinding>(
             ));
             vec
         }),
-        prepare_func: &nogc_mutator_noop,
-        release_func: &nogc_mutator_noop,
+        prepare_func: &unreachable_prepare_func,
+        release_func: &unreachable_release_func,
     };
 
     Mutator {

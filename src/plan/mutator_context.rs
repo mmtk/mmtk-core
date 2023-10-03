@@ -14,6 +14,28 @@ use enum_map::EnumMap;
 
 pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, ArcFlexMut<dyn Space<VM>>)>;
 
+/// A place-holder implementation for `MutatorConfig::prepare_func` that should not be called.
+/// It is the most often used by plans that sets `PlanConstraints::needs_prepare_mutator` to
+/// `false`.  It is also used by `NoGC` because it must not trigger GC.
+pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
+    _mutator: &mut Mutator<VM>,
+    _tls: VMWorkerThread,
+) {
+    unreachable!("`MutatorConfig::prepare_func` must not be called for the current plan.")
+}
+
+/// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
+/// Currently only used by `NoGC`.
+pub(crate) fn unreachable_release_func<VM: VMBinding>(
+    _mutator: &mut Mutator<VM>,
+    _tls: VMWorkerThread,
+) {
+    unreachable!("`MutatorConfig::release_func` must not be called for the current plan.")
+}
+
+/// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
+pub(crate) fn no_op_release_func<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
+
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
 #[repr(C)]
