@@ -1,4 +1,3 @@
-use std::mem::size_of;
 use std::mem::MaybeUninit;
 
 use memoffset::offset_of;
