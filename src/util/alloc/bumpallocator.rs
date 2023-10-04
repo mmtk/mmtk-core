@@ -27,6 +27,7 @@ pub struct BumpAllocator<VM: VMBinding> {
 /// A common fast-path bump-pointer allocator shared across different allocator implementations
 /// that use bump-pointer allocation.
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct BumpPointer {
     pub cursor: Address,
     pub limit: Address,

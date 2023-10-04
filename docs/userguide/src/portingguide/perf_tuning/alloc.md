@@ -1,6 +1,6 @@
 # Optimizing Allocation
 
-MMTk provides an allocation function, [`alloc()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.alloc.html),
+MMTk provides [`alloc()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.alloc.html)
 and [`post_alloc()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.post_alloc.html), to allocate a piece of memory, and
 finalize the memory as an object. Calling them is sufficient for a functional implementation, and we recommend doing
 so in the early development of an MMTk integration. However, as allocation is performance critical, runtimes generally would
@@ -23,53 +23,33 @@ Usually one of the following approaches is used to store MMTk mutators.
 ### Option 1: Storing the pointer
 
 MMTk returns a boxed pointer of `Mutator`. It is simple to store it in the TLS.
-This approach does not make any assumption about the intenral of a MMTk `Mutator`. However, it requires one more pointer dereference
-to use the mutator, thus has suboptimal performance.
+This approach does not make any assumption about the intenral of a MMTk `Mutator`. However, it requires an extra pointer dereference
+whene accessing a value in the mutator. This may sound not that bad. However, this degrades the performance of
+a carefully implemented inlined fastpath allocation sequence which is normally just a few instructions.
+This approach could be a simple start in the early development, but we do not recommend it for an efficient implementation.
 
 If the implementation language is not Rust,
 the binding needs to turn the boxed pointer into a raw pointer before storing it.
 
 ```rust
-struct TLS {
-    ...
-    mmtk_mutator: Box<Mutator>,
-}
-
-// Bind an MMTk mutator
-let mutator = mmtk::memory_manager::bind_mutator(&mmtk, tls_opaque_pointer);
-// Store the pointer in TLS.
-tls.mmtk_mutator = mutator;
-
-// Allocate
-let addr = mmtk::memory_manager::alloc(&tls.mmtk_mutator, ...);
+{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_boxed_pointer}}
 ```
 
 ### Option 2: Embed the `Mutator` struct
 
 To remove the extra pointer dereference, the binding can embed the `Mutator` type into their TLS type. This saves the extra dereference.
 
-If the implementation language is not Rust, it needs to create a type that has the same layout as `Mutator`. It is recommended to
+If the implementation language is not Rust, the developer needs to create a type that has the same layout as `Mutator`. It is recommended to
 have an assertion to ensure that the native type has the exact same layout as the Rust type `Mutator`.
 
 ```rust
-struct TLS {
-    ...
-    mmtk_mutator: Mutator,
-}
-
-// Bind an MMTk Mutator
-let mutator = mmtk::memory_manager::bind_mutator(&mmtk, tls_opaque_pointer);
-// Store the struct (or use memcpy for non-Rust)
-tls.mmtk_mutator = Box::into_inner(mutator);
-
-// Allocator
-let addr = mmtk::memory_manager::alloc(&tls.mmtk_mutator, ...);
+{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_embed_mutator_struct}}
 ```
 
 ### Option 3: Embed the fastpath struct
 
-The size of `Mutator` is usually a few hundreds of bytes, which could be large for TLS for some langauges.
-And it requires to duplicate a native type for the `Mutator` struct if the implementation language is not Rust.
+The size of `Mutator` is a few hundreds of bytes, which could be considered as too large for TLS in some langauge implementations.
+Embedding `Mutator` also requires to duplicate a native type for the `Mutator` struct if the implementation language is not Rust.
 Sometimes it is undesirable to embed the `Mutator` type. One can choose only embed the fastpath struct that is in use.
 
 Unlike the `Mutator` type, the fastpath struct has a C-compatible layout, and it is simple and primitive enough
@@ -77,40 +57,14 @@ so it is unlikely to change. For example, MMTk provides [`BumpPointer`](https://
 which simply includes a `cursor` and a `limit`.
 
 The following example shows how to create a fastpath `BumpPointer`, how to allocate from it in a fast path, and
-how to sync values with the mutator struct and call the slow path.
+how to sync values with the mutator struct and call the slow path. Be aware that the following example implements
+fastpath allocation for a bump pointer allocator, and it assumes the allocator for `AllocationSemantics::Default`
+in the selected plan is a bump pointer allocator. So the example only works for certain plans, such as `NoGC`,
+`SemiSpace`, `Immix`, etc. Also the example only implements the fastpath for one allocator (the default allocator). 
+If you would like to use multiple `AllocationSemantics`, you would need to maintain multiple fastpath structs for each allocator you use.
 
 ```rust
-struct TLS {
-    ...
-    default_bump_pointer: BumpPointer,
-    mmtk_mutator: Box<Mutator>,
-}
-
-// Bind an MMTk Mutator
-let mutator = mmtk::memory_manager::bind_mutator(&mmtk, tls_opaque_pointer);
-// Store the struct (or use memcpy for non-Rust)
-tls.mmtk_mutator = mutator;
-// Initialize the default allocator -- it only works if the default allocator for the current plan is a bump pointer allocator.
-let default_selector = mmtk::memory_manager::get_allocator_mapping(&mmtk, AllocationSemantics::Default);
-let default_allocator_in_mutator = tls.mmtk_mutator.allocator_impl::<mmtk::util::alloc::BumpAllocator>(default_selector);
-tls.default_bump_pointer = BumpPointer::new(default_allocator_in_mutator.bump_pointer.cursor, default_allocator_in_mutator.bump_pointer.limit);
-
-// Allocate
-let new_cursor = tls.default_bump_pointer.cursor + size; // Alignment is ignored.
-let addr = if new_cursor < tls.default_bump_pointer.limit {
-    // - fastpath: direct allocate from `BumpPointer`.
-    let res = tls.default_bump_pointer.cursor;
-    tls.default_bump_pointer.cursor = new_cursor;
-    res
-} else {
-    // - slowpath: sync fastpath struct `BumpPointer` with the mutator
-    let default_selector = mmtk::memory_manager::get_allocator_mapping(&mmtk, AllocationSemantics::Default);
-    let mut default_allocator_in_mutator = tls.mmtk_mutator.allocator_impl_mut::<mmtk::util::alloc::BumpAllocator>(default_selector);
-    default_allocator_in_mutator.bump_pointer = tls.default_bump_pointer;
-    let res = default_allocator_in_mutator.alloc_slow(...);
-    tls.default_bump_pointer = default_allocator_in_mutator.bump_pointer;
-    res
-};
+{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_embed_fastpath_struct}}
 ```
 
 ## Avoid resolving the allocator at run time
@@ -119,7 +73,7 @@ For a simple and general API of `alloc()`, MMTk requires `AllocationSemantics` a
 The following is roughly what `alloc()` does internally.
 
 1. Resolving the allocator
-    1. Find the `Allocator` for the required `AllocationSemantics`.
+    1. Find the `Allocator` for the required `AllocationSemantics`. It is defined by the plan in use.
     2. Dynamically dispatch the call to [`Allocator::alloc()`](https://docs.mmtk.io/api/mmtk/util/alloc/trait.Allocator.html#tymethod.alloc).
 2. `Allocator::alloc()` executes the allocation fast path.
 3. If the fastpath fails, it executes the allocation slow path [`Allocator::alloc_slow()`](https://docs.mmtk.io/api/mmtk/util/alloc/trait.Allocator.html#method.alloc_slow).
@@ -128,20 +82,14 @@ The following is roughly what `alloc()` does internally.
 Resolving to a specific allocator and doing dynamic dispatch is expensive for an allocation.
 With the build-time or JIT-time knowledge on the object that will be allocated, an MMTK binding can possibly skip the first step in the run time.
 
-For example, once MMTK is initialized, a binding can get the memory offset for the default allocator by doing the following:
+If you implement an efficient fastpath allocation in the binding side (like the Option 3 above, and generating allocation code in a JIT which will be discussed next),
+that naturally avoids this problem. If you do not want to implement the fastpath allocation, the following is another example of how to avoid resolving the allocator.
+
+Once MMTK is initialized, a binding can get the memory offset for the default allocator, and save it somewhere. When we know an object should be allocated
+with the default allocation semantics, we can use the offset to get a reference to the actual allocator (with unsafe code), and allocate with the allocator.
 
 ```rust
-let selector = mmtk::memory_manager::get_allocator_mapping(&mmtk, AllocationSemantics::Default);
-DEFAULT_ALLOCATOR_BASE_OFFSET = mmtk::plan::Mutator::get_allocator_base_offset(selector);
-```
-
-Then when we allocate an object and we know the object should be allocated with the default allocator (`AllocationSemantics::Default`),
-we can use the `base_offset` to get the allocator for efficient allocation:
-
-```rust
-let mutator_addr = mmtk::util::Address::from_ref(&tls.mmtk_mutator);
-let allocator = unsafe { (mutator_addr + DEFAULT_ALLOCATOR_BASE_OFFSET).as_mut_ref::<BumpAllocator>() };
-let res = allocator.alloc(...);
+{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_avoid_resolving_allocator.rs:avoid_resolving_allocator}}
 ```
 
 ## Emitting Allocation Sequence in a JIT Compiler
@@ -153,7 +101,7 @@ JIT time. The actual implementation highly depends on the compiler implementatio
 
 The following are some examples from our bindings (at the time of writing):
 * OpenJDK:
-  * https://github.com/mmtk/mmtk-openjdk/blob/9ab13ae3ac9c68c5f694cdd527a63ca909e27b15/openjdk/mmtkBarrierSetAssembler_x86.cpp#L38
-  * https://github.com/mmtk/mmtk-openjdk/blob/9ab13ae3ac9c68c5f694cdd527a63ca909e27b15/openjdk/mmtkBarrierSetC2.cpp#L45
-* JikesRVM: https://github.com/mmtk/mmtk-jikesrvm/blob/fbfb91adafd9e9b3f45bd6a4b32c845a5d48d20b/jikesrvm/rvm/src/org/jikesrvm/mm/mminterface/MMTkMutatorContext.java#L377
-* Julia: https://github.com/mmtk/julia/blob/5c406d9bb20d76e2298a6101f171cfac491f651c/src/llvm-final-gc-lowering.cpp#L267
+  * <https://github.com/mmtk/mmtk-openjdk/blob/9ab13ae3ac9c68c5f694cdd527a63ca909e27b15/openjdk/mmtkBarrierSetAssembler_x86.cpp#L38>
+  * <https://github.com/mmtk/mmtk-openjdk/blob/9ab13ae3ac9c68c5f694cdd527a63ca909e27b15/openjdk/mmtkBarrierSetC2.cpp#L45>
+* JikesRVM: <https://github.com/mmtk/mmtk-jikesrvm/blob/fbfb91adafd9e9b3f45bd6a4b32c845a5d48d20b/jikesrvm/rvm/src/org/jikesrvm/mm/mminterface/MMTkMutatorContext.java#L377>
+* Julia: <https://github.com/mmtk/julia/blob/5c406d9bb20d76e2298a6101f171cfac491f651c/src/llvm-final-gc-lowering.cpp#L267>
