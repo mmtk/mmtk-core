@@ -42,6 +42,8 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     num_specialized_scans: 1,
     max_non_los_default_alloc_bytes: MAX_OBJECT_SIZE,
     may_trace_duplicate_edges: true,
+    needs_prepare_mutator: !cfg!(feature = "malloc_mark_sweep")
+        && !cfg!(feature = "eager_sweeping"),
     ..PlanConstraints::default()
 };
 
