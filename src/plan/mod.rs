@@ -66,3 +66,15 @@ pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;
 pub use semispace::SS_CONSTRAINTS;
 pub use sticky::immix::STICKY_IMMIX_CONSTRAINTS;
+
+/// When we log the page usage for a plan, we also log page usage for each space.
+pub(crate) const LOG_DETAILED_SPACE_USAGE: bool = false;
+
+/// Collect reserved pages for each space in the plan, and return a string.
+pub(crate) fn get_detailed_space_usage_string<VM: crate::vm::VMBinding>(plan: &dyn Plan<VM = VM>) -> String {
+    let mut print = String::new();
+    plan.for_each_space(&mut |space: &dyn crate::policy::space::Space<VM>| {
+        print.push_str(&format!("{}={},", space.name(), space.reserved_pages()));
+    });
+    print
+}

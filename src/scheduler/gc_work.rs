@@ -217,9 +217,14 @@ pub struct EndOfGC {
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!(
-            "End of GC ({}/{} pages, took {} ms)",
+            "End of GC ({}/{} pages{}, took {} ms)",
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
+            if crate::plan::LOG_DETAILED_SPACE_USAGE {
+                format!(": {}", crate::plan::get_detailed_space_usage_string(mmtk.get_plan()))
+            } else {
+                "".to_owned()
+            },
             self.elapsed.as_millis()
         );
 
