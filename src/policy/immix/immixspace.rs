@@ -86,10 +86,6 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        if !Block::containing::<VM>(object).is_defrag_source() {
-            return None;
-        }
-
         if ForwardingWord::is_forwarded::<VM>(object) {
             Some(ForwardingWord::read_forwarding_pointer::<VM>(object))
         } else {
