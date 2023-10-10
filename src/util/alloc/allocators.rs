@@ -90,7 +90,10 @@ impl<VM: VMBinding> Allocators<VM> {
 
     /// # Safety
     /// The selector needs to be valid, and points to an allocator that has been initialized.
-    pub unsafe fn get_typed_allocator_mut<T: Allocator<VM>>(&mut self, selector: AllocatorSelector) -> &mut T {
+    pub unsafe fn get_typed_allocator_mut<T: Allocator<VM>>(
+        &mut self,
+        selector: AllocatorSelector,
+    ) -> &mut T {
         self.get_allocator_mut(selector).downcast_mut().unwrap()
     }
 

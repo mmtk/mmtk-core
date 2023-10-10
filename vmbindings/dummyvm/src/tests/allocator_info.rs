@@ -29,16 +29,18 @@ fn test_allocator_info() {
             | PlanSelector::GenImmix
             | PlanSelector::MarkCompact
             | PlanSelector::StickyImmix => {
-                match allocator_info {
-                    // These plans all use bump pointer allocator. The first field at base offset is tls, and the second field is the BumpPointer struct.
-                    AllocatorInfo::BumpPointer {
-                        bump_pointer_offset,
-                    } => assert_eq!(
-                        base_offset + mmtk::util::constants::BYTES_IN_ADDRESS,
-                        bump_pointer_offset
-                    ),
-                    _ => panic!("Expected AllocatorInfo for a bump pointer allocator"),
-                }
+                // These plans all use bump pointer allocator.
+                let AllocatorInfo::BumpPointer {
+                    bump_pointer_offset,
+                } = allocator_info
+                else {
+                    panic!("Expected AllocatorInfo for a bump pointer allocator");
+                };
+                // In all of those plans, the first field at base offset is tls, and the second field is the BumpPointer struct.
+                assert_eq!(
+                    base_offset + mmtk::util::constants::BYTES_IN_ADDRESS,
+                    bump_pointer_offset
+                );
             }
             PlanSelector::MarkSweep => {
                 if cfg!(feature = "malloc_mark_sweep") {

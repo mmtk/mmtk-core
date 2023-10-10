@@ -86,11 +86,8 @@ pub fn embed_fastpath_struct() {
             let default_allocator = unsafe {
                 mutator.allocator_impl::<mmtk::util::alloc::BumpAllocator<DummyVM>>(selector)
             };
-            // Copy the cursor/limit value to the BumpPointer struct
-            BumpPointer::new(
-                default_allocator.bump_pointer.cursor,
-                default_allocator.bump_pointer.limit,
-            )
+            // Copy the bump pointer struct
+            default_allocator.bump_pointer
         };
         // Store the fastpath BumpPointer along with the mutator
         let mut storage = MutatorInTLS {

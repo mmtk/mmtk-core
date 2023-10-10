@@ -15,20 +15,21 @@ We recommend adding assertions in the binding code to make sure the assumptions 
 
 ## Efficient access to MMTk mutators
 
-MMTk mutators (created by [`bind_mutator()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.bind_mutator.html)) is a thread local data structure
+An MMTk mutator context (created by [`bind_mutator()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.bind_mutator.html)) is a thread local data structure
 of type [`Mutator`](https://docs.mmtk.io/api/mmtk/plan/struct.Mutator.html).
 MMTk expects the binding to provide efficient access to the mutator structure in their thread local storage (TLS).
 Usually one of the following approaches is used to store MMTk mutators.
 
 ### Option 1: Storing the pointer
 
-MMTk returns a boxed pointer of `Mutator`. It is simple to store it in the TLS.
+The `Box<Mutator<VM>>` returned from `mmtk::memory_manager::bind_mutator` is actually a pointer to
+a `Mutator<VM>` instance allocated in the Rust heap. It is simple to store it in the TLS.
 This approach does not make any assumption about the intenral of a MMTk `Mutator`. However, it requires an extra pointer dereference
 whene accessing a value in the mutator. This may sound not that bad. However, this degrades the performance of
 a carefully implemented inlined fastpath allocation sequence which is normally just a few instructions.
 This approach could be a simple start in the early development, but we do not recommend it for an efficient implementation.
 
-If the implementation language is not Rust,
+If the VM is not implemented in Rust,
 the binding needs to turn the boxed pointer into a raw pointer before storing it.
 
 ```rust
@@ -56,12 +57,24 @@ Unlike the `Mutator` type, the fastpath struct has a C-compatible layout, and it
 so it is unlikely to change. For example, MMTk provides [`BumpPointer`](https://docs.mmtk.io/api/mmtk/util/alloc/struct.BumpPointer.html),
 which simply includes a `cursor` and a `limit`.
 
-The following example shows how to create a fastpath `BumpPointer`, how to allocate from it in a fast path, and
-how to sync values with the mutator struct and call the slow path. Be aware that the following example implements
-fastpath allocation for a bump pointer allocator, and it assumes the allocator for `AllocationSemantics::Default`
-in the selected plan is a bump pointer allocator. So the example only works for certain plans, such as `NoGC`,
-`SemiSpace`, `Immix`, etc. Also the example only implements the fastpath for one allocator (the default allocator). 
-If you would like to use multiple `AllocationSemantics`, you would need to maintain multiple fastpath structs for each allocator you use.
+In the following example, we embed one `BumpPointer` struct in the TLS.
+The `BumpPointer` is used in the fast path, and carefully synchronized with the allocator in the `Mutator` struct in the slow path.
+Note that the `allocate_default` closure in the example below assumes the allocation semantics is `AllocationSemantics::Default`
+and its selected allocator uses bump-pointer allocation.
+Real-world fast-path implementations for high-performance VMs are usually JIT-compiled, inlined, and specialized for the current plan
+and allocation site, so that the allocation semantics of the concrete allocation site (and therefore the selected allocator) is known to the JIT compiler.
+
+For the sake of simplicity, we only store _one_ `BumpPointer` in the TLS in the example.
+In MMTk, each plan has multiple allocators, and the allocation semantics are mapped
+to those allocator by the GC plan you choose. So a plan use multiple allocators, and
+depending on how many allocation semantics are used by a binding, the binding may use multiple allocators as well.
+In practice, a binding may embed multiple fastpath structs as the example for those allocators if they would like
+more efficient allocation.
+
+Also for simpliticy, the example assumes the default allocator for the plan in use is a bump pointer allocator.
+Many plans in MMTk use bump pointer allocator for their default allocation semantics (`AllocationSemantics::Default`),
+which includes (but not limited to) `NoGC`, `SemiSpace`, `Immix`, generational plans, etc.
+If a plan does not do bump-pointer allocation, we may still implement fast paths, but we need to embed different data structures instead of `BumpPointer`.
 
 ```rust
 {{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_embed_fastpath_struct}}

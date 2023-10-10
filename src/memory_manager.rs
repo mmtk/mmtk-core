@@ -176,7 +176,7 @@ pub fn alloc<VM: VMBinding>(
 }
 
 /// Invoke the allocation slow path. This is only intended for use when a binding implements the fastpath on
-/// the binding side. When the binding handles fast path allocation and the fast path fails, they can use this
+/// the binding side. When the binding handles fast path allocation and the fast path fails, it can use this
 /// method for slow path allocation. Calling before exhausting fast path allocaiton buffer will lead to bad
 /// performance.
 ///

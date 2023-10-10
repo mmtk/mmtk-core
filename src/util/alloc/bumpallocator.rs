@@ -47,6 +47,18 @@ impl BumpPointer {
     }
 }
 
+impl std::default::Default for BumpPointer {
+    fn default() -> Self {
+        // Defaults to 0,0. In this case, the first
+        // allocation would naturally fail the check
+        // `cursor + size < limit`, and go to the slowpath.
+        BumpPointer {
+            cursor: Address::ZERO,
+            limit: Address::ZERO,
+        }
+    }
+}
+
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn set_limit(&mut self, start: Address, limit: Address) {
         self.bump_pointer.reset(start, limit);
