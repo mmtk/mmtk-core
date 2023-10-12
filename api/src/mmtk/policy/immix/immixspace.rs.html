@@ -1088,25 +1088,6 @@
 <a href="#1088" id="1088">1088</a>
 <a href="#1089" id="1089">1089</a>
 <a href="#1090" id="1090">1090</a>
-<a href="#1091" id="1091">1091</a>
-<a href="#1092" id="1092">1092</a>
-<a href="#1093" id="1093">1093</a>
-<a href="#1094" id="1094">1094</a>
-<a href="#1095" id="1095">1095</a>
-<a href="#1096" id="1096">1096</a>
-<a href="#1097" id="1097">1097</a>
-<a href="#1098" id="1098">1098</a>
-<a href="#1099" id="1099">1099</a>
-<a href="#1100" id="1100">1100</a>
-<a href="#1101" id="1101">1101</a>
-<a href="#1102" id="1102">1102</a>
-<a href="#1103" id="1103">1103</a>
-<a href="#1104" id="1104">1104</a>
-<a href="#1105" id="1105">1105</a>
-<a href="#1106" id="1106">1106</a>
-<a href="#1107" id="1107">1107</a>
-<a href="#1108" id="1108">1108</a>
-<a href="#1109" id="1109">1109</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
@@ -1195,7 +1176,8 @@
     }
 
     <span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-        <span class="kw">if </span>!Block::containing::&lt;VM&gt;(object).is_defrag_source() {
+        <span class="comment">// If we never move objects, look no further.
+        </span><span class="kw">if </span><span class="kw">super</span>::NEVER_MOVE_OBJECTS {
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
@@ -1215,17 +1197,6 @@
         <span class="comment">// If we never move objects, look no further.
         </span><span class="kw">if </span><span class="kw">super</span>::NEVER_MOVE_OBJECTS {
             <span class="kw">return </span><span class="bool-val">false</span>;
-        }
-
-        <span class="comment">// If the forwarding bits are on the side,
-        </span><span class="kw">if </span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
-            <span class="comment">// we need to ensure `object` is in a defrag source
-            // because `PrepareBlockState` does not clear forwarding bits
-            // for non-defrag-source blocks.
-            </span><span class="kw">if </span>!Block::containing::&lt;VM&gt;(object).is_defrag_source() {
-                <span class="comment">// Objects not in defrag sources cannot be forwarded.
-                </span><span class="kw">return </span><span class="bool-val">false</span>;
-            }
         }
 
         <span class="comment">// If the object is forwarded, it is live, too.
@@ -1952,6 +1923,10 @@
                 </span><span class="macro">unimplemented!</span>(<span class="string">&quot;We cannot bulk zero unlogged bit.&quot;</span>)
             }
         }
+        <span class="comment">// If the forwarding bits are on the side, we need to clear them, too.
+        </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(<span class="self">self</span>.chunk.start(), Chunk::BYTES);
+        }
     }
 }
 
@@ -1985,20 +1960,7 @@
             </span>block.set_state(BlockState::Unmarked);
             <span class="macro">debug_assert!</span>(!block.get_state().is_reusable());
             <span class="macro">debug_assert_ne!</span>(block.get_state(), BlockState::Marked);
-            <span class="comment">// Clear forwarding bits if necessary.
-            </span><span class="kw">if </span>is_defrag_source {
-                <span class="comment">// Note that `ImmixSpace::is_live` depends on the fact that we only clear side
-                // forwarding bits for defrag sources.  If we change the code here, we need to
-                // make sure `ImmixSpace::is_live` is fixed, too.
-                </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-                    <span class="comment">// Clear on-the-side forwarding bits.
-                    </span>side.bzero_metadata(block.start(), Block::BYTES);
-                }
-            }
-            <span class="comment">// NOTE: We don&#39;t need to reset the forwarding pointer metadata because it is meaningless
-            // until the forwarding bits are also set, at which time we also write the forwarding
-            // pointer.
-        </span>}
+        }
     }
 }
 
