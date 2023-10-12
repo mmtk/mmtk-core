@@ -595,6 +595,14 @@
 <a href="#595" id="595">595</a>
 <a href="#596" id="596">596</a>
 <a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
 
 <span class="kw">use </span>std::fmt;
@@ -895,6 +903,14 @@
     /// The caller must guarantee the address actually points to a Rust object.
     </span><span class="kw">pub unsafe fn </span>as_ref&lt;<span class="lifetime">&#39;a</span>, T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T {
         <span class="kw-2">&amp;*</span><span class="self">self</span>.to_mut_ptr()
+    }
+
+    <span class="doccomment">/// converts the Address to a mutable Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
+    </span><span class="kw">pub unsafe fn </span>as_mut_ref&lt;<span class="lifetime">&#39;a</span>, T&gt;(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>T {
+        <span class="kw-2">&amp;mut *</span><span class="self">self</span>.to_mut_ptr()
     }
 
     <span class="doccomment">/// converts the Address to a pointer-sized integer

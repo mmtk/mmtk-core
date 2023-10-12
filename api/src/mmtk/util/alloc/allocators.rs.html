@@ -237,8 +237,13 @@
 <a href="#237" id="237">237</a>
 <a href="#238" id="238">238</a>
 <a href="#239" id="239">239</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
-<span class="kw">use </span>std::mem::MaybeUninit;
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 
 <span class="kw">use </span>memoffset::offset_of;
 
@@ -301,6 +306,12 @@
 
     <span class="doccomment">/// # Safety
     /// The selector needs to be valid, and points to an allocator that has been initialized.
+    </span><span class="kw">pub unsafe fn </span>get_typed_allocator&lt;T: Allocator&lt;VM&gt;&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, selector: AllocatorSelector) -&gt; <span class="kw-2">&amp;</span>T {
+        <span class="self">self</span>.get_allocator(selector).downcast_ref().unwrap()
+    }
+
+    <span class="doccomment">/// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
     </span><span class="kw">pub unsafe fn </span>get_allocator_mut(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         selector: AllocatorSelector,
@@ -320,6 +331,15 @@
             }
             AllocatorSelector::None =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Allocator mapping is not initialized&quot;</span>),
         }
+    }
+
+    <span class="doccomment">/// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    </span><span class="kw">pub unsafe fn </span>get_typed_allocator_mut&lt;T: Allocator&lt;VM&gt;&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        selector: AllocatorSelector,
+    ) -&gt; <span class="kw-2">&amp;mut </span>T {
+        <span class="self">self</span>.get_allocator_mut(selector).downcast_mut().unwrap()
     }
 
     <span class="kw">pub fn </span>new(
@@ -435,11 +455,9 @@
     /// Arguments:
     /// * `selector`: The allocator selector to query.
     </span><span class="kw">pub fn </span>new&lt;VM: VMBinding&gt;(selector: AllocatorSelector) -&gt; AllocatorInfo {
+        <span class="kw">let </span>base_offset = Mutator::&lt;VM&gt;::get_allocator_base_offset(selector);
         <span class="kw">match </span>selector {
-            AllocatorSelector::BumpPointer(index) =&gt; {
-                <span class="kw">let </span>base_offset = <span class="macro">offset_of!</span>(Mutator&lt;VM&gt;, allocators)
-                    + <span class="macro">offset_of!</span>(Allocators&lt;VM&gt;, bump_pointer)
-                    + size_of::&lt;BumpAllocator&lt;VM&gt;&gt;() * index <span class="kw">as </span>usize;
+            AllocatorSelector::BumpPointer(<span class="kw">_</span>) =&gt; {
                 <span class="kw">let </span>bump_pointer_offset = <span class="macro">offset_of!</span>(BumpAllocator&lt;VM&gt;, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
@@ -447,10 +465,7 @@
                 }
             }
 
-            AllocatorSelector::Immix(index) =&gt; {
-                <span class="kw">let </span>base_offset = <span class="macro">offset_of!</span>(Mutator&lt;VM&gt;, allocators)
-                    + <span class="macro">offset_of!</span>(Allocators&lt;VM&gt;, immix)
-                    + size_of::&lt;ImmixAllocator&lt;VM&gt;&gt;() * index <span class="kw">as </span>usize;
+            AllocatorSelector::Immix(<span class="kw">_</span>) =&gt; {
                 <span class="kw">let </span>bump_pointer_offset = <span class="macro">offset_of!</span>(ImmixAllocator&lt;VM&gt;, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
@@ -458,10 +473,7 @@
                 }
             }
 
-            AllocatorSelector::MarkCompact(index) =&gt; {
-                <span class="kw">let </span>base_offset = <span class="macro">offset_of!</span>(Mutator&lt;VM&gt;, allocators)
-                    + <span class="macro">offset_of!</span>(Allocators&lt;VM&gt;, markcompact)
-                    + size_of::&lt;MarkCompactAllocator&lt;VM&gt;&gt;() * index <span class="kw">as </span>usize;
+            AllocatorSelector::MarkCompact(<span class="kw">_</span>) =&gt; {
                 <span class="kw">let </span>bump_offset =
                     base_offset + <span class="macro">offset_of!</span>(MarkCompactAllocator&lt;VM&gt;, bump_allocator);
                 <span class="kw">let </span>bump_pointer_offset = <span class="macro">offset_of!</span>(BumpAllocator&lt;VM&gt;, bump_pointer);

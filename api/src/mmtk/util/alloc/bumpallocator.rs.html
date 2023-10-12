@@ -210,6 +210,19 @@
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
@@ -229,7 +242,7 @@
     <span class="doccomment">/// [`VMThread`] associated with this allocator instance
     </span><span class="kw">pub </span>tls: VMThread,
     <span class="doccomment">/// Bump-pointer itself.
-    </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::util::alloc) bump_pointer: BumpPointer,
+    </span><span class="kw">pub </span>bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;,
     <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.
@@ -239,6 +252,7 @@
 <span class="doccomment">/// A common fast-path bump-pointer allocator shared across different allocator implementations
 /// that use bump-pointer allocation.
 </span><span class="attr">#[repr(C)]
+#[derive(Copy, Clone)]
 </span><span class="kw">pub struct </span>BumpPointer {
     <span class="kw">pub </span>cursor: Address,
     <span class="kw">pub </span>limit: Address,
@@ -255,6 +269,18 @@
     <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, end: Address) {
         <span class="self">self</span>.cursor = start;
         <span class="self">self</span>.limit = end;
+    }
+}
+
+<span class="kw">impl </span>std::default::Default <span class="kw">for </span>BumpPointer {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="comment">// Defaults to 0,0. In this case, the first
+        // allocation would naturally fail the check
+        // `cursor + size &lt; limit`, and go to the slowpath.
+        </span>BumpPointer {
+            cursor: Address::ZERO,
+            limit: Address::ZERO,
+        }
     }
 }
 
