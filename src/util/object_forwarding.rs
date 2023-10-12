@@ -1,9 +1,9 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
-/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use std::marker::PhantomData;
 use std::sync::atomic::Ordering;
 
 const FORWARDING_NOT_TRIGGERED_YET: u8 = 0b00;
@@ -19,9 +19,118 @@ const FORWARDING_POINTER_MASK: usize = 0x00ff_ffff_ffff_fff8;
 #[cfg(target_pointer_width = "32")]
 const FORWARDING_POINTER_MASK: usize = 0xffff_fffc;
 
+/// This type, together with `WonForwardingAttempt` and `LostForwardingAttempt`, represents an
+/// attempt to forward an object, and provides methods for manipulating the forwarding state and
+/// forwarding pointer of an object in an idiomatic way.
+///
+/// A GC worker thread initiates object forwarding by calling `ForwardingAttempt::attempt(object)`.
+/// It will try to atomically transition the forwarding state from `FORWARDING_NOT_TRIGGERED_YET`
+/// to `BEING_FORWARDED`.
+///
+/// -   If the transition is successful (i.e. we "won" the race), the GC worker gains exclusive
+///     right to further transition its forwarding state.
+///
+///     -   The GC worker can finish the forwarding by calling
+///         `WonForwardingAttempt::forward_object`.  It will actually copy the object and set the
+///         forwarding bits and forwarding pointers.
+///
+///     -   The GC worker can abort the forwarding by calling `WonForwardingAttempt::revert`.  It
+///         will revert the forwarding state to the state before calling
+///         `ForwardingAttempt::attempt`.
+///
+/// -   If the transition failed (i.e. we "lost" the race), it means another GC worker is
+///     forwarding or has forwarded the object.
+///
+///     -   The current GC worker can call `LostForwardingAttempt::spin_and_get_forwarded_object`
+///         to wait until the other GC worker finished forwarding, and read the forwarding pointer.
+#[must_use]
+pub enum ForwardingAttempt<VM: VMBinding> {
+    /// The old state before `Self::attempt` was `FORWARDING_NOT_TRIGGERED_YET`.
+    /// It means the current thread transitioned the forwarding state from
+    /// `FORWARDING_NOT_TRIGGERED_YET` to `BEING_FORWARDED`.
+    Won(WonForwardingAttempt<VM>),
+    /// The old state before `Self::attempt` was `BEING_FORWARDED` or `FORWARDED`.
+    /// It means another thread is forwarding or has already forwarded the object.
+    Lost(LostForwardingAttempt<VM>),
+}
+
+/// Provide states and methods for a won forwarding attempt.
+///
+/// See [`ForwardingAttempt`]
+#[must_use]
+pub struct WonForwardingAttempt<VM: VMBinding> {
+    /// The object to forward.  This field holds the from-space address.
+    object: ObjectReference,
+    /// VM-specific temporary data used for reverting the forwarding states.
+    vm_data: usize,
+    phantom_data: PhantomData<VM>,
+}
+
+/// Provide states and methods for a lost forwarding attempt.
+///
+/// See [`ForwardingAttempt`]
+#[must_use]
+pub struct LostForwardingAttempt<VM: VMBinding> {
+    /// The object to forward.  This field holds the from-space address.
+    object: ObjectReference,
+    old_state: u8,
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> ForwardingAttempt<VM> {
+    /// Attempt to forward an object by atomically transitioning the forwarding state of `object`
+    /// from `FORWARDING_NOT_TRIGGERED_YET` to `BEING_FORWARDED`.
+    pub fn attempt(object: ObjectReference) -> Self {
+        let old_value = attempt_to_forward::<VM>(object);
+
+        if is_forwarded_or_being_forwarded::<VM>(object) {
+            Self::Lost(LostForwardingAttempt {
+                object,
+                old_state: old_value,
+                phantom_data: PhantomData,
+            })
+        } else {
+            Self::Won(WonForwardingAttempt {
+                object,
+                vm_data: 0,
+                phantom_data: PhantomData,
+            })
+        }
+    }
+}
+
+impl<VM: VMBinding> WonForwardingAttempt<VM> {
+    /// Call this to forward the object.
+    ///
+    /// This method will also set the forwarding state to `FORWARDED` and store the forwarding
+    /// pointer at the appropriate location.
+    pub fn forward_object(
+        self,
+        semantics: CopySemantics,
+        copy_context: &mut GCWorkerCopyContext<VM>,
+    ) -> ObjectReference {
+        let new_object = VM::VMObjectModel::copy(self.object, semantics, copy_context);
+        write_forwarding_bits_and_forwarding_pointer::<VM>(self.object, new_object);
+        new_object
+    }
+
+    /// Call this to revert the forwarding state to the state before calling `attempt`
+    pub fn revert(self) {
+        clear_forwarding_bits::<VM>(self.object);
+    }
+}
+
+impl<VM: VMBinding> LostForwardingAttempt<VM> {
+    /// Spin-wait for the object's forwarding to become complete and then read the forwarding
+    /// pointer to the new object.
+    pub fn spin_and_get_forwarded_object(self) -> ObjectReference {
+        spin_and_get_forwarded_object::<VM>(self.object, self.old_state)
+    }
+}
+
 /// Attempt to become the worker thread who will forward the object.
 /// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.
-pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
+fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     loop {
         let old_value = get_forwarding_status::<VM>(object);
         if old_value != FORWARDING_NOT_TRIGGERED_YET
@@ -50,7 +159,7 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
 ///
 /// Returns a reference to the new object.
 ///
-pub fn spin_and_get_forwarded_object<VM: VMBinding>(
+fn spin_and_get_forwarded_object<VM: VMBinding>(
     object: ObjectReference,
     forwarding_bits: u8,
 ) -> ObjectReference {
@@ -75,12 +184,10 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
-pub fn forward_object<VM: VMBinding>(
+fn write_forwarding_bits_and_forwarding_pointer<VM: VMBinding>(
     object: ObjectReference,
-    semantics: CopySemantics,
-    copy_context: &mut GCWorkerCopyContext<VM>,
-) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
+    new_object: ObjectReference,
+) {
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
@@ -97,11 +204,10 @@ pub fn forward_object<VM: VMBinding>(
             Ordering::SeqCst,
         );
     }
-    new_object
 }
 
 /// Return the forwarding bits for a given `ObjectReference`.
-pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
+fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
     VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(
         object,
         None,
@@ -117,15 +223,15 @@ fn is_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     get_forwarding_status::<VM>(object) == BEING_FORWARDED
 }
 
-pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
+fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     get_forwarding_status::<VM>(object) != FORWARDING_NOT_TRIGGERED_YET
 }
 
-pub fn state_is_forwarded_or_being_forwarded(forwarding_bits: u8) -> bool {
+fn state_is_forwarded_or_being_forwarded(forwarding_bits: u8) -> bool {
     forwarding_bits != FORWARDING_NOT_TRIGGERED_YET
 }
 
-pub fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
+fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
     forwarding_bits == BEING_FORWARDED
 }
 
@@ -163,7 +269,7 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
 /// Write the forwarding pointer of an object.
 /// This function is called on being_forwarded objects.
-pub fn write_forwarding_pointer<VM: VMBinding>(
+fn write_forwarding_pointer<VM: VMBinding>(
     object: ObjectReference,
     new_object: ObjectReference,
 ) {
@@ -191,7 +297,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
 /// Otherwise, returns `Some(shift)`, where `shift` is the left shift needed on forwarding bits.
 ///
 #[cfg(target_endian = "little")]
-pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
+fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
     use std::ops::Deref;
     // if both forwarding bits and forwarding pointer are in-header
     match (
@@ -211,6 +317,6 @@ pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> O
 }
 
 #[cfg(target_endian = "big")]
-pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
+fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
     unimplemented!()
 }

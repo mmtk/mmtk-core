@@ -117,6 +117,12 @@ pub trait ObjectModel<VM: VMBinding> {
     #[cfg(feature = "vo_bit")]
     const NEED_VO_BITS_DURING_TRACING: bool = false;
 
+    /// When true, mmtk-core will use the metadata `LOCAL_FORWARDING_BITS_SPEC` and
+    /// `LOCAL_FORWARDING_POINTER_SPEC` defined above to implement object forwarding.
+    ///
+    /// When false, 
+    const VM_IMPLEMENTED_FORWARDING: bool = false;
+
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
     /// Returns the metadata value.

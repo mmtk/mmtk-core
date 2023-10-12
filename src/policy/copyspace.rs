@@ -233,30 +233,25 @@ impl<VM: VMBinding> CopySpace<VM> {
         );
 
         trace!("attempting to forward");
-        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
+        match object_forwarding::ForwardingAttempt::<VM>::attempt(object) {
+            object_forwarding::ForwardingAttempt::Lost(lost) => {
+                trace!("... Lost the forwarding race.  Another thread is forwarding the object");
+                let new_object = lost.spin_and_get_forwarded_object();
+                trace!("... {} is already forwarded to {}", object, new_object);
+                new_object
+            }
+            object_forwarding::ForwardingAttempt::Won(won) => {
+                trace!("... Won the forwarding race.  Forwarding...");
+                let new_object =
+                    won.forward_object(semantics.unwrap(), worker.get_copy_context_mut());
 
-        trace!("checking if object is being forwarded");
-        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            trace!("... yes it is");
-            let new_object =
-                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-            trace!("Returning");
-            new_object
-        } else {
-            trace!("... no it isn't. Copying");
-            let new_object = object_forwarding::forward_object::<VM>(
-                object,
-                semantics.unwrap(),
-                worker.get_copy_context_mut(),
-            );
+                #[cfg(feature = "vo_bit")]
+                crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
 
-            #[cfg(feature = "vo_bit")]
-            crate::util::metadata::vo_bit::set_vo_bit::<VM>(new_object);
-
-            trace!("Forwarding pointer");
-            queue.enqueue(new_object);
-            trace!("Copied [{:?} -> {:?}]", object, new_object);
-            new_object
+                queue.enqueue(new_object);
+                trace!("Copied [{:?} -> {:?}]", object, new_object);
+                new_object
+            }
         }
     }
 
