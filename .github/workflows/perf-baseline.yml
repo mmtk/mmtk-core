@@ -1,21 +1,21 @@
-name: JikesRVM Performance Baseline
+name: Performance Baseline
 
 on:
-  # # Manual dispatch
-  # workflow_dispatch:
-  # # Or on every sunday 1200am UTC
-  # schedule:
-  #   - cron: '0 0 * * SUN'
+  # Manual dispatch
+  workflow_dispatch:
+  # Or on a sunday 1200am UTC between 1st and 7th each month
+  schedule:
+    - cron: '0 0 1-7 * 0'
   # READ BEFORE ENABLING THE TRIGGER BELOW
   # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
   # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
-  pull_request:
-    branches:
-      - master
+  # pull_request:
+  #   branches:
+  #     - master
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'test'
+  RESULT_REPO_BRANCH: 'self-hosted'
 
 jobs:
   jikesrvm-baseline:
