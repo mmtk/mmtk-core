@@ -86,7 +86,8 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        if !Block::containing::<VM>(object).is_defrag_source() {
+        // If we never move objects, look no further.
+        if super::NEVER_MOVE_OBJECTS {
             return None;
         }
 
@@ -106,17 +107,6 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         // If we never move objects, look no further.
         if super::NEVER_MOVE_OBJECTS {
             return false;
-        }
-
-        // If the forwarding bits are on the side,
-        if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
-            // we need to ensure `object` is in a defrag source
-            // because `PrepareBlockState` does not clear forwarding bits
-            // for non-defrag-source blocks.
-            if !Block::containing::<VM>(object).is_defrag_source() {
-                // Objects not in defrag sources cannot be forwarded.
-                return false;
-            }
         }
 
         // If the object is forwarded, it is live, too.
@@ -843,6 +833,10 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
+        // If the forwarding bits are on the side, we need to clear them, too.
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+        }
     }
 }
 
@@ -876,19 +870,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
-            // Clear forwarding bits if necessary.
-            if is_defrag_source {
-                // Note that `ImmixSpace::is_live` depends on the fact that we only clear side
-                // forwarding bits for defrag sources.  If we change the code here, we need to
-                // make sure `ImmixSpace::is_live` is fixed, too.
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-                    // Clear on-the-side forwarding bits.
-                    side.bzero_metadata(block.start(), Block::BYTES);
-                }
-            }
-            // NOTE: We don't need to reset the forwarding pointer metadata because it is meaningless
-            // until the forwarding bits are also set, at which time we also write the forwarding
-            // pointer.
         }
     }
 }
