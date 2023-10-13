@@ -1,4 +1,3 @@
-use std::mem::size_of;
 use std::mem::MaybeUninit;
 
 use memoffset::offset_of;
@@ -62,6 +61,12 @@ impl<VM: VMBinding> Allocators<VM> {
 
     /// # Safety
     /// The selector needs to be valid, and points to an allocator that has been initialized.
+    pub unsafe fn get_typed_allocator<T: Allocator<VM>>(&self, selector: AllocatorSelector) -> &T {
+        self.get_allocator(selector).downcast_ref().unwrap()
+    }
+
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator_mut(
         &mut self,
         selector: AllocatorSelector,
@@ -81,6 +86,15 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
+    }
+
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    pub unsafe fn get_typed_allocator_mut<T: Allocator<VM>>(
+        &mut self,
+        selector: AllocatorSelector,
+    ) -> &mut T {
+        self.get_allocator_mut(selector).downcast_mut().unwrap()
     }
 
     pub fn new(
@@ -196,11 +210,9 @@ impl AllocatorInfo {
     /// Arguments:
     /// * `selector`: The allocator selector to query.
     pub fn new<VM: VMBinding>(selector: AllocatorSelector) -> AllocatorInfo {
+        let base_offset = Mutator::<VM>::get_allocator_base_offset(selector);
         match selector {
-            AllocatorSelector::BumpPointer(index) => {
-                let base_offset = offset_of!(Mutator<VM>, allocators)
-                    + offset_of!(Allocators<VM>, bump_pointer)
-                    + size_of::<BumpAllocator<VM>>() * index as usize;
+            AllocatorSelector::BumpPointer(_) => {
                 let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
@@ -208,10 +220,7 @@ impl AllocatorInfo {
                 }
             }
 
-            AllocatorSelector::Immix(index) => {
-                let base_offset = offset_of!(Mutator<VM>, allocators)
-                    + offset_of!(Allocators<VM>, immix)
-                    + size_of::<ImmixAllocator<VM>>() * index as usize;
+            AllocatorSelector::Immix(_) => {
                 let bump_pointer_offset = offset_of!(ImmixAllocator<VM>, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
@@ -219,10 +228,7 @@ impl AllocatorInfo {
                 }
             }
 
-            AllocatorSelector::MarkCompact(index) => {
-                let base_offset = offset_of!(Mutator<VM>, allocators)
-                    + offset_of!(Allocators<VM>, markcompact)
-                    + size_of::<MarkCompactAllocator<VM>>() * index as usize;
+            AllocatorSelector::MarkCompact(_) => {
                 let bump_offset =
                     base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
                 let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);

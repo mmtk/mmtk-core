@@ -9,6 +9,7 @@ mod allocate_with_disable_collection;
 mod allocate_with_initialize_collection;
 mod allocate_with_re_enable_collection;
 mod allocate_without_initialize_collection;
+mod allocator_info;
 mod barrier_slow_path_assertion;
 #[cfg(feature = "is_mmtk_object")]
 mod conservatism;
@@ -29,3 +30,7 @@ mod vm_layout_compressed_pointer_64;
 mod vm_layout_default;
 mod vm_layout_heap_start;
 mod vm_layout_log_address_space;
+
+// The code snippets of these tests are also referred in our docs.
+mod doc_avoid_resolving_allocator;
+mod doc_mutator_storage;
