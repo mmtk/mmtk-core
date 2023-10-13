@@ -3,9 +3,9 @@ name: Performance Baseline
 on:
   # Manual dispatch
   workflow_dispatch:
-  # Or on a sunday 1200am UTC between 1st and 7th each month
+  # Or on the first day of a month.
   schedule:
-    - cron: '0 0 1-7 * 0'
+    - cron: '0 0 1 * *'
   # READ BEFORE ENABLING THE TRIGGER BELOW
   # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
   # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
