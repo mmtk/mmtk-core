@@ -1106,7 +1106,7 @@
 <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{<span class="self">self</span>, MetadataSpec};
-<span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding <span class="kw">as </span>ForwardingWord;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use crate</span>::{
@@ -1181,8 +1181,8 @@
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
-        <span class="kw">if </span>ForwardingWord::is_forwarded::&lt;VM&gt;(object) {
-            <span class="prelude-val">Some</span>(ForwardingWord::read_forwarding_pointer::&lt;VM&gt;(object))
+        <span class="kw">if </span>object_forwarding::is_forwarded::&lt;VM&gt;(object) {
+            <span class="prelude-val">Some</span>(object_forwarding::read_forwarding_pointer::&lt;VM&gt;(object))
         } <span class="kw">else </span>{
             <span class="prelude-val">None
         </span>}
@@ -1200,7 +1200,7 @@
         }
 
         <span class="comment">// If the object is forwarded, it is live, too.
-        </span>ForwardingWord::is_forwarded::&lt;VM&gt;(object)
+        </span>object_forwarding::is_forwarded::&lt;VM&gt;(object)
     }
     <span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
     </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
@@ -1671,14 +1671,14 @@
         <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
         </span>vo_bit::helper::on_trace_object::&lt;VM&gt;(object);
 
-        <span class="kw">let </span>forwarding_status = ForwardingWord::attempt_to_forward::&lt;VM&gt;(object);
-        <span class="kw">if </span>ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
+        <span class="kw">let </span>forwarding_status = object_forwarding::attempt_to_forward::&lt;VM&gt;(object);
+        <span class="kw">if </span>object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             <span class="comment">// We lost the forwarding race as some other thread has set the forwarding word; wait
             // until the object has been forwarded by the winner. Note that the object may not
             // necessarily get forwarded since Immix opportunistically moves objects.
             </span><span class="attr">#[allow(clippy::let_and_return)]
             </span><span class="kw">let </span>new_object =
-                ForwardingWord::spin_and_get_forwarded_object::&lt;VM&gt;(object, forwarding_status);
+                object_forwarding::spin_and_get_forwarded_object::&lt;VM&gt;(object, forwarding_status);
             <span class="attr">#[cfg(debug_assertions)]
             </span>{
                 <span class="kw">if </span>new_object == object {
@@ -1701,7 +1701,7 @@
         } <span class="kw">else if </span><span class="self">self</span>.is_marked(object) {
             <span class="comment">// We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
-            </span>ForwardingWord::clear_forwarding_bits::&lt;VM&gt;(object);
+            </span>object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
             object
         } <span class="kw">else </span>{
             <span class="comment">// We won the forwarding race; actually forward and copy the object if it is not pinned
@@ -1710,7 +1710,7 @@
                 || (!nursery_collection &amp;&amp; <span class="self">self</span>.defrag.space_exhausted())
             {
                 <span class="self">self</span>.attempt_mark(object, <span class="self">self</span>.mark_state);
-                ForwardingWord::clear_forwarding_bits::&lt;VM&gt;(object);
+                object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
                 Block::containing::&lt;VM&gt;(object).set_state(BlockState::Marked);
 
                 <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
@@ -1724,7 +1724,7 @@
                 // Clippy complains if the &quot;vo_bit&quot; feature is not enabled.
                 </span><span class="attr">#[allow(clippy::let_and_return)]
                 </span><span class="kw">let </span>new_object =
-                    ForwardingWord::forward_object::&lt;VM&gt;(object, semantics, copy_context);
+                    object_forwarding::forward_object::&lt;VM&gt;(object, semantics, copy_context);
 
                 <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
                 </span>vo_bit::helper::on_object_forwarded::&lt;VM&gt;(new_object);

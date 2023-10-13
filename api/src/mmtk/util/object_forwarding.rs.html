@@ -213,11 +213,9 @@
 <a href="#213" id="213">213</a>
 <a href="#214" id="214">214</a>
 <a href="#215" id="215">215</a>
-<a href="#216" id="216">216</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
-<span class="doccomment">/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-</span><span class="kw">use </span><span class="kw">crate</span>::util::{constants, ObjectReference};
+<span class="kw">use </span><span class="kw">crate</span>::util::{constants, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -390,7 +388,7 @@
         get_forwarding_status::&lt;VM&gt;(object),
     );
 
-    <span class="macro">trace!</span>(<span class="string">&quot;GCForwardingWord::write({:#?}, {:x})\n&quot;</span>, object, new_object);
+    <span class="macro">trace!</span>(<span class="string">&quot;write_forwarding_pointer({}, {})&quot;</span>, object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::&lt;VM, usize&gt;(
         object,
         new_object.to_raw_address().as_usize(),
