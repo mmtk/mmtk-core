@@ -25,6 +25,9 @@ pub mod memory;
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
+/// Per-object pinning state.
+#[cfg(feature = "object_pinning")]
+pub mod pin_state;
 /// Reference processing implementation.
 pub mod reference_processor;
 

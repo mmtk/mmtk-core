@@ -113,15 +113,15 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         object_forwarding::is_forwarded::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
-    fn pin_object(&self, object: ObjectReference) -> bool {
+    fn set_pinned(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
-    fn unpin_object(&self, object: ObjectReference) -> bool {
+    fn unset_pinned(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
-    fn is_object_pinned(&self, object: ObjectReference) -> bool {
+    fn debug_get_pinned(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
     fn is_movable(&self) -> bool {
@@ -729,7 +729,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Check if an object is pinned.
     fn is_pinned(&self, _object: ObjectReference) -> bool {
         #[cfg(feature = "object_pinning")]
-        return self.is_object_pinned(_object);
+        return self.debug_get_pinned(_object);
 
         #[cfg(not(feature = "object_pinning"))]
         false
