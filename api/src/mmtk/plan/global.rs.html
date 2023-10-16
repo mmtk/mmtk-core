@@ -1757,7 +1757,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         </span><span class="self">self</span>.vm_space.release();
     }
 
-    <span class="kw">pub fn </span>set_collection_kind&lt;P: Plan&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span>P) {
+    <span class="kw">pub fn </span>set_collection_kind(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) {
         <span class="self">self</span>.cur_collection_attempts.store(
             <span class="kw">if </span><span class="self">self</span>.is_user_triggered_collection() {
                 <span class="number">1

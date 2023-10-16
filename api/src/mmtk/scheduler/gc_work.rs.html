@@ -1213,14 +1213,14 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ScheduleCollection {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        mmtk.get_plan().schedule_collection(worker.scheduler());
-
+        <span class="kw">let </span>plan = mmtk.get_plan();
         <span class="comment">// Tell GC trigger that GC started.
-        // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
-        // TODO: Depending on the OS scheduling, other workers can run so fast that they can finish
-        // everything in the `Unconstrained` and the `Prepare` buckets before we execute the next
-        // statement. Consider if there is a better place to call `on_gc_start`.
-        </span>mmtk.get_plan().base().gc_trigger.policy.on_gc_start(mmtk);
+        </span>plan.base().gc_trigger.policy.on_gc_start(mmtk);
+
+        plan.base().set_collection_kind(plan);
+        plan.base().set_gc_status(GcStatus::GcPrepare);
+
+        plan.schedule_collection(worker.scheduler());
     }
 }
 

@@ -245,8 +245,6 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
-        self.base().set_collection_kind::&lt;Self&gt;(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::&lt;MyGCWorkContext&lt;VM&gt;&gt;(self);
     }
 <span class="boring">}</span></code></pre></pre>

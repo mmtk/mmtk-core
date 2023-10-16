@@ -211,17 +211,12 @@
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
 <a href="#213" id="213">213</a>
-<a href="#214" id="214">214</a>
-<a href="#215" id="215">215</a>
-<a href="#216" id="216">216</a>
-<a href="#217" id="217">217</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
-<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 <span class="kw">use </span><span class="kw">crate</span>::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
@@ -297,9 +292,6 @@
     }
 
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
-        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
-        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
-
         <span class="comment">// TODO use schedule_common once it can work with markcompact
         // self.common()
         //     .schedule_common::&lt;Self, MarkingProcessEdges&lt;VM&gt;, NoCopy&lt;VM&gt;&gt;(

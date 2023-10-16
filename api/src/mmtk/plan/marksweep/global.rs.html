@@ -120,14 +120,10 @@
 <a href="#120" id="120">120</a>
 <a href="#121" id="121">121</a>
 <a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
-<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::marksweep::gc_work::MSGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
@@ -175,8 +171,6 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>MarkSweep&lt;VM&gt; {
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
-        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
-        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::&lt;MSGCWorkContext&lt;VM&gt;&gt;(<span class="self">self</span>);
     }
 

@@ -347,16 +347,11 @@
 <a href="#347" id="347">347</a>
 <a href="#348" id="348">348</a>
 <a href="#349" id="349">349</a>
-<a href="#350" id="350">350</a>
-<a href="#351" id="351">351</a>
-<a href="#352" id="352">352</a>
-<a href="#353" id="353">353</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::immix;
-<span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
@@ -433,9 +428,6 @@
     }
 
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span><span class="kw">crate</span>::scheduler::GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;) {
-        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
-        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
-
         <span class="kw">let </span>is_full_heap = <span class="self">self</span>.requires_full_heap_collection();
         <span class="self">self</span>.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 

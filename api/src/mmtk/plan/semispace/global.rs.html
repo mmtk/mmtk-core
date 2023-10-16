@@ -187,14 +187,10 @@
 <a href="#187" id="187">187</a>
 <a href="#188" id="188">188</a>
 <a href="#189" id="189">189</a>
-<a href="#190" id="190">190</a>
-<a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::SSGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
-<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::semispace::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
@@ -259,8 +255,6 @@
     }
 
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
-        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
-        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::&lt;SSGCWorkContext&lt;VM&gt;&gt;(<span class="self">self</span>);
     }
 

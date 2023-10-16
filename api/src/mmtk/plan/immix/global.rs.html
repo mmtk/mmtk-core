@@ -181,16 +181,12 @@
 <a href="#181" id="181">181</a>
 <a href="#182" id="182">182</a>
 <a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
-<span class="kw">use </span><span class="kw">crate</span>::plan::global::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
@@ -259,8 +255,6 @@
     }
 
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;) {
-        <span class="self">self</span>.base().set_collection_kind::&lt;<span class="self">Self</span>&gt;(<span class="self">self</span>);
-        <span class="self">self</span>.base().set_gc_status(GcStatus::GcPrepare);
         <span class="self">Self</span>::schedule_immix_full_heap_collection::&lt;
             Immix&lt;VM&gt;,
             ImmixGCWorkContext&lt;VM, TRACE_KIND_FAST&gt;,
