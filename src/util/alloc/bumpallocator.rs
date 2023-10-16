@@ -18,7 +18,7 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// Bump-pointer itself.
-    pub(in crate::util::alloc) bump_pointer: BumpPointer,
+    pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static dyn Space<VM>,
     pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
@@ -28,6 +28,7 @@ pub struct BumpAllocator<VM: VMBinding> {
 /// A common fast-path bump-pointer allocator shared across different allocator implementations
 /// that use bump-pointer allocation.
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct BumpPointer {
     pub cursor: Address,
     pub limit: Address,
@@ -44,6 +45,18 @@ impl BumpPointer {
     pub fn reset(&mut self, start: Address, end: Address) {
         self.cursor = start;
         self.limit = end;
+    }
+}
+
+impl std::default::Default for BumpPointer {
+    fn default() -> Self {
+        // Defaults to 0,0. In this case, the first
+        // allocation would naturally fail the check
+        // `cursor + size < limit`, and go to the slowpath.
+        BumpPointer {
+            cursor: Address::ZERO,
+            limit: Address::ZERO,
+        }
     }
 }
 

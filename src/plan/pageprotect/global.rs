@@ -29,6 +29,7 @@ pub struct PageProtect<VM: VMBinding> {
 
 pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
+    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 

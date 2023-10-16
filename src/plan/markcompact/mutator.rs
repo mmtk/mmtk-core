@@ -4,6 +4,7 @@ use crate::MMTK;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
+use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
@@ -39,7 +40,7 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::MarkCompact(0), markcompact.mc_space()));
             vec
         }),
-        prepare_func: &markcompact_mutator_prepare,
+        prepare_func: &unreachable_prepare_func,
         release_func: &markcompact_mutator_release,
     };
 
@@ -50,12 +51,6 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
         config,
         plan: markcompact,
     }
-}
-
-pub fn markcompact_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<VM>,
-    _tls: VMWorkerThread,
-) {
 }
 
 pub fn markcompact_mutator_release<VM: VMBinding>(

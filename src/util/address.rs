@@ -300,6 +300,14 @@ impl Address {
         &*self.to_mut_ptr()
     }
 
+    /// converts the Address to a mutable Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
+    pub unsafe fn as_mut_ref<'a, T>(self) -> &'a mut T {
+        &mut *self.to_mut_ptr()
+    }
+
     /// converts the Address to a pointer-sized integer
     pub const fn as_usize(self) -> usize {
         self.0

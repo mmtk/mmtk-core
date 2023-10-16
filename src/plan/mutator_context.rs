@@ -5,6 +5,7 @@ use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::Allocator;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
@@ -12,6 +13,28 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 
 pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
+
+/// A place-holder implementation for `MutatorConfig::prepare_func` that should not be called.
+/// It is the most often used by plans that sets `PlanConstraints::needs_prepare_mutator` to
+/// `false`.  It is also used by `NoGC` because it must not trigger GC.
+pub(crate) fn unreachable_prepare_func<VM: VMBinding>(
+    _mutator: &mut Mutator<VM>,
+    _tls: VMWorkerThread,
+) {
+    unreachable!("`MutatorConfig::prepare_func` must not be called for the current plan.")
+}
+
+/// A place-holder implementation for `MutatorConfig::release_func` that should not be called.
+/// Currently only used by `NoGC`.
+pub(crate) fn unreachable_release_func<VM: VMBinding>(
+    _mutator: &mut Mutator<VM>,
+    _tls: VMWorkerThread,
+) {
+    unreachable!("`MutatorConfig::release_func` must not be called for the current plan.")
+}
+
+/// A place-holder implementation for `MutatorConfig::release_func` that does nothing.
+pub(crate) fn no_op_release_func<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
@@ -96,6 +119,20 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         .alloc(size, align, offset)
     }
 
+    fn alloc_slow(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+    ) -> Address {
+        unsafe {
+            self.allocators
+                .get_allocator_mut(self.config.allocator_mapping[allocator])
+        }
+        .alloc_slow(size, align, offset)
+    }
+
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
     fn post_alloc(
         &mut self,
@@ -147,6 +184,80 @@ impl<VM: VMBinding> Mutator<VM> {
             unsafe { self.allocators.get_allocator_mut(selector) }.on_mutator_destroy();
         }
     }
+
+    /// Get the allocator for the selector.
+    ///
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
+    pub unsafe fn allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
+        self.allocators.get_allocator(selector)
+    }
+
+    /// Get the mutable allocator for the selector.
+    ///
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
+    pub unsafe fn allocator_mut(&mut self, selector: AllocatorSelector) -> &mut dyn Allocator<VM> {
+        self.allocators.get_allocator_mut(selector)
+    }
+
+    /// Get the allocator of a concrete type for the selector.
+    ///
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
+    pub unsafe fn allocator_impl<T: Allocator<VM>>(&self, selector: AllocatorSelector) -> &T {
+        self.allocators.get_typed_allocator(selector)
+    }
+
+    /// Get the mutable allocator of a concrete type for the selector.
+    ///
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    /// [`crate::memory_manager::get_allocator_mapping`] can be used to get a selector.
+    pub unsafe fn allocator_impl_mut<T: Allocator<VM>>(
+        &mut self,
+        selector: AllocatorSelector,
+    ) -> &mut T {
+        self.allocators.get_typed_allocator_mut(selector)
+    }
+
+    /// Return the base offset from a mutator pointer to the allocator specified by the selector.
+    pub fn get_allocator_base_offset(selector: AllocatorSelector) -> usize {
+        use crate::util::alloc::*;
+        use memoffset::offset_of;
+        use std::mem::size_of;
+        offset_of!(Mutator<VM>, allocators)
+            + match selector {
+                AllocatorSelector::BumpPointer(index) => {
+                    offset_of!(Allocators<VM>, bump_pointer)
+                        + size_of::<BumpAllocator<VM>>() * index as usize
+                }
+                AllocatorSelector::FreeList(index) => {
+                    offset_of!(Allocators<VM>, free_list)
+                        + size_of::<FreeListAllocator<VM>>() * index as usize
+                }
+                AllocatorSelector::Immix(index) => {
+                    offset_of!(Allocators<VM>, immix)
+                        + size_of::<ImmixAllocator<VM>>() * index as usize
+                }
+                AllocatorSelector::LargeObject(index) => {
+                    offset_of!(Allocators<VM>, large_object)
+                        + size_of::<LargeObjectAllocator<VM>>() * index as usize
+                }
+                AllocatorSelector::Malloc(index) => {
+                    offset_of!(Allocators<VM>, malloc)
+                        + size_of::<MallocAllocator<VM>>() * index as usize
+                }
+                AllocatorSelector::MarkCompact(index) => {
+                    offset_of!(Allocators<VM>, markcompact)
+                        + size_of::<MarkCompactAllocator<VM>>() * index as usize
+                }
+                AllocatorSelector::None => panic!("Expect a valid AllocatorSelector, found None"),
+            }
+    }
 }
 
 /// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
@@ -158,6 +269,13 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn prepare(&mut self, tls: VMWorkerThread);
     fn release(&mut self, tls: VMWorkerThread);
     fn alloc(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: usize,
+        allocator: AllocationSemantics,
+    ) -> Address;
+    fn alloc_slow(
         &mut self,
         size: usize,
         align: usize,

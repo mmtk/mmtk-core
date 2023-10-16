@@ -17,7 +17,7 @@ use crate::vm::*;
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
-    pub(in crate::util::alloc) bump_pointer: BumpPointer,
+    pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
     context: Arc<AllocatorContext<VM>>,

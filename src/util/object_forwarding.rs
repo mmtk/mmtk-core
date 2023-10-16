@@ -1,6 +1,5 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
-/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -174,7 +173,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
         get_forwarding_status::<VM>(object),
     );
 
-    trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
+    trace!("write_forwarding_pointer({}, {})", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_raw_address().as_usize(),

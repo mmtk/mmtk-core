@@ -43,6 +43,7 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     needs_forward_after_liveness: true,
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
