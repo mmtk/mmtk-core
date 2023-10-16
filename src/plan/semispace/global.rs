@@ -2,7 +2,6 @@ use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -67,8 +66,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<SSGCWorkContext<VM>>(self);
     }
 

@@ -8,7 +8,6 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -73,8 +72,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.requires_full_heap_collection();
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         if is_full_heap {
             scheduler.schedule_common_work::<GenCopyGCWorkContext<VM>>(self);
         } else {
