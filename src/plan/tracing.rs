@@ -4,7 +4,7 @@
 use crate::scheduler::gc_work::{EdgeOf, ProcessEdgesWork};
 use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
-use crate::vm::EdgeVisitor;
+use crate::vm::{EdgeVisitor, VMBinding};
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -20,15 +20,34 @@ pub type VectorObjectQueue = VectorQueue<ObjectReference>;
 pub struct VectorQueue<T> {
     /// Enqueued nodes.
     buffer: Vec<T>,
+    /// Capacity of the queue.
+    capacity: usize,
 }
 
 impl<T> VectorQueue<T> {
-    /// Reserve a capacity of this on first enqueue to avoid frequent resizing.
-    const CAPACITY: usize = 4096;
+    /// The default capacity of the queue.
+    const DEFAULT_CAPACITY: usize = 4096;
 
-    /// Create an empty `VectorObjectQueue`.
+    /// Create an empty `VectorObjectQueue` with default capacity.
     pub fn new() -> Self {
-        Self { buffer: Vec::new() }
+        Self::with_capacity(Self::DEFAULT_CAPACITY)
+    }
+
+    /// Create an empty `VectorObjectQueue` with a given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buffer: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Create an empty `VectorObjectQueue` with an optionally given capacity.
+    pub fn with_capacity_opt(capacity_opt: Option<usize>) -> Self {
+        if let Some(capacity) = capacity_opt {
+            Self::with_capacity(capacity)
+        } else {
+            Self::new()
+        }
     }
 
     /// Return `true` if the queue is empty.
@@ -46,14 +65,14 @@ impl<T> VectorQueue<T> {
         self.buffer
     }
 
-    /// Check if the buffer size reaches `CAPACITY`.
+    /// Check if the buffer size reaches the capacity.
     pub fn is_full(&self) -> bool {
-        self.buffer.len() >= Self::CAPACITY
+        self.buffer.len() >= self.capacity
     }
 
     pub fn push(&mut self, v: T) {
         if self.buffer.is_empty() {
-            self.buffer.reserve(Self::CAPACITY);
+            self.buffer.reserve(self.capacity);
         }
         self.buffer.push(v);
     }
@@ -80,8 +99,9 @@ pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
 
 impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     pub fn new(worker: &'a mut GCWorker<E::VM>, bucket: WorkBucketStage) -> Self {
+        let buffer = VectorQueue::with_capacity_opt(E::VM::override_scan_objects_packet_size());
         Self {
-            buffer: VectorQueue::new(),
+            buffer,
             worker,
             bucket,
         }
