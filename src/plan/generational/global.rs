@@ -300,9 +300,6 @@ pub trait GenerationalPlan: Plan {
     /// Is the object in the nursery?
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
 
-    /// Is the given space the nursery space?
-    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool;
-
     /// Is the address in the nursery? As we only know addresses rather than object references, the
     /// implementation cannot access per-object metadata. If the plan does not have knowledge whether
     /// the address is in nursery or not (e.g. mature/nursery objects share the same space and are

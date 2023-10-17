@@ -32,7 +32,7 @@ pub struct PlanStatsForDefrag {
 }
 
 impl PlanStatsForDefrag {
-    pub fn collect<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> Self {
+    pub fn new<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> Self {
         Self {
             total_pages: plan.get_total_pages(),
             reserved_pages: plan.get_reserved_pages(),

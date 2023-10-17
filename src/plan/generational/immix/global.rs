@@ -125,7 +125,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.prepare(
                 full_heap,
-                crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
+                crate::policy::immix::defrag::PlanStatsForDefrag::new(self),
             );
         }
     }
@@ -189,10 +189,6 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
 
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
         self.gen.nursery.in_space(object)
-    }
-
-    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
-        space.common().descriptor == self.gen.nursery.common().descriptor
     }
 
     fn is_address_in_nursery(&self, addr: Address) -> bool {

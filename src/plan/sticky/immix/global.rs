@@ -110,7 +110,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(
                 false,
-                crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
+                crate::policy::immix::defrag::PlanStatsForDefrag::new(self),
             );
             self.immix.common.los.prepare(false);
         } else {
@@ -196,10 +196,6 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
 
     fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
         self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked(object)
-    }
-
-    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
-        space.common().descriptor == self.immix.immix_space.common().descriptor
     }
 
     // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
