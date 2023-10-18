@@ -19,6 +19,15 @@ parser.add_argument('--mmtk_core_rev', help='Revision to use')
 
 args = parser.parse_args()
 
+# Check what we should do.
+if args.mmtk_core_path is not None:
+    how = "point_to_local"
+elif args.mmtk_core_git is not None and args.mmtk_core_rev is not None:
+    how = "point_to_repo"
+else:
+    print("No path or git/rev is supplied. We cannot update the toml")
+    sys.exit(1)
+
 print("Reading TOML from '{}'".format(args.toml_path))
 with open(args.toml_path, "rt") as f:
     toml_data = tomlkit.load(f)
@@ -27,21 +36,37 @@ if "mmtk" not in toml_data["dependencies"]:
     print("Cannot find the mmtk dependency in {}".format(args.toml_path))
     sys.exit(1)
 
-# A new node for dependency
-mmtk_node = tomlkit.inline_table()
+# The mmtk dependency could be an inlined table for some bindings:
+# [dependencies]
+# mmtk = { git = "...", rev = "..." }
+# But it could be a subtable for other bindings:
+# [dependencies.mmtk]
+# git = "..."
+# rev = "..."
+mmtk_node = toml_data["dependencies"]["mmtk"]
 
-# Construct the new mmtk node
-if args.mmtk_core_path is not None:
+def remove_keys(item, keys):
+    for key in keys:
+        if key in item:
+            print("Deleting dependencies.mmtk.{}".format(key))
+            del item[key]
+        else:
+            print("Key dependencies.mmtk.{} does not exist.  Ignored.".format(key))
+
+if how == "point_to_local":
+    # Remove any existing key about the versioning. We use whatever version we have in the local path.
+    remove_keys(mmtk_node, ["git", "branch", "registry", "rev"])
+
     # Use mmtk-core from the specified local directory.
     mmtk_repo_path = os.path.realpath(args.mmtk_core_path)
     print("Setting dependencies.mmtk.path to {}".format(mmtk_repo_path))
     mmtk_node["path"] = mmtk_repo_path
-elif args.mmtk_core_git is not None and args.mmtk_core_rev is not None:
+elif how == "point_to_repo":
+    # Remove any existing key about local path
+    remove_keys(mmtk_node, ["path"])
+    # Update git/rev
     mmtk_node["git"] = args.mmtk_core_git
     mmtk_node["rev"] = args.mmtk_core_rev
-else:
-    print("No path or git/rev is supplied. We cannot update the toml")
-    sys.exit(1)
 
 # Store the mmtk node
 toml_data["dependencies"]["mmtk"] = mmtk_node
