@@ -45,14 +45,6 @@ jobs:
           path: ${{ env.BINDING_WORK_DIR }}
           ref: ${{ inputs.ref }}
 
-      - name: Install gh CLI
-        if: steps.check-input.outputs.skip == 'false'
-        run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository https://cli.github.com/packages
-          sudo apt update
-          sudo apt install gh
-
       - name: Get PR number
         if: steps.check-input.outputs.skip == 'false'
         id: get-pr
