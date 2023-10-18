@@ -22,6 +22,7 @@ jobs:
 #   if: github.event.pull_request.merged == true
     with:
       repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+      base_repo: mmtk/mmtk-openjdk
       ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
       core_commit: ${{ github.event.pull_request.merge_commit_sha }}
     secrets: inherit

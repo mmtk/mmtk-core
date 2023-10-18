@@ -6,6 +6,9 @@ on:
       repo:
         required: true
         type: string
+      base_repo:
+        required: true
+        type: string
       ref:
         required: true
         type: string
@@ -24,7 +27,7 @@ jobs:
       - name: Check input conditions
         id: check-input
         run: |
-          if [[ "${{ inputs.repo }}" =~ mmtk/mmtk- ]] && [[ "${{ inputs.ref }}" == "master" ]]; then
+          if [[ "${{ inputs.repo }}" == ${{ inputs.base_repo }} ]] && [[ "${{ inputs.ref }}" == "master" ]]; then
             echo "Conditions not met"
             echo "::set-output name=skip::true"
           else
@@ -51,7 +54,7 @@ jobs:
         if: steps.check-input.outputs.skip == 'false'
         id: get-pr
         run: |
-          PR_NUMBER=$(gh pr list --base ${{ inputs.ref }} --repo ${{ inputs.repo }} --json number --jq '.[0].number')
+          PR_NUMBER=$(gh pr list --head ${{ inputs.ref }} --repo ${{ inputs.base_repo }} --json number --jq '.[0].number')
           echo "::set-output name=pr_number::$PR_NUMBER"
         shell: bash
         env:
@@ -78,6 +81,6 @@ jobs:
       - name: Enable auto-merge for the PR
         if: steps.check-input.outputs.skip == 'false'
         run: |
-          gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.repo }}
+          gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.base_repo }}
         env:
           GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
