@@ -1,0 +1,84 @@
+name: Merge Binding PR
+
+on:
+  workflow_call:
+    inputs:
+      repo:
+        required: true
+        type: string
+      ref:
+        required: true
+        type: string
+      core_commit:
+        required: true
+        type: string
+
+env:
+  MMTK_CORE_WORK_DIR: mmtk-core
+  BINDING_WORK_DIR: mmtk-binding-repo
+
+jobs:
+  process-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check input conditions
+        id: check-input
+        run: |
+          if [[ "${{ inputs.repo }}" =~ mmtk/mmtk- ]] && [[ "${{ inputs.ref }}" == "master" ]]; then
+            echo "Conditions not met"
+            echo "::set-output name=skip::true"
+          else
+            echo "::set-output name=skip::false"
+          fi
+        shell: bash
+
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v3
+        if: steps.check-input.outputs.skip == 'false'
+        with:
+          path: ${{ env.MMTK_CORE_WORK_DIR }}
+      - name: Checkout repository
+        if: steps.check-input.outputs.skip == 'false'
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repo }}
+          path: ${{ env.BINDING_WORK_DIR }}
+          ref: ${{ inputs.ref }}
+
+      - name: Install gh CLI
+        if: steps.check-input.outputs.skip == 'false'
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install gh
+
+      - name: Get PR number
+        if: steps.check-input.outputs.skip == 'false'
+        id: get-pr
+        run: |
+          PR_NUMBER=$(gh pr list --base ${{ inputs.ref }} --repo ${{ inputs.repo }} --json number --jq '.[0].number')
+          echo "::set-output name=pr_number::$PR_NUMBER"
+        shell: bash
+
+      - name: Update mmtk dependency
+        if: steps.check-input.outputs.skip == 'false'
+        working-directory: ${{ env.MMTK_CORE_WORK_DIR }}
+        run: |
+          ./.github/scripts/ci-replace-mmtk-dep.sh ../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml --mmtk-core-git https://github.com/mmtk/mmtk-core --mmtk-core-rev ${{ inputs.core_commit }}
+          cargo generate-lockfile --manifest-path mmtk/Cargo.toml
+      - name: Push a new commit
+        if: steps.check-input.outputs.skip == 'false'
+        working-directory: ${{ env.BINDING_WORK_DIR }}
+        run: |
+          git config user.name "mmtkgc-bot"
+          git config user.email "mmtkgc-bot@gmail.com"
+          git add mmtk/Cargo.toml
+          git add mmtk/Cargo.lock
+          git commit -m "Update mmtk-core to ${{ inputs.core_commit }}"
+          git push
+
+      - name: Enable auto-merge for the PR
+        if: steps.check-input.outputs.skip == 'false'
+        run: |
+          gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.repo }}
