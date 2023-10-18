@@ -1,9 +1,9 @@
 name: Auto Merge Binding PRs
 
-# only trigger on pull request closed events
+# Only trigger on pull request closed events. Then we further check if the PR is merged or not.
 on:
   pull_request:
-#   types: [closed]
+#    types: [closed]
     branches:
       - master
 
@@ -11,7 +11,7 @@ jobs:
   # Figure out binding PRs.
   binding-refs:
     # this job will only run if the PR has been merged
-#   if: github.event.pull_request.merged == true
+#    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/pr-binding-refs.yml
     with:
       pull_request: ${{ github.event.pull_request.number }}
@@ -19,10 +19,54 @@ jobs:
   check-merge-openjdk-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
     needs: binding-refs
-#   if: github.event.pull_request.merged == true
+#    if: github.event.pull_request.merged == true
     with:
       repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
       base_repo: mmtk/mmtk-openjdk
       ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      core_commit: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets: inherit
+
+  check-merge-jikesrvm-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: binding-refs
+#    if: github.event.pull_request.merged == true
+    with:
+      repo: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
+      base_repo: mmtk/mmtk-jikesrvm
+      ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
+      core_commit: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets: inherit
+
+  check-merge-v8-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: binding-refs
+#    if: github.event.pull_request.merged == true
+    with:
+      repo: ${{ needs.binding-refs.outputs.v8_binding_repo }}
+      base_repo: mmtk/mmtk-v8
+      ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+      core_commit: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets: inherit
+
+  check-merge-julia-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: binding-refs
+#    if: github.event.pull_request.merged == true
+    with:
+      repo: ${{ needs.binding-refs.outputs.julia_binding_repo }}
+      base_repo: mmtk/mmtk-julia
+      ref: ${{ needs.binding-refs.outputs.julia_binding_ref }}
+      core_commit: ${{ github.event.pull_request.merge_commit_sha }}
+    secrets: inherit
+
+  check-merge-ruby-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: binding-refs
+#    if: github.event.pull_request.merged == true
+    with:
+      repo: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
+      base_repo: mmtk/mmtk-ruby
+      ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
       core_commit: ${{ github.event.pull_request.merge_commit_sha }}
     secrets: inherit
