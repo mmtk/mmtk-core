@@ -37,4 +37,5 @@ we will have a new commit in `mmtk-core` master. We will need to fix the mmtk de
 and then merge the binding PRs.
 
 This process will be done automatically by [`auto-merge.yml`](https://github.com/mmtk/mmtk-core/blob/master/.github/workflows/auto-merge.yml)
-when the `binding-refs` comment is present.
+when an mmtk-core PR is merged and the `binding-refs` comment is present. If, for any reason, the automatic merging is not working, an MMTK
+team member should manually merge the PRs.
