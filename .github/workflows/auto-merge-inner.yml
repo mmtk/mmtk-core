@@ -52,6 +52,8 @@ jobs:
           PR_NUMBER=$(gh pr list --base ${{ inputs.ref }} --repo ${{ inputs.repo }} --json number --jq '.[0].number')
           echo "::set-output name=pr_number::$PR_NUMBER"
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update mmtk dependency
         if: steps.check-input.outputs.skip == 'false'
