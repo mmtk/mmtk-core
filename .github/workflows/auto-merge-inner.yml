@@ -59,8 +59,9 @@ jobs:
         if: steps.check-input.outputs.skip == 'false'
         working-directory: ${{ env.MMTK_CORE_WORK_DIR }}
         run: |
-          ./.github/scripts/ci-replace-mmtk-dep.sh ../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml --mmtk_core_git https://github.com/mmtk/mmtk-core --mmtk_core_rev ${{ inputs.core_commit }}
-          cargo generate-lockfile --manifest-path mmtk/Cargo.toml
+          export MANIFEST_PATH=../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml
+          ./.github/scripts/ci-replace-mmtk-dep.sh $MANIFEST_PATH --mmtk_core_git https://github.com/mmtk/mmtk-core --mmtk_core_rev ${{ inputs.core_commit }}
+          cargo generate-lockfile --manifest-path $MANIFEST_PATH
       - name: Push a new commit
         if: steps.check-input.outputs.skip == 'false'
         working-directory: ${{ env.BINDING_WORK_DIR }}
