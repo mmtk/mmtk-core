@@ -44,6 +44,8 @@ jobs:
           repository: ${{ inputs.repo }}
           path: ${{ env.BINDING_WORK_DIR }}
           ref: ${{ inputs.ref }}
+          # Check out with CI_ACCESS_TOKEN so we can push to it.
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
 
       - name: Get PR number
         if: steps.check-input.outputs.skip == 'false'
@@ -72,8 +74,6 @@ jobs:
           git add mmtk/Cargo.lock
           git commit -m "Update mmtk-core to ${{ inputs.core_commit }}"
           git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
 
       - name: Enable auto-merge for the PR
         if: steps.check-input.outputs.skip == 'false'
