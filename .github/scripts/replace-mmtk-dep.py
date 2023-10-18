@@ -27,13 +27,8 @@ if "mmtk" not in toml_data["dependencies"]:
     print("Cannot find the mmtk dependency in {}".format(args.toml_path))
     sys.exit(1)
 
-mmtk_node = toml_data["dependencies"]["mmtk"]
-
-# Remove anything in the mmtk node.
-for key in ["git", "branch", "version", "registry", "rev"]:
-    if key in mmtk_node:
-        print("Deleting dependencies.mmtk.{}".format(key))
-        del mmtk_node[key]
+# A new node for dependency
+mmtk_node = tomlkit.inline_table()
 
 # Construct the new mmtk node
 if args.mmtk_core_path is not None:
