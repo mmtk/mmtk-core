@@ -72,6 +72,8 @@ jobs:
           git add mmtk/Cargo.lock
           git commit -m "Update mmtk-core to ${{ inputs.core_commit }}"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
 
       - name: Enable auto-merge for the PR
         if: steps.check-input.outputs.skip == 'false'
