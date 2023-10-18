@@ -3,7 +3,7 @@ name: Auto Merge Binding PRs
 # only trigger on pull request closed events
 on:
   pull_request:
-    types: [closed]
+#   types: [closed]
     branches:
       - master
 
@@ -11,7 +11,7 @@ jobs:
   # Figure out binding PRs.
   binding-refs:
     # this job will only run if the PR has been merged
-    if: github.event.pull_request.merged == true
+#   if: github.event.pull_request.merged == true
     uses: ./.github/workflows/pr-binding-refs.yml
     with:
       pull_request: ${{ github.event.pull_request.number }}
@@ -19,7 +19,7 @@ jobs:
   check-merge-openjdk-pr:
     uses: ./.github/workflows/auto-merge-inner.yml
     needs: binding-refs
-    if: github.event.pull_request.merged == true
+#   if: github.event.pull_request.merged == true
     with:
       repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
       ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
