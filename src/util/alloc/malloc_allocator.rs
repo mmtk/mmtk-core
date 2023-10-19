@@ -16,7 +16,6 @@ pub struct MallocAllocator<VM: VMBinding> {
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static MallocSpace<VM>,
     context: Arc<AllocatorContext<VM>>,
-    _pad: usize,
 }
 
 impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
@@ -55,7 +54,6 @@ impl<VM: VMBinding> MallocAllocator<VM> {
             tls,
             space,
             context,
-            _pad: 0,
         }
     }
 }

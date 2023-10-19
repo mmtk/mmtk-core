@@ -18,7 +18,6 @@ pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
     context: Arc<AllocatorContext<VM>>,
-    _pad: usize,
     /// blocks with free space
     pub available_blocks: BlockLists,
     /// blocks with free space for precise stress GC
@@ -138,7 +137,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             tls,
             space,
             context,
-            _pad: 0,
             available_blocks: new_empty_block_lists(),
             available_blocks_stress: new_empty_block_lists(),
             unswept_blocks: new_empty_block_lists(),

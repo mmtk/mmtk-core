@@ -21,7 +21,6 @@ pub struct ImmixAllocator<VM: VMBinding> {
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
     context: Arc<AllocatorContext<VM>>,
-    _pad: usize,
     /// *unused*
     hot: bool,
     /// Is this a copy allocator?
@@ -175,7 +174,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             tls,
             space: space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap(),
             context,
-            _pad: 0,
             bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
             hot: false,
             copy,

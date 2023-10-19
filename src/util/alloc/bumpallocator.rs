@@ -22,7 +22,6 @@ pub struct BumpAllocator<VM: VMBinding> {
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static dyn Space<VM>,
     pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
-    _pad: usize,
 }
 
 /// A common fast-path bump-pointer allocator shared across different allocator implementations
@@ -184,7 +183,6 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             bump_pointer: unsafe { BumpPointer::new(Address::zero(), Address::zero()) },
             space,
             context,
-            _pad: 0,
         }
     }
 
