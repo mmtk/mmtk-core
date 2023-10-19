@@ -83,7 +83,7 @@ impl<VM: VMBinding> ForwardingAttempt<VM> {
     pub fn attempt(object: ObjectReference) -> Self {
         let old_value = attempt_to_forward::<VM>(object);
 
-        if is_forwarded_or_being_forwarded::<VM>(object) {
+        if state_is_forwarded_or_being_forwarded(old_value) {
             Self::Lost(LostForwardingAttempt {
                 object,
                 old_state: old_value,
