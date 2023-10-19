@@ -3,7 +3,6 @@ use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
-use crate::plan::GcStatus;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::sft::SFT;
@@ -80,9 +79,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
-
         let is_full_heap = self.requires_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 

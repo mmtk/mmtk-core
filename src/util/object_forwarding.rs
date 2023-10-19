@@ -280,7 +280,7 @@ fn write_forwarding_pointer<VM: VMBinding>(
         get_forwarding_status::<VM>(object),
     );
 
-    trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
+    trace!("write_forwarding_pointer({}, {})", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_raw_address().as_usize(),
