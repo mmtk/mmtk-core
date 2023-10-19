@@ -25,13 +25,13 @@ pub struct Defrag {
     available_clean_pages_for_defrag: AtomicUsize,
 }
 
-pub struct PlanStatsForDefrag {
+pub struct StatsForDefrag {
     total_pages: usize,
     reserved_pages: usize,
     collection_reserved_pages: usize,
 }
 
-impl PlanStatsForDefrag {
+impl StatsForDefrag {
     pub fn new<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> Self {
         Self {
             total_pages: plan.get_total_pages(),
@@ -116,7 +116,7 @@ impl Defrag {
 
     /// Prepare work. Should be called in ImmixSpace::prepare.
     #[allow(clippy::assertions_on_constants)]
-    pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>, plan_stats: PlanStatsForDefrag) {
+    pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>, plan_stats: StatsForDefrag) {
         debug_assert!(super::DEFRAG);
         self.defrag_space_exhausted.store(false, Ordering::Release);
 

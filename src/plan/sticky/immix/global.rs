@@ -110,7 +110,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(
                 false,
-                crate::policy::immix::defrag::PlanStatsForDefrag::new(self),
+                crate::policy::immix::defrag::StatsForDefrag::new(self),
             );
             self.immix.common.los.prepare(false);
         } else {

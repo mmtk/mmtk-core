@@ -1,4 +1,4 @@
-use super::defrag::PlanStatsForDefrag;
+use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
@@ -359,7 +359,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: PlanStatsForDefrag) {
+    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
