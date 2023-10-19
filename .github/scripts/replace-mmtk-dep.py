@@ -12,10 +12,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument('toml_path', help='Path to Cargo.toml')
 # The following arguments are exclusive. Use either. If both are supplied, we use the local path.
 # 1. Point to a local path
-parser.add_argument('--mmtk_core_path', help='Path to the mmtk_core repo.')
+parser.add_argument('--mmtk-core-path', help='Path to the mmtk-core repo.')
 # 2. Point to a remote repo
-parser.add_argument('--mmtk_core_git', help='URL to the mmtk_core repo.')
-parser.add_argument('--mmtk_core_rev', help='Revision to use')
+parser.add_argument('--mmtk-core-git', help='URL to the mmtk-core repo.')
+parser.add_argument('--mmtk-core-rev', help='Revision to use')
 
 args = parser.parse_args()
 

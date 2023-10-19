@@ -69,7 +69,7 @@ jobs:
         working-directory: ${{ env.MMTK_CORE_WORK_DIR }}
         run: |
           export MANIFEST_PATH=../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml
-          ./.github/scripts/ci-replace-mmtk-dep.sh $MANIFEST_PATH --mmtk_core_git https://github.com/mmtk/mmtk-core.git --mmtk_core_rev ${{ inputs.core_commit }}
+          ./.github/scripts/ci-replace-mmtk-dep.sh $MANIFEST_PATH --mmtk-core-git https://github.com/mmtk/mmtk-core.git --mmtk-core-rev ${{ inputs.core_commit }}
           cargo generate-lockfile --manifest-path $MANIFEST_PATH
 
       - name: Push a new commit
