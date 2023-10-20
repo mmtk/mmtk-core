@@ -3,7 +3,9 @@ name: Auto Merge Binding PRs
 # Only trigger on push to master. The workflow needs to use repo secrets.
 # Triggering on master can make sure we have secrets.
 on:
-  push
+  push:
+    branches:
+    - master
 
 jobs:
   # Figure out the PR that is merged.
@@ -17,7 +19,7 @@ jobs:
         run: echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
       - id: get-pr
         run: |
-          PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --repo mmtk/mmtk-core --json number --jq '.[0].number')
+          PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core --json number --jq '.[0].number')
           echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
