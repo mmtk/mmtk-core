@@ -11,7 +11,7 @@ jobs:
       matrix:
         repo: [mmtk-openjdk, mmtk-jikesrvm, mmtk-v8, mmtk-ruby, mmtk-julia]
     steps:
-      - name: Sync to mmtk-openjdk
+      - name: Sync to ${{ matrix.repo }}
         run: |
           gh label clone mmtk/mmtk-core --repo ${{ matrix.repo }}
         env:
