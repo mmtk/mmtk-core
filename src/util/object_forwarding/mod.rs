@@ -90,12 +90,12 @@ impl<VM: VMBinding> ForwardingAttempt<VM> {
         #[cfg(feature = "vm_forwarding")]
         {
             match VM::VMObjectModel::attempt_to_forward(object) {
-                Ok(vm_data) => Self::Won(WonForwardingAttempt {
+                Some(vm_data) => Self::Won(WonForwardingAttempt {
                     object,
                     vm_data,
                     phantom_data: PhantomData,
                 }),
-                Err(_) => Self::Lost(LostForwardingAttempt {
+                None => Self::Lost(LostForwardingAttempt {
                     object,
                     phantom_data: PhantomData,
                 }),

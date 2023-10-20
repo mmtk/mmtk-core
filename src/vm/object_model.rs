@@ -486,36 +486,31 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Initiate the attempt to forward an object.  This function should atomically transition the
     /// state of the `object` from "forwarding not triggered yet" to "being forwarded".
     ///
-    /// This function only needs to be implemented if `VM_IMPLEMENTED_FORWARDING` is true.
-    ///
     /// This function is called when an evacuating GC attempts to forward an object. It should be
-    /// semantically equivalent to `crate::util::object_forwarding::attempt_to_forward`, albeit
-    /// this function is allowed to use any VM-specific encoding of the states, not limited to the
-    /// `FORWARDING_BITS` metadata.
+    /// semantically equivalent to
+    /// [`crate::util::object_forwarding::traditional::attempt_to_forward`], albeit this function
+    /// uses VM-specific encoding of forwarding states.
     ///
     /// Arguments:
     /// * `object`: The object to forward.
     ///
-    /// Returns `Ok(value)` if this function successfully transitioned the state, and `value` can
+    /// Returns `Some(value)` if this function successfully transitioned the state, and `value` can
     /// be any VM-specific value that can be used to revert the state change.  For VMs that
     /// implement the forwarding states by overwriting the type tag in the header, this value can
     /// be the original type tag before calling this function.
     ///
-    /// Returns `Err(())` if the transition failed (i.e. another GC worker is forwarding or has
+    /// Returns `None`` if the transition failed (i.e. another GC worker is forwarding or has
     /// forwarded the object).
     #[cfg(feature = "vm_forwarding")]
-    fn attempt_to_forward(_object: ObjectReference) -> Result<Self::VMForwardingDataType, ()>;
+    fn attempt_to_forward(_object: ObjectReference) -> Option<Self::VMForwardingDataType>;
 
     /// Change the the forwarding state of `object` to represent "forwarded" and write the
     /// forwarding pointer to its proper location.
     ///
-    /// This function only needs to be implemented if `VM_IMPLEMENTED_FORWARDING` is true.
-    ///
     /// This function is called after `object` has been copied to the new location `new_object`. It
     /// should be semantically equivalent to
-    /// `crate::util::object_forwarding::write_forwarding_bits_and_forwarding_pointer`, albeit this
-    /// function is allowed to use any VM-specific encoding of the states, not limited to the
-    /// `FORWARDING_BITS` metadata.
+    /// [`crate::util::object_forwarding::traditional::write_forwarding_bits_and_forwarding_pointer`],
+    /// albeit this function uses VM-specific encoding of forwarding states.
     ///
     /// Argiments:
     /// * `object`: The old address of the object.
@@ -530,31 +525,28 @@ pub trait ObjectModel<VM: VMBinding> {
     /// called.  After this function is called, the state should represents "object forwarding is
     /// not triggered yet".
     ///
-    /// This function only needs to be implemented if `VM_IMPLEMENTED_FORWARDING` is true.
-    ///
     /// This function is called after `object` has been copied to the new location `new_object`.
     ///
     /// Note that mmtk-core's intrinsic implementation of this operation clears the forwarding bits
     /// to `0b00` which represents "object forwarding is not triggered yet".  If the VM binding
     /// represents the forwarding states by overwriting the type tag, it should restore the type
     /// tag to the value before `attempt_to_forward` is called.  The VM binding can use the
-    /// Ok(word)` value returned from `attempt_to_forward` to remember the old type tag.
+    /// `Some(value)` value returned from `attempt_to_forward` to remember the old type tag.
     ///
     /// Arguments:
     /// * `object`: The object to restore state.
-    /// * `vm_data`: The `value` of the `Ok(value)` returned from the `attempt_to_forward` call.
+    /// * `vm_data`: The `value` of the `Some(value)` returned from the `attempt_to_forward` call.
     #[cfg(feature = "vm_forwarding")]
     fn revert_forwarding_state(object: ObjectReference, vm_data: Self::VMForwardingDataType);
 
     /// Wait until the object is no longer in the "being forwarded state" and return the forwarding
     /// pointer if the object is forwarded.
     ///
-    /// This function only needs to be implemented if `VM_IMPLEMENTED_FORWARDING` is true.
-    ///
     /// The function is called after `attempt_to_forward` failed.  The failing GC worker calls this
     /// function to wait for another GC thread to finish forwarding the object or reverting the
     /// forwarding state.  It should be semantically equivalent to
-    /// `crate::util::object_forwarding::spin_and_get_forwarded_object`.
+    /// [`crate::util::object_forwarding::traditional::spin_and_get_forwarded_object`], albeit this
+    /// function uses VM-specific encoding of forwarding states.
     ///
     /// Arguments:
     /// * `object`: The object to get forwarding pointer from.
@@ -564,8 +556,37 @@ pub trait ObjectModel<VM: VMBinding> {
     #[cfg(feature = "vm_forwarding")]
     fn spin_and_get_forwarded_object(object: ObjectReference) -> ObjectReference;
 
+    /// Returns true if `object` is already forwarded.
+    ///
+    /// This function may be called during tracing and weak reference processing.  This test must
+    /// be atomic with respect to other GC workers which may attempt ot forward the same `object`.
+    ///
+    /// For example, during weak reference processing, in `Scanning::process_weak_refs`, the VM
+    /// binding may call `ObjectReference::is_reachable` to test if an object is reached, and call
+    /// `ObjectTracer::trace_object` to resurrect dead finalizable objects.  For some spaces, such
+    /// as `CopySpace` and `ImmixSpace`, `is_reachable` may call `is_forwarded`, and `trace_object`
+    /// may forward the object.  The implementer of this function must be aware that while one GC
+    /// worker is executing `is_forwarding`, another GC worker may be forwarding the same object.
+    /// The implementor of weak reference process must also be aware that even if
+    /// `is_forwarded(object)` returns `false`, the object may be concurrently forwarded by another
+    /// GC worker.  The good news is, `trace_object(object)` is thread-safe.  If two GC workers
+    /// call `trace_object` on the same `object`, one will forward it.  The other will not forward
+    /// it, but will get its forwarded address.
+    ///
+    /// Argument:
+    /// * `object`: The object to test if it is forwarded.
     #[cfg(feature = "vm_forwarding")]
     fn is_forwarded(object: ObjectReference) -> bool;
+
+    /// Read the forwarding pointer of `object` which is already forwarded.
+    ///
+    /// This function may be called during weak reference processing.  Because the `object` must
+    /// have already been forwarded before calling this function, it is OK if this function is not
+    /// atomic because other GC workers will not revert the forwarding state.
+    ///
+    /// Argument:
+    /// * `object`: The forwarding pointer of this object will be read.  This object must be
+    ///   already forwarded before calling this function.
     #[cfg(feature = "vm_forwarding")]
     fn read_forwarding_pointer(object: ObjectReference) -> ObjectReference;
 }
