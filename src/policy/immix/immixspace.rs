@@ -583,6 +583,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         match object_forwarding::ForwardingAttempt::<VM>::attempt(object) {
             object_forwarding::ForwardingAttempt::Lost(lost) => {
+                trace!("Lost. object: {}", object);
                 // We lost the forwarding race as some other thread has set the forwarding word; wait
                 // until the object has been forwarded by the winner. Note that the object may not
                 // necessarily get forwarded since Immix opportunistically moves objects.
@@ -610,17 +611,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 new_object
             }
             object_forwarding::ForwardingAttempt::Won(won) => {
+                trace!("Won. object: {}", object);
                 if self.is_marked(object) {
+                    trace!("Is marked.");
                     // We won the forwarding race but the object is already marked so we clear the
                     // forwarding status and return the unmoved object
                     won.revert();
                     object
                 } else {
+                    trace!("Not marked.");
                     // We won the forwarding race; actually forward and copy the object if it is not pinned
                     // and we have sufficient space in our copy allocator
                     let new_object = if self.is_pinned(object)
                         || (!nursery_collection && self.defrag.space_exhausted())
                     {
+                        trace!("Is pinned or space exhausted.");
                         self.attempt_mark(object, self.mark_state);
                         won.revert();
                         Block::containing::<VM>(object).set_state(BlockState::Marked);
@@ -630,6 +635,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
                         object
                     } else {
+                        trace!("We should forward.");
                         // We are forwarding objects. When the copy allocator allocates the block, it should
                         // mark the block. So we do not need to explicitly mark it here.
 
@@ -647,6 +653,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                         BlockState::Marked
                     );
 
+                    trace!("Enqeuing {}", new_object);
                     queue.enqueue(new_object);
                     debug_assert!(new_object.is_live());
                     self.unlog_object_if_needed(new_object);
