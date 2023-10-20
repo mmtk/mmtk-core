@@ -344,12 +344,13 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `from`: The address of the object to be copied.
     /// * `semantics`: The copy semantic to use.
     /// * `copy_context`: The `GCWorkerCopyContext` for the GC thread.
+    /// * `vm_data`: The VM-specific data from the `attempt_to_forward` call.  This argument only
+    ///   exists if the Cargo feature `"vm_forwarding"` is enabled.
     fn copy(
         from: ObjectReference,
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<VM>,
-        #[cfg(feature = "vm_forwarding")]
-        vm_data: usize,
+        #[cfg(feature = "vm_forwarding")] vm_data: Self::VMForwardingDataType,
     ) -> ObjectReference;
 
     /// Copy an object. This is required
@@ -495,15 +496,15 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Arguments:
     /// * `object`: The object to forward.
     ///
-    /// Returns `Ok(word)` if this function successfully transitioned the state, and `word` can be
-    /// any VM-specific `usize` value that can be used to revert the state change.  For VMs that
-    /// implement the forwarding states by overwriting the type tag in the header, this word can be
-    /// the original type tag before calling this function.
+    /// Returns `Ok(value)` if this function successfully transitioned the state, and `value` can
+    /// be any VM-specific value that can be used to revert the state change.  For VMs that
+    /// implement the forwarding states by overwriting the type tag in the header, this value can
+    /// be the original type tag before calling this function.
     ///
     /// Returns `Err(())` if the transition failed (i.e. another GC worker is forwarding or has
     /// forwarded the object).
     #[cfg(feature = "vm_forwarding")]
-    fn attempt_to_forward(_object: ObjectReference) -> Result<usize, ()>;
+    fn attempt_to_forward(_object: ObjectReference) -> Result<Self::VMForwardingDataType, ()>;
 
     /// Change the the forwarding state of `object` to represent "forwarded" and write the
     /// forwarding pointer to its proper location.
@@ -541,9 +542,9 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `object`: The object to restore state.
-    /// * `vm_data`: The `word` of the `Ok(word)` returned from the `attempt_to_forward` call.
+    /// * `vm_data`: The `value` of the `Ok(value)` returned from the `attempt_to_forward` call.
     #[cfg(feature = "vm_forwarding")]
-    fn revert_forwarding_state(object: ObjectReference, vm_data: usize);
+    fn revert_forwarding_state(object: ObjectReference, vm_data: Self::VMForwardingDataType);
 
     /// Wait until the object is no longer in the "being forwarded state" and return the forwarding
     /// pointer if the object is forwarded.
@@ -562,6 +563,11 @@ pub trait ObjectModel<VM: VMBinding> {
     /// the "object forwarding is not triggered yet" state, simply return `object`.
     #[cfg(feature = "vm_forwarding")]
     fn spin_and_get_forwarded_object(object: ObjectReference) -> ObjectReference;
+
+    #[cfg(feature = "vm_forwarding")]
+    fn is_forwarded(object: ObjectReference) -> bool;
+    #[cfg(feature = "vm_forwarding")]
+    fn read_forwarding_pointer(object: ObjectReference) -> ObjectReference;
 }
 
 pub mod specs {
