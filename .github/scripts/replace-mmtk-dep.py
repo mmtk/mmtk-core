@@ -53,23 +53,26 @@ def remove_keys(item, keys):
         else:
             print("Key dependencies.mmtk.{} does not exist.  Ignored.".format(key))
 
+
 if how == "point_to_local":
-    # Remove any existing key about the versioning. We use whatever version we have in the local path.
-    remove_keys(mmtk_node, ["git", "branch", "registry", "rev"])
+    # We are going to update the dependency to a local path. First remove anything we know that would set a version.
+    # Deleting all the keys will mess up the formatting. But it doesn't matter, as the file with
+    # a dependency to the local path is just temporary.
+    remove_keys(mmtk_node, ["git", "branch", "registry", "rev", "tag", "path", "version"])
 
     # Use mmtk-core from the specified local directory.
     mmtk_repo_path = os.path.realpath(args.mmtk_core_path)
-    print("Setting dependencies.mmtk.path to {}".format(mmtk_repo_path))
     mmtk_node["path"] = mmtk_repo_path
+    print("Setting dependencies.mmtk.path to {}".format(mmtk_repo_path))
 elif how == "point_to_repo":
-    # Remove any existing key about local path
-    remove_keys(mmtk_node, ["path"])
+    # We assume the file already includes `git` and `rev`. We just update them. This will preserve the
+    # original formatting and comments.
+
     # Update git/rev
     mmtk_node["git"] = args.mmtk_core_git
     mmtk_node["rev"] = args.mmtk_core_rev
+    print("Setting dependencies.mmtk to git={},rev={}".format(args.mmtk_core_git, args.mmtk_core_rev))
 
-# Store the mmtk node
-toml_data["dependencies"]["mmtk"] = mmtk_node
 
 print("Writing TOML to '{}'".format(args.toml_path))
 with open(args.toml_path, "wt") as f:
