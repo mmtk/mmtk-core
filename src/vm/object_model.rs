@@ -488,7 +488,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// This function is called when an evacuating GC attempts to forward an object. It should be
     /// semantically equivalent to
-    /// [`crate::util::object_forwarding::traditional::attempt_to_forward`], albeit this function
+    /// `crate::util::object_forwarding::traditional::attempt_to_forward`, albeit this function
     /// uses VM-specific encoding of forwarding states.
     ///
     /// Arguments:
@@ -509,7 +509,7 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// This function is called after `object` has been copied to the new location `new_object`. It
     /// should be semantically equivalent to
-    /// [`crate::util::object_forwarding::traditional::write_forwarding_bits_and_forwarding_pointer`],
+    /// `crate::util::object_forwarding::traditional::write_forwarding_bits_and_forwarding_pointer`,
     /// albeit this function uses VM-specific encoding of forwarding states.
     ///
     /// Argiments:
@@ -545,7 +545,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// The function is called after `attempt_to_forward` failed.  The failing GC worker calls this
     /// function to wait for another GC thread to finish forwarding the object or reverting the
     /// forwarding state.  It should be semantically equivalent to
-    /// [`crate::util::object_forwarding::traditional::spin_and_get_forwarded_object`], albeit this
+    /// `crate::util::object_forwarding::traditional::spin_and_get_forwarded_object`, albeit this
     /// function uses VM-specific encoding of forwarding states.
     ///
     /// Arguments:

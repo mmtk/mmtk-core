@@ -174,10 +174,7 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
 /// Write the forwarding pointer of an object.
 /// This function is called on being_forwarded objects.
-fn write_forwarding_pointer<VM: VMBinding>(
-    object: ObjectReference,
-    new_object: ObjectReference,
-) {
+fn write_forwarding_pointer<VM: VMBinding>(object: ObjectReference, new_object: ObjectReference) {
     debug_assert!(
         is_being_forwarded::<VM>(object),
         "write_forwarding_pointer called for object {:?} that is not being forwarded! Forwarding state = 0x{:x}",

@@ -117,7 +117,10 @@ impl<VM: VMBinding> WonForwardingAttempt<VM> {
         #[cfg(not(feature = "vm_forwarding"))]
         {
             let new_object = VM::VMObjectModel::copy(self.object, semantics, copy_context);
-            traditional::write_forwarding_bits_and_forwarding_pointer::<VM>(self.object, new_object);
+            traditional::write_forwarding_bits_and_forwarding_pointer::<VM>(
+                self.object,
+                new_object,
+            );
             new_object
         }
 
@@ -174,7 +177,6 @@ pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
         VM::VMObjectModel::is_forwarded(object)
     }
 }
-
 
 /// Read the forwarding pointer of an object.
 /// This function is called on forwarded/being_forwarded objects.
