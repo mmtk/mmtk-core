@@ -62,7 +62,8 @@ pub struct WonForwardingAttempt<VM: VMBinding> {
     /// The object to forward.  This field holds the from-space address.
     object: ObjectReference,
     /// VM-specific temporary data used for reverting the forwarding states.
-    vm_data: usize,
+    #[cfg(feature = "vm_forwarding")]
+    vm_data: VM::VMObjectModel::VMForwardingDataType,
     phantom_data: PhantomData<VM>,
 }
 
@@ -73,6 +74,7 @@ pub struct WonForwardingAttempt<VM: VMBinding> {
 pub struct LostForwardingAttempt<VM: VMBinding> {
     /// The object to forward.  This field holds the from-space address.
     object: ObjectReference,
+    #[cfg(not(feature = "vm_forwarding"))]
     old_state: u8,
     phantom_data: PhantomData<VM>,
 }
@@ -81,20 +83,26 @@ impl<VM: VMBinding> ForwardingAttempt<VM> {
     /// Attempt to forward an object by atomically transitioning the forwarding state of `object`
     /// from `FORWARDING_NOT_TRIGGERED_YET` to `BEING_FORWARDED`.
     pub fn attempt(object: ObjectReference) -> Self {
-        let old_value = attempt_to_forward::<VM>(object);
+        #[cfg(not(feature = "vm_forwarding"))]
+        {
+            let old_state = attempt_to_forward::<VM>(object);
+            if state_is_forwarded_or_being_forwarded(old_state) {
+                Self::Lost(LostForwardingAttempt {
+                    object,
+                    old_state,
+                    phantom_data: PhantomData,
+                })
+            } else {
+                Self::Won(WonForwardingAttempt {
+                    object,
+                    phantom_data: PhantomData,
+                })
+            }
+        }
 
-        if state_is_forwarded_or_being_forwarded(old_value) {
-            Self::Lost(LostForwardingAttempt {
-                object,
-                old_state: old_value,
-                phantom_data: PhantomData,
-            })
-        } else {
-            Self::Won(WonForwardingAttempt {
-                object,
-                vm_data: 0,
-                phantom_data: PhantomData,
-            })
+        #[cfg(feature = "vm_forwarding")]
+        {
+            match VM::VMObjectModel::attempt_to_forward(object) {}
         }
     }
 }
@@ -109,22 +117,51 @@ impl<VM: VMBinding> WonForwardingAttempt<VM> {
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<VM>,
     ) -> ObjectReference {
-        let new_object = VM::VMObjectModel::copy(self.object, semantics, copy_context);
-        write_forwarding_bits_and_forwarding_pointer::<VM>(self.object, new_object);
-        new_object
+        #[cfg(not(feature = "vm_forwarding"))]
+        {
+            let new_object = VM::VMObjectModel::copy(self.object, semantics, copy_context);
+            write_forwarding_bits_and_forwarding_pointer::<VM>(self.object, new_object);
+            new_object
+        }
+
+        #[cfg(feature = "vm_forwarding")]
+        {
+            let new_object = VM::VMObjectModel::copy(self.object, semantics, copy_context, self.vm_data);
+            VM::VMObjectModel::write_forwarding_state_and_forwarding_pointer(
+                self.object,
+                new_object,
+            );
+            new_object
+        }
     }
 
     /// Call this to revert the forwarding state to the state before calling `attempt`
     pub fn revert(self) {
+        #[cfg(not(feature = "vm_forwarding"))]
         clear_forwarding_bits::<VM>(self.object);
+
+        #[cfg(feature = "vm_forwarding")]
+        VM::VMObjectModel::revert_forwarding_state(self.object, self.vm_data);
     }
 }
 
 impl<VM: VMBinding> LostForwardingAttempt<VM> {
     /// Spin-wait for the object's forwarding to become complete and then read the forwarding
-    /// pointer to the new object.
+    /// pointer to the new object.  If the forwarding state is reverted, this function will simply
+    /// return `self.object`.
     pub fn spin_and_get_forwarded_object(self) -> ObjectReference {
-        spin_and_get_forwarded_object::<VM>(self.object, self.old_state)
+        // About the curly braces: The Rust compiler seems not to know that
+        // `not(feature = "vm_forwarding")` and `feature = "vm_forwarding"` are mutually exclusive.
+        // It will suggest adding semicolon (which is wrong) if we remove the curly braces.
+        #[cfg(not(feature = "vm_forwarding"))]
+        {
+            spin_and_get_forwarded_object::<VM>(self.object, self.old_state)
+        }
+
+        #[cfg(feature = "vm_forwarding")]
+        {
+            VM::VMObjectModel::spin_and_get_forwarded_object(self.object)
+        }
     }
 }
 
@@ -157,8 +194,9 @@ fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
 /// * `object`: the forwarded/being_forwarded object.
 /// * `forwarding_bits`: the last state of the forwarding bits before calling this function.
 ///
-/// Returns a reference to the new object.
-///
+/// Returns a reference to the new object.  But if the GC algorithm decides that the object should
+/// be pinned and should not move, it will revert the forwarding bits to
+/// `FORWARDING_NOT_TRIGGERED_YET`.  In that case, this function will simply return `object`.
 fn spin_and_get_forwarded_object<VM: VMBinding>(
     object: ObjectReference,
     forwarding_bits: u8,
@@ -269,10 +307,7 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
 /// Write the forwarding pointer of an object.
 /// This function is called on being_forwarded objects.
-fn write_forwarding_pointer<VM: VMBinding>(
-    object: ObjectReference,
-    new_object: ObjectReference,
-) {
+fn write_forwarding_pointer<VM: VMBinding>(object: ObjectReference, new_object: ObjectReference) {
     debug_assert!(
         is_being_forwarded::<VM>(object),
         "write_forwarding_pointer called for object {:?} that is not being forwarded! Forwarding state = 0x{:x}",

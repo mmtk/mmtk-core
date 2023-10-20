@@ -143,6 +143,11 @@ malloc_counted_size = []
 # Count the size of all live objects in GC
 count_live_bytes_in_gc = []
 
+# Let the VM implement forwarding states (forwarding bits) and forwarding pointers.
+# Useful for VMs that have to use the type tag to encode forwarding states due to the lack of spare
+# bits in the header.
+vm_forwarding = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.
