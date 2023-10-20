@@ -19,6 +19,10 @@ on:
       core_commit:
         required: true
         type: string
+      # the command line to update lock file once we update Cargo.toml
+      update_lockfile:
+        required: true
+        type: string
 
 env:
   MMTK_CORE_WORK_DIR: mmtk-core
@@ -70,7 +74,7 @@ jobs:
         run: |
           export MANIFEST_PATH=../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml
           ./.github/scripts/ci-replace-mmtk-dep.sh $MANIFEST_PATH --mmtk-core-git https://github.com/mmtk/mmtk-core.git --mmtk-core-rev ${{ inputs.core_commit }}
-          cargo generate-lockfile --manifest-path $MANIFEST_PATH
+          ${{ inputs.update_lockfile }} --manifest-path $MANIFEST_PATH
 
       - name: Push a new commit
         if: steps.check-input.outputs.skip == 'false'

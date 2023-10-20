@@ -66,6 +66,11 @@ If `auto-merge.yml` failed for any reason, or if we have to manually merge bindi
       * Find the `mmtk` dependency under `[dependencies]`.
       * Update the field `git` if necessary. It should point to our mmtk-core repo, `https://github.com/mmtk/mmtk-core.git`.
       * Update the field `rev`. It should point to the new mmtk-core commit hash `{mmtk_core_commit}`.
-      * Generate the lockfile, due to the dependency change: `cargo generate-lockfile`.
+      * Update `mmtk/Cargo.lock` by building the Rust project again. If the binding needs to choose a GC plan by feature, use
+        any supported plan. So this step is slightly different for different bindings:
+        * OpenJDK, Ruby: `cargo build`
+        * JikesRVM: `cargo build --features nogc --target i686-unknown-linux-gnu`
+        * V8: `cargo build --features nogc`
+        * Julia: `cargo build --features immix`
       * Check in both `mmtk/Cargo.toml` and `mmtk/Cargo.lock`, and commit.
     2. Merge the PR once it can be merged.
