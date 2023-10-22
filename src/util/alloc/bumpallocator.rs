@@ -34,13 +34,6 @@ pub struct BumpPointer {
 }
 
 impl BumpPointer {
-    pub const fn new(start: Address, end: Address) -> Self {
-        BumpPointer {
-            cursor: start,
-            limit: end,
-        }
-    }
-
     pub fn reset(&mut self, start: Address, end: Address) {
         self.cursor = start;
         self.limit = end;
@@ -178,7 +171,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
     ) -> Self {
         BumpAllocator {
             tls,
-            bump_pointer: unsafe { BumpPointer::new(Address::zero(), Address::zero()) },
+            bump_pointer: BumpPointer::default(),
             space,
             plan,
         }

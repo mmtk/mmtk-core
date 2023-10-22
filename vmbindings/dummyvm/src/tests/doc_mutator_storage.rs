@@ -76,19 +76,9 @@ pub fn embed_fastpath_struct() {
 
         // Bind an MMTk mutator
         let mutator = mmtk::memory_manager::bind_mutator(&fixture.mmtk, tls_opaque_pointer);
-        // Create a fastpath BumpPointer
-        let default_bump_pointer = {
-            // First find the allocator
-            let selector = mmtk::memory_manager::get_allocator_mapping(
-                &fixture.mmtk,
-                AllocationSemantics::Default,
-            );
-            let default_allocator = unsafe {
-                mutator.allocator_impl::<mmtk::util::alloc::BumpAllocator<DummyVM>>(selector)
-            };
-            // Copy the bump pointer struct
-            default_allocator.bump_pointer
-        };
+        // Create a fastpath BumpPointer with default(). The BumpPointer from default() will guarantee to fail on the first allocation
+        // so the allocation goes to the slowpath and we will get an allocation buffer from MMTk.
+        let default_bump_pointer = BumpPointer::default();
         // Store the fastpath BumpPointer along with the mutator
         let mut storage = MutatorInTLS {
             default_bump_pointer,
@@ -119,7 +109,7 @@ pub fn embed_fastpath_struct() {
                 default_allocator.bump_pointer = storage.default_bump_pointer;
                 // Do slow path allocation with MMTk
                 let addr = default_allocator.alloc_slow(size, 8, 0);
-                // Copy bump pointer values to the fastpath BumpPointer
+                // Copy bump pointer values to the fastpath BumpPointer so we will have an allocation buffer.
                 storage.default_bump_pointer = default_allocator.bump_pointer;
                 addr
             }

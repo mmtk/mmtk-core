@@ -174,10 +174,10 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             tls,
             space: space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap(),
             plan,
-            bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            bump_pointer: BumpPointer::default(),
             hot: false,
             copy,
-            large_bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            large_bump_pointer: BumpPointer::default(),
             request_for_large: false,
             line: None,
         }
