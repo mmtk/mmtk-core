@@ -7,7 +7,7 @@ and they can be turned on in a release build with Rust flags (https://doc.rust-l
 
 ## Extreme debugging assertions
 
-Other than the normal debugging assertions, MMTk also has a set of
+In addition to the normal debugging assertions, MMTk also has a set of
 optional runtime checks that can be turned on by enabling the feature `extreme_assertions`.
 These usually include checks that are too expensive (even in a debug build) that we do not
 want to enable by default.
