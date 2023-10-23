@@ -87,9 +87,15 @@ jobs:
           git commit -m "Update mmtk-core to ${{ inputs.core_commit }}"
           git push
 
+      # Apply a delay before we attempt to merge and retry if we fail: there is a small period of time that we cannot merge a PR after we update it.
       - name: Enable auto-merge for the PR
         if: steps.check-input.outputs.skip == 'false'
         run: |
-          gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.base_repo }} --squash
+          for n in {1..5}; do
+            echo "Wait 30s then try merge"
+            sleep 30
+            gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.base_repo }} --squash && break
+            echo "Failed to merge the PR. Retry..."
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}
