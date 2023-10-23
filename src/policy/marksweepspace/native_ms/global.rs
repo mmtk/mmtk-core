@@ -7,7 +7,7 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
-        heap::FreeListPageResource,
+        heap::{FreeListPageResource, PageResource},
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
@@ -154,6 +154,10 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 
     fn get_page_resource(&self) -> &dyn crate::util::heap::PageResource<VM> {
         &self.pr
+    }
+
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        Some(&mut self.pr)
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
