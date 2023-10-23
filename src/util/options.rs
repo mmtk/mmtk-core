@@ -726,6 +726,9 @@ options! {
     // Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
+    // Should we exclude perf events occurring in kernel space. By default we include the kernel.
+    // Only set this option if you know the implications of excluding the kernel!
+    perf_exclude_kernel:    bool                  [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = false,
     // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
     // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
     // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
@@ -742,7 +745,7 @@ options! {
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     // Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
+    gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
     // Enable transparent hugepage support via madvise (only Linux is supported)
     transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
