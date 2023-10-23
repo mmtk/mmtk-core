@@ -12,5 +12,4 @@ optional runtime checks that can be turned on by enabling the feature `extreme_a
 These usually include checks that are too expensive (even in a debug build) that we do not
 want to enable by default.
 
-It is generally a good idea to make sure your MMTk binding can pass all the assertions
-(including `extreme_assertions`).
+You should make sure your MMTk binding can pass all the assertions (including `extreme_assertions`).
