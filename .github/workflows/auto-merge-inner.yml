@@ -68,6 +68,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup
+        if: steps.check-input.outputs.skip == 'false'
+        working-directory: ${{ env.BINDING_WORK_DIR }}
+        run: |
+          .github/scripts/ci-setup.sh
       - name: Update mmtk dependency
         if: steps.check-input.outputs.skip == 'false'
         working-directory: ${{ env.MMTK_CORE_WORK_DIR }}
