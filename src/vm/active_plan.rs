@@ -1,5 +1,4 @@
 use crate::plan::Mutator;
-use crate::plan::Plan;
 use crate::scheduler::GCWorker;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
@@ -8,12 +7,6 @@ use crate::ObjectQueue;
 
 /// VM-specific methods for the current plan.
 pub trait ActivePlan<VM: VMBinding> {
-    /// Return a reference to the current plan.
-    // TODO: I don't know how this can be implemented when we have multiple MMTk instances.
-    // This function is used by space and phase to refer to the current plan.
-    // Possibly we should remove the use of this function, and remove this function?
-    fn global() -> &'static dyn Plan<VM = VM>;
-
     /// Return whether there is a mutator created and associated with the thread.
     ///
     /// Arguments:

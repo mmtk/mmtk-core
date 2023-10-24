@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
+use std::sync::Arc;
 
-use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::copyspace::CopySpace;
@@ -13,10 +13,13 @@ use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use std::sync::atomic::Ordering;
 
 use enum_map::Enum;
 use enum_map::EnumMap;
+
+use super::alloc::allocator::AllocatorContext;
 
 const MAX_COPYSPACE_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_COPY_ALLOCATORS: usize = 1;
@@ -175,17 +178,14 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
     /// * `worker_tls`: The worker thread for this copy context.
     /// * `plan`: A reference to the current plan.
     /// * `config`: The configuration for the copy context.
-    pub fn new(
-        worker_tls: VMWorkerThread,
-        plan: &'static dyn Plan<VM = VM>,
-        config: CopyConfig<VM>,
-    ) -> Self {
+    pub fn new(worker_tls: VMWorkerThread, mmtk: &MMTK<VM>, config: CopyConfig<VM>) -> Self {
         let mut ret = GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             immix_hybrid: unsafe { MaybeUninit::uninit().assume_init() },
             config,
         };
+        let context = Arc::new(AllocatorContext::new(mmtk));
 
         // Initiate the copy context for each policy based on the space mapping.
         for &(selector, space) in ret.config.space_mapping.iter() {
@@ -193,21 +193,21 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
                 CopySelector::CopySpace(index) => {
                     ret.copy[index as usize].write(CopySpaceCopyContext::new(
                         worker_tls,
-                        plan,
+                        context.clone(),
                         space.downcast_ref::<CopySpace<VM>>().unwrap(),
                     ));
                 }
                 CopySelector::Immix(index) => {
                     ret.immix[index as usize].write(ImmixCopyContext::new(
                         worker_tls,
-                        plan,
+                        context.clone(),
                         space.downcast_ref::<ImmixSpace<VM>>().unwrap(),
                     ));
                 }
                 CopySelector::ImmixHybrid(index) => {
                     ret.immix_hybrid[index as usize].write(ImmixHybridCopyContext::new(
                         worker_tls,
-                        plan,
+                        context.clone(),
                         space.downcast_ref::<ImmixSpace<VM>>().unwrap(),
                     ));
                 }
