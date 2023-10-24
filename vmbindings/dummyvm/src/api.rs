@@ -164,11 +164,6 @@ pub extern "C" fn mmtk_is_mapped_address(address: Address) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_modify_check(object: ObjectReference) {
-    memory_manager::modify_check(&SINGLETON, object)
-}
-
-#[no_mangle]
 pub extern "C" fn mmtk_handle_user_collection_request(tls: VMMutatorThread) {
     memory_manager::handle_user_collection_request::<DummyVM>(&SINGLETON, tls);
 }
@@ -262,4 +257,10 @@ pub extern "C" fn mmtk_free_with_size(addr: Address, old_size: usize) {
 #[no_mangle]
 pub extern "C" fn mmtk_free(addr: Address) {
     memory_manager::free(addr)
+}
+
+#[no_mangle]
+#[cfg(feature = "malloc_counted_size")]
+pub extern "C" fn mmtk_get_malloc_bytes() -> usize {
+    memory_manager::get_malloc_bytes(&SINGLETON)
 }

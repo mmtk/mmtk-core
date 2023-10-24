@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
+use super::allocator::AllocatorContext;
 use super::BumpAllocator;
-use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
@@ -32,8 +34,8 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         self.bump_allocator.get_space()
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.bump_allocator.get_plan()
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.bump_allocator.context
     }
 
     fn get_tls(&self) -> VMThread {
@@ -89,13 +91,13 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
 impl<VM: VMBinding> MarkCompactAllocator<VM> {
     pub const HEADER_RESERVED_IN_BYTES: usize =
         crate::policy::markcompactspace::MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES;
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: &'static dyn Space<VM>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         MarkCompactAllocator {
-            bump_allocator: BumpAllocator::new(tls, space, plan),
+            bump_allocator: BumpAllocator::new(tls, space, context),
         }
     }
 }

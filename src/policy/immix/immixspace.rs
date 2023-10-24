@@ -1,3 +1,4 @@
+use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
@@ -6,6 +7,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::*;
 use crate::util::heap::chunk_map::*;
@@ -357,7 +359,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool) {
+    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -369,7 +371,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             // Prepare defrag info
             if super::DEFRAG {
-                self.defrag.prepare(self);
+                self.defrag.prepare(self, plan_stats);
             }
 
             // Prepare each block for GC
@@ -931,7 +933,6 @@ impl<VM: VMBinding> FlushPageResource<VM> {
     }
 }
 
-use crate::plan::Plan;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
@@ -966,13 +967,13 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
 }
 
 impl<VM: VMBinding> ImmixCopyContext<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMWorkerThread,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
         space: &'static ImmixSpace<VM>,
     ) -> Self {
         ImmixCopyContext {
-            allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
+            allocator: ImmixAllocator::new(tls.0, Some(space), context, true),
         }
     }
 
@@ -1019,14 +1020,14 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixHybridCopyContext<VM> {
 }
 
 impl<VM: VMBinding> ImmixHybridCopyContext<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMWorkerThread,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
         space: &'static ImmixSpace<VM>,
     ) -> Self {
         ImmixHybridCopyContext {
-            copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),
-            defrag_allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
+            copy_allocator: ImmixAllocator::new(tls.0, Some(space), context.clone(), false),
+            defrag_allocator: ImmixAllocator::new(tls.0, Some(space), context, true),
         }
     }
 

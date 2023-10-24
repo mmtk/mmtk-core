@@ -34,7 +34,10 @@ pub struct NoGC<VM: VMBinding> {
     pub los: ImmortalSpace<VM>,
 }
 
-pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    collects_garbage: false,
+    ..PlanConstraints::default()
+};
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
@@ -74,15 +77,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             + self.immortal.reserved_pages()
             + self.los.reserved_pages()
             + self.base.get_used_pages()
-    }
-
-    fn handle_user_collection_request(
-        &self,
-        _tls: VMMutatorThread,
-        _force: bool,
-        _exhaustive: bool,
-    ) {
-        warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }
 

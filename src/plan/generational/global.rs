@@ -46,9 +46,11 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             ),
             true,
         );
+        let full_heap_gc_count = args
+            .global_args
+            .stats
+            .new_event_counter("majorGC", true, true);
         let common = CommonPlan::new(args);
-
-        let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 
         CommonGenPlan {
             nursery,
@@ -107,11 +109,9 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             cur_nursery,
             max_nursery,
         );
-
         if nursery_full {
             return true;
         }
-
         if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             return true;
         }
@@ -151,6 +151,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         } else if self
             .common
             .base
+            .global_state
             .user_triggered_collection
             .load(Ordering::SeqCst)
             && *self.common.base.options.full_heap_system_gc
@@ -162,6 +163,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             || self
                 .common
                 .base
+                .global_state
                 .cur_collection_attempts
                 .load(Ordering::SeqCst)
                 > 1
@@ -171,6 +173,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
                 self.next_gc_full_heap.load(Ordering::SeqCst),
                 self.common
                     .base
+                    .global_state
                     .cur_collection_attempts
                     .load(Ordering::SeqCst)
             );

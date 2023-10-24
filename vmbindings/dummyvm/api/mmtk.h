@@ -67,9 +67,6 @@ extern bool mmtk_is_mapped_object(void* ref);
 // Return if the address pointed to by `addr` is in mapped memory
 extern bool mmtk_is_mapped_address(void* addr);
 
-// Check if a GC is in progress and if the object `ref` is movable
-extern void mmtk_modify_check(void* ref);
-
 // Return if object pointed to by `object` will never move
 extern bool mmtk_will_never_move(void* object);
 
