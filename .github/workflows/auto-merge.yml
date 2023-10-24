@@ -48,7 +48,7 @@ jobs:
       base_repo: mmtk/mmtk-jikesrvm
       ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
-      update_lockfile: cargo build --features nogc --target i686-unknown-linux-gnu
+      update_lockfile: cargo generate-lockfile
     secrets: inherit
 
   check-merge-v8-pr:
