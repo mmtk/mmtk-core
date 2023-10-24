@@ -1,4 +1,4 @@
-use super::MarkCompact; // Add
+use super::MarkCompact;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
@@ -11,7 +11,7 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::MarkCompactAllocator;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use crate::Plan;
+use crate::MMTK;
 use enum_map::EnumMap;
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
@@ -29,13 +29,13 @@ lazy_static! {
 
 pub fn create_markcompact_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let markcompact = plan.downcast_ref::<MarkCompact<VM>>().unwrap();
+    let markcompact = mmtk.get_plan().downcast_ref::<MarkCompact<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, markcompact);
             vec.push((AllocatorSelector::MarkCompact(0), markcompact.mc_space()));
             vec
         }),
@@ -44,11 +44,11 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: markcompact,
     }
 }
 

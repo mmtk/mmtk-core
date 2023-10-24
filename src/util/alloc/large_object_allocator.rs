@@ -1,4 +1,5 @@
-use crate::plan::Plan;
+use std::sync::Arc;
+
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::{allocator, Allocator};
@@ -6,14 +7,15 @@ use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
+use super::allocator::AllocatorContext;
+
 #[repr(C)]
 pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static LargeObjectSpace<VM>,
-    /// [`Plan`] instance that this allocator instance is associated with.
-    plan: &'static dyn Plan<VM = VM>,
+    context: Arc<AllocatorContext<VM>>,
 }
 
 impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
@@ -21,8 +23,8 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         self.tls
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.plan
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.context
     }
 
     fn get_space(&self) -> &'static dyn Space<VM> {
@@ -56,11 +58,15 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
 }
 
 impl<VM: VMBinding> LargeObjectAllocator<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: &'static LargeObjectSpace<VM>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
     ) -> Self {
-        LargeObjectAllocator { tls, space, plan }
+        LargeObjectAllocator {
+            tls,
+            space,
+            context,
+        }
     }
 }

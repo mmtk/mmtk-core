@@ -5,6 +5,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
+use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::copy::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -15,6 +16,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
@@ -290,7 +292,6 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 }
 
-use crate::plan::Plan;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::VMWorkerThread;
@@ -319,13 +320,13 @@ impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMWorkerThread,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
         tospace: &'static CopySpace<VM>,
     ) -> Self {
         CopySpaceCopyContext {
-            copy_allocator: BumpAllocator::new(tls.0, tospace, plan),
+            copy_allocator: BumpAllocator::new(tls.0, tospace, context),
         }
     }
 }

@@ -3,8 +3,8 @@ use super::{
     line::Line,
     ImmixSpace,
 };
-use crate::policy::space::Space;
 use crate::util::linear_scan::Region;
+use crate::{policy::space::Space, Plan};
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
 use spin::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -23,6 +23,22 @@ pub struct Defrag {
     pub defrag_spill_threshold: AtomicUsize,
     /// The number of remaining clean pages in defrag space.
     available_clean_pages_for_defrag: AtomicUsize,
+}
+
+pub struct StatsForDefrag {
+    total_pages: usize,
+    reserved_pages: usize,
+    collection_reserved_pages: usize,
+}
+
+impl StatsForDefrag {
+    pub fn new<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> Self {
+        Self {
+            total_pages: plan.get_total_pages(),
+            reserved_pages: plan.get_reserved_pages(),
+            collection_reserved_pages: plan.get_collection_reserved_pages(),
+        }
+    }
 }
 
 impl Defrag {
@@ -100,15 +116,14 @@ impl Defrag {
 
     /// Prepare work. Should be called in ImmixSpace::prepare.
     #[allow(clippy::assertions_on_constants)]
-    pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>) {
+    pub fn prepare<VM: VMBinding>(&self, space: &ImmixSpace<VM>, plan_stats: StatsForDefrag) {
         debug_assert!(super::DEFRAG);
         self.defrag_space_exhausted.store(false, Ordering::Release);
 
         // Calculate available free space for defragmentation.
 
-        let mut available_clean_pages_for_defrag = VM::VMActivePlan::global().get_total_pages()
-            as isize
-            - VM::VMActivePlan::global().get_reserved_pages() as isize
+        let mut available_clean_pages_for_defrag = plan_stats.total_pages as isize
+            - plan_stats.reserved_pages as isize
             + self.defrag_headroom_pages(space) as isize;
         if available_clean_pages_for_defrag < 0 {
             available_clean_pages_for_defrag = 0
@@ -122,8 +137,7 @@ impl Defrag {
         }
 
         self.available_clean_pages_for_defrag.store(
-            available_clean_pages_for_defrag as usize
-                + VM::VMActivePlan::global().get_collection_reserved_pages(),
+            available_clean_pages_for_defrag as usize + plan_stats.collection_reserved_pages,
             Ordering::Release,
         );
     }

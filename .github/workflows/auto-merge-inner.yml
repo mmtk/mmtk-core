@@ -1,0 +1,101 @@
+name: Merge Binding PR
+
+on:
+  workflow_call:
+    inputs:
+      # The repository from which the binding PR is submitted, such as qinsoon/mmtk-openjdk
+      repo:
+        required: true
+        type: string
+      # The upstream repository where the binding PR is opened, such as mmtk/mmtk-openjdk
+      base_repo:
+        required: true
+        type: string
+      # The branch name for the PR
+      ref:
+        required: true
+        type: string
+      # The core commit hash that the binding should be using.
+      core_commit:
+        required: true
+        type: string
+      # the command line to update lock file once we update Cargo.toml
+      update_lockfile:
+        required: true
+        type: string
+
+env:
+  MMTK_CORE_WORK_DIR: mmtk-core
+  BINDING_WORK_DIR: mmtk-binding-repo
+
+jobs:
+  process-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check input conditions
+        id: check-input
+        run: |
+          if [[ "${{ inputs.repo }}" == ${{ inputs.base_repo }} ]] && [[ "${{ inputs.ref }}" == "master" ]]; then
+            echo "Conditions not met"
+            echo "::set-output name=skip::true"
+          else
+            echo "::set-output name=skip::false"
+          fi
+        shell: bash
+
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v3
+        if: steps.check-input.outputs.skip == 'false'
+        with:
+          path: ${{ env.MMTK_CORE_WORK_DIR }}
+      - name: Checkout repository
+        if: steps.check-input.outputs.skip == 'false'
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repo }}
+          path: ${{ env.BINDING_WORK_DIR }}
+          ref: ${{ inputs.ref }}
+          # Check out with CI_ACCESS_TOKEN so we can push to it.
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+
+      - name: Get PR number
+        if: steps.check-input.outputs.skip == 'false'
+        id: get-pr
+        run: |
+          PR_NUMBER=$(gh pr list --head ${{ inputs.ref }} --repo ${{ inputs.base_repo }} --json number --jq '.[0].number')
+          echo "::set-output name=pr_number::$PR_NUMBER"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update mmtk dependency
+        if: steps.check-input.outputs.skip == 'false'
+        working-directory: ${{ env.MMTK_CORE_WORK_DIR }}
+        run: |
+          export MANIFEST_PATH=../${{ env.BINDING_WORK_DIR }}/mmtk/Cargo.toml
+          ./.github/scripts/ci-replace-mmtk-dep.sh $MANIFEST_PATH --mmtk-core-git https://github.com/mmtk/mmtk-core.git --mmtk-core-rev ${{ inputs.core_commit }}
+          ${{ inputs.update_lockfile }} --manifest-path $MANIFEST_PATH
+
+      - name: Push a new commit
+        if: steps.check-input.outputs.skip == 'false'
+        working-directory: ${{ env.BINDING_WORK_DIR }}
+        run: |
+          git config user.name "mmtkgc-bot"
+          git config user.email "mmtkgc.bot@gmail.com"
+          git add mmtk/Cargo.toml
+          git add mmtk/Cargo.lock
+          git commit -m "Update mmtk-core to ${{ inputs.core_commit }}"
+          git push
+
+      # Apply a delay before we attempt to merge and retry if we fail: there is a small period of time that we cannot merge a PR after we update it.
+      - name: Enable auto-merge for the PR
+        if: steps.check-input.outputs.skip == 'false'
+        run: |
+          for n in {1..5}; do
+            echo "Wait 30s then try merge"
+            sleep 30
+            gh pr merge ${{ steps.get-pr.outputs.pr_number }} --auto --repo ${{ inputs.base_repo }} --squash && break
+            echo "Failed to merge the PR. Retry..."
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_ACCESS_TOKEN }}

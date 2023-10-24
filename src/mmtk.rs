@@ -1,18 +1,26 @@
 //! MMTk instance.
+use crate::global_state::{GcStatus, GlobalState};
+use crate::plan::gc_requester::GCRequester;
+use crate::plan::CreateGeneralPlanArgs;
 use crate::plan::Plan;
 use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
+#[cfg(feature = "analysis")]
+use crate::util::analysis::AnalysisManager;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
+use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
+use crate::util::heap::HeapMeta;
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
@@ -98,6 +106,7 @@ impl Default for MMTKBuilder {
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<Options>,
+    pub(crate) state: Arc<GlobalState>,
     pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
@@ -107,7 +116,15 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMEdge>>,
     #[cfg(feature = "extreme_assertions")]
     pub(crate) edge_logger: EdgeLogger<VM::VMEdge>,
+    pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
+    pub(crate) gc_requester: Arc<GCRequester<VM>>,
+    pub(crate) stats: Arc<Stats>,
     inside_harness: AtomicBool,
+    #[cfg(feature = "sanity")]
+    inside_sanity: AtomicBool,
+    /// Analysis counters. The feature analysis allows us to periodically stop the world and collect some statistics.
+    #[cfg(feature = "analysis")]
+    pub(crate) analysis_manager: Arc<AnalysisManager<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for MMTK<VM> {}
@@ -128,21 +145,51 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
 
+        let state = Arc::new(GlobalState::default());
+
+        let gc_requester = Arc::new(GCRequester::new());
+
+        let gc_trigger = Arc::new(GCTrigger::new(
+            options.clone(),
+            gc_requester.clone(),
+            state.clone(),
+        ));
+
+        let stats = Arc::new(Stats::new(&options));
+
+        // We need this during creating spaces, but we do not use this once the MMTk instance is created.
+        // So we do not save it in MMTK. This may change in the future.
+        let mut heap = HeapMeta::new();
+
         let plan = crate::plan::create_plan(
             *options.plan,
-            VM_MAP.as_ref(),
-            MMAPPER.as_ref(),
-            options.clone(),
-            scheduler.clone(),
+            CreateGeneralPlanArgs {
+                vm_map: VM_MAP.as_ref(),
+                mmapper: MMAPPER.as_ref(),
+                options: options.clone(),
+                state: state.clone(),
+                gc_trigger: gc_trigger.clone(),
+                scheduler: scheduler.clone(),
+                stats: &stats,
+                heap: &mut heap,
+            },
         );
+
+        // We haven't finished creating MMTk. No one is using the GC trigger. We cast the arc into a mutable reference.
+        {
+            // TODO: use Arc::get_mut_unchecked() when it is availble.
+            let gc_trigger: &mut GCTrigger<VM> =
+                unsafe { &mut *(Arc::as_ptr(&gc_trigger) as *mut _) };
+            // We know the plan address will not change. Cast it to a static reference.
+            let static_plan: &'static dyn Plan<VM = VM> = unsafe { &*(&*plan as *const _) };
+            // Set the plan so we can trigger GC and check GC condition without using plan
+            gc_trigger.set_plan(static_plan);
+        }
 
         // TODO: This probably does not work if we have multiple MMTk instances.
         VM_MAP.boot();
         // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        VM_MAP.finalize_static_space_map(
-            plan.base().heap.get_discontig_start(),
-            plan.base().heap.get_discontig_end(),
-        );
+        VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
@@ -150,6 +197,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         MMTK {
             options,
+            state,
             plan: UnsafeCell::new(plan),
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::<
@@ -158,25 +206,118 @@ impl<VM: VMBinding> MMTK<VM> {
             scheduler,
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),
+            #[cfg(feature = "sanity")]
+            inside_sanity: AtomicBool::new(false),
             inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
             edge_logger: EdgeLogger::new(),
+            #[cfg(feature = "analysis")]
+            analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
+            gc_trigger,
+            gc_requester,
+            stats,
         }
     }
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.get_plan()
-            .handle_user_collection_request(tls, true, true);
+        self.handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
-        self.get_plan().base().stats.start_all();
+        self.stats.start_all();
         self.scheduler.enable_stat();
     }
 
     pub fn harness_end(&'static self) {
-        self.get_plan().base().stats.stop_all(self);
+        self.stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
         probe!(mmtk, harness_end);
+    }
+
+    #[cfg(feature = "sanity")]
+    pub(crate) fn sanity_begin(&self) {
+        self.inside_sanity.store(true, Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "sanity")]
+    pub(crate) fn sanity_end(&self) {
+        self.inside_sanity.store(false, Ordering::Relaxed)
+    }
+
+    #[cfg(feature = "sanity")]
+    pub(crate) fn is_in_sanity(&self) -> bool {
+        self.inside_sanity.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn set_gc_status(&self, s: GcStatus) {
+        let mut gc_status = self.state.gc_status.lock().unwrap();
+        if *gc_status == GcStatus::NotInGC {
+            self.state.stacks_prepared.store(false, Ordering::SeqCst);
+            // FIXME stats
+            self.stats.start_gc();
+        }
+        *gc_status = s;
+        if *gc_status == GcStatus::NotInGC {
+            // FIXME stats
+            if self.stats.get_gathering_stats() {
+                self.stats.end_gc();
+            }
+        }
+    }
+
+    pub fn gc_in_progress(&self) -> bool {
+        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+    }
+
+    pub fn gc_in_progress_proper(&self) -> bool {
+        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
+    }
+
+    /// The application code has requested a collection. This is just a GC hint, and
+    /// we may ignore it.
+    ///
+    /// # Arguments
+    /// * `tls`: The mutator thread that requests the GC
+    /// * `force`: The request cannot be ignored (except for NoGC)
+    /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
+    pub fn handle_user_collection_request(
+        &self,
+        tls: VMMutatorThread,
+        force: bool,
+        exhaustive: bool,
+    ) {
+        use crate::vm::Collection;
+        if !self.get_plan().constraints().collects_garbage {
+            warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
+            return;
+        }
+
+        if force || !*self.options.ignore_system_gc {
+            info!("User triggering collection");
+            if exhaustive {
+                if let Some(gen) = self.get_plan().generational() {
+                    gen.force_full_heap_collection();
+                }
+            }
+
+            self.state
+                .user_triggered_collection
+                .store(true, Ordering::Relaxed);
+            self.gc_requester.request();
+            VM::VMCollection::block_for_gc(tls);
+        }
+    }
+
+    /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
+    // This is not used, as we do not have a concurrent plan.
+    #[allow(unused)]
+    pub fn trigger_internal_collection_request(&self) {
+        self.state
+            .last_internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.state
+            .internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.gc_requester.request();
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
