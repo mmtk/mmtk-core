@@ -99,8 +99,12 @@
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
 <a href="#101" id="101">101</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::BumpAllocator;
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+
+<span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
+<span class="kw">use </span><span class="kw">super</span>::BumpAllocator;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -133,8 +137,8 @@
         <span class="self">self</span>.bump_allocator.get_space()
     }
 
-    <span class="kw">fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="self">self</span>.bump_allocator.get_plan()
+    <span class="kw">fn </span>get_context(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AllocatorContext&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.bump_allocator.context
     }
 
     <span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMThread {
@@ -190,13 +194,13 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompactAllocator&lt;VM&gt; {
     <span class="kw">pub const </span>HEADER_RESERVED_IN_BYTES: usize =
         <span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace::&lt;VM&gt;::HEADER_RESERVED_IN_BYTES;
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,
         space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
         MarkCompactAllocator {
-            bump_allocator: BumpAllocator::new(tls, space, plan),
+            bump_allocator: BumpAllocator::new(tls, space, context),
         }
     }
 }

@@ -198,13 +198,27 @@
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::{
     block::{Block, BlockState},
     line::Line,
     ImmixSpace,
 };
-<span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
+<span class="kw">use crate</span>::{policy::space::Space, Plan};
 <span class="kw">use crate</span>::{util::constants::LOG_BYTES_IN_PAGE, vm::<span class="kw-2">*</span>};
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -223,6 +237,22 @@
     </span><span class="kw">pub </span>defrag_spill_threshold: AtomicUsize,
     <span class="doccomment">/// The number of remaining clean pages in defrag space.
     </span>available_clean_pages_for_defrag: AtomicUsize,
+}
+
+<span class="kw">pub struct </span>StatsForDefrag {
+    total_pages: usize,
+    reserved_pages: usize,
+    collection_reserved_pages: usize,
+}
+
+<span class="kw">impl </span>StatsForDefrag {
+    <span class="kw">pub fn </span>new&lt;VM: VMBinding&gt;(plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            total_pages: plan.get_total_pages(),
+            reserved_pages: plan.get_reserved_pages(),
+            collection_reserved_pages: plan.get_collection_reserved_pages(),
+        }
+    }
 }
 
 <span class="kw">impl </span>Defrag {
@@ -300,15 +330,14 @@
 
     <span class="doccomment">/// Prepare work. Should be called in ImmixSpace::prepare.
     </span><span class="attr">#[allow(clippy::assertions_on_constants)]
-    </span><span class="kw">pub fn </span>prepare&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;) {
+    </span><span class="kw">pub fn </span>prepare&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span>ImmixSpace&lt;VM&gt;, plan_stats: StatsForDefrag) {
         <span class="macro">debug_assert!</span>(<span class="kw">super</span>::DEFRAG);
         <span class="self">self</span>.defrag_space_exhausted.store(<span class="bool-val">false</span>, Ordering::Release);
 
         <span class="comment">// Calculate available free space for defragmentation.
 
-        </span><span class="kw">let </span><span class="kw-2">mut </span>available_clean_pages_for_defrag = VM::VMActivePlan::global().get_total_pages()
-            <span class="kw">as </span>isize
-            - VM::VMActivePlan::global().get_reserved_pages() <span class="kw">as </span>isize
+        </span><span class="kw">let </span><span class="kw-2">mut </span>available_clean_pages_for_defrag = plan_stats.total_pages <span class="kw">as </span>isize
+            - plan_stats.reserved_pages <span class="kw">as </span>isize
             + <span class="self">self</span>.defrag_headroom_pages(space) <span class="kw">as </span>isize;
         <span class="kw">if </span>available_clean_pages_for_defrag &lt; <span class="number">0 </span>{
             available_clean_pages_for_defrag = <span class="number">0
@@ -322,8 +351,7 @@
         }
 
         <span class="self">self</span>.available_clean_pages_for_defrag.store(
-            available_clean_pages_for_defrag <span class="kw">as </span>usize
-                + VM::VMActivePlan::global().get_collection_reserved_pages(),
+            available_clean_pages_for_defrag <span class="kw">as </span>usize + plan_stats.collection_reserved_pages,
             Ordering::Release,
         );
     }

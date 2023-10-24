@@ -337,6 +337,9 @@
 <a href="#337" id="337">337</a>
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -385,9 +388,11 @@
             ),
             <span class="bool-val">true</span>,
         );
+        <span class="kw">let </span>full_heap_gc_count = args
+            .global_args
+            .stats
+            .new_event_counter(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="kw">let </span>common = CommonPlan::new(args);
-
-        <span class="kw">let </span>full_heap_gc_count = common.base.stats.new_event_counter(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
 
         CommonGenPlan {
             nursery,
@@ -446,11 +451,9 @@
             cur_nursery,
             max_nursery,
         );
-
         <span class="kw">if </span>nursery_full {
             <span class="kw">return </span><span class="bool-val">true</span>;
         }
-
         <span class="kw">if </span><span class="self">Self</span>::virtual_memory_exhausted(plan.generational().unwrap()) {
             <span class="kw">return </span><span class="bool-val">true</span>;
         }
@@ -490,6 +493,7 @@
         </span>} <span class="kw">else if </span><span class="self">self
             </span>.common
             .base
+            .global_state
             .user_triggered_collection
             .load(Ordering::SeqCst)
             &amp;&amp; <span class="kw-2">*</span><span class="self">self</span>.common.base.options.full_heap_system_gc
@@ -501,6 +505,7 @@
             || <span class="self">self
                 </span>.common
                 .base
+                .global_state
                 .cur_collection_attempts
                 .load(Ordering::SeqCst)
                 &gt; <span class="number">1
@@ -510,6 +515,7 @@
                 <span class="self">self</span>.next_gc_full_heap.load(Ordering::SeqCst),
                 <span class="self">self</span>.common
                     .base
+                    .global_state
                     .cur_collection_attempts
                     .load(Ordering::SeqCst)
             );

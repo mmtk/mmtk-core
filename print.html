@@ -821,7 +821,7 @@ tospace, and to the two spaces controlled by the common plan. </p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use super::MyGC; // Add
-use crate::Plan;
+use crate::MMTK;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -871,7 +871,7 @@ bound with <code>tospace</code>.</p>
 <code>MyGC</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    let mygc = plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
+</span>    let mygc = mmtk.get_plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
 <span class="boring">}</span></code></pre></pre>
 <p>Then, use <code>mygc</code> to access the spaces in <code>MyGC</code>.</p>
 <ol>
@@ -883,7 +883,7 @@ the <code>&amp;</code> prefix).</li>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>        space_mapping: Box::new({
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, mygc);
             vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace()));
             vec
         }),

@@ -72,9 +72,13 @@
 <a href="#72" id="72">72</a>
 <a href="#73" id="73">73</a>
 <a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::analysis::RtAnalysis;
 <span class="kw">use </span><span class="kw">crate</span>::util::statistics::counter::EventCounter;
-<span class="kw">use </span><span class="kw">crate</span>::vm::{ActivePlan, VMBinding};
+<span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::Stats;
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::sync::{Arc, Mutex};
 
@@ -87,10 +91,10 @@
  * We keep track of the size classes using a HashMap with the key being the name of the
  * size class.
  */
-</span><span class="attr">#[derive(Default)]
 </span><span class="kw">pub struct </span>PerSizeClassObjectCounter {
     running: bool,
     size_classes: Mutex&lt;HashMap&lt;String, Arc&lt;Mutex&lt;EventCounter&gt;&gt;&gt;&gt;,
+    stats: Arc&lt;Stats&gt;,
 }
 
 <span class="comment">// Macro to simplify the creation of a new counter for a particular size class.
@@ -105,10 +109,11 @@
 }
 
 <span class="kw">impl </span>PerSizeClassObjectCounter {
-    <span class="kw">pub fn </span>new(running: bool) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(running: bool, stats: Arc&lt;Stats&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             running,
             size_classes: Mutex::new(HashMap::new()),
+            stats,
         }
     }
 
@@ -125,14 +130,13 @@
             <span class="kw">return</span>;
         }
 
-        <span class="kw">let </span>stats = <span class="kw-2">&amp;</span>(VM::VMActivePlan::global().base()).stats;
         <span class="kw">let </span>size_class = <span class="macro">format!</span>(<span class="string">&quot;size{}&quot;</span>, <span class="self">self</span>.size_class(size));
         <span class="kw">let </span><span class="kw-2">mut </span>size_classes = <span class="self">self</span>.size_classes.lock().unwrap();
         <span class="kw">let </span>c = size_classes.get_mut(<span class="kw-2">&amp;</span>size_class);
         <span class="kw">match </span>c {
             <span class="prelude-val">None </span>=&gt; {
                 <span class="comment">// Create (and increment) the counter associated with the size class if it doesn&#39;t exist
-                </span><span class="kw">let </span>ctr = <span class="macro">new_ctr!</span>(stats, size_classes, size_class);
+                </span><span class="kw">let </span>ctr = <span class="macro">new_ctr!</span>(<span class="self">self</span>.stats, size_classes, size_class);
                 ctr.lock().unwrap().inc();
             }
             <span class="prelude-val">Some</span>(ctr) =&gt; {

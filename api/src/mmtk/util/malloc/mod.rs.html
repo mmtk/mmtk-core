@@ -108,7 +108,7 @@
 </span><span class="kw">pub fn </span>counted_malloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, size: usize) -&gt; Address {
     <span class="kw">let </span>res = malloc(size);
     <span class="kw">if </span>!res.is_zero() {
-        mmtk.get_plan().base().increase_malloc_bytes_by(size);
+        mmtk.state.increase_malloc_bytes_by(size);
     }
     res
 }
@@ -121,7 +121,7 @@
 </span><span class="kw">pub fn </span>counted_calloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, num: usize, size: usize) -&gt; Address {
     <span class="kw">let </span>res = calloc(num, size);
     <span class="kw">if </span>!res.is_zero() {
-        mmtk.get_plan().base().increase_malloc_bytes_by(num * size);
+        mmtk.state.increase_malloc_bytes_by(num * size);
     }
     res
 }
@@ -140,10 +140,10 @@
     <span class="kw">let </span>res = realloc(addr, size);
 
     <span class="kw">if </span>!addr.is_zero() {
-        mmtk.get_plan().base().decrease_malloc_bytes_by(old_size);
+        mmtk.state.decrease_malloc_bytes_by(old_size);
     }
     <span class="kw">if </span>size != <span class="number">0 </span>&amp;&amp; !res.is_zero() {
-        mmtk.get_plan().base().increase_malloc_bytes_by(size);
+        mmtk.state.increase_malloc_bytes_by(size);
     }
 
     res
@@ -157,7 +157,7 @@
 </span><span class="kw">pub fn </span>free_with_size&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, addr: Address, old_size: usize) {
     free(addr);
     <span class="kw">if </span>!addr.is_zero() {
-        mmtk.get_plan().base().decrease_malloc_bytes_by(old_size);
+        mmtk.state.decrease_malloc_bytes_by(old_size);
     }
 }
 </code></pre></div></section></main></body></html>

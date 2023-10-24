@@ -51,13 +51,22 @@
 <a href="#51" id="51">51</a>
 <a href="#52" id="52">52</a>
 <a href="#53" id="53">53</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::malloc_ms::MallocSpace;
+<a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+
+<span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::malloc_ms::MallocSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<span class="kw">use </span><span class="kw">crate</span>::Plan;
+
+<span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
 
 <span class="attr">#[repr(C)]
 </span><span class="kw">pub struct </span>MallocAllocator&lt;VM: VMBinding&gt; {
@@ -65,8 +74,7 @@
     </span><span class="kw">pub </span>tls: VMThread,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MallocSpace&lt;VM&gt;,
-    <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.
-    </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Allocator&lt;VM&gt; <span class="kw">for </span>MallocAllocator&lt;VM&gt; {
@@ -74,8 +82,8 @@
         <span class="self">self</span>.space <span class="kw">as </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;
     }
 
-    <span class="kw">fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="self">self</span>.plan
+    <span class="kw">fn </span>get_context(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AllocatorContext&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.context
     }
 
     <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
@@ -96,12 +104,16 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MallocAllocator&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,
         space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MallocSpace&lt;VM&gt;,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
-        MallocAllocator { tls, space, plan }
+        MallocAllocator {
+            tls,
+            space,
+            context,
+        }
     }
 }
 </code></pre></div></section></main></body></html>

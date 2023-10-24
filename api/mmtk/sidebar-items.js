@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["build_info","memory_manager","mmtk","plan","policy","scheduler","util","vm"],"struct":["MMTK","MMTKBuilder"],"trait":["PolicyCopyContext"]};
+window.SIDEBAR_ITEMS = {"mod":["build_info","global_state","memory_manager","mmtk","plan","policy","scheduler","util","vm"],"struct":["MMTK","MMTKBuilder"],"trait":["PolicyCopyContext"]};

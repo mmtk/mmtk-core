@@ -630,7 +630,15 @@
 <a href="#630" id="630">630</a>
 <a href="#631" id="631">631</a>
 <a href="#632" id="632">632</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::{
@@ -718,10 +726,13 @@
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
         </span><span class="kw">let </span>should_poll = VM::VMActivePlan::is_mutator(tls)
-            &amp;&amp; VM::VMActivePlan::global().should_trigger_gc_when_heap_is_full();
+            &amp;&amp; <span class="self">self
+                </span>.common()
+                .global_state
+                .should_trigger_gc_when_heap_is_full();
         <span class="comment">// Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        </span><span class="kw">let </span>allow_gc = should_poll &amp;&amp; VM::VMActivePlan::global().is_initialized();
+        </span><span class="kw">let </span>allow_gc = should_poll &amp;&amp; <span class="self">self</span>.common().global_state.is_initialized();
 
         <span class="macro">trace!</span>(<span class="string">&quot;Reserving pages&quot;</span>);
         <span class="kw">let </span>pr = <span class="self">self</span>.get_page_resource();
@@ -1069,6 +1080,7 @@
     </span><span class="kw">pub </span>acquire_lock: Mutex&lt;()&gt;,
 
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
+    <span class="kw">pub </span>global_state: Arc&lt;GlobalState&gt;,
 
     p: PhantomData&lt;VM&gt;,
 }
@@ -1094,6 +1106,7 @@
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
     <span class="kw">pub </span>options: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Options,
+    <span class="kw">pub </span>global_state: Arc&lt;GlobalState&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
@@ -1135,6 +1148,7 @@
                 local: args.local_side_metadata_specs,
             },
             acquire_lock: Mutex::new(()),
+            global_state: args.plan_args.global_state,
             p: PhantomData,
         };
 

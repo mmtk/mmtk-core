@@ -223,11 +223,14 @@
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
 <a href="#225" id="225">225</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+
+<span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::bytes_to_pages;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
@@ -245,8 +248,7 @@
     </span><span class="kw">pub </span>bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;,
-    <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.
-    </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::util::alloc) context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
 }
 
 <span class="doccomment">/// A common fast-path bump-pointer allocator shared across different allocator implementations
@@ -303,13 +305,15 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::fill_alignment_gap;
 
+<span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
+
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Allocator&lt;VM&gt; <span class="kw">for </span>BumpAllocator&lt;VM&gt; {
     <span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt; {
         <span class="self">self</span>.space
     }
 
-    <span class="kw">fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="self">self</span>.plan
+    <span class="kw">fn </span>get_context(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AllocatorContext&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.context
     }
 
     <span class="kw">fn </span>does_thread_local_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -396,16 +400,16 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; BumpAllocator&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,
         space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
         BumpAllocator {
             tls,
             bump_pointer: <span class="kw">unsafe </span>{ BumpPointer::new(Address::zero(), Address::zero()) },
             space,
-            plan,
+            context,
         }
     }
 

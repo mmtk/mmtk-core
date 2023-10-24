@@ -243,11 +243,14 @@
 <a href="#243" id="243">243</a>
 <a href="#244" id="244">244</a>
 <a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>memoffset::offset_of;
 
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::malloc_ms::MallocSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::native_ms::MarkSweepSpace;
@@ -258,7 +261,9 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::VMMutatorThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::Mutator;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
 
+<span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
 <span class="kw">use </span><span class="kw">super</span>::FreeListAllocator;
 <span class="kw">use </span><span class="kw">super</span>::MarkCompactAllocator;
 
@@ -344,7 +349,7 @@
 
     <span class="kw">pub fn </span>new(
         mutator_tls: VMMutatorThread,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;,
         space_mapping: <span class="kw-2">&amp;</span>[(AllocatorSelector, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;)],
     ) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>ret = Allocators {
@@ -355,6 +360,7 @@
             free_list: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             markcompact: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
         };
+        <span class="kw">let </span>context = Arc::new(AllocatorContext::new(mmtk));
 
         <span class="kw">for </span><span class="kw-2">&amp;</span>(selector, space) <span class="kw">in </span>space_mapping.iter() {
             <span class="kw">match </span>selector {
@@ -362,28 +368,28 @@
                     ret.bump_pointer[index <span class="kw">as </span>usize].write(BumpAllocator::new(
                         mutator_tls.<span class="number">0</span>,
                         space,
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::LargeObject(index) =&gt; {
                     ret.large_object[index <span class="kw">as </span>usize].write(LargeObjectAllocator::new(
                         mutator_tls.<span class="number">0</span>,
                         space.downcast_ref::&lt;LargeObjectSpace&lt;VM&gt;&gt;().unwrap(),
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::Malloc(index) =&gt; {
                     ret.malloc[index <span class="kw">as </span>usize].write(MallocAllocator::new(
                         mutator_tls.<span class="number">0</span>,
                         space.downcast_ref::&lt;MallocSpace&lt;VM&gt;&gt;().unwrap(),
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::Immix(index) =&gt; {
                     ret.immix[index <span class="kw">as </span>usize].write(ImmixAllocator::new(
                         mutator_tls.<span class="number">0</span>,
                         <span class="prelude-val">Some</span>(space),
-                        plan,
+                        context.clone(),
                         <span class="bool-val">false</span>,
                     ));
                 }
@@ -391,14 +397,14 @@
                     ret.free_list[index <span class="kw">as </span>usize].write(FreeListAllocator::new(
                         mutator_tls.<span class="number">0</span>,
                         space.downcast_ref::&lt;MarkSweepSpace&lt;VM&gt;&gt;().unwrap(),
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::MarkCompact(index) =&gt; {
                     ret.markcompact[index <span class="kw">as </span>usize].write(MarkCompactAllocator::new(
                         mutator_tls.<span class="number">0</span>,
                         space,
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::None =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Allocator mapping is not initialized&quot;</span>),

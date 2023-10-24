@@ -157,7 +157,7 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="comment">// The following needs to be done right before the second round of root scanning
         </span>VM::VMScanning::prepare_for_roots_re_scanning();
-        mmtk.get_plan().base().prepare_for_stack_scanning();
+        mmtk.state.prepare_for_stack_scanning();
         <span class="comment">// Prepare common and base spaces for the 2nd round of transitive closure
         </span><span class="kw">let </span>plan_mut = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*mut </span>MarkCompact&lt;VM&gt;) };
         plan_mut.common.release(worker.tls, <span class="bool-val">true</span>);

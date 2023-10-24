@@ -85,7 +85,6 @@
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
-<a href="#88" id="88">88</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::Stats;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -121,8 +120,7 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>GcHookWork {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="kw">let </span>base = <span class="kw-2">&amp;</span>mmtk.get_plan().base();
-        base.analysis_manager.gc_hook(mmtk);
+        mmtk.analysis_manager.gc_hook(mmtk);
     }
 }
 
@@ -134,7 +132,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; AnalysisManager&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(stats: <span class="kw-2">&amp;</span>Stats) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(stats: Arc&lt;Stats&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>manager = AnalysisManager {
             routines: Mutex::new(<span class="macro">vec!</span>[]),
         };
@@ -144,12 +142,12 @@
 
     <span class="comment">// Initializing all routines. If you want to add a new routine, here is the place
     // to do so
-    </span><span class="kw">fn </span>initialize_routines(<span class="kw-2">&amp;mut </span><span class="self">self</span>, stats: <span class="kw-2">&amp;</span>Stats) {
+    </span><span class="kw">fn </span>initialize_routines(<span class="kw-2">&amp;mut </span><span class="self">self</span>, stats: Arc&lt;Stats&gt;) {
         <span class="kw">let </span>ctr = stats.new_event_counter(<span class="string">&quot;obj.num&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="kw">let </span>gc_ctr = stats.new_event_counter(<span class="string">&quot;gc.num&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="kw">let </span>obj_num = Arc::new(Mutex::new(ObjectCounter::new(<span class="bool-val">true</span>, ctr)));
         <span class="kw">let </span>gc_count = Arc::new(Mutex::new(GcCounter::new(<span class="bool-val">true</span>, gc_ctr)));
-        <span class="kw">let </span>obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(<span class="bool-val">true</span>)));
+        <span class="kw">let </span>obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(<span class="bool-val">true</span>, stats)));
         <span class="self">self</span>.add_analysis_routine(obj_num);
         <span class="self">self</span>.add_analysis_routine(gc_count);
         <span class="self">self</span>.add_analysis_routine(obj_size);

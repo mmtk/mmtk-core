@@ -66,8 +66,8 @@
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::MarkCompact; <span class="comment">// Add
-</span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::MarkCompact;
+<span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_space_mapping;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::unreachable_prepare_func;
@@ -79,7 +79,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::MarkCompactAllocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<span class="kw">use </span><span class="kw">crate</span>::Plan;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>enum_map::EnumMap;
 
 <span class="kw">const </span>RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
@@ -97,13 +97,13 @@
 
 <span class="kw">pub fn </span>create_markcompact_mutator&lt;VM: VMBinding&gt;(
     mutator_tls: VMMutatorThread,
-    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
 ) -&gt; Mutator&lt;VM&gt; {
-    <span class="kw">let </span>markcompact = plan.downcast_ref::&lt;MarkCompact&lt;VM&gt;&gt;().unwrap();
+    <span class="kw">let </span>markcompact = mmtk.get_plan().downcast_ref::&lt;MarkCompact&lt;VM&gt;&gt;().unwrap();
     <span class="kw">let </span>config = MutatorConfig {
         allocator_mapping: <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            <span class="kw">let </span><span class="kw-2">mut </span>vec = create_space_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>, plan);
+            <span class="kw">let </span><span class="kw-2">mut </span>vec = create_space_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>, markcompact);
             vec.push((AllocatorSelector::MarkCompact(<span class="number">0</span>), markcompact.mc_space()));
             vec
         }),
@@ -112,11 +112,11 @@
     };
 
     Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, plan, <span class="kw-2">&amp;</span>config.space_mapping),
+        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: markcompact,
     }
 }
 

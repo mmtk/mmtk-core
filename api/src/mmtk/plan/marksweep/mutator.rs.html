@@ -128,6 +128,7 @@
 <a href="#128" id="128">128</a>
 <a href="#129" id="129">129</a>
 <a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::NoBarrier;
 <span class="kw">use </span><span class="kw">crate</span>::plan::marksweep::MarkSweep;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::create_allocator_mapping;
@@ -140,6 +141,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
 <span class="kw">use </span><span class="kw">crate</span>::util::{VMMutatorThread, VMWorkerThread};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
 
 <span class="kw">use </span>enum_map::EnumMap;
 
@@ -241,21 +243,21 @@
 
 <span class="kw">pub fn </span>create_ms_mutator&lt;VM: VMBinding&gt;(
     mutator_tls: VMMutatorThread,
-    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
 ) -&gt; Mutator&lt;VM&gt; {
     <span class="kw">let </span>config = MutatorConfig {
         allocator_mapping: <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING,
-        space_mapping: create_space_mapping(plan),
+        space_mapping: create_space_mapping(mmtk.get_plan()),
         prepare_func: <span class="kw-2">&amp;</span>ms_mutator_prepare,
         release_func: <span class="kw-2">&amp;</span>ms_mutator_release,
     };
 
     Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, plan, <span class="kw-2">&amp;</span>config.space_mapping),
+        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: mmtk.get_plan(),
     }
 }
 </code></pre></div></section></main></body></html>

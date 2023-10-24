@@ -1088,7 +1088,9 @@
 <a href="#1088" id="1088">1088</a>
 <a href="#1089" id="1089">1089</a>
 <a href="#1090" id="1090">1090</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
+<a href="#1091" id="1091">1091</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
+<span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
@@ -1096,6 +1098,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft_map::SFTMap;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocatorContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::<span class="kw-2">*</span>;
@@ -1447,7 +1450,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.scheduler
     }
 
-    <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, major_gc: bool) {
+    <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, major_gc: bool, plan_stats: StatsForDefrag) {
         <span class="kw">if </span>major_gc {
             <span class="comment">// Update mark_state
             </span><span class="kw">if </span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -1459,7 +1462,7 @@
 
             <span class="comment">// Prepare defrag info
             </span><span class="kw">if </span><span class="kw">super</span>::DEFRAG {
-                <span class="self">self</span>.defrag.prepare(<span class="self">self</span>);
+                <span class="self">self</span>.defrag.prepare(<span class="self">self</span>, plan_stats);
             }
 
             <span class="comment">// Prepare each block for GC
@@ -2021,7 +2024,6 @@
     }
 }
 
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::ImmixAllocator;
@@ -2056,13 +2058,13 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmixCopyContext&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMWorkerThread,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
         space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt;,
     ) -&gt; <span class="self">Self </span>{
         ImmixCopyContext {
-            allocator: ImmixAllocator::new(tls.<span class="number">0</span>, <span class="prelude-val">Some</span>(space), plan, <span class="bool-val">true</span>),
+            allocator: ImmixAllocator::new(tls.<span class="number">0</span>, <span class="prelude-val">Some</span>(space), context, <span class="bool-val">true</span>),
         }
     }
 
@@ -2109,14 +2111,14 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmixHybridCopyContext&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMWorkerThread,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
         space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt;,
     ) -&gt; <span class="self">Self </span>{
         ImmixHybridCopyContext {
-            copy_allocator: ImmixAllocator::new(tls.<span class="number">0</span>, <span class="prelude-val">Some</span>(space), plan, <span class="bool-val">false</span>),
-            defrag_allocator: ImmixAllocator::new(tls.<span class="number">0</span>, <span class="prelude-val">Some</span>(space), plan, <span class="bool-val">true</span>),
+            copy_allocator: ImmixAllocator::new(tls.<span class="number">0</span>, <span class="prelude-val">Some</span>(space), context.clone(), <span class="bool-val">false</span>),
+            defrag_allocator: ImmixAllocator::new(tls.<span class="number">0</span>, <span class="prelude-val">Some</span>(space), context, <span class="bool-val">true</span>),
         }
     }
 

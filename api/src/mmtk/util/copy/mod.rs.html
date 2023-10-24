@@ -262,8 +262,8 @@
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
+<span class="kw">use </span>std::sync::Arc;
 
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpace;
@@ -276,10 +276,13 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
 <span class="kw">use </span>enum_map::Enum;
 <span class="kw">use </span>enum_map::EnumMap;
+
+<span class="kw">use </span><span class="kw">super</span>::alloc::allocator::AllocatorContext;
 
 <span class="kw">const </span>MAX_COPYSPACE_COPY_ALLOCATORS: usize = <span class="number">1</span>;
 <span class="kw">const </span>MAX_IMMIX_COPY_ALLOCATORS: usize = <span class="number">1</span>;
@@ -438,17 +441,14 @@
     /// * `worker_tls`: The worker thread for this copy context.
     /// * `plan`: A reference to the current plan.
     /// * `config`: The configuration for the copy context.
-    </span><span class="kw">pub fn </span>new(
-        worker_tls: VMWorkerThread,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
-        config: CopyConfig&lt;VM&gt;,
-    ) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">pub fn </span>new(worker_tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, config: CopyConfig&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>ret = GCWorkerCopyContext {
             copy: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             immix: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             immix_hybrid: <span class="kw">unsafe </span>{ MaybeUninit::uninit().assume_init() },
             config,
         };
+        <span class="kw">let </span>context = Arc::new(AllocatorContext::new(mmtk));
 
         <span class="comment">// Initiate the copy context for each policy based on the space mapping.
         </span><span class="kw">for </span><span class="kw-2">&amp;</span>(selector, space) <span class="kw">in </span>ret.config.space_mapping.iter() {
@@ -456,21 +456,21 @@
                 CopySelector::CopySpace(index) =&gt; {
                     ret.copy[index <span class="kw">as </span>usize].write(CopySpaceCopyContext::new(
                         worker_tls,
-                        plan,
+                        context.clone(),
                         space.downcast_ref::&lt;CopySpace&lt;VM&gt;&gt;().unwrap(),
                     ));
                 }
                 CopySelector::Immix(index) =&gt; {
                     ret.immix[index <span class="kw">as </span>usize].write(ImmixCopyContext::new(
                         worker_tls,
-                        plan,
+                        context.clone(),
                         space.downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
                     ));
                 }
                 CopySelector::ImmixHybrid(index) =&gt; {
                     ret.immix_hybrid[index <span class="kw">as </span>usize].write(ImmixHybridCopyContext::new(
                         worker_tls,
-                        plan,
+                        context.clone(),
                         space.downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
                     ));
                 }

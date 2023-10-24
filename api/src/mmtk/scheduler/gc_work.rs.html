@@ -1195,11 +1195,9 @@
 <a href="#1195" id="1195">1195</a>
 <a href="#1196" id="1196">1196</a>
 <a href="#1197" id="1197">1197</a>
-<a href="#1198" id="1198">1198</a>
-<a href="#1199" id="1199">1199</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::plan::GcStatus;
+<span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectsClosure;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
@@ -1213,14 +1211,22 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ScheduleCollection {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="kw">let </span>plan = mmtk.get_plan();
         <span class="comment">// Tell GC trigger that GC started.
-        </span>plan.base().gc_trigger.policy.on_gc_start(mmtk);
+        </span>mmtk.gc_trigger.policy.on_gc_start(mmtk);
 
-        plan.base().set_collection_kind(plan);
-        plan.base().set_gc_status(GcStatus::GcPrepare);
+        <span class="comment">// Determine collection kind
+        </span><span class="kw">let </span>is_emergency = mmtk.state.set_collection_kind(
+            mmtk.get_plan().last_collection_was_exhaustive(),
+            mmtk.gc_trigger.policy.can_heap_size_grow(),
+        );
+        <span class="kw">if </span>is_emergency {
+            mmtk.get_plan().notify_emergency_collection();
+        }
+        <span class="comment">// Set to GcPrepare
+        </span>mmtk.set_gc_status(GcStatus::GcPrepare);
 
-        plan.schedule_collection(worker.scheduler());
+        <span class="comment">// Let the plan to schedule collection work
+        </span>mmtk.get_plan().schedule_collection(worker.scheduler());
     }
 }
 
@@ -1318,9 +1324,7 @@
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;Release Global&quot;</span>);
 
-        <span class="kw">unsafe </span>{
-            (<span class="kw-2">*</span><span class="self">self</span>.plan).base().gc_trigger.policy.on_gc_release(mmtk);
-        }
+        mmtk.gc_trigger.policy.on_gc_release(mmtk);
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
 
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
@@ -1341,10 +1345,7 @@
                 .scheduler
                 .worker_group
                 .get_and_clear_worker_live_bytes();
-            mmtk.get_plan()
-                .base()
-                .live_bytes_in_last_gc
-                .store(live_bytes, std::sync::atomic::Ordering::SeqCst);
+            mmtk.state.set_live_bytes_in_last_gc(live_bytes);
         }
     }
 }
@@ -1395,7 +1396,7 @@
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>StopMutators&lt;C&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators start&quot;</span>);
-        mmtk.get_plan().base().prepare_for_stack_scanning();
+        mmtk.state.prepare_for_stack_scanning();
         &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::stop_all_mutators(worker.tls, |mutator| {
             <span class="comment">// TODO: The stack scanning work won&#39;t start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
@@ -1424,11 +1425,7 @@
 
         <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
         </span>{
-            <span class="kw">let </span>live_bytes = mmtk
-                .get_plan()
-                .base()
-                .live_bytes_in_last_gc
-                .load(std::sync::atomic::Ordering::SeqCst);
+            <span class="kw">let </span>live_bytes = mmtk.state.get_live_bytes_in_last_gc();
             <span class="kw">let </span>used_bytes =
                 mmtk.get_plan().get_used_pages() &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
             <span class="macro">debug_assert!</span>(
@@ -1454,11 +1451,11 @@
             </span>mmtk.edge_logger.reset();
         }
 
-        mmtk.get_plan().base().set_gc_status(GcStatus::NotInGC);
-
         <span class="comment">// Reset the triggering information.
-        </span>mmtk.get_plan().base().reset_collection_trigger();
+        </span>mmtk.state.reset_collection_trigger();
 
+        <span class="comment">// Set to NotInGC after everything, and right before resuming mutators.
+        </span>mmtk.set_gc_status(GcStatus::NotInGC);
         &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::resume_mutators(worker.tls);
     }
 }
@@ -1652,7 +1649,6 @@
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;C&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">&quot;ScanMutatorRoots for mutator {:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
-        <span class="kw">let </span>base = mmtk.get_plan().base();
         <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;
             C::VM,
@@ -1666,11 +1662,11 @@
         );
         <span class="self">self</span>.<span class="number">0</span>.flush();
 
-        <span class="kw">if </span>mmtk.get_plan().base().inform_stack_scanned(mutators) {
+        <span class="kw">if </span>mmtk.state.inform_stack_scanned(mutators) {
             &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::notify_initial_thread_scan_complete(
                 <span class="bool-val">false</span>, worker.tls,
             );
-            base.set_gc_status(GcStatus::GcProper);
+            mmtk.set_gc_status(GcStatus::GcProper);
         }
     }
 }
@@ -1865,7 +1861,7 @@
             <span class="self">self</span>.flush();
         }
         <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
-        </span><span class="kw">if </span><span class="self">self</span>.roots &amp;&amp; !_mmtk.get_plan().is_in_sanity() {
+        </span><span class="kw">if </span><span class="self">self</span>.roots &amp;&amp; !_mmtk.is_in_sanity() {
             <span class="self">self</span>.cache_roots_for_sanity_gc();
         }
         <span class="macro">trace!</span>(<span class="string">&quot;ProcessEdgesWork End&quot;</span>);
@@ -2305,7 +2301,7 @@
 
         <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
         </span>{
-            <span class="kw">if </span>!mmtk.get_plan().is_in_sanity() {
+            <span class="kw">if </span>!mmtk.is_in_sanity() {
                 mmtk.sanity_checker
                     .lock()
                     .unwrap()

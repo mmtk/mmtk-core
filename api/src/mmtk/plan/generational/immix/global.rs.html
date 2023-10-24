@@ -256,6 +256,9 @@
 <a href="#256" id="256">256</a>
 <a href="#257" id="257">257</a>
 <a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -381,7 +384,10 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.prepare(tls);
         <span class="kw">if </span>full_heap {
-            <span class="self">self</span>.immix_space.prepare(full_heap);
+            <span class="self">self</span>.immix_space.prepare(
+                full_heap,
+                <span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>),
+            );
         }
     }
 

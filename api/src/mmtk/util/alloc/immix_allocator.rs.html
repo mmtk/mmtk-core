@@ -398,9 +398,10 @@
 <a href="#398" id="398">398</a>
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap};
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
+
+<span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 <span class="kw">use </span><span class="kw">super</span>::BumpPointer;
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::line::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
@@ -419,8 +420,7 @@
     <span class="kw">pub </span>bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt;,
-    <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.
-    </span>plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     <span class="doccomment">/// *unused*
     </span>hot: bool,
     <span class="doccomment">/// Is this a copy allocator?
@@ -447,8 +447,8 @@
         <span class="self">self</span>.space <span class="kw">as _
     </span>}
 
-    <span class="kw">fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="self">self</span>.plan
+    <span class="kw">fn </span>get_context(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AllocatorContext&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.context
     }
 
     <span class="kw">fn </span>does_thread_local_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -564,16 +564,16 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmixAllocator&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,
         space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
         copy: bool,
     ) -&gt; <span class="self">Self </span>{
         ImmixAllocator {
             tls,
             space: space.unwrap().downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
-            plan,
+            context,
             bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
             hot: <span class="bool-val">false</span>,
             copy,
@@ -618,8 +618,8 @@
             // recyclable line.  Hence, we bring the &quot;if we&#39;re in stress test&quot; check up a level and
             // directly call `alloc_slow_inline()` which will properly account for the allocation
             // request as well as allocate from the newly recycled line
-            </span><span class="kw">let </span>stress_test = <span class="self">self</span>.plan.base().is_stress_test_gc_enabled();
-            <span class="kw">let </span>precise_stress = <span class="self">self</span>.plan.base().is_precise_stress();
+            </span><span class="kw">let </span>stress_test = <span class="self">self</span>.context.options.is_stress_test_gc_enabled();
+            <span class="kw">let </span>precise_stress = <span class="kw-2">*</span><span class="self">self</span>.context.options.precise_stress;
             <span class="kw">if </span>unlikely(stress_test &amp;&amp; precise_stress) {
                 <span class="self">self</span>.alloc_slow_inline(size, align, offset)
             } <span class="kw">else </span>{

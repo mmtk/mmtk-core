@@ -93,7 +93,7 @@
     };
 
     Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk.get_plan(), <span class="kw-2">&amp;</span>config.space_mapping),
+        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
         barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
             mmtk, genimmix,
         ))),

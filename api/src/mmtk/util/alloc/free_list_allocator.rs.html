@@ -503,23 +503,30 @@
 <a href="#503" id="503">503</a>
 <a href="#504" id="504">504</a>
 <a href="#505" id="505">505</a>
+<a href="#506" id="506">506</a>
+<a href="#507" id="507">507</a>
+<a href="#508" id="508">508</a>
+<a href="#509" id="509">509</a>
 </pre></div><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft&#39;s mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
-</span><span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::native_ms::<span class="kw-2">*</span>;
+</span><span class="kw">use </span>std::sync::Arc;
+
+<span class="kw">use </span><span class="kw">crate</span>::policy::marksweepspace::native_ms::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<span class="kw">use </span><span class="kw">crate</span>::Plan;
+
+<span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
 
 <span class="doccomment">/// A MiMalloc free list allocator
 </span><span class="attr">#[repr(C)]
 </span><span class="kw">pub struct </span>FreeListAllocator&lt;VM: VMBinding&gt; {
     <span class="kw">pub </span>tls: VMThread,
     space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MarkSweepSpace&lt;VM&gt;,
-    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     <span class="doccomment">/// blocks with free space
     </span><span class="kw">pub </span>available_blocks: BlockLists,
     <span class="doccomment">/// blocks with free space for precise stress GC
@@ -543,8 +550,8 @@
         <span class="self">self</span>.space
     }
 
-    <span class="kw">fn </span>get_plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
-        <span class="self">self</span>.plan
+    <span class="kw">fn </span>get_context(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AllocatorContext&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.context
     }
 
     <span class="comment">// Find a block with free space and allocate to it
@@ -562,8 +569,8 @@
             <span class="kw">if </span>!cell.is_zero() {
                 <span class="comment">// We succeeded in fastpath alloc, this cannot be precise stress test
                 </span><span class="macro">debug_assert!</span>(
-                    !(<span class="kw-2">*</span><span class="self">self</span>.plan.options().precise_stress
-                        &amp;&amp; <span class="self">self</span>.plan.base().is_stress_test_gc_enabled())
+                    !(<span class="kw-2">*</span><span class="self">self</span>.context.options.precise_stress
+                        &amp;&amp; <span class="self">self</span>.context.options.is_stress_test_gc_enabled())
                 );
 
                 <span class="kw">let </span>res = allocator::align_allocation::&lt;VM&gt;(cell, align, offset);
@@ -630,15 +637,15 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; FreeListAllocator&lt;VM&gt; {
     <span class="comment">// New free list allcoator
-    </span><span class="kw">pub fn </span>new(
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,
         space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MarkSweepSpace&lt;VM&gt;,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
         FreeListAllocator {
             tls,
             space,
-            plan,
+            context,
             available_blocks: new_empty_block_lists(),
             available_blocks_stress: new_empty_block_lists(),
             unswept_blocks: new_empty_block_lists(),
@@ -743,7 +750,7 @@
     /// method may add the block to available_blocks, or available_blocks_stress.
     </span><span class="kw">fn </span>add_to_available_blocks(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bin: usize, block: Block, stress: bool) {
         <span class="kw">if </span>stress {
-            <span class="macro">debug_assert!</span>(<span class="self">self</span>.plan.base().is_precise_stress());
+            <span class="macro">debug_assert!</span>(<span class="kw-2">*</span><span class="self">self</span>.context.options.precise_stress);
             <span class="self">self</span>.available_blocks_stress[bin].push(block);
         } <span class="kw">else </span>{
             <span class="self">self</span>.available_blocks[bin].push(block);
@@ -773,7 +780,7 @@
                         </span><span class="self">self</span>.add_to_available_blocks(
                             bin,
                             block,
-                            <span class="self">self</span>.plan.base().is_stress_test_gc_enabled(),
+                            <span class="self">self</span>.context.options.is_stress_test_gc_enabled(),
                         );
                         <span class="kw">return </span><span class="prelude-val">Some</span>(block);
                     } <span class="kw">else </span>{
@@ -966,9 +973,10 @@
 
             <span class="comment">// Sweep consumed blocks, and also push the blocks back to the available list.
             </span><span class="self">self</span>.consumed_blocks[bin].sweep_blocks(<span class="self">self</span>.space);
-            <span class="kw">if </span><span class="self">self</span>.plan.base().is_precise_stress() &amp;&amp; <span class="self">self</span>.plan.base().is_stress_test_gc_enabled()
+            <span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.context.options.precise_stress
+                &amp;&amp; <span class="self">self</span>.context.options.is_stress_test_gc_enabled()
             {
-                <span class="macro">debug_assert!</span>(<span class="self">self</span>.plan.base().is_precise_stress());
+                <span class="macro">debug_assert!</span>(<span class="kw-2">*</span><span class="self">self</span>.context.options.precise_stress);
                 <span class="self">self</span>.available_blocks_stress[bin].append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.consumed_blocks[bin]);
             } <span class="kw">else </span>{
                 <span class="self">self</span>.available_blocks[bin].append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.consumed_blocks[bin]);

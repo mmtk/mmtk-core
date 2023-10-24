@@ -72,10 +72,10 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::MutatorConfig;
 <span class="kw">use </span><span class="kw">crate</span>::plan::mutator_context::ReservedAllocators;
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::{AllocatorSelector, Allocators};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::ImmixAllocator;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use crate</span>::{
     plan::barriers::NoBarrier,
     util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
@@ -108,13 +108,13 @@
 
 <span class="kw">pub fn </span>create_immix_mutator&lt;VM: VMBinding&gt;(
     mutator_tls: VMMutatorThread,
-    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
 ) -&gt; Mutator&lt;VM&gt; {
-    <span class="kw">let </span>immix = plan.downcast_ref::&lt;Immix&lt;VM&gt;&gt;().unwrap();
+    <span class="kw">let </span>immix = mmtk.get_plan().downcast_ref::&lt;Immix&lt;VM&gt;&gt;().unwrap();
     <span class="kw">let </span>config = MutatorConfig {
         allocator_mapping: <span class="kw-2">&amp;</span>ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            <span class="kw">let </span><span class="kw-2">mut </span>vec = create_space_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>, plan);
+            <span class="kw">let </span><span class="kw-2">mut </span>vec = create_space_mapping(RESERVED_ALLOCATORS, <span class="bool-val">true</span>, immix);
             vec.push((AllocatorSelector::Immix(<span class="number">0</span>), <span class="kw-2">&amp;</span>immix.immix_space));
             vec
         }),
@@ -123,11 +123,11 @@
     };
 
     Mutator {
-        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, plan, <span class="kw-2">&amp;</span>config.space_mapping),
+        allocators: Allocators::&lt;VM&gt;::new(mutator_tls, mmtk, <span class="kw-2">&amp;</span>config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: immix,
     }
 }
 </code></pre></div></section></main></body></html>

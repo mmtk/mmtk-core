@@ -525,8 +525,34 @@
 <a href="#525" id="525">525</a>
 <a href="#526" id="526">526</a>
 <a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
+<span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
+<span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
@@ -535,6 +561,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>std::mem::MaybeUninit;
 <span class="kw">use </span>std::sync::atomic::AtomicUsize;
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="doccomment">/// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -546,10 +573,17 @@
     </span>plan: MaybeUninit&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;,
     <span class="doccomment">/// The triggering policy.
     </span><span class="kw">pub </span>policy: Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt;,
+    gc_requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
+    options: Arc&lt;Options&gt;,
+    state: Arc&lt;GlobalState&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTrigger&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(options: <span class="kw-2">&amp;</span>Options) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(
+        options: Arc&lt;Options&gt;,
+        gc_requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
+        state: Arc&lt;GlobalState&gt;,
+    ) -&gt; <span class="self">Self </span>{
         GCTrigger {
             plan: MaybeUninit::uninit(),
             policy: <span class="kw">match </span><span class="kw-2">*</span>options.gc_trigger {
@@ -562,6 +596,9 @@
                 )),
                 GCTriggerSelector::Delegated =&gt; <span class="macro">unimplemented!</span>(),
             },
+            options,
+            gc_requester,
+            state,
         }
     }
 
@@ -591,11 +628,22 @@
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            plan.base().gc_requester.request();
+            <span class="self">self</span>.gc_requester.request();
             <span class="kw">return </span><span class="bool-val">true</span>;
         }
         <span class="bool-val">false
     </span>}
+
+    <span class="kw">pub fn </span>should_do_stress_gc(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">Self</span>::should_do_stress_gc_inner(<span class="kw-2">&amp;</span><span class="self">self</span>.state, <span class="kw-2">&amp;</span><span class="self">self</span>.options)
+    }
+
+    <span class="doccomment">/// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>should_do_stress_gc_inner(state: <span class="kw-2">&amp;</span>GlobalState, options: <span class="kw-2">&amp;</span>Options) -&gt; bool {
+        state.is_initialized()
+            &amp;&amp; (state.allocation_bytes.load(Ordering::SeqCst) &gt; <span class="kw-2">*</span>options.stress_factor)
+    }
 
     <span class="doccomment">/// Check if the heap is full
     </span><span class="kw">pub fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -630,7 +678,7 @@
         plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
     ) -&gt; bool;
     <span class="doccomment">/// Is current heap full?
-    </span><span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool;
+    </span><span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool;
     <span class="doccomment">/// Return the current heap size (in pages)
     </span><span class="kw">fn </span>get_current_heap_size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
     <span class="doccomment">/// Return the upper bound of heap size
@@ -654,7 +702,7 @@
         </span>plan.collection_required(space_full, space)
     }
 
-    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
+    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
         <span class="comment">// If reserved pages is larger than the total pages, the heap is full.
         </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.total_pages
     }
@@ -843,6 +891,16 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCTriggerPolicy&lt;VM&gt; <span class="kw">for </span>MemBalancerTrigger {
+    <span class="kw">fn </span>is_gc_required(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        space_full: bool,
+        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
+        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+    ) -&gt; bool {
+        <span class="comment">// Let the plan decide
+        </span>plan.collection_required(space_full, space)
+    }
+
     <span class="kw">fn </span>on_pending_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>, pages: usize) {
         <span class="self">self</span>.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }
@@ -912,17 +970,7 @@
         </span><span class="self">self</span>.pending_pages.store(<span class="number">0</span>, Ordering::SeqCst);
     }
 
-    <span class="kw">fn </span>is_gc_required(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        space_full: bool,
-        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
-        plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
-    ) -&gt; bool {
-        <span class="comment">// Let the plan decide
-        </span>plan.collection_required(space_full, space)
-    }
-
-    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
+    <span class="kw">fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
         <span class="comment">// If reserved pages is larger than the current heap size, the heap is full.
         </span>plan.get_reserved_pages() &gt; <span class="self">self</span>.current_heap_pages.load(Ordering::Relaxed)
     }

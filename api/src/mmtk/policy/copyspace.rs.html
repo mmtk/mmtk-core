@@ -341,6 +341,7 @@
 <a href="#341" id="341">341</a>
 <a href="#342" id="342">342</a>
 <a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -348,6 +349,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
+<span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocatorContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
@@ -358,6 +360,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span>libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 <span class="kw">use </span>std::sync::atomic::{AtomicBool, Ordering};
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="doccomment">/// This type implements a simple copying space.
 </span><span class="kw">pub struct </span>CopySpace&lt;VM: VMBinding&gt; {
@@ -638,7 +641,6 @@
     }
 }
 
-<span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::BumpAllocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::VMWorkerThread;
@@ -667,13 +669,13 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; CopySpaceCopyContext&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMWorkerThread,
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;,
+        context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
         tospace: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>CopySpace&lt;VM&gt;,
     ) -&gt; <span class="self">Self </span>{
         CopySpaceCopyContext {
-            copy_allocator: BumpAllocator::new(tls.<span class="number">0</span>, tospace, plan),
+            copy_allocator: BumpAllocator::new(tls.<span class="number">0</span>, tospace, context),
         }
     }
 }

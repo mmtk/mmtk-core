@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["AllocationError"],"fn":["align_allocation","align_allocation_inner","align_allocation_no_fill","fill_alignment_gap","get_maximum_aligned_size","get_maximum_aligned_size_inner"],"trait":["Allocator"]};
+window.SIDEBAR_ITEMS = {"enum":["AllocationError"],"fn":["align_allocation","align_allocation_inner","align_allocation_no_fill","fill_alignment_gap","get_maximum_aligned_size","get_maximum_aligned_size_inner"],"struct":["AllocatorContext"],"trait":["Allocator"]};

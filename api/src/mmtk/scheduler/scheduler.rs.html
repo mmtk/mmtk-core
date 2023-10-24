@@ -505,7 +505,7 @@
         );
         <span class="kw">let </span>gc_controller = GCController::new(
             mmtk,
-            mmtk.get_plan().base().gc_requester.clone(),
+            mmtk.gc_requester.clone(),
             <span class="self">self</span>.clone(),
             coordinator_worker,
         );
@@ -807,7 +807,7 @@
     }
 
     <span class="kw">pub fn </span>notify_mutators_paused(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        mmtk.get_plan().base().gc_requester.clear_request();
+        mmtk.gc_requester.clear_request();
         <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::first_stw_stage()];
         <span class="macro">debug_assert!</span>(!first_stw_bucket.is_activated());
         <span class="comment">// Note: This is the only place where a non-coordinator thread opens a bucket.

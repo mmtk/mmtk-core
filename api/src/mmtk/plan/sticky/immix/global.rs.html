@@ -347,6 +347,11 @@
 <a href="#347" id="347">347</a>
 <a href="#348" id="348">348</a>
 <a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -457,7 +462,10 @@
     <span class="kw">fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: <span class="kw">crate</span>::util::VMWorkerThread) {
         <span class="kw">if </span><span class="self">self</span>.is_current_gc_nursery() {
             <span class="comment">// Prepare both large object space and immix space
-            </span><span class="self">self</span>.immix.immix_space.prepare(<span class="bool-val">false</span>);
+            </span><span class="self">self</span>.immix.immix_space.prepare(
+                <span class="bool-val">false</span>,
+                <span class="kw">crate</span>::policy::immix::defrag::StatsForDefrag::new(<span class="self">self</span>),
+            );
             <span class="self">self</span>.immix.common.los.prepare(<span class="bool-val">false</span>);
         } <span class="kw">else </span>{
             <span class="self">self</span>.full_heap_gc_count.lock().unwrap().inc();
@@ -632,6 +640,7 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; StickyImmix&lt;VM&gt; {
     <span class="kw">pub fn </span>new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>full_heap_gc_count = args.stats.new_event_counter(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="kw">let </span>plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: <span class="kw-2">&amp;</span>STICKY_IMMIX_CONSTRAINTS,
@@ -654,7 +663,6 @@
                 </span>mixed_age: <span class="bool-val">true</span>,
             },
         );
-        <span class="kw">let </span>full_heap_gc_count = immix.base().stats.new_event_counter(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="self">Self </span>{
             immix,
             gc_full_heap: AtomicBool::new(<span class="bool-val">false</span>),
@@ -670,6 +678,7 @@
             </span>.immix
             .common
             .base
+            .global_state
             .user_triggered_collection
             .load(Ordering::SeqCst)
             &amp;&amp; <span class="kw-2">*</span><span class="self">self</span>.immix.common.base.options.full_heap_system_gc
@@ -681,6 +690,7 @@
                 </span>.immix
                 .common
                 .base
+                .global_state
                 .cur_collection_attempts
                 .load(Ordering::SeqCst)
                 &gt; <span class="number">1
