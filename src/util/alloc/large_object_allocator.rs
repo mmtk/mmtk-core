@@ -17,7 +17,6 @@ pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: ArcFlexMut<LargeObjectSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
-    _pad: usize,
 }
 
 impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
@@ -72,7 +71,6 @@ impl<VM: VMBinding> LargeObjectAllocator<VM> {
             tls,
             space,
             context,
-            _pad: 0,
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::defrag::PlanStatsForDefrag;
+use super::defrag::StatsForDefrag;
 use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
@@ -18,7 +18,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
-use crate::util::object_forwarding as ForwardingWord;
+use crate::util::object_forwarding;
 use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -89,12 +89,13 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        if !Block::containing::<VM>(object).is_defrag_source() {
+        // If we never move objects, look no further.
+        if super::NEVER_MOVE_OBJECTS {
             return None;
         }
 
-        if ForwardingWord::is_forwarded::<VM>(object) {
-            Some(ForwardingWord::read_forwarding_pointer::<VM>(object))
+        if object_forwarding::is_forwarded::<VM>(object) {
+            Some(object_forwarding::read_forwarding_pointer::<VM>(object))
         } else {
             None
         }
@@ -111,19 +112,8 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             return false;
         }
 
-        // If the forwarding bits are on the side,
-        if VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_on_side() {
-            // we need to ensure `object` is in a defrag source
-            // because `PrepareBlockState` does not clear forwarding bits
-            // for non-defrag-source blocks.
-            if !Block::containing::<VM>(object).is_defrag_source() {
-                // Objects not in defrag sources cannot be forwarded.
-                return false;
-            }
-        }
-
         // If the object is forwarded, it is live, too.
-        ForwardingWord::is_forwarded::<VM>(object)
+        object_forwarding::is_forwarded::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
@@ -370,7 +360,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self.scheduler
     }
 
-    pub fn prepare(&mut self, major_gc: bool, plan_stats: PlanStatsForDefrag) {
+    pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -593,14 +583,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::on_trace_object::<VM>(object);
 
-        let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
-        if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
+        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
+        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             // We lost the forwarding race as some other thread has set the forwarding word; wait
             // until the object has been forwarded by the winner. Note that the object may not
             // necessarily get forwarded since Immix opportunistically moves objects.
             #[allow(clippy::let_and_return)]
             let new_object =
-                ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
+                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             #[cfg(debug_assertions)]
             {
                 if new_object == object {
@@ -623,7 +613,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else if self.is_marked(object) {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
-            ForwardingWord::clear_forwarding_bits::<VM>(object);
+            object_forwarding::clear_forwarding_bits::<VM>(object);
             object
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
@@ -632,7 +622,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 || (!nursery_collection && self.defrag.space_exhausted())
             {
                 self.attempt_mark(object, self.mark_state);
-                ForwardingWord::clear_forwarding_bits::<VM>(object);
+                object_forwarding::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
 
                 #[cfg(feature = "vo_bit")]
@@ -646,7 +636,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 // Clippy complains if the "vo_bit" feature is not enabled.
                 #[allow(clippy::let_and_return)]
                 let new_object =
-                    ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
+                    object_forwarding::forward_object::<VM>(object, semantics, copy_context);
 
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_forwarded::<VM>(new_object);
@@ -845,6 +835,10 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
+        // If the forwarding bits are on the side, we need to clear them, too.
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+        }
     }
 }
 
@@ -878,19 +872,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
-            // Clear forwarding bits if necessary.
-            if is_defrag_source {
-                // Note that `ImmixSpace::is_live` depends on the fact that we only clear side
-                // forwarding bits for defrag sources.  If we change the code here, we need to
-                // make sure `ImmixSpace::is_live` is fixed, too.
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-                    // Clear on-the-side forwarding bits.
-                    side.bzero_metadata(block.start(), Block::BYTES);
-                }
-            }
-            // NOTE: We don't need to reset the forwarding pointer metadata because it is meaningless
-            // until the forwarding bits are also set, at which time we also write the forwarding
-            // pointer.
         }
     }
 }

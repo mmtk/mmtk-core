@@ -1,3 +1,43 @@
+0.20.0 (2023-09-29)
+===
+
+## What's Changed
+
+### Plan
+* Refactor derive macros and add HasSpaces trait by @wks in https://github.com/mmtk/mmtk-core/pull/934
+* Make MarkCompact LOS support 2nd transitive closure by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/944
+* Disabling PrepareMutator from PlanConstraints by @wks in https://github.com/mmtk/mmtk-core/pull/964
+
+### Policy
+* Add ExternalPageResource and allow discontiguous VM space by @qinsoon in https://github.com/mmtk/mmtk-core/pull/864
+* Discontiguous mark compact space support by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/939
+* Discontiguous PageProtect GC support  by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/946
+* Fix vo-bit reset for discontiguous space by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/948
+
+### API
+* Boot-time configurable heap constants by @wenyuzhao in https://github.com/mmtk/mmtk-core/pull/899
+* This PR enables transitively pinning (TP) objects from particular roots for Immix/StickyImmix by @udesou in https://github.com/mmtk/mmtk-core/pull/897
+* Let VM control when or if to read env var options by @wks in https://github.com/mmtk/mmtk-core/pull/955
+
+### Misc
+* Update doc comment of Scanning::process_weak_refs by @wks in https://github.com/mmtk/mmtk-core/pull/919
+* Binding test for Ruby by @wks in https://github.com/mmtk/mmtk-core/pull/916
+* Fix api-check CI by @wks in https://github.com/mmtk/mmtk-core/pull/923
+* Fix default value for RUBY_BINDING_REPO by @qinsoon in https://github.com/mmtk/mmtk-core/pull/926
+* Add a ready-to-merge check by @qinsoon in https://github.com/mmtk/mmtk-core/pull/910
+* Run ready to merge check for PRs by @qinsoon in https://github.com/mmtk/mmtk-core/pull/928
+* Remove cast ref to mut everywhere by @playXE in https://github.com/mmtk/mmtk-core/pull/893
+* Benchmark Rust code by @qinsoon in https://github.com/mmtk/mmtk-core/pull/933
+* Fix broken links in the tutorial by @caizixian in https://github.com/mmtk/mmtk-core/pull/936
+* Update doc to add a section for LTO by @qinsoon in https://github.com/mmtk/mmtk-core/pull/937
+* Add CARGO_INCREMENTAL=0 to work around clippy 1.72 bug by @qinsoon in https://github.com/mmtk/mmtk-core/pull/938
+* Fix issues for cargo fmt in 1.72 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/940
+* Use atomic operations for SFT map and remove unsafe code by @qinsoon in https://github.com/mmtk/mmtk-core/pull/931
+* Fix outdated Rust version in README by @qinsoon in https://github.com/mmtk/mmtk-core/pull/942
+* Fix length of Map64::descriptor_map by @wks in https://github.com/mmtk/mmtk-core/pull/956
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.19.0...v0.20.0
+
 0.19.0 (2023-08-18)
 ===
 
@@ -75,6 +115,7 @@
 * @fepicture made their first contribution in https://github.com/mmtk/mmtk-core/pull/838
 * @ClSlaid made their first contribution in https://github.com/mmtk/mmtk-core/pull/843
 * @playXE made their first contribution in https://github.com/mmtk/mmtk-core/pull/880
+
 
 **Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.18.0...v0.19.0
 

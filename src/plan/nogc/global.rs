@@ -35,7 +35,10 @@ pub struct NoGC<VM: VMBinding> {
     pub los: ArcFlexMut<ImmortalSpace<VM>>,
 }
 
-pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    collects_garbage: false,
+    ..PlanConstraints::default()
+};
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
     fn constraints(&self) -> &'static PlanConstraints {

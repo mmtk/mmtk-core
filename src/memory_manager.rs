@@ -176,6 +176,27 @@ pub fn alloc<VM: VMBinding>(
     mutator.alloc(size, align, offset, semantics)
 }
 
+/// Invoke the allocation slow path. This is only intended for use when a binding implements the fastpath on
+/// the binding side. When the binding handles fast path allocation and the fast path fails, it can use this
+/// method for slow path allocation. Calling before exhausting fast path allocaiton buffer will lead to bad
+/// performance.
+///
+/// Arguments:
+/// * `mutator`: The mutator to perform this allocation request.
+/// * `size`: The number of bytes required for the object.
+/// * `align`: Required alignment for the object.
+/// * `offset`: Offset associated with the alignment.
+/// * `semantics`: The allocation semantic required for the allocation.
+pub fn alloc_slow<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantics: AllocationSemantics,
+) -> Address {
+    mutator.alloc_slow(size, align, offset, semantics)
+}
+
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
 /// required. For performance reasons, a VM should implement the post alloc fast-path on their side
 /// rather than just calling this function.
@@ -611,8 +632,8 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// Check if `addr` is the address of an object reference to an MMTk object.
 ///
 /// Concretely:
-/// 1.  Return true if `addr.to_object_reference()` is a valid object reference to an object in any
-///     space in MMTk.
+/// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
+///     object in any space in MMTk.
 /// 2.  Also return true if there exists an `objref: ObjectReference` such that
 ///     -   `objref` is a valid object reference to an object in any space in MMTk, and
 ///     -   `lo <= objref.to_address() < hi`, where

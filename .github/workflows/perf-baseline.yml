@@ -1,0 +1,99 @@
+name: Performance Baseline
+
+on:
+  # Manual dispatch
+  workflow_dispatch:
+  # Or on the first day of a month.
+  schedule:
+    - cron: '0 0 1 * *'
+  # READ BEFORE ENABLING THE TRIGGER BELOW
+  # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
+  # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
+  # pull_request:
+  #   branches:
+  #     - master
+
+env:
+  # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
+  RESULT_REPO_BRANCH: 'self-hosted'
+
+jobs:
+  jikesrvm-baseline:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    # Allow 1 day to run
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          path: mmtk-jikesrvm
+          submodules: true
+      - name: Checkout JikesRVM
+        working-directory: mmtk-jikesrvm
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          repository: mmtk/ci-perf-kit
+          ref: "0.6.10"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
+      # run
+      - name: Performance Run
+        timeout-minutes: 1440
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-07-10
+          JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-stock.sh ./mmtk-jikesrvm/repos/jikesrvm
+
+  openjdk-baseline:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    # Allow 2 days to run (it currently takes slightly more than 1 day to finish)
+    timeout-minutes: 2880
+    steps:
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-openjdk
+          path: mmtk-openjdk
+          submodules: true
+      - name: Checkout OpenJDK
+        working-directory: mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
+          repository: mmtk/ci-perf-kit
+          ref: "0.6.10"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+      # run
+      - name: Performance Run
+        timeout-minutes: 2880
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-07-10
+          ./ci-perf-kit/scripts/openjdk-stock.sh ./mmtk-openjdk/repos/openjdk

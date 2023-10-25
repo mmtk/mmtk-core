@@ -14,6 +14,10 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        // Tell GC trigger that GC started.
+        mmtk.gc_trigger.policy.on_gc_start(mmtk);
+
+        // Determine collection kind
         let is_emergency = mmtk.state.set_collection_kind(
             mmtk.get_plan().last_collection_was_exhaustive(),
             mmtk.gc_trigger.policy.can_heap_size_grow(),
@@ -21,17 +25,11 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
         if is_emergency {
             mmtk.get_plan().notify_emergency_collection();
         }
-
+        // Set to GcPrepare
         mmtk.set_gc_status(GcStatus::GcPrepare);
 
+        // Let the plan to schedule collection work
         mmtk.get_plan().schedule_collection(worker.scheduler());
-
-        // Tell GC trigger that GC started.
-        // We now know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
-        // TODO: Depending on the OS scheduling, other workers can run so fast that they can finish
-        // everything in the `Unconstrained` and the `Prepare` buckets before we execute the next
-        // statement. Consider if there is a better place to call `on_gc_start`.
-        mmtk.gc_trigger.policy.on_gc_start(mmtk);
     }
 }
 

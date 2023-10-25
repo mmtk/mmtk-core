@@ -107,7 +107,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
-
         if !is_full_heap {
             debug!("Nursery GC");
             scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
@@ -130,7 +129,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if full_heap {
             self.immix_space.write().prepare(
                 full_heap,
-                crate::policy::immix::defrag::PlanStatsForDefrag::collect(self),
+                crate::policy::immix::defrag::StatsForDefrag::new(self),
             );
         }
     }

@@ -17,11 +17,10 @@ use crate::vm::*;
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
-    pub(in crate::util::alloc) bump_pointer: BumpPointer,
+    pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     pub(crate) space: ArcFlexMut<ImmixSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
-    _pad: usize,
     /// *unused*
     hot: bool,
     /// Is this a copy allocator?
@@ -171,11 +170,10 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             tls,
             space,
             context,
-            _pad: 0,
-            bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            bump_pointer: BumpPointer::default(),
             hot: false,
             copy,
-            large_bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            large_bump_pointer: BumpPointer::default(),
             request_for_large: false,
             line: None,
         }

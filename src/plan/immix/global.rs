@@ -89,7 +89,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        let stats_for_defrag = crate::policy::immix::defrag::PlanStatsForDefrag::collect(self);
+        let stats_for_defrag = crate::policy::immix::defrag::StatsForDefrag::new(self);
         let mut space = self.immix_space.write();
         space.prepare(true, stats_for_defrag);
     }

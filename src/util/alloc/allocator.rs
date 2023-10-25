@@ -329,7 +329,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     self.get_context()
                         .state
                         .allocation_success
-                        .swap(false, Ordering::SeqCst);
+                        .store(false, Ordering::SeqCst);
                     return result;
                 }
             }
