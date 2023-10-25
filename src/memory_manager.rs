@@ -631,8 +631,8 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// Check if `addr` is the address of an object reference to an MMTk object.
 ///
 /// Concretely:
-/// 1.  Return true if `addr.to_object_reference()` is a valid object reference to an object in any
-///     space in MMTk.
+/// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
+///     object in any space in MMTk.
 /// 2.  Also return true if there exists an `objref: ObjectReference` such that
 ///     -   `objref` is a valid object reference to an object in any space in MMTk, and
 ///     -   `lo <= objref.to_address() < hi`, where
