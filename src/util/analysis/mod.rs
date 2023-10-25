@@ -33,8 +33,7 @@ pub struct GcHookWork;
 
 impl<VM: VMBinding> GCWork<VM> for GcHookWork {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        let base = &mmtk.get_plan().base();
-        base.analysis_manager.gc_hook(mmtk);
+        mmtk.analysis_manager.gc_hook(mmtk);
     }
 }
 
@@ -46,7 +45,7 @@ pub struct AnalysisManager<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> AnalysisManager<VM> {
-    pub fn new(stats: &Stats) -> Self {
+    pub fn new(stats: Arc<Stats>) -> Self {
         let mut manager = AnalysisManager {
             routines: Mutex::new(vec![]),
         };
@@ -56,12 +55,12 @@ impl<VM: VMBinding> AnalysisManager<VM> {
 
     // Initializing all routines. If you want to add a new routine, here is the place
     // to do so
-    fn initialize_routines(&mut self, stats: &Stats) {
+    fn initialize_routines(&mut self, stats: Arc<Stats>) {
         let ctr = stats.new_event_counter("obj.num", true, true);
         let gc_ctr = stats.new_event_counter("gc.num", true, true);
         let obj_num = Arc::new(Mutex::new(ObjectCounter::new(true, ctr)));
         let gc_count = Arc::new(Mutex::new(GcCounter::new(true, gc_ctr)));
-        let obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(true)));
+        let obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(true, stats)));
         self.add_analysis_routine(obj_num);
         self.add_analysis_routine(gc_count);
         self.add_analysis_routine(obj_size);

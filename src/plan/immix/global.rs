@@ -85,7 +85,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare(true);
+        self.immix_space.prepare(
+            true,
+            crate::policy::immix::defrag::StatsForDefrag::new(self),
+        );
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
@@ -163,10 +166,13 @@ impl<VM: VMBinding> Immix<VM> {
         scheduler: &GCWorkScheduler<VM>,
     ) {
         let in_defrag = immix_space.decide_whether_to_defrag(
-            plan.is_emergency_collection(),
+            plan.base().global_state.is_emergency_collection(),
             true,
-            plan.base().cur_collection_attempts.load(Ordering::SeqCst),
-            plan.base().is_user_triggered_collection(),
+            plan.base()
+                .global_state
+                .cur_collection_attempts
+                .load(Ordering::SeqCst),
+            plan.base().global_state.is_user_triggered_collection(),
             *plan.base().options.full_heap_system_gc,
         );
 

@@ -1,3 +1,4 @@
+use crate::global_state::GlobalState;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
@@ -86,10 +87,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
         let should_poll = VM::VMActivePlan::is_mutator(tls)
-            && VM::VMActivePlan::global().should_trigger_gc_when_heap_is_full();
+            && self
+                .common()
+                .global_state
+                .should_trigger_gc_when_heap_is_full();
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll && VM::VMActivePlan::global().is_initialized();
+        let allow_gc = should_poll && self.common().global_state.is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -437,6 +441,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub acquire_lock: Mutex<()>,
 
     pub gc_trigger: Arc<GCTrigger<VM>>,
+    pub global_state: Arc<GlobalState>,
 
     p: PhantomData<VM>,
 }
@@ -462,6 +467,7 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub scheduler: Arc<GCWorkScheduler<VM>>,
     pub options: &'a Options,
+    pub global_state: Arc<GlobalState>,
 }
 
 impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
@@ -503,6 +509,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 local: args.local_side_metadata_specs,
             },
             acquire_lock: Mutex::new(()),
+            global_state: args.plan_args.global_state,
             p: PhantomData,
         };
 

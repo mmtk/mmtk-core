@@ -1,5 +1,7 @@
 use atomic::Ordering;
 
+use crate::global_state::GlobalState;
+use crate::plan::gc_requester::GCRequester;
 use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions;
@@ -8,6 +10,7 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -19,10 +22,17 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
+    gc_requester: Arc<GCRequester<VM>>,
+    options: Arc<Options>,
+    state: Arc<GlobalState>,
 }
 
 impl<VM: VMBinding> GCTrigger<VM> {
-    pub fn new(options: &Options) -> Self {
+    pub fn new(
+        options: Arc<Options>,
+        gc_requester: Arc<GCRequester<VM>>,
+        state: Arc<GlobalState>,
+    ) -> Self {
         GCTrigger {
             plan: MaybeUninit::uninit(),
             policy: match *options.gc_trigger {
@@ -35,6 +45,9 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 )),
                 GCTriggerSelector::Delegated => unimplemented!(),
             },
+            options,
+            gc_requester,
+            state,
         }
     }
 
@@ -64,10 +77,21 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            plan.base().gc_requester.request();
+            self.gc_requester.request();
             return true;
         }
         false
+    }
+
+    pub fn should_do_stress_gc(&self) -> bool {
+        Self::should_do_stress_gc_inner(&self.state, &self.options)
+    }
+
+    /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
+    pub(crate) fn should_do_stress_gc_inner(state: &GlobalState, options: &Options) -> bool {
+        state.is_initialized()
+            && (state.allocation_bytes.load(Ordering::SeqCst) > *options.stress_factor)
     }
 
     /// Check if the heap is full
@@ -103,7 +127,7 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
         plan: &dyn Plan<VM = VM>,
     ) -> bool;
     /// Is current heap full?
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool;
+    fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool;
     /// Return the current heap size (in pages)
     fn get_current_heap_size_in_pages(&self) -> usize;
     /// Return the upper bound of heap size
@@ -127,7 +151,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
         plan.collection_required(space_full, space)
     }
 
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
+    fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the total pages, the heap is full.
         plan.get_reserved_pages() > self.total_pages
     }
@@ -316,6 +340,16 @@ impl MemBalancerStats {
 }
 
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
+        // Let the plan decide
+        plan.collection_required(space_full, space)
+    }
+
     fn on_pending_allocation(&self, pages: usize) {
         self.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }
@@ -385,17 +419,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         self.pending_pages.store(0, Ordering::SeqCst);
     }
 
-    fn is_gc_required(
-        &self,
-        space_full: bool,
-        space: Option<&dyn Space<VM>>,
-        plan: &dyn Plan<VM = VM>,
-    ) -> bool {
-        // Let the plan decide
-        plan.collection_required(space_full, space)
-    }
-
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
+    fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the current heap size, the heap is full.
         plan.get_reserved_pages() > self.current_heap_pages.load(Ordering::Relaxed)
     }

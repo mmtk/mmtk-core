@@ -1,5 +1,7 @@
 // This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
+use std::sync::Arc;
+
 use crate::policy::marksweepspace::native_ms::*;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
@@ -7,14 +9,15 @@ use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
-use crate::Plan;
+
+use super::allocator::AllocatorContext;
 
 /// A MiMalloc free list allocator
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
-    plan: &'static dyn Plan<VM = VM>,
+    context: Arc<AllocatorContext<VM>>,
     /// blocks with free space
     pub available_blocks: BlockLists,
     /// blocks with free space for precise stress GC
@@ -38,8 +41,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.space
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.plan
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.context
     }
 
     // Find a block with free space and allocate to it
@@ -57,8 +60,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             if !cell.is_zero() {
                 // We succeeded in fastpath alloc, this cannot be precise stress test
                 debug_assert!(
-                    !(*self.plan.options().precise_stress
-                        && self.plan.base().is_stress_test_gc_enabled())
+                    !(*self.context.options.precise_stress
+                        && self.context.options.is_stress_test_gc_enabled())
                 );
 
                 let res = allocator::align_allocation::<VM>(cell, align, offset);
@@ -125,15 +128,15 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
 impl<VM: VMBinding> FreeListAllocator<VM> {
     // New free list allcoator
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: &'static MarkSweepSpace<VM>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         FreeListAllocator {
             tls,
             space,
-            plan,
+            context,
             available_blocks: new_empty_block_lists(),
             available_blocks_stress: new_empty_block_lists(),
             unswept_blocks: new_empty_block_lists(),
@@ -238,7 +241,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     /// method may add the block to available_blocks, or available_blocks_stress.
     fn add_to_available_blocks(&mut self, bin: usize, block: Block, stress: bool) {
         if stress {
-            debug_assert!(self.plan.base().is_precise_stress());
+            debug_assert!(*self.context.options.precise_stress);
             self.available_blocks_stress[bin].push(block);
         } else {
             self.available_blocks[bin].push(block);
@@ -268,7 +271,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         self.add_to_available_blocks(
                             bin,
                             block,
-                            self.plan.base().is_stress_test_gc_enabled(),
+                            self.context.options.is_stress_test_gc_enabled(),
                         );
                         return Some(block);
                     } else {
@@ -461,9 +464,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
             self.consumed_blocks[bin].sweep_blocks(self.space);
-            if self.plan.base().is_precise_stress() && self.plan.base().is_stress_test_gc_enabled()
+            if *self.context.options.precise_stress
+                && self.context.options.is_stress_test_gc_enabled()
             {
-                debug_assert!(self.plan.base().is_precise_stress());
+                debug_assert!(*self.context.options.precise_stress);
                 self.available_blocks_stress[bin].append(&mut self.consumed_blocks[bin]);
             } else {
                 self.available_blocks[bin].append(&mut self.consumed_blocks[bin]);

@@ -10,6 +10,7 @@ use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
+use crate::MMTK;
 
 use enum_map::EnumMap;
 
@@ -111,20 +112,20 @@ pub use native_mark_sweep::*;
 
 pub fn create_ms_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
-        space_mapping: create_space_mapping(plan),
+        space_mapping: create_space_mapping(mmtk.get_plan()),
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: mmtk.get_plan(),
     }
 }
