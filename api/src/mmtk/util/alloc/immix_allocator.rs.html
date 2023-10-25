@@ -574,10 +574,10 @@
             tls,
             space: space.unwrap().downcast_ref::&lt;ImmixSpace&lt;VM&gt;&gt;().unwrap(),
             context,
-            bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            bump_pointer: BumpPointer::default(),
             hot: <span class="bool-val">false</span>,
             copy,
-            large_bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            large_bump_pointer: BumpPointer::default(),
             request_for_large: <span class="bool-val">false</span>,
             line: <span class="prelude-val">None</span>,
         }
