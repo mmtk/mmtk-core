@@ -50,7 +50,11 @@ jobs:
       base_repo: mmtk/mmtk-jikesrvm
       ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
       core_commit: ${{ needs.get-merged-pr.outputs.commit }}
-      update_lockfile: cargo build --features nogc --target i686-unknown-linux-gnu
+      # `cargo generate-lockfile` will update other dependencies. We avoid using it for the bindings.
+      # But we do not have a good option for JikesRVM. The Rust project in JikesRVM needs some source files
+      # that are generated during its build process. Unless we want to do a full build for JikesRVM, we cannot
+      # use `cargo build`. So use `cargo generate-lockfile` instead.
+      update_lockfile: cargo generate-lockfile
     secrets: inherit
 
   check-merge-v8-pr:
