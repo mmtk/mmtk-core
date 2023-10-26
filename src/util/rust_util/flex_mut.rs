@@ -4,15 +4,6 @@ use crate::vm::VMBinding;
 use downcast_rs::Downcast;
 use std::{ops::Deref, ops::DerefMut, sync::Arc};
 
-macro_rules! to_trait_object {
-    ($self: expr, $trait: ty) => {{
-        let inner = $self.inner;
-        let raw = Arc::into_raw(inner);
-        let new_inner = unsafe { Arc::from_raw(raw as *const peace_lock::RwLock<$trait>) };
-        ArcFlexMut { inner: new_inner }
-    }};
-}
-
 /// `ArcFlexMut` is a replacement for `UnsafeCell` for a shared reference in situations where 1.
 /// their mutability is managed by the programmer, 2. mutability is hard to reason about statically,
 /// 3. using locks or `RefCell`/`AtomicRefCell` is not plausible for the sake of performance, and
@@ -95,6 +86,15 @@ impl<T: 'static + Downcast + ?Sized> ArcFlexMut<T> {
 // The references points to the same object with the same count.
 // This impl block is a workaround to implement the functionality specifically for
 // `dyn Space`, as I can't find a way to implement this using generics.
+
+macro_rules! to_trait_object {
+    ($self: expr, $trait: ty) => {{
+        let inner = $self.inner;
+        let raw = Arc::into_raw(inner);
+        let new_inner = unsafe { Arc::from_raw(raw as *const peace_lock::RwLock<$trait>) };
+        ArcFlexMut { inner: new_inner }
+    }};
+}
 
 impl<T> ArcFlexMut<T> {
     pub fn into_dyn_space<VM: VMBinding>(self) -> ArcFlexMut<dyn Space<VM>>

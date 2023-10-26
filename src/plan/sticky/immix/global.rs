@@ -207,10 +207,6 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
             && !self.immix.immix_space.read().is_marked(object)
     }
 
-    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
-        space.common().descriptor == self.immix.immix_space.read().common().descriptor
-    }
-
     // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
     // As sticky immix needs object metadata to know if an object is an nursery object or not, we cannot really tell
     // whether an address is in nursery or not. In this case, we just return false -- this is a conservative return value

@@ -153,6 +153,7 @@ pub(crate) fn generate_may_move_objects<'a>(
     // If any space or the parent may move objects, the plan may move objects
     let space_handlers = space_fields.iter().map(|f| {
         use syn::{Type, PathArguments};
+        // We assume the space field is `ArcFlexMut<T>`
         if let Type::Path(type_path) = &f.ty {
             if type_path.path.segments[0].ident == "ArcFlexMut" {
                 if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {

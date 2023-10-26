@@ -14,8 +14,6 @@
 /// memory).
 pub mod space;
 
-pub mod space_ref;
-
 /// Copy context defines the thread local copy allocator for copying policies.
 pub mod copy_context;
 /// Policy specific GC work

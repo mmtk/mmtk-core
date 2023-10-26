@@ -195,10 +195,6 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
         self.gen.nursery.read().in_space(object)
     }
 
-    fn is_nursery_space(&self, space: &dyn Space<Self::VM>) -> bool {
-        space.common().descriptor == self.gen.nursery.read().common().descriptor
-    }
-
     fn is_address_in_nursery(&self, addr: Address) -> bool {
         self.gen.nursery.read().address_in_space(addr)
     }

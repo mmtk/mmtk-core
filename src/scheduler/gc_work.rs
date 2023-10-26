@@ -55,11 +55,10 @@ impl<C: GCWorkContext> Prepare<C> {
 impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Prepare Global");
-        // We assume this is the only running work packet that accesses plan at the point of execution
-        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
-        plan_mut.prepare(worker.tls);
+        let plan = mmtk.get_plan();
+        plan.prepare(worker.tls);
 
-        if plan_mut.constraints().needs_prepare_mutator {
+        if plan.constraints().needs_prepare_mutator {
             for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
                 mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                     .add(PrepareMutator::<C::VM>::new(mutator));
@@ -128,10 +127,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         trace!("Release Global");
 
         mmtk.gc_trigger.policy.on_gc_release(mmtk);
-        // We assume this is the only running work packet that accesses plan at the point of execution
 
-        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
-        plan_mut.release(worker.tls);
+        mmtk.get_plan().release(worker.tls);
 
         for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
@@ -244,7 +241,6 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             );
         }
 
-        // We assume this is the only running work packet that accesses plan at the point of execution
         mmtk.get_plan().end_of_gc(worker.tls);
 
         #[cfg(feature = "extreme_assertions")]
