@@ -112,10 +112,8 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn prepare(&self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
             // Prepare both large object space and immix space
-            self.immix.immix_space.write().prepare(
-                false,
-                crate::policy::immix::defrag::StatsForDefrag::new(self),
-            );
+            let stats_for_defrag = crate::policy::immix::defrag::StatsForDefrag::new(self);
+            self.immix.immix_space.write().prepare(false, stats_for_defrag);
             self.immix.common.los.write().prepare(false);
         } else {
             self.full_heap_gc_count.lock().unwrap().inc();
