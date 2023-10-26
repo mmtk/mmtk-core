@@ -1,7 +1,8 @@
 # Debugging Tips
 
-In this section, we offer insights into debugging strategies tailored for identifying issues
-in a binding implementation. Our emphasis is on the unique debugging tools and methods in MMTk.
+In this section, we discuss debugging tips that will be useful to debug MMTk
+in a binding implementation. We will focus on discussing strategies and tools
+in the specific context of debugging MMTk.
 
 We aim to enhance the debugging capabilities for MMTk. However, as of October 2023, our debugging
 tools remain limited. We welcome your feedback and suggestions. If there's a specific debugging tool
