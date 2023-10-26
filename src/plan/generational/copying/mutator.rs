@@ -34,7 +34,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new(create_gen_space_mapping(
             mmtk.get_plan(),
-            &gencopy.gen.nursery,
+            gencopy.gen.nursery.clone(),
         )),
         prepare_func: &unreachable_prepare_func,
         release_func: &gencopy_mutator_release,

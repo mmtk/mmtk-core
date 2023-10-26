@@ -45,7 +45,6 @@ pub(crate) fn generate_trace_object<'a>(
     // Generate a check with early return for each space
     let space_field_handler = space_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
-        let f_ty = &f.ty;
 
         // Figure out copy
         let maybe_copy_semantics_attr = util::get_field_attribute(f, "copy_semantics");
@@ -71,8 +70,11 @@ pub(crate) fn generate_trace_object<'a>(
         };
 
         quote! {
-            if self.#f_ident.in_space(__mmtk_objref) {
-                return <#f_ty as PolicyTraceObject #ty_generics>::trace_object::<Q, KIND>(&self.#f_ident, __mmtk_queue, __mmtk_objref, #copy, __mmtk_worker);
+            {
+                let space = self.#f_ident.read();
+                if space.in_space(__mmtk_objref) {
+                    return PolicyTraceObject::trace_object::<Q, KIND>(&*space, __mmtk_queue, __mmtk_objref, #copy, __mmtk_worker);
+                }
             }
         }
     });
@@ -108,13 +110,15 @@ pub(crate) fn generate_post_scan_object<'a>(
 ) -> TokenStream2 {
     let scan_field_handler = post_scan_object_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
-        let f_ty = &f.ty;
 
         quote! {
-            if self.#f_ident.in_space(__mmtk_objref) {
-                use crate::policy::gc_work::PolicyTraceObject;
-                <#f_ty as PolicyTraceObject #ty_generics>::post_scan_object(&self.#f_ident, __mmtk_objref);
-                return;
+            {
+                let space = self.#f_ident.read();
+                if space.in_space(__mmtk_objref) {
+                    use crate::policy::gc_work::PolicyTraceObject;
+                    PolicyTraceObject::post_scan_object(&*space, __mmtk_objref);
+                    return;
+                }
             }
         }
     });
@@ -148,10 +152,23 @@ pub(crate) fn generate_may_move_objects<'a>(
 ) -> TokenStream2 {
     // If any space or the parent may move objects, the plan may move objects
     let space_handlers = space_fields.iter().map(|f| {
-        let f_ty = &f.ty;
-
-        quote! {
-            || <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
+        use syn::{Type, PathArguments};
+        // We assume the space field is `ArcFlexMut<T>`
+        if let Type::Path(type_path) = &f.ty {
+            if type_path.path.segments[0].ident == "ArcFlexMut" {
+                if let PathArguments::AngleBracketed(angle_bracketed_args) = &type_path.path.segments[0].arguments {
+                    let inner_type = &angle_bracketed_args.args.first().unwrap();
+                    quote! {
+                        || <#inner_type as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
+                    }
+                } else {
+                    unreachable!("Failed to get the inner type of ArcFlexMut: {:?}", f.ty)
+                }
+            } else {
+                panic!("Expected a space to be ArcFlexMut<T>, found {:?}", f.ty)
+            }
+        } else {
+            panic!("Failed to get the type of a space: {:?}", f.ty)
         }
     });
 

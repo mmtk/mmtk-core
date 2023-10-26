@@ -123,6 +123,8 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
+use super::space::SpaceAllocFail;
+
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjectSpace<VM> {
     fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
@@ -242,7 +244,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     /// Allocate an object
-    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Address {
+    pub fn allocate_pages(&self, tls: VMThread, pages: usize) -> Result<Address, SpaceAllocFail> {
         self.acquire(tls, pages)
     }
 

@@ -44,7 +44,7 @@ pub fn mygc_mutator_release<VM: VMBinding>(
             .plan
             .downcast_ref::<MyGC<VM>>()
             .unwrap()
-            .tospace(),
+            .tospace().clone().into_dyn_space(),
     );
 }
 // ANCHOR_END: release
@@ -78,7 +78,7 @@ pub fn create_mygc_mutator<VM: VMBinding>(
         // ANCHOR: space_mapping
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, mygc);
-            vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace()));
+            vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace().clone().into_dyn_space()));
             vec
         }),
         // ANCHOR_END: space_mapping

@@ -26,7 +26,10 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
         space_mapping: Box::new({
             let mut vec =
                 create_space_mapping(immix::mutator::RESERVED_ALLOCATORS, true, mmtk.get_plan());
-            vec.push((AllocatorSelector::Immix(0), stickyimmix.get_immix_space()));
+            vec.push((
+                AllocatorSelector::Immix(0),
+                stickyimmix.get_immix_space().clone().into_dyn_space(),
+            ));
             vec
         }),
         prepare_func: &unreachable_prepare_func,

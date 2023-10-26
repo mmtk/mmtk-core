@@ -9,7 +9,6 @@ use crate::MMTK;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -155,10 +154,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// Return the [`VMThread`] associated with this allocator instance.
     fn get_tls(&self) -> VMThread;
 
-    /// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    fn get_space(&self) -> &'static dyn Space<VM>;
-
-    /// Return the context for the allocator.
+    // Return the context for the allocator.
     fn get_context(&self) -> &AllocatorContext<VM>;
 
     /// Return if this allocator can do thread local allocation. If an allocator does not do thread

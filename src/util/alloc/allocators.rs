@@ -3,13 +3,11 @@ use std::sync::Arc;
 
 use memoffset::offset_of;
 
-use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::marksweepspace::malloc_ms::MallocSpace;
-use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::Mutator;
@@ -102,7 +100,7 @@ impl<VM: VMBinding> Allocators<VM> {
     pub fn new(
         mutator_tls: VMMutatorThread,
         mmtk: &MMTK<VM>,
-        space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
+        space_mapping: &[(AllocatorSelector, ArcFlexMut<dyn Space<VM>>)],
     ) -> Self {
         let mut ret = Allocators {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
@@ -114,46 +112,47 @@ impl<VM: VMBinding> Allocators<VM> {
         };
         let context = Arc::new(AllocatorContext::new(mmtk));
 
-        for &(selector, space) in space_mapping.iter() {
+        for (selector, space) in space_mapping.iter() {
+            let space = space.clone();
             match selector {
                 AllocatorSelector::BumpPointer(index) => {
-                    ret.bump_pointer[index as usize].write(BumpAllocator::new(
+                    ret.bump_pointer[*index as usize].write(BumpAllocator::new(
                         mutator_tls.0,
                         space,
                         context.clone(),
                     ));
                 }
                 AllocatorSelector::LargeObject(index) => {
-                    ret.large_object[index as usize].write(LargeObjectAllocator::new(
+                    ret.large_object[*index as usize].write(LargeObjectAllocator::new(
                         mutator_tls.0,
-                        space.downcast_ref::<LargeObjectSpace<VM>>().unwrap(),
+                        space.downcast(),
                         context.clone(),
                     ));
                 }
                 AllocatorSelector::Malloc(index) => {
-                    ret.malloc[index as usize].write(MallocAllocator::new(
+                    ret.malloc[*index as usize].write(MallocAllocator::new(
                         mutator_tls.0,
-                        space.downcast_ref::<MallocSpace<VM>>().unwrap(),
+                        space.downcast(),
                         context.clone(),
                     ));
                 }
                 AllocatorSelector::Immix(index) => {
-                    ret.immix[index as usize].write(ImmixAllocator::new(
+                    ret.immix[*index as usize].write(ImmixAllocator::new(
                         mutator_tls.0,
-                        Some(space),
+                        space.downcast(),
                         context.clone(),
                         false,
                     ));
                 }
                 AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                    ret.free_list[*index as usize].write(FreeListAllocator::new(
                         mutator_tls.0,
-                        space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
+                        space.downcast(),
                         context.clone(),
                     ));
                 }
                 AllocatorSelector::MarkCompact(index) => {
-                    ret.markcompact[index as usize].write(MarkCompactAllocator::new(
+                    ret.markcompact[*index as usize].write(MarkCompactAllocator::new(
                         mutator_tls.0,
                         space,
                         context.clone(),

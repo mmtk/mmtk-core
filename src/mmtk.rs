@@ -23,7 +23,6 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use std::cell::UnsafeCell;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -107,7 +106,7 @@ impl Default for MMTKBuilder {
 pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<Options>,
     pub(crate) state: Arc<GlobalState>,
-    pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
+    pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
@@ -198,7 +197,7 @@ impl<VM: VMBinding> MMTK<VM> {
         MMTK {
             options,
             state,
-            plan: UnsafeCell::new(plan),
+            plan,
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::<
                 <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
@@ -339,17 +338,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
-        unsafe { &**(self.plan.get()) }
-    }
-
-    /// Get the plan as mutable reference.
-    ///
-    /// # Safety
-    ///
-    /// This is unsafe because the caller must ensure that the plan is not used by other threads.
-    #[allow(clippy::mut_from_ref)]
-    pub unsafe fn get_plan_mut(&self) -> &mut dyn Plan<VM = VM> {
-        &mut **(self.plan.get())
+        &*self.plan
     }
 
     pub fn get_options(&self) -> &Options {

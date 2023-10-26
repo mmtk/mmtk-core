@@ -40,6 +40,7 @@ mimalloc-sys = { version = "0.1.6", optional = true }
 mmtk-macros = { version = "0.20.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
+peace-lock = "0.1.3"
 pfm = { version = "0.1.0-beta.3", optional = true }
 probe = "0.5"
 portable-atomic = "1.4.3"
@@ -71,6 +72,9 @@ perf_counter = ["pfm"]
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Non mutually exclusive features --
+
+# Turn on checks for the type ArcFlexMut (we use peace-lock for the type so just turn on check for peace-lock).
+check_flex_mut = ["peace-lock/check"]
 
 # spaces with different semantics
 
@@ -129,7 +133,7 @@ nogc_no_zeroing = ["nogc_lock_free"]
 single_worker = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
-extreme_assertions = []
+extreme_assertions = ["check_flex_mut"]
 
 # Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
 nogc_multi_space = []

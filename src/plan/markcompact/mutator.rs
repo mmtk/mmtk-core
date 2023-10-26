@@ -36,7 +36,10 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, markcompact);
-            vec.push((AllocatorSelector::MarkCompact(0), markcompact.mc_space()));
+            vec.push((
+                AllocatorSelector::MarkCompact(0),
+                markcompact.mc_space().clone().into_dyn_space(),
+            ));
             vec
         }),
         prepare_func: &unreachable_prepare_func,

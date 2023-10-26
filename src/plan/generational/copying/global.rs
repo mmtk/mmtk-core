@@ -17,6 +17,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -34,10 +35,10 @@ pub struct GenCopy<VM: VMBinding> {
     pub hi: AtomicBool,
     #[space]
     #[copy_semantics(CopySemantics::Mature)]
-    pub copyspace0: CopySpace<VM>,
+    pub copyspace0: ArcFlexMut<CopySpace<VM>>,
     #[space]
     #[copy_semantics(CopySemantics::Mature)]
-    pub copyspace1: CopySpace<VM>,
+    pub copyspace1: ArcFlexMut<CopySpace<VM>>,
 }
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
@@ -57,7 +58,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             },
             space_mapping: vec![
                 // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), self.tospace()),
+                (
+                    CopySelector::CopySpace(0),
+                    self.tospace().clone().into_dyn_space(),
+                ),
             ],
             constraints: &GENCOPY_CONSTRAINTS,
         }
@@ -83,7 +87,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &ALLOCATOR_MAPPING
     }
 
-    fn prepare(&mut self, tls: VMWorkerThread) {
+    fn prepare(&self, tls: VMWorkerThread) {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
@@ -91,37 +95,39 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 .store(!self.hi.load(Ordering::SeqCst), Ordering::SeqCst); // flip the semi-spaces
         }
         let hi = self.hi.load(Ordering::SeqCst);
-        self.copyspace0.prepare(hi);
-        self.copyspace1.prepare(!hi);
+        self.copyspace0.read().prepare(hi);
+        self.copyspace1.read().prepare(!hi);
 
-        self.fromspace_mut()
+        self.fromspace()
+            .write()
             .set_copy_for_sft_trace(Some(CopySemantics::Mature));
-        self.tospace_mut().set_copy_for_sft_trace(None);
+        self.tospace().write().set_copy_for_sft_trace(None);
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<Self::VM>) {
-        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }
+            .rebind(self.tospace().clone());
     }
 
-    fn release(&mut self, tls: VMWorkerThread) {
+    fn release(&self, tls: VMWorkerThread) {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
-            self.fromspace().release();
+            self.fromspace().read().release();
         }
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn end_of_gc(&self, _tls: VMWorkerThread) {
         self.gen
             .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
-        self.gen.get_collection_reserved_pages() + self.tospace().reserved_pages()
+        self.gen.get_collection_reserved_pages() + self.tospace().read().reserved_pages()
     }
 
     fn get_used_pages(&self) -> usize {
-        self.gen.get_used_pages() + self.tospace().reserved_pages()
+        self.gen.get_used_pages() + self.tospace().read().reserved_pages()
     }
 
     /// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
@@ -156,19 +162,19 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
     }
 
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
-        self.gen.nursery.in_space(object)
+        self.gen.nursery.read().in_space(object)
     }
 
     fn is_address_in_nursery(&self, addr: Address) -> bool {
-        self.gen.nursery.address_in_space(addr)
+        self.gen.nursery.read().address_in_space(addr)
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {
-        self.tospace().available_physical_pages()
+        self.tospace().read().available_physical_pages()
     }
 
     fn get_mature_reserved_pages(&self) -> usize {
-        self.tospace().reserved_pages()
+        self.tospace().read().reserved_pages()
     }
 
     fn force_full_heap_collection(&self) {
@@ -200,14 +206,14 @@ impl<VM: VMBinding> GenCopy<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
-        let copyspace0 = CopySpace::new(
+        let copyspace0 = ArcFlexMut::new(CopySpace::new(
             plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
             false,
-        );
-        let copyspace1 = CopySpace::new(
+        ));
+        let copyspace1 = ArcFlexMut::new(CopySpace::new(
             plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
             true,
-        );
+        ));
 
         let res = GenCopy {
             gen: CommonGenPlan::new(plan_args),
@@ -225,7 +231,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         self.gen.requires_full_heap_collection(self)
     }
 
-    pub fn tospace(&self) -> &CopySpace<VM> {
+    pub fn tospace(&self) -> &ArcFlexMut<CopySpace<VM>> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace1
         } else {
@@ -233,27 +239,11 @@ impl<VM: VMBinding> GenCopy<VM> {
         }
     }
 
-    pub fn tospace_mut(&mut self) -> &mut CopySpace<VM> {
-        if self.hi.load(Ordering::SeqCst) {
-            &mut self.copyspace1
-        } else {
-            &mut self.copyspace0
-        }
-    }
-
-    pub fn fromspace(&self) -> &CopySpace<VM> {
+    pub fn fromspace(&self) -> &ArcFlexMut<CopySpace<VM>> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace0
         } else {
             &self.copyspace1
-        }
-    }
-
-    pub fn fromspace_mut(&mut self) -> &mut CopySpace<VM> {
-        if self.hi.load(Ordering::SeqCst) {
-            &mut self.copyspace0
-        } else {
-            &mut self.copyspace1
         }
     }
 }

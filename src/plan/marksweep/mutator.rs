@@ -43,7 +43,10 @@ mod malloc_mark_sweep {
         Box::new({
             let mut vec =
                 crate::plan::mutator_context::create_space_mapping(RESERVED_ALLOCATORS, true, plan);
-            vec.push((AllocatorSelector::Malloc(0), ms.ms_space()));
+            vec.push((
+                AllocatorSelector::Malloc(0),
+                ms.ms_space().clone().into_dyn_space(),
+            ));
             vec
         })
     }
@@ -98,7 +101,10 @@ mod native_mark_sweep {
         Box::new({
             let mut vec =
                 crate::plan::mutator_context::create_space_mapping(RESERVED_ALLOCATORS, true, plan);
-            vec.push((AllocatorSelector::FreeList(0), ms.ms_space()));
+            vec.push((
+                AllocatorSelector::FreeList(0),
+                ms.ms_space().clone().into_dyn_space(),
+            ));
             vec
         })
     }

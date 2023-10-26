@@ -4,11 +4,11 @@ use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorCo
 use super::BumpPointer;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
-use crate::policy::space::Space;
 use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::rust_util::unlikely;
 use crate::util::Address;
 use crate::vm::*;
@@ -19,7 +19,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     pub tls: VMThread,
     pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    space: &'static ImmixSpace<VM>,
+    pub(crate) space: ArcFlexMut<ImmixSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     /// *unused*
     hot: bool,
@@ -43,10 +43,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 }
 
 impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
-    fn get_space(&self) -> &'static dyn Space<VM> {
-        self.space as _
-    }
-
     fn get_context(&self) -> &AllocatorContext<VM> {
         &self.context
     }
@@ -166,13 +162,13 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 impl<VM: VMBinding> ImmixAllocator<VM> {
     pub(crate) fn new(
         tls: VMThread,
-        space: Option<&'static dyn Space<VM>>,
+        space: ArcFlexMut<ImmixSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
         copy: bool,
     ) -> Self {
         ImmixAllocator {
             tls,
-            space: space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap(),
+            space,
             context,
             bump_pointer: BumpPointer::default(),
             hot: false,
@@ -181,10 +177,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             request_for_large: false,
             line: None,
         }
-    }
-
-    pub fn immix_space(&self) -> &'static ImmixSpace<VM> {
-        self.space
     }
 
     /// Large-object (larger than a line) bump allocation.
@@ -234,8 +226,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: usize) -> bool {
         while self.line.is_some() || self.acquire_recyclable_block() {
             let line = self.line.unwrap();
-            if let Some((start_line, end_line)) = self.immix_space().get_next_available_lines(line)
-            {
+            if let Some((start_line, end_line)) = self.space.read().get_next_available_lines(line) {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.bump_pointer.cursor = start_line.start();
                 self.bump_pointer.limit = end_line.start();
@@ -274,7 +265,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     /// Get a recyclable block from ImmixSpace.
     fn acquire_recyclable_block(&mut self) -> bool {
-        match self.immix_space().get_reusable_block(self.copy) {
+        match self.space.read().get_reusable_block(self.copy) {
             Some(block) => {
                 trace!("{:?}: acquire_recyclable_block -> {:?}", self.tls, block);
                 // Set the hole-searching cursor to the start of this block.
@@ -287,9 +278,9 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
 
     // Get a clean block from ImmixSpace.
     fn acquire_clean_block(&mut self, size: usize, align: usize, offset: usize) -> Address {
-        match self.immix_space().get_clean_block(self.tls, self.copy) {
-            None => Address::ZERO,
-            Some(block) => {
+        let alloc_res = self.space.read().get_clean_block(self.tls, self.copy);
+        match alloc_res {
+            Ok(block) => {
                 trace!(
                     "{:?}: Acquired a new block {:?} -> {:?}",
                     self.tls,
@@ -304,6 +295,10 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     self.bump_pointer.limit = block.end();
                 }
                 self.alloc(size, align, offset)
+            }
+            Err(_) => {
+                VM::VMCollection::block_for_gc(crate::util::VMMutatorThread(self.tls));
+                Address::ZERO
             }
         }
     }

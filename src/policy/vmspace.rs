@@ -2,6 +2,7 @@ use crate::mmtk::SFT_MAP;
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
+use crate::policy::space::SpaceAllocFail;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::constants::BYTES_IN_PAGE;
@@ -119,7 +120,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         unreachable!()
     }
 
-    fn acquire(&self, _tls: VMThread, _pages: usize) -> Address {
+    fn acquire(&self, _tls: VMThread, _pages: usize) -> Result<Address, SpaceAllocFail> {
         unreachable!()
     }
 

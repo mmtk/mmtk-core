@@ -37,7 +37,21 @@ use std::sync::Mutex;
 
 use downcast_rs::Downcast;
 
-pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
+/// The type represents a failure to allocate from a space, similar to [`crate::util::heap::pageresource::PRAllocFail`].
+pub struct SpaceAllocFail;
+
+/// This trait defines and manages spaces. A space is a region of virtual memory (contiguous or
+/// discontigous) which is subject to the same memory management
+/// regime (also known as 'policy').  Multiple spaces (instances of this class or its
+/// descendants) may have the same policy (eg there could be numerous
+/// instances of CopySpace, each with different roles). Spaces are
+/// defined in terms of a unique region of virtual memory, so no two
+/// space instances ever share any virtual memory.
+///
+/// In addition to tracking virtual memory use and the mapping to
+/// policy, spaces also manage memory consumption (used virtual
+/// memory).
+pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Send + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
@@ -75,7 +89,23 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         false
     }
 
-    fn acquire(&self, tls: VMThread, pages: usize) -> Address {
+    /// Acquire a number of pages from the page resource, returning
+    /// a result, either represetning the address of the first page,
+    /// or an error for failing to allocate.
+    ///
+    /// When returning an error, a GC is requested in the method, and the caller should
+    /// call [`crate::vm::Collection::block_for_gc`] and wait for the GC.
+    ///
+    /// First the page budget is checked to see whether polling the GC is
+    /// necessary. If so, the GC is polled. If a GC is required then the
+    /// request fails and an error is returned.
+    ///
+    /// If the check of the page budget does not lead to GC being
+    /// triggered, then a request is made for specific pages in virtual
+    /// memory. If the page manager cannot satisify this request, then
+    /// the request fails, a GC is forced, and an error is returned.
+    /// Otherwise the address of the first page is returned.
+    fn acquire(&self, tls: VMThread, pages: usize) -> Result<Address, SpaceAllocFail> {
         trace!("Space.acquire, tls={:?}", tls);
 
         debug_assert!(
@@ -111,8 +141,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .policy
                 .on_pending_allocation(pages_reserved);
 
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
-            unsafe { Address::zero() }
+            Err(SpaceAllocFail)
         } else {
             debug!("Collection not required");
 
@@ -204,7 +233,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     }
 
                     debug!("Space.acquire(), returned = {}", res.start);
-                    res.start
+                    Ok(res.start)
                 }
                 Err(_) => {
                     drop(lock); // drop the lock immediately
@@ -224,8 +253,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         .policy
                         .on_pending_allocation(pages_reserved);
 
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
-                    unsafe { Address::zero() }
+                    Err(SpaceAllocFail)
                 }
             }
         }

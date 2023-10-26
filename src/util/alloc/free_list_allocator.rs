@@ -6,7 +6,9 @@ use crate::policy::marksweepspace::native_ms::*;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::Address;
+use crate::util::VMMutatorThread;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 
@@ -16,7 +18,7 @@ use super::allocator::AllocatorContext;
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
-    space: &'static MarkSweepSpace<VM>,
+    space: ArcFlexMut<MarkSweepSpace<VM>>,
     context: Arc<AllocatorContext<VM>>,
     /// blocks with free space
     pub available_blocks: BlockLists,
@@ -35,10 +37,6 @@ pub struct FreeListAllocator<VM: VMBinding> {
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_tls(&self) -> VMThread {
         self.tls
-    }
-
-    fn get_space(&self) -> &'static dyn crate::policy::space::Space<VM> {
-        self.space
     }
 
     fn get_context(&self) -> &AllocatorContext<VM> {
@@ -130,7 +128,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // New free list allcoator
     pub(crate) fn new(
         tls: VMThread,
-        space: &'static MarkSweepSpace<VM>,
+        space: ArcFlexMut<MarkSweepSpace<VM>>,
         context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         FreeListAllocator {
@@ -294,9 +292,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     ) -> Option<Block> {
         let bin = mi_bin::<VM>(size, align);
         loop {
-            match self.space.acquire_block(self.tls, size, align) {
+            let block = self.space.read().acquire_block(self.tls, size, align);
+            match block {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
                     // GC
+                    use crate::vm::Collection;
+                    VM::VMCollection::block_for_gc(VMMutatorThread(self.tls));
                     return None;
                 }
 
@@ -332,7 +333,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn init_block(&self, block: Block, cell_size: usize) {
-        self.space.record_new_block(block);
+        self.space.read().record_new_block(block);
 
         // construct free list
         let block_end = block.start() + Block::BYTES;
@@ -458,12 +459,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         debug!("reset");
         // sweep all blocks and push consumed onto available list
         for bin in 0..MI_BIN_FULL {
+            let space = self.space.read();
             // Sweep available blocks
-            self.available_blocks[bin].sweep_blocks(self.space);
-            self.available_blocks_stress[bin].sweep_blocks(self.space);
+            self.available_blocks[bin].sweep_blocks(&space);
+            self.available_blocks_stress[bin].sweep_blocks(&space);
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
-            self.consumed_blocks[bin].sweep_blocks(self.space);
+            self.consumed_blocks[bin].sweep_blocks(&space);
             if *self.context.options.precise_stress
                 && self.context.options.is_stress_test_gc_enabled()
             {
@@ -483,7 +485,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn abandon_blocks(&mut self) {
-        let mut abandoned = self.space.abandoned.lock().unwrap();
+        let space = self.space.read();
+        let mut abandoned = space.abandoned.lock().unwrap();
         for i in 0..MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
             if !available.is_empty() {

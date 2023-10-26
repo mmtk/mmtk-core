@@ -13,3 +13,8 @@ criterion_main!(bench_sft::benches);
 mod bench_alloc;
 #[cfg(feature = "bench_alloc")]
 criterion_main!(bench_alloc::benches);
+
+#[cfg(feature = "bench_post_alloc")]
+mod bench_post_alloc;
+#[cfg(feature = "bench_post_alloc")]
+criterion_main!(bench_post_alloc::benches);

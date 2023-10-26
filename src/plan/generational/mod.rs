@@ -11,6 +11,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::AllocatorSelector;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -85,9 +86,9 @@ lazy_static! {
 
 fn create_gen_space_mapping<VM: VMBinding>(
     plan: &'static dyn Plan<VM = VM>,
-    nursery: &'static CopySpace<VM>,
-) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    nursery: ArcFlexMut<CopySpace<VM>>,
+) -> Vec<(AllocatorSelector, ArcFlexMut<dyn Space<VM>>)> {
     let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
-    vec.push((AllocatorSelector::BumpPointer(0), nursery));
+    vec.push((AllocatorSelector::BumpPointer(0), nursery.into_dyn_space()));
     vec
 }

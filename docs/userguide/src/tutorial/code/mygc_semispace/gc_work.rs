@@ -61,15 +61,15 @@ impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
         }
         let worker = self.worker();
         let queue = &mut self.base.nodes;
-        if self.plan.tospace().in_space(object) {
-            self.plan.tospace().trace_object(
+        if self.plan.tospace().read().in_space(object) {
+            self.plan.tospace().read().trace_object(
                 queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
                 worker,
             )
-        } else if self.plan.fromspace().in_space(object) {
-            self.plan.fromspace().trace_object(
+        } else if self.plan.fromspace().read().in_space(object) {
+            self.plan.fromspace().read().trace_object(
                 queue,
                 object,
                 Some(CopySemantics::DefaultCopy),

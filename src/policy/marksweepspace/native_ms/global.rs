@@ -335,10 +335,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
 
         let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
-        if acquired.is_zero() {
-            BlockAcquireResult::Exhausted
-        } else {
-            BlockAcquireResult::Fresh(Block::from_unaligned_address(acquired))
+        match acquired {
+            Err(_) => BlockAcquireResult::Exhausted,
+            Ok(addr) => BlockAcquireResult::Fresh(Block::from_unaligned_address(addr)),
         }
     }
 

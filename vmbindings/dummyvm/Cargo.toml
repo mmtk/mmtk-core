@@ -40,3 +40,4 @@ extreme_assertions = ["mmtk/extreme_assertions"]
 # Feature to control which benchmarks to run. See benches/main.rs
 bench_sft = []
 bench_alloc = []
+bench_post_alloc = []

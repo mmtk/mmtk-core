@@ -22,6 +22,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::options::PlanSelector;
+use crate::util::rust_util::flex_mut::ArcFlexMut;
 use crate::util::statistics::stats::Stats;
 use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -167,7 +168,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn prepare(&mut self, tls: VMWorkerThread);
+    fn prepare(&self, tls: VMWorkerThread);
 
     /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific
     /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
@@ -176,11 +177,11 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// Release the plan after transitive closure. A plan can implement this method to call each policy's release,
     /// or create any work packet that should be done in release.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn release(&mut self, tls: VMWorkerThread);
+    fn release(&self, tls: VMWorkerThread);
 
     /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
+    fn end_of_gc(&self, _tls: VMWorkerThread) {}
 
     fn notify_emergency_collection(&self) {
         if let Some(gen) = self.generational() {
@@ -312,13 +313,13 @@ pub struct BasePlan<VM: VMBinding> {
     // Spaces in base plan
     #[cfg(feature = "code_space")]
     #[space]
-    pub code_space: ImmortalSpace<VM>,
+    pub code_space: ArcFlexMut<ImmortalSpace<VM>>,
     #[cfg(feature = "code_space")]
     #[space]
-    pub code_lo_space: ImmortalSpace<VM>,
+    pub code_lo_space: ArcFlexMut<ImmortalSpace<VM>>,
     #[cfg(feature = "ro_space")]
     #[space]
-    pub ro_space: ImmortalSpace<VM>,
+    pub ro_space: ArcFlexMut<ImmortalSpace<VM>>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
     /// for boot image.
@@ -334,7 +335,7 @@ pub struct BasePlan<VM: VMBinding> {
     ///     the VM space.
     #[cfg(feature = "vm_space")]
     #[space]
-    pub vm_space: VMSpace<VM>,
+    pub vm_space: ArcFlexMut<VMSpace<VM>>,
 }
 
 /// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
@@ -390,29 +391,29 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
         BasePlan {
             #[cfg(feature = "code_space")]
-            code_space: ImmortalSpace::new(args.get_space_args(
+            code_space: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "code_space",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             #[cfg(feature = "code_space")]
-            code_lo_space: ImmortalSpace::new(args.get_space_args(
+            code_lo_space: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             #[cfg(feature = "ro_space")]
-            ro_space: ImmortalSpace::new(args.get_space_args(
+            ro_space: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             #[cfg(feature = "vm_space")]
-            vm_space: VMSpace::new(args.get_space_args(
+            vm_space: ArcFlexMut::new(VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
                 VMRequest::discontiguous(),
-            )),
+            ))),
 
             global_state: args.global_args.state.clone(),
             gc_trigger: args.global_args.gc_trigger,
@@ -428,12 +429,12 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         #[cfg(feature = "code_space")]
         {
-            pages += self.code_space.reserved_pages();
-            pages += self.code_lo_space.reserved_pages();
+            pages += self.code_space.read().reserved_pages();
+            pages += self.code_lo_space.read().reserved_pages();
         }
         #[cfg(feature = "ro_space")]
         {
-            pages += self.ro_space.reserved_pages();
+            pages += self.ro_space.read().reserved_pages();
         }
 
         // If we need to count malloc'd size as part of our heap, we add it here.
@@ -454,52 +455,52 @@ impl<VM: VMBinding> BasePlan<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
-        if self.code_space.in_space(object) {
+        if self.code_space.read().in_space(object) {
             trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(queue, object);
+            return self.code_space.read().trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(object) {
+        if self.code_lo_space.read().in_space(object) {
             trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(queue, object);
+            return self.code_lo_space.read().trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(object) {
+        if self.ro_space.read().in_space(object) {
             trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(queue, object);
+            return self.ro_space.read().trace_object(queue, object);
         }
 
         #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(object) {
+        if self.vm_space.read().in_space(object) {
             trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(queue, object);
+            return self.vm_space.read().trace_object(queue, object);
         }
 
         VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
     }
 
-    pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
+    pub fn prepare(&self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
-        self.code_space.prepare();
+        self.code_space.write().prepare();
         #[cfg(feature = "code_space")]
-        self.code_lo_space.prepare();
+        self.code_lo_space.write().prepare();
         #[cfg(feature = "ro_space")]
-        self.ro_space.prepare();
+        self.ro_space.write().prepare();
         #[cfg(feature = "vm_space")]
-        self.vm_space.prepare();
+        self.vm_space.write().prepare();
     }
 
-    pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
+    pub fn release(&self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
-        self.code_space.release();
+        self.code_space.write().release();
         #[cfg(feature = "code_space")]
-        self.code_lo_space.release();
+        self.code_lo_space.write().release();
         #[cfg(feature = "ro_space")]
-        self.ro_space.release();
+        self.ro_space.write().release();
         #[cfg(feature = "vm_space")]
-        self.vm_space.release();
+        self.vm_space.write().release();
     }
 
     pub(crate) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
@@ -539,12 +540,12 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 #[derive(HasSpaces, PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
     #[space]
-    pub immortal: ImmortalSpace<VM>,
+    pub immortal: ArcFlexMut<ImmortalSpace<VM>>,
     #[space]
-    pub los: LargeObjectSpace<VM>,
+    pub los: ArcFlexMut<LargeObjectSpace<VM>>,
     // TODO: We should use a marksweep space for nonmoving.
     #[space]
-    pub nonmoving: ImmortalSpace<VM>,
+    pub nonmoving: ArcFlexMut<ImmortalSpace<VM>>,
     #[parent]
     pub base: BasePlan<VM>,
 }
@@ -552,28 +553,28 @@ pub struct CommonPlan<VM: VMBinding> {
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
         CommonPlan {
-            immortal: ImmortalSpace::new(args.get_space_args(
+            immortal: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
-            )),
-            los: LargeObjectSpace::new(
+            ))),
+            los: ArcFlexMut::new(LargeObjectSpace::new(
                 args.get_space_args("los", true, VMRequest::discontiguous()),
                 false,
-            ),
-            nonmoving: ImmortalSpace::new(args.get_space_args(
+            )),
+            nonmoving: ArcFlexMut::new(ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
                 VMRequest::discontiguous(),
-            )),
+            ))),
             base: BasePlan::new(args),
         }
     }
 
     pub fn get_used_pages(&self) -> usize {
-        self.immortal.reserved_pages()
-            + self.los.reserved_pages()
-            + self.nonmoving.reserved_pages()
+        self.immortal.read().reserved_pages()
+            + self.los.read().reserved_pages()
+            + self.nonmoving.read().reserved_pages()
             + self.base.get_used_pages()
     }
 
@@ -583,45 +584,60 @@ impl<VM: VMBinding> CommonPlan<VM> {
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        if self.immortal.in_space(object) {
-            trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(queue, object);
+        {
+            let space = self.immortal.read();
+            if space.in_space(object) {
+                trace!("trace_object: object in immortal space");
+                return space.trace_object(queue, object);
+            }
         }
-        if self.los.in_space(object) {
-            trace!("trace_object: object in los");
-            return self.los.trace_object(queue, object);
+        {
+            let space = self.los.read();
+            if space.in_space(object) {
+                trace!("trace_object: object in los space");
+                return space.trace_object(queue, object);
+            }
         }
-        if self.nonmoving.in_space(object) {
-            trace!("trace_object: object in nonmoving space");
-            return self.nonmoving.trace_object(queue, object);
+        {
+            let space = self.nonmoving.read();
+            if space.in_space(object) {
+                trace!("trace_object: object in nonmoving space");
+                return space.trace_object(queue, object);
+            }
         }
         self.base.trace_object::<Q>(queue, object, worker)
     }
 
-    pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.prepare();
-        self.los.prepare(full_heap);
-        self.nonmoving.prepare();
+    pub fn prepare(&self, tls: VMWorkerThread, full_heap: bool) {
+        {
+            let mut space = self.immortal.write();
+            space.prepare();
+        }
+        {
+            let mut space = self.los.write();
+            space.prepare(full_heap);
+        }
+        {
+            let mut space = self.nonmoving.write();
+            space.prepare();
+        }
         self.base.prepare(tls, full_heap)
     }
 
-    pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
-        self.immortal.release();
-        self.los.release(full_heap);
-        self.nonmoving.release();
+    pub fn release(&self, tls: VMWorkerThread, full_heap: bool) {
+        {
+            let mut space = self.immortal.write();
+            space.release();
+        }
+        {
+            let mut space = self.los.write();
+            space.release(full_heap);
+        }
+        {
+            let mut space = self.nonmoving.write();
+            space.release();
+        }
         self.base.release(tls, full_heap)
-    }
-
-    pub fn get_immortal(&self) -> &ImmortalSpace<VM> {
-        &self.immortal
-    }
-
-    pub fn get_los(&self) -> &LargeObjectSpace<VM> {
-        &self.los
-    }
-
-    pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
-        &self.nonmoving
     }
 }
 
@@ -656,7 +672,7 @@ pub trait HasSpaces {
     ///
     /// If `Self` contains nested fields that contain more spaces, this method shall visit spaces
     /// in the outer struct first.
-    fn for_each_space_mut(&mut self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
+    fn for_each_space_mut(&self, func: &mut dyn FnMut(&mut dyn Space<Self::VM>));
 }
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.

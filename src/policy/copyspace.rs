@@ -301,6 +301,8 @@ use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::VMWorkerThread;
 
+use crate::util::rust_util::flex_mut::ArcFlexMut;
+
 /// Copy allocator for CopySpace
 pub struct CopySpaceCopyContext<VM: VMBinding> {
     copy_allocator: BumpAllocator<VM>,
@@ -328,17 +330,16 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub(crate) fn new(
         tls: VMWorkerThread,
         context: Arc<AllocatorContext<VM>>,
-        tospace: &'static CopySpace<VM>,
+        tospace: ArcFlexMut<CopySpace<VM>>,
     ) -> Self {
         CopySpaceCopyContext {
-            copy_allocator: BumpAllocator::new(tls.0, tospace, context),
+            copy_allocator: BumpAllocator::new(tls.0, tospace.into_dyn_space(), context),
         }
     }
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
-    pub fn rebind(&mut self, space: &CopySpace<VM>) {
-        self.copy_allocator
-            .rebind(unsafe { &*{ space as *const _ } });
+    pub fn rebind(&mut self, space: ArcFlexMut<CopySpace<VM>>) {
+        self.copy_allocator.rebind(space.into_dyn_space());
     }
 }
