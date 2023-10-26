@@ -200,7 +200,7 @@ jobs:
           ref: mmtk
 
       - name: Override mmtk-core dependency for binding
-        run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml .
+        run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml --mmtk-core-path .
         working-directory: mmtk-core
 
       - name: Setup environment

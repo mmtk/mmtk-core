@@ -1,6 +1,7 @@
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
+use std::sync::Arc;
+
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
 use super::BumpPointer;
-use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
@@ -19,8 +20,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
     pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
-    /// [`Plan`] instance that this allocator instance is associated with.
-    plan: &'static dyn Plan<VM = VM>,
+    context: Arc<AllocatorContext<VM>>,
     /// *unused*
     hot: bool,
     /// Is this a copy allocator?
@@ -47,8 +47,8 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         self.space as _
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.plan
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.context
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -164,20 +164,20 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: Option<&'static dyn Space<VM>>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
         copy: bool,
     ) -> Self {
         ImmixAllocator {
             tls,
             space: space.unwrap().downcast_ref::<ImmixSpace<VM>>().unwrap(),
-            plan,
-            bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            context,
+            bump_pointer: BumpPointer::default(),
             hot: false,
             copy,
-            large_bump_pointer: BumpPointer::new(Address::ZERO, Address::ZERO),
+            large_bump_pointer: BumpPointer::default(),
             request_for_large: false,
             line: None,
         }
@@ -218,8 +218,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             // recyclable line.  Hence, we bring the "if we're in stress test" check up a level and
             // directly call `alloc_slow_inline()` which will properly account for the allocation
             // request as well as allocate from the newly recycled line
-            let stress_test = self.plan.base().is_stress_test_gc_enabled();
-            let precise_stress = self.plan.base().is_precise_stress();
+            let stress_test = self.context.options.is_stress_test_gc_enabled();
+            let precise_stress = *self.context.options.precise_stress;
             if unlikely(stress_test && precise_stress) {
                 self.alloc_slow_inline(size, align, offset)
             } else {

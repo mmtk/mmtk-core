@@ -1,0 +1,91 @@
+name: Auto Merge Binding PRs
+
+# Only trigger on push to master. The workflow needs to use repo secrets.
+# Triggering on master can make sure we have secrets.
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  # Figure out the PR that is merged.
+  get-merged-pr:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.get-commit-hash.outputs.commit }}
+      pr: ${{ steps.get-pr.outputs.pr }}
+    steps:
+      - id: get-commit-hash
+        run: echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - id: get-pr
+        run: |
+          PR_NUMBER=$(gh pr list --search "${GITHUB_SHA}" --state merged --repo mmtk/mmtk-core --json number --jq '.[0].number')
+          echo "pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Figure out binding PRs.
+  binding-refs:
+    uses: ./.github/workflows/pr-binding-refs.yml
+    needs: get-merged-pr
+    with:
+      pull_request: ${{ needs.get-merged-pr.outputs.pr }}
+
+  check-merge-openjdk-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+      base_repo: mmtk/mmtk-openjdk
+      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      update_lockfile: cargo build
+    secrets: inherit
+
+  check-merge-jikesrvm-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
+      base_repo: mmtk/mmtk-jikesrvm
+      ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      # `cargo generate-lockfile` will update other dependencies. We avoid using it for the bindings.
+      # But we do not have a good option for JikesRVM. The Rust project in JikesRVM needs some source files
+      # that are generated during its build process. Unless we want to do a full build for JikesRVM, we cannot
+      # use `cargo build`. So use `cargo generate-lockfile` instead.
+      update_lockfile: cargo generate-lockfile
+    secrets: inherit
+
+  check-merge-v8-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.v8_binding_repo }}
+      base_repo: mmtk/mmtk-v8
+      ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      update_lockfile: cargo build --features nogc
+    secrets: inherit
+
+  check-merge-julia-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.julia_binding_repo }}
+      base_repo: mmtk/mmtk-julia
+      ref: ${{ needs.binding-refs.outputs.julia_binding_ref }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      update_lockfile: cargo build --features immix
+    secrets: inherit
+
+  check-merge-ruby-pr:
+    uses: ./.github/workflows/auto-merge-inner.yml
+    needs: [get-merged-pr, binding-refs]
+    with:
+      repo: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
+      base_repo: mmtk/mmtk-ruby
+      ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
+      core_commit: ${{ needs.get-merged-pr.outputs.commit }}
+      update_lockfile: cargo build
+    secrets: inherit

@@ -1,8 +1,9 @@
+use std::sync::Arc;
+
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
 
-use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::opaque_pointer::*;
@@ -20,12 +21,14 @@ pub struct BumpAllocator<VM: VMBinding> {
     pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static dyn Space<VM>,
-    /// [`Plan`] instance that this allocator instance is associated with.
-    plan: &'static dyn Plan<VM = VM>,
+    pub(in crate::util::alloc) context: Arc<AllocatorContext<VM>>,
 }
 
 /// A common fast-path bump-pointer allocator shared across different allocator implementations
 /// that use bump-pointer allocation.
+/// A `BumpPointer` is always initialized with cursor = 0, limit = 0, so the first allocation
+/// always fails the check of `cursor + size < limit` and goes to the slowpath. A binding
+/// can also take advantage of this design to zero-initialize the a bump pointer.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BumpPointer {
@@ -34,13 +37,6 @@ pub struct BumpPointer {
 }
 
 impl BumpPointer {
-    pub const fn new(start: Address, end: Address) -> Self {
-        BumpPointer {
-            cursor: start,
-            limit: end,
-        }
-    }
-
     pub fn reset(&mut self, start: Address, end: Address) {
         self.cursor = start;
         self.limit = end;
@@ -48,10 +44,10 @@ impl BumpPointer {
 }
 
 impl std::default::Default for BumpPointer {
+    /// Defaults to 0,0. In this case, the first
+    /// allocation would naturally fail the check
+    /// `cursor + size < limit`, and go to the slowpath.    
     fn default() -> Self {
-        // Defaults to 0,0. In this case, the first
-        // allocation would naturally fail the check
-        // `cursor + size < limit`, and go to the slowpath.
         BumpPointer {
             cursor: Address::ZERO,
             limit: Address::ZERO,
@@ -78,13 +74,15 @@ impl<VM: VMBinding> BumpAllocator<VM> {
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::alloc::fill_alignment_gap;
 
+use super::allocator::AllocatorContext;
+
 impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     fn get_space(&self) -> &'static dyn Space<VM> {
         self.space
     }
 
-    fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
-        self.plan
+    fn get_context(&self) -> &AllocatorContext<VM> {
+        &self.context
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -171,16 +169,16 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
-    pub fn new(
+    pub(crate) fn new(
         tls: VMThread,
         space: &'static dyn Space<VM>,
-        plan: &'static dyn Plan<VM = VM>,
+        context: Arc<AllocatorContext<VM>>,
     ) -> Self {
         BumpAllocator {
             tls,
-            bump_pointer: unsafe { BumpPointer::new(Address::zero(), Address::zero()) },
+            bump_pointer: BumpPointer::default(),
             space,
-            plan,
+            context,
         }
     }
 

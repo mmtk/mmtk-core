@@ -27,7 +27,7 @@ pub fn malloc(size: usize) -> Address {
 pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
     let res = malloc(size);
     if !res.is_zero() {
-        mmtk.get_plan().base().increase_malloc_bytes_by(size);
+        mmtk.state.increase_malloc_bytes_by(size);
     }
     res
 }
@@ -40,7 +40,7 @@ pub fn calloc(num: usize, size: usize) -> Address {
 pub fn counted_calloc<VM: VMBinding>(mmtk: &MMTK<VM>, num: usize, size: usize) -> Address {
     let res = calloc(num, size);
     if !res.is_zero() {
-        mmtk.get_plan().base().increase_malloc_bytes_by(num * size);
+        mmtk.state.increase_malloc_bytes_by(num * size);
     }
     res
 }
@@ -59,10 +59,10 @@ pub fn realloc_with_old_size<VM: VMBinding>(
     let res = realloc(addr, size);
 
     if !addr.is_zero() {
-        mmtk.get_plan().base().decrease_malloc_bytes_by(old_size);
+        mmtk.state.decrease_malloc_bytes_by(old_size);
     }
     if size != 0 && !res.is_zero() {
-        mmtk.get_plan().base().increase_malloc_bytes_by(size);
+        mmtk.state.increase_malloc_bytes_by(size);
     }
 
     res
@@ -76,6 +76,6 @@ pub fn free(addr: Address) {
 pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
     free(addr);
     if !addr.is_zero() {
-        mmtk.get_plan().base().decrease_malloc_bytes_by(old_size);
+        mmtk.state.decrease_malloc_bytes_by(old_size);
     }
 }

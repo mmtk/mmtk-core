@@ -53,6 +53,8 @@ pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 
+mod global_state;
+
 mod policy;
 
 pub mod build_info;
