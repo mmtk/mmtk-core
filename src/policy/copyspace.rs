@@ -144,7 +144,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
 impl<VM: VMBinding> CopySpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>, from_space: bool) -> Self {
         let vm_map = args.vm_map;
-        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let is_discontiguous = !args.space_meta.contiguous;
         let common = CommonSpace::new(args.into_policy_args(
             true,
             false,

@@ -200,7 +200,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> MarkSweepSpace<VM> {
         let scheduler = args.scheduler.clone();
         let vm_map = args.vm_map;
-        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let is_discontiguous = !args.space_meta.contiguous;
         let local_specs = {
             metadata::extract_side_metadata(&vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),

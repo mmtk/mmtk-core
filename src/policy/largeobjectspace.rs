@@ -143,7 +143,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         protect_memory_on_release: bool,
     ) -> Self {
-        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let is_discontiguous = !args.space_meta.contiguous;
         let vm_map = args.vm_map;
         let common = CommonSpace::new(args.into_policy_args(
             false,

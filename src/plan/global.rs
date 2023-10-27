@@ -14,9 +14,9 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::heap_meta::{SpaceMeta, HeapMeta};
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
@@ -366,16 +366,15 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
         &mut self,
         name: &'static str,
         zeroed: bool,
-        vmrequest: VMRequest,
+        space_meta: SpaceMeta,
     ) -> PlanCreateSpaceArgs<VM> {
         PlanCreateSpaceArgs {
             name,
             zeroed,
-            vmrequest,
+            space_meta,
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
             mmapper: self.global_args.mmapper,
-            heap: self.global_args.heap,
             constraints: self.constraints,
             gc_trigger: self.global_args.gc_trigger.clone(),
             scheduler: self.global_args.scheduler.clone(),
