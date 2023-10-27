@@ -26,6 +26,9 @@ pub struct BumpAllocator<VM: VMBinding> {
 
 /// A common fast-path bump-pointer allocator shared across different allocator implementations
 /// that use bump-pointer allocation.
+/// A `BumpPointer` is always initialized with cursor = 0, limit = 0, so the first allocation
+/// always fails the check of `cursor + size < limit` and goes to the slowpath. A binding
+/// can also take advantage of this design to zero-initialize the a bump pointer.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BumpPointer {
@@ -34,13 +37,6 @@ pub struct BumpPointer {
 }
 
 impl BumpPointer {
-    pub const fn new(start: Address, end: Address) -> Self {
-        BumpPointer {
-            cursor: start,
-            limit: end,
-        }
-    }
-
     pub fn reset(&mut self, start: Address, end: Address) {
         self.cursor = start;
         self.limit = end;
@@ -48,10 +44,10 @@ impl BumpPointer {
 }
 
 impl std::default::Default for BumpPointer {
+    /// Defaults to 0,0. In this case, the first
+    /// allocation would naturally fail the check
+    /// `cursor + size < limit`, and go to the slowpath.    
     fn default() -> Self {
-        // Defaults to 0,0. In this case, the first
-        // allocation would naturally fail the check
-        // `cursor + size < limit`, and go to the slowpath.
         BumpPointer {
             cursor: Address::ZERO,
             limit: Address::ZERO,
@@ -180,7 +176,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
     ) -> Self {
         BumpAllocator {
             tls,
-            bump_pointer: unsafe { BumpPointer::new(Address::zero(), Address::zero()) },
+            bump_pointer: BumpPointer::default(),
             space,
             context,
         }
