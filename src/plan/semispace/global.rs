@@ -137,13 +137,11 @@ impl<VM: VMBinding> SemiSpace<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let heap_meta = args.heap;
-
-        let copyspace0_spec = heap_meta.specify_space(SpaceSpec::DontCare);
-        let copyspace1_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let copyspace0_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let copyspace1_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
-        let common = CommonPlan::new(plan_args);
+        let common = CommonPlan::new(&mut plan_args);
 
         let res = SemiSpace {
             hi: AtomicBool::new(false),
@@ -152,7 +150,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 false,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args("copyspace1", true, copyspace0_spec.unwrap()),
+                plan_args.get_space_args("copyspace1", true, copyspace1_spec.unwrap()),
                 true,
             ),
             common,

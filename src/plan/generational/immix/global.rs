@@ -232,9 +232,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
-        let heap_meta = args.heap;
-
-        let immix_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let immix_space_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
         let gen = CommonGenPlan::new(&mut plan_args);

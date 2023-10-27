@@ -140,12 +140,10 @@ impl<VM: VMBinding> Immix<VM> {
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        let heap_meta = plan_args.global_args.heap;
-
-        let immix_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let immix_space_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
-        let common = CommonPlan::new(plan_args);
+        let common = CommonPlan::new(&mut plan_args);
 
         let immix = Immix {
             immix_space: ImmixSpace::new(

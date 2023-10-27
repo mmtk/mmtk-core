@@ -465,7 +465,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(args: PolicyCreateSpaceArgs<VM>) -> Self {
         let space_meta = args.plan_args.space_meta;
         let SpaceMeta {
-            space_id,
+            space_id: _space_id, // TODO: Let SpaceDescriptor use this space_id
             start,
             extent,
             contiguous,
@@ -473,7 +473,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
 
         let descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
 
-        let mut rtn = CommonSpace {
+        let rtn = CommonSpace {
             name: args.plan_args.name,
             descriptor,
             space_meta,

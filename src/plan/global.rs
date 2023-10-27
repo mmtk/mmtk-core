@@ -385,19 +385,17 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
 
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
-    pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
-        let heap_meta = args.global_args.heap;
-
+    pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
         #[cfg(feature = "code_space")]
-        let code_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let code_space_spec = args.global_args.heap.specify_space(SpaceSpec::DontCare);
         #[cfg(feature = "code_space")]
-        let code_lo_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let code_lo_space_spec = args.global_args.heap.specify_space(SpaceSpec::DontCare);
         #[cfg(feature = "ro_space")]
-        let ro_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let ro_space_spec = args.global_args.heap.specify_space(SpaceSpec::DontCare);
         // NOTE: We don't specify VM space because it doesn't use SpaceMeta anyway.
 
         // BasePlan does not have any nested structs with spaces.  We now place spaces.
-        heap_meta.place_spaces();
+        args.global_args.heap.place_spaces();
 
         BasePlan {
             #[cfg(feature = "code_space")]
@@ -426,8 +424,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             )),
 
             global_state: args.global_args.state.clone(),
-            gc_trigger: args.global_args.gc_trigger,
-            options: args.global_args.options,
+            gc_trigger: args.global_args.gc_trigger.clone(),
+            options: args.global_args.options.clone(),
         }
     }
 
@@ -561,12 +559,10 @@ pub struct CommonPlan<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> CommonPlan<VM> {
-    pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
-        let heap_meta = args.global_args.heap;
-
-        let immortal_spec = heap_meta.specify_space(SpaceSpec::DontCare);
-        let los_spec = heap_meta.specify_space(SpaceSpec::DontCare);
-        let nonmoving_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+    pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
+        let immortal_spec = args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let los_spec = args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let nonmoving_spec = args.global_args.heap.specify_space(SpaceSpec::DontCare);
 
         let base = BasePlan::new(args);
 
@@ -582,7 +578,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 true,
                 nonmoving_spec.unwrap(),
             )),
-            base: BasePlan::new(args),
+            base,
         }
     }
 

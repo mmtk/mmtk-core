@@ -200,10 +200,8 @@ impl<VM: VMBinding> GenCopy<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
-        let heap_meta = plan_args.global_args.heap;
-
-        let copyspace0_spec = heap_meta.specify_space(SpaceSpec::DontCare);
-        let copyspace1_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let copyspace0_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let copyspace1_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
         let gen = CommonGenPlan::new(&mut plan_args);

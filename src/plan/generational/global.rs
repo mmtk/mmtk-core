@@ -38,9 +38,7 @@ pub struct CommonGenPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> Self {
-        let heap_meta = args.global_args.heap;
-
-        let nursery_spec = heap_meta.specify_space(SpaceSpec::Extent {
+        let nursery_spec = args.global_args.heap.specify_space(SpaceSpec::Extent {
             extent: args.global_args.options.get_max_nursery_bytes(),
             top: false,
         });
