@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::util::constants::LOG_BYTES_IN_MBYTE;
+use crate::util::conversions::raw_align_up;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::vm_layout::BYTES_IN_CHUNK;
 use crate::util::Address;
@@ -68,7 +70,7 @@ pub struct SpaceMeta {
     pub space_id: usize,
     pub start: Address,
     pub extent: usize,
-    pub is_contiguous: bool,
+    pub contiguous: bool,
 }
 
 /// A space meta that will be provided in the future.
@@ -135,7 +137,7 @@ impl HeapMeta {
                     space_id: i,
                     start,
                     extent,
-                    is_contiguous: true,
+                    contiguous: true,
                 };
 
                 entry.promise_meta.provide(meta);
@@ -148,8 +150,24 @@ impl HeapMeta {
                         let start = reserver.reserve(extent, top);
                         (start, extent)
                     }
-                    SpaceSpec::Fraction { .. } => {
-                        todo!("Currently none of our plans require spaces of a fraction of the address space.")
+                    SpaceSpec::Fraction { frac, top } => {
+                        // Taken from `crate::policy::space::get_frac_available`, but we currently
+                        // don't have any plans that actually uses it.
+                        let extent = {
+                            trace!("AVAILABLE_START={}", self.heap_start);
+                            trace!("AVAILABLE_END={}", self.heap_limit);
+                            let available_bytes = self.heap_limit - self.heap_start;
+                            let bytes = (frac * available_bytes as f32) as usize;
+                            trace!("bytes={}*{}={}", frac, vm_layout().available_bytes(), bytes);
+                            let mb = bytes >> LOG_BYTES_IN_MBYTE;
+                            let rtn = mb << LOG_BYTES_IN_MBYTE;
+                            trace!("rtn={}", rtn);
+                            let aligned_rtn = raw_align_up(rtn, BYTES_IN_CHUNK);
+                            trace!("aligned_rtn={}", aligned_rtn);
+                            aligned_rtn
+                        };
+                        let start = reserver.reserve(extent, top);
+                        (start, extent)
                     }
                 };
 
@@ -157,7 +175,7 @@ impl HeapMeta {
                     space_id: i,
                     start,
                     extent,
-                    is_contiguous: true,
+                    contiguous: true,
                 };
 
                 entry.promise_meta.provide(meta);
@@ -174,7 +192,7 @@ impl HeapMeta {
                     space_id: i,
                     start: discontig_start,
                     extent: discontig_extent,
-                    is_contiguous: false,
+                    contiguous: false,
                 };
 
                 entry.promise_meta.provide(meta);

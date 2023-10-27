@@ -2,18 +2,19 @@ use crate::global_state::GlobalState;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
+use crate::util::heap::heap_meta::SpaceMeta;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use crate::util::heap::layout::vm_layout::{vm_layout, LOG_BYTES_IN_CHUNK};
-use crate::util::heap::{PageResource, VMRequest};
+use crate::util::heap::layout::vm_layout::LOG_BYTES_IN_CHUNK;
+use crate::util::heap::PageResource;
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
-use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
@@ -27,7 +28,6 @@ use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::heap::HeapMeta;
 use crate::util::memory;
 use crate::vm::VMBinding;
 
@@ -370,40 +370,15 @@ pub(crate) fn print_vm_map<VM: VMBinding>(
         write!(out, "N")?;
     }
     write!(out, " ")?;
-    if common.contiguous {
-        write!(
-            out,
-            "{}->{}",
-            common.start,
-            common.start + common.extent - 1
-        )?;
-        match common.vmrequest {
-            VMRequest::Extent { extent, .. } => {
-                write!(out, " E {}", extent)?;
-            }
-            VMRequest::Fraction { frac, .. } => {
-                write!(out, " F {}", frac)?;
-            }
-            _ => {}
-        }
-    } else {
-        let mut a = space
-            .get_page_resource()
-            .common()
-            .get_head_discontiguous_region();
-        while !a.is_zero() {
-            write!(
-                out,
-                "{}->{}",
-                a,
-                a + space.common().vm_map().get_contiguous_region_size(a) - 1
-            )?;
-            a = space.common().vm_map().get_next_contiguous_region(a);
-            if !a.is_zero() {
-                write!(out, " ")?;
-            }
-        }
-    }
+    let SpaceMeta {
+        space_id,
+        start,
+        extent,
+        contiguous: is_contiguous,
+    } = common.space_meta;
+    write!(out, "{}->{}", start, start + extent - 1)?;
+    write!(out, " E {}", extent)?;
+
     writeln!(out)?;
 
     Ok(())
@@ -414,7 +389,7 @@ impl_downcast!(Space<VM> where VM: VMBinding);
 pub struct CommonSpace<VM: VMBinding> {
     pub name: &'static str,
     pub descriptor: SpaceDescriptor,
-    pub vmrequest: VMRequest,
+    pub space_meta: SpaceMeta,
 
     /// For a copying space that allows sft_trace_object(), this should be set before each GC so we know
     // the copy semantics for the space.
@@ -458,11 +433,10 @@ pub struct PolicyCreateSpaceArgs<'a, VM: VMBinding> {
 pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub name: &'static str,
     pub zeroed: bool,
-    pub vmrequest: VMRequest,
+    pub space_meta: SpaceMeta,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
-    pub heap: &'a mut HeapMeta,
     pub constraints: &'a PlanConstraints,
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub scheduler: Arc<GCWorkScheduler<VM>>,
@@ -489,17 +463,27 @@ impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(args: PolicyCreateSpaceArgs<VM>) -> Self {
+        let space_meta = args.plan_args.space_meta;
+        let SpaceMeta {
+            space_id,
+            start,
+            extent,
+            contiguous,
+        } = space_meta;
+
+        let descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
+
         let mut rtn = CommonSpace {
             name: args.plan_args.name,
-            descriptor: SpaceDescriptor::UNINITIALIZED,
-            vmrequest: args.plan_args.vmrequest,
+            descriptor,
+            space_meta,
             copy: None,
             immortal: args.immortal,
             movable: args.movable,
-            contiguous: true,
+            contiguous,
             zeroed: args.plan_args.zeroed,
-            start: unsafe { Address::zero() },
-            extent: 0,
+            start,
+            extent,
             vm_map: args.plan_args.vm_map,
             mmapper: args.plan_args.mmapper,
             needs_log_bit: args.plan_args.constraints.needs_log_bit,
@@ -512,56 +496,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
             global_state: args.plan_args.global_state,
             p: PhantomData,
         };
-
-        let vmrequest = args.plan_args.vmrequest;
-        if vmrequest.is_discontiguous() {
-            rtn.contiguous = false;
-            // FIXME
-            rtn.descriptor = SpaceDescriptor::create_descriptor();
-            // VM.memory.setHeapRange(index, HEAP_START, HEAP_END);
-            return rtn;
-        }
-
-        let (extent, top) = match vmrequest {
-            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), _top),
-            VMRequest::Extent {
-                extent: _extent,
-                top: _top,
-            } => (_extent, _top),
-            VMRequest::Fixed {
-                extent: _extent, ..
-            } => (_extent, false),
-            _ => unreachable!(),
-        };
-
-        assert!(
-            extent == raw_align_up(extent, BYTES_IN_CHUNK),
-            "{} requested non-aligned extent: {} bytes",
-            rtn.name,
-            extent
-        );
-
-        let start = if let VMRequest::Fixed { start: _start, .. } = vmrequest {
-            _start
-        } else {
-            // FIXME
-            //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            //args.plan_args.heap.reserve(extent, top)
-            todo!()
-        };
-        assert!(
-            start == chunk_align_up(start),
-            "{} starting on non-aligned boundary: {}",
-            rtn.name,
-            start
-        );
-
-        rtn.contiguous = true;
-        rtn.start = start;
-        rtn.extent = extent;
-        // FIXME
-        rtn.descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
-        // VM.memory.setHeapRange(index, start, start.plus(extent));
 
         // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
         // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
@@ -619,19 +553,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
     pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
     }
-}
-
-fn get_frac_available(frac: f32) -> usize {
-    trace!("AVAILABLE_START={}", vm_layout().available_start());
-    trace!("AVAILABLE_END={}", vm_layout().available_end());
-    let bytes = (frac * vm_layout().available_bytes() as f32) as usize;
-    trace!("bytes={}*{}={}", frac, vm_layout().available_bytes(), bytes);
-    let mb = bytes >> LOG_BYTES_IN_MBYTE;
-    let rtn = mb << LOG_BYTES_IN_MBYTE;
-    trace!("rtn={}", rtn);
-    let aligned_rtn = raw_align_up(rtn, BYTES_IN_CHUNK);
-    trace!("aligned_rtn={}", aligned_rtn);
-    aligned_rtn
 }
 
 pub fn required_chunks(pages: usize) -> usize {
