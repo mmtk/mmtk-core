@@ -73,6 +73,18 @@ pub struct SpaceMeta {
     pub contiguous: bool,
 }
 
+impl SpaceMeta {
+    /// Create a dummy SpaceMeta for VMSpace.
+    pub(crate) fn dummy() -> Self {
+        Self {
+            space_id: usize::MAX,
+            start: Address::ZERO,
+            extent: 0,
+            contiguous: false,
+        }
+    }
+}
+
 /// A space meta that will be provided in the future.
 #[derive(Clone)]
 pub struct FutureSpaceMeta {

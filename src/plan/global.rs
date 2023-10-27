@@ -14,10 +14,9 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::heap_meta::{SpaceMeta, HeapMeta};
+use crate::util::heap::heap_meta::{HeapMeta, SpaceMeta, SpaceSpec};
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
-use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
@@ -387,30 +386,43 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
+        let heap_meta = args.global_args.heap;
+
+        #[cfg(feature = "code_space")]
+        let code_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        #[cfg(feature = "code_space")]
+        let code_lo_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        #[cfg(feature = "ro_space")]
+        let ro_space_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        // NOTE: We don't specify VM space because it doesn't use SpaceMeta anyway.
+
+        // BasePlan does not have any nested structs with spaces.  We now place spaces.
+        heap_meta.place_spaces();
+
         BasePlan {
             #[cfg(feature = "code_space")]
             code_space: ImmortalSpace::new(args.get_space_args(
                 "code_space",
                 true,
-                VMRequest::discontiguous(),
+                code_space_spec.unwrap(),
             )),
             #[cfg(feature = "code_space")]
             code_lo_space: ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
                 true,
-                VMRequest::discontiguous(),
+                code_space_spec.unwrap(),
             )),
             #[cfg(feature = "ro_space")]
             ro_space: ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
-                VMRequest::discontiguous(),
+                code_space_spec.unwrap(),
             )),
             #[cfg(feature = "vm_space")]
             vm_space: VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
-                VMRequest::discontiguous(),
+                SpaceMeta::dummy(),
             )),
 
             global_state: args.global_args.state.clone(),
@@ -550,20 +562,25 @@ pub struct CommonPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
+        let heap_meta = args.global_args.heap;
+
+        let immortal_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let los_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+        let nonmoving_spec = heap_meta.specify_space(SpaceSpec::DontCare);
+
+        let base = BasePlan::new(args);
+
         CommonPlan {
             immortal: ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
-                VMRequest::discontiguous(),
+                immortal_spec.unwrap(),
             )),
-            los: LargeObjectSpace::new(
-                args.get_space_args("los", true, VMRequest::discontiguous()),
-                false,
-            ),
+            los: LargeObjectSpace::new(args.get_space_args("los", true, los_spec.unwrap()), false),
             nonmoving: ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
-                VMRequest::discontiguous(),
+                nonmoving_spec.unwrap(),
             )),
             base: BasePlan::new(args),
         }
