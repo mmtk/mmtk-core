@@ -2,13 +2,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::util::heap::layout::vm_layout::vm_layout;
+use crate::util::heap::vm_layout::BYTES_IN_CHUNK;
 use crate::util::Address;
 
 /// This struct is used to determine the placement of each space during the creation of a Plan.
 ///
 /// TODO: This type needs a better name.
 pub struct HeapMeta {
-    pub heap_cursor: Address,
+    pub heap_start: Address,
     pub heap_limit: Address,
     entries: Vec<SpaceEntry>,
 }
@@ -48,8 +49,23 @@ pub enum SpaceSpec {
     },
 }
 
+impl SpaceSpec {
+    fn dont_care(&self) -> bool {
+        matches!(self, SpaceSpec::DontCare)
+    }
+
+    fn top(&self) -> bool {
+        match *self {
+            SpaceSpec::DontCare => false,
+            SpaceSpec::Extent { top, .. } => top,
+            SpaceSpec::Fraction { top, .. } => top,
+        }
+    }
+}
+
 /// This struct represents the placement decision of a space.
 pub struct SpaceMeta {
+    pub space_id: usize,
     pub start: Address,
     pub extent: usize,
     pub is_contiguous: bool,
@@ -87,7 +103,7 @@ impl PromiseSpaceMeta {
 impl HeapMeta {
     pub fn new() -> Self {
         HeapMeta {
-            heap_cursor: vm_layout().heap_start,
+            heap_start: vm_layout().heap_start,
             heap_limit: vm_layout().heap_end,
             entries: Vec::default(),
         }
@@ -103,33 +119,67 @@ impl HeapMeta {
         future_meta
     }
 
-    pub fn reserve(&mut self, extent: usize, top: bool) -> Address {
-        let ret = if top {
-            self.heap_limit -= extent;
-            self.heap_limit
+    pub fn place_spaces(&mut self) {
+        let force_use_contiguous_spaces = vm_layout().force_use_contiguous_spaces;
+
+        let mut reserver = AddressRangeReserver::new(self.heap_start, self.heap_limit);
+
+        if force_use_contiguous_spaces {
+            let extent = vm_layout().max_space_extent();
+
+            for (i, entry) in self.entries.iter_mut().enumerate() {
+                let top = entry.spec.top();
+                let start = reserver.reserve(extent, top);
+
+                let meta = SpaceMeta {
+                    space_id: i,
+                    start,
+                    extent,
+                    is_contiguous: true,
+                };
+
+                entry.promise_meta.provide(meta);
+            }
         } else {
-            let start = self.heap_cursor;
-            self.heap_cursor += extent;
-            start
-        };
+            for (i, entry) in self.entries.iter_mut().enumerate() {
+                let (start, extent) = match entry.spec {
+                    SpaceSpec::DontCare => continue,
+                    SpaceSpec::Extent { extent, top } => {
+                        let start = reserver.reserve(extent, top);
+                        (start, extent)
+                    }
+                    SpaceSpec::Fraction { .. } => {
+                        todo!("Currently none of our plans require spaces of a fraction of the address space.")
+                    }
+                };
 
-        assert!(
-            self.heap_cursor <= self.heap_limit,
-            "Out of virtual address space at {} ({} > {})",
-            self.heap_cursor - extent,
-            self.heap_cursor,
-            self.heap_limit
-        );
+                let meta = SpaceMeta {
+                    space_id: i,
+                    start,
+                    extent,
+                    is_contiguous: true,
+                };
 
-        ret
-    }
+                entry.promise_meta.provide(meta);
+            }
 
-    pub fn get_discontig_start(&self) -> Address {
-        self.heap_cursor
-    }
+            let (discontig_start, discontig_end) = reserver.remaining_range();
+            let discontig_extent = discontig_end - discontig_start;
+            for (i, entry) in self.entries.iter_mut().enumerate() {
+                if !entry.spec.dont_care() {
+                    continue;
+                }
 
-    pub fn get_discontig_end(&self) -> Address {
-        self.heap_limit - 1
+                let meta = SpaceMeta {
+                    space_id: i,
+                    start: discontig_start,
+                    extent: discontig_extent,
+                    is_contiguous: false,
+                };
+
+                entry.promise_meta.provide(meta);
+            }
+        }
     }
 }
 
@@ -137,5 +187,48 @@ impl HeapMeta {
 impl Default for HeapMeta {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// A helper struct for reserving spaces from both ends of an address region.
+struct AddressRangeReserver {
+    pub lower_bound: Address,
+    pub upper_bound: Address,
+}
+
+impl AddressRangeReserver {
+    pub fn new(lower_bound: Address, upper_bound: Address) -> Self {
+        assert!(lower_bound.is_aligned_to(BYTES_IN_CHUNK));
+        assert!(upper_bound.is_aligned_to(BYTES_IN_CHUNK));
+
+        Self {
+            lower_bound,
+            upper_bound,
+        }
+    }
+
+    pub fn reserve(&mut self, extent: usize, top: bool) -> Address {
+        let ret = if top {
+            self.upper_bound -= extent;
+            self.upper_bound
+        } else {
+            let start = self.lower_bound;
+            self.lower_bound += extent;
+            start
+        };
+
+        assert!(
+            self.lower_bound <= self.upper_bound,
+            "Out of virtual address space at {} ({} > {})",
+            self.lower_bound - extent,
+            self.lower_bound,
+            self.upper_bound
+        );
+
+        ret
+    }
+
+    pub fn remaining_range(&self) -> (Address, Address) {
+        (self.lower_bound, self.upper_bound)
     }
 }

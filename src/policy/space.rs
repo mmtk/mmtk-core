@@ -546,7 +546,8 @@ impl<VM: VMBinding> CommonSpace<VM> {
         } else {
             // FIXME
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            args.plan_args.heap.reserve(extent, top)
+            //args.plan_args.heap.reserve(extent, top)
+            todo!()
         };
         assert!(
             start == chunk_align_up(start),

@@ -189,7 +189,7 @@ impl<VM: VMBinding> MMTK<VM> {
         // TODO: This probably does not work if we have multiple MMTk instances.
         VM_MAP.boot();
         // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
+        //VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
