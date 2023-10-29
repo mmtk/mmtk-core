@@ -40,7 +40,7 @@ mimalloc-sys = { version = "0.1.6", optional = true }
 mmtk-macros = { version = "0.20.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
-pfm = { git = "https://github.com/caizixian/pfm", rev = "822f89e53daf66f140445b47c1e7b349e1f6266a", optional = true }
+pfm = { version = "0.1.1", optional = true }
 portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
