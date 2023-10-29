@@ -245,6 +245,11 @@
 <a href="#245" id="245">245</a>
 <a href="#246" id="246">246</a>
 <a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Statistics for work packets
 </span><span class="kw">use </span><span class="kw">super</span>::work_counter::{WorkCounter, WorkCounterBase, WorkDuration};
 <span class="attr">#[cfg(feature = <span class="string">&quot;perf_counter&quot;</span>)]
@@ -487,7 +492,12 @@
         <span class="kw">let </span><span class="kw-2">mut </span>counters: Vec&lt;Box&lt;<span class="kw">dyn </span>WorkCounter&gt;&gt; = <span class="macro">vec!</span>[Box::new(WorkDuration::new())];
         <span class="attr">#[cfg(feature = <span class="string">&quot;perf_counter&quot;</span>)]
         </span><span class="kw">for </span>e <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.options.work_perf_events.events {
-            counters.push(Box::new(WorkPerfEvent::new(<span class="kw-2">&amp;</span>e.<span class="number">0</span>, e.<span class="number">1</span>, e.<span class="number">2</span>)));
+            counters.push(Box::new(WorkPerfEvent::new(
+                <span class="kw-2">&amp;</span>e.<span class="number">0</span>,
+                e.<span class="number">1</span>,
+                e.<span class="number">2</span>,
+                <span class="kw-2">*</span>mmtk.options.perf_exclude_kernel,
+            )));
         }
         counters
     }

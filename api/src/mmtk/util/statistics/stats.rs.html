@@ -360,7 +360,7 @@
                 shared.clone(),
                 <span class="bool-val">true</span>,
                 <span class="bool-val">false</span>,
-                PerfEventDiffable::new(<span class="kw-2">&amp;</span>e.<span class="number">0</span>),
+                PerfEventDiffable::new(<span class="kw-2">&amp;</span>e.<span class="number">0</span>, <span class="kw-2">*</span>options.perf_exclude_kernel),
             ))));
         }
         Stats {

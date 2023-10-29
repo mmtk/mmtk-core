@@ -1162,6 +1162,9 @@
 <a href="#1162" id="1162">1162</a>
 <a href="#1163" id="1163">1163</a>
 <a href="#1164" id="1164">1164</a>
+<a href="#1165" id="1165">1165</a>
+<a href="#1166" id="1166">1166</a>
+<a href="#1167" id="1167">1167</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -1897,6 +1900,9 @@
     <span class="comment">// Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; are enabled. The current macro does not allow us to do this.
     </span>phase_perf_events:      PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">&quot;perf_counter&quot;</span>)] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
+    <span class="comment">// Should we exclude perf events occurring in kernel space. By default we include the kernel.
+    // Only set this option if you know the implications of excluding the kernel!
+    </span>perf_exclude_kernel:    bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">&quot;perf_counter&quot;</span>)] = <span class="bool-val">false</span>,
     <span class="comment">// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
     // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
     // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
@@ -1913,7 +1919,7 @@
     </span>thread_affinity:        AffinityKind         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>AffinityKind| v.validate()] = AffinityKind::OsDefault,
     <span class="comment">// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     // Default to a fixed heap size of 0.5x physical memory.
-    </span>gc_trigger     :        GCTriggerSelector    [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
+    </span>gc_trigger:             GCTriggerSelector    [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
     <span class="comment">// Enable transparent hugepage support via madvise (only Linux is supported)
     </span>transparent_hugepages: bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">&quot;linux&quot;</span>)] = <span class="bool-val">false
 </span>}
