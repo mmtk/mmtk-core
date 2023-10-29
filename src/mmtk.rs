@@ -272,6 +272,24 @@ impl<VM: VMBinding> MMTK<VM> {
         *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
+    /// Return true if the current GC is an emergency GC.
+    ///
+    /// An emergency GC happens when a normal GC cannot reclaim enough memory to satisfy allocation
+    /// requests.  Plans may do full-heap GC, defragmentation, etc. during emergency in order to
+    /// free up more memory.
+    ///
+    /// VM bindings can call this function during GC to check if the current GC is an emergency GC.
+    /// If it is, the VM binding is recommended to retain fewer objects than normal GCs, to the
+    /// extent allowed by the specification of the VM or langauge.  For example, the VM binding may
+    /// choose not to retain objects used for caching.  Specifically, for Java virtual machines,
+    /// that means not retaining referents of [`SoftReference`][java-soft-ref] which is primarily
+    /// designed for implementing memory-sensitive caches.
+    ///
+    /// [java-soft-ref]: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html
+    pub fn is_emergency_collection(&self) -> bool {
+        self.state.is_emergency_collection()
+    }
+
     /// The application code has requested a collection. This is just a GC hint, and
     /// we may ignore it.
     ///

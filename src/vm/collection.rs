@@ -12,14 +12,13 @@ pub enum GCThreadContext<VM: VMBinding> {
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
     /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
-    /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
     /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
     /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
     ///
     /// Arguments:
-    /// * `tls`: The thread pointer for the GC controller/coordinator.
+    /// * `tls`: The thread pointer for the GC worker.
     /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
     fn stop_all_mutators<F>(tls: VMWorkerThread, mutator_visitor: F)
     where
@@ -27,8 +26,11 @@ pub trait Collection<VM: VMBinding> {
 
     /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
     ///
+    /// This method may not be called by the same GC thread that called `stop_all_mutators`.
+    ///
     /// Arguments:
-    /// * `tls`: The thread pointer for the GC controller/coordinator.
+    /// * `tls`: The thread pointer for the GC worker.  Currently it is the tls of the embedded `GCWorker` instance
+    /// of the coordinator thread, but it is subject to change, and should not be depended on.
     fn resume_mutators(tls: VMWorkerThread);
 
     /// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC
