@@ -2,8 +2,8 @@
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
-use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -12,7 +12,7 @@ use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::SpaceSpec;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -167,13 +167,35 @@ impl<VM: VMBinding> MyGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
+        // ANCHOR: specify_spaces
+        let copyspace0_meta = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
+        let copyspace1_meta = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
+        // ANCHOR_END: specify_spaces
+
+        // ANCHOR: create_common_plan
+        // Spaces will eventually be placed by `BasePlan`.
+        let common = CommonPlan::new(&mut plan_args);
+        // ANCHOR_END: create_common_plan
+
         let res = MyGC {
             hi: AtomicBool::new(false),
-            // ANCHOR: copyspace_new
-            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
-            // ANCHOR_END: copyspace_new
-            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
-            common: CommonPlan::new(plan_args),
+            // ANCHOR: copyspaces_new
+            copyspace0: CopySpace::new(
+                plan_args.get_space_args("copyspace0", true, copyspace0_meta.unwrap()),
+                false,
+            ),
+            copyspace1: CopySpace::new(
+                plan_args.get_space_args("copyspace1", true, copyspace1_meta.unwrap()),
+                true,
+            ),
+            // ANCHOR_END: copyspaces_new
+            common,
         };
 
         res.verify_side_metadata_sanity();
