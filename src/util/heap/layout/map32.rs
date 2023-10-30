@@ -194,7 +194,8 @@ impl VMMap for Map32 {
         /* establish bounds of discontiguous space */
         let start_address = from;
         let first_chunk = start_address.chunk_index();
-        let last_chunk = to.chunk_index();
+        let last_byte = to - 1;
+        let last_chunk = last_byte.chunk_index();
         let unavail_start_chunk = last_chunk + 1;
         let trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;

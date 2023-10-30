@@ -1,4 +1,30 @@
+//! This module determines the address ranges of spaces of a plan according to the specifications
+//! given by the plan.
+//!
+//! [`HeapMeta`] is the helper type for space placement, and is a prerequisite of creating plans.
+//! It is used as following.
+//!
+//! 1.  A plan declares all the spaces it wants to create using the `specify_space` method.  For
+//!     each space, it passes a [`SpaceSpec`] which specifies the requirements for each space,
+//!     including whether the space is contiguous, whether it has a fixed extent, and whether it
+//!     should be place at the low end or high end of the heap range, etc.  The `specify_space`
+//!     method returns a [`FutureSpaceMeta`] for each space which can be used later.
+//! 2.  After all spaces are specified, the plan calls the `place_spaces` method.  It determines
+//!     the locations (starts and extends) and contiguousness of all spaces according to the policy
+//!     specified by [`crate::util::heap::layout::vm_layout::vm_layout`].
+//! 3.  Then the plan calls `unwrap()` on each [`FutureSpaceMeta`] to get a [`SpaceMeta`] which
+//!     holds the the placement decision for each space (start, extent, contiguousness, etc.).
+//!     Using such information, the space can create each concrete spaces.
+//!
+//! In summary, the plan specifies all spaces before `HeapMeta` makes placement decision, and all
+//! spaces know their locations the moment they are created.
+//!
+//! By doing so, we can avoid creating spaces first and then computing their start addresses and
+//! mutate those spaces.  JikesRVM's MMTk used to do that, but such practice is unfriendly to Rust
+//! which has strict ownership and mutability rules.
+
 use std::cell::RefCell;
+use std::ops::Range;
 use std::rc::Rc;
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
@@ -8,15 +34,17 @@ use crate::util::heap::vm_layout::BYTES_IN_CHUNK;
 use crate::util::Address;
 
 /// This struct is used to determine the placement of each space during the creation of a Plan.
+/// Read the module-level documentation for how to use.
 ///
 /// TODO: This type needs a better name.
 pub struct HeapMeta {
     heap_start: Address,
     heap_limit: Address,
-    discontiguous_range: Option<(Address, Address)>,
+    discontiguous_range: Option<Range<Address>>,
     entries: Vec<SpaceEntry>,
 }
 
+/// A space specification and a "promise" for sending `SpaceMeta` to the user (plan).
 struct SpaceEntry {
     spec: SpaceSpec,
     promise_meta: PromiseSpaceMeta,
@@ -29,8 +57,10 @@ struct SpaceEntry {
 /// the space placement strategy may give each space a contiguous 2TiB address space even if it
 /// requests a small extent.
 pub enum SpaceSpec {
-    /// There is no size or place requirement for the space.  The space may be given a very large
-    /// contiguous or discontiguous space range of address, depending on the strategy.
+    /// There is no size, location, or contiguousness requirement for the space.  In a confined
+    /// address space, the space may be given a discontiguous address range shared with other
+    /// spaces; in a generous address space, the space may be given a very large contiguous address
+    /// range solely owned by this space.
     DontCare,
     /// Require a contiguous range of address of a fixed size.
     Extent {
@@ -69,15 +99,21 @@ impl SpaceSpec {
 /// This struct represents the placement decision of a space.
 #[derive(Debug)]
 pub struct SpaceMeta {
+    /// An assigned ID of the space.  Guaranteed to be unique.
     pub space_id: usize,
+    /// The start of the address range of the space.  For discontiguous spaces, this range will be
+    /// shared with other discontiguous spaces.
     pub start: Address,
+    /// The extent of the address range of the space.
     pub extent: usize,
+    /// `true` if the space is contiguous.
     pub contiguous: bool,
 }
 
 impl SpaceMeta {
-    /// Create a dummy SpaceMeta for VMSpace.
-    pub(crate) fn dummy() -> Self {
+    /// Create a dummy `SpaceMeta for `VMSpace` because the address range of `VMSpace` is not
+    /// determined by `HeapMeta`.
+    pub(crate) fn vm_space_dummy() -> Self {
         Self {
             space_id: usize::MAX,
             start: Address::ZERO,
@@ -87,7 +123,7 @@ impl SpaceMeta {
     }
 }
 
-/// A space meta that will be provided in the future.
+/// A `SpaceMeta` that will be provided in the future.
 #[derive(Clone)]
 pub struct FutureSpaceMeta {
     inner: Rc<RefCell<Option<SpaceMeta>>>,
@@ -103,7 +139,7 @@ impl FutureSpaceMeta {
     }
 }
 
-/// The struct for HeapMeta to provide a SpaceMeta instance for its user.
+/// The struct for `HeapMeta` to provide a `SpaceMeta` instance for its user.
 struct PromiseSpaceMeta {
     inner: Rc<RefCell<Option<SpaceMeta>>>,
 }
@@ -126,6 +162,7 @@ impl HeapMeta {
         }
     }
 
+    /// Declare a space and specify the detailed requirements.
     pub fn specify_space(&mut self, spec: SpaceSpec) -> FutureSpaceMeta {
         let shared_meta = Rc::new(RefCell::new(None));
         let future_meta = FutureSpaceMeta {
@@ -136,6 +173,7 @@ impl HeapMeta {
         future_meta
     }
 
+    /// Determine the locations of all specified spaces.
     pub fn place_spaces(&mut self) {
         let force_use_contiguous_spaces = vm_layout().force_use_contiguous_spaces;
 
@@ -201,11 +239,16 @@ impl HeapMeta {
             }
 
             let discontig_range = reserver.remaining_range();
-            self.discontiguous_range = Some(discontig_range);
+            self.discontiguous_range = Some(discontig_range.clone());
+            let Range {
+                start: discontig_start,
+                end: discontig_end,
+            } = discontig_range;
 
-            let (discontig_start, discontig_end) = discontig_range;
-
-            debug!("Discontiguous range is [{}, {})", discontig_start, discontig_end);
+            debug!(
+                "Discontiguous range is [{}, {})",
+                discontig_start, discontig_end
+            );
 
             let discontig_extent = discontig_end - discontig_start;
             for (i, entry) in self.entries.iter_mut().enumerate() {
@@ -228,8 +271,9 @@ impl HeapMeta {
         debug!("Space placement finished.");
     }
 
-    pub fn get_discontiguous_range(&self) -> Option<(Address, Address)> {
-        self.discontiguous_range
+    /// Get the shared address range for discontigous spaces.
+    pub fn get_discontiguous_range(&self) -> Option<Range<Address>> {
+        self.discontiguous_range.clone()
     }
 }
 
@@ -278,7 +322,7 @@ impl AddressRangeReserver {
         ret
     }
 
-    pub fn remaining_range(&self) -> (Address, Address) {
-        (self.lower_bound, self.upper_bound)
+    pub fn remaining_range(&self) -> Range<Address> {
+        self.lower_bound..self.upper_bound
     }
 }

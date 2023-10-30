@@ -420,7 +420,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             vm_space: VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
-                SpaceMeta::dummy(),
+                SpaceMeta::vm_space_dummy(),
             )),
 
             global_state: args.global_args.state.clone(),
