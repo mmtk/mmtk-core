@@ -408,13 +408,13 @@ impl<VM: VMBinding> BasePlan<VM> {
             code_lo_space: ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
                 true,
-                code_space_spec.unwrap(),
+                code_lo_space_spec.unwrap(),
             )),
             #[cfg(feature = "ro_space")]
             ro_space: ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
-                code_space_spec.unwrap(),
+                ro_space_spec.unwrap(),
             )),
             #[cfg(feature = "vm_space")]
             vm_space: VMSpace::new(args.get_space_args(
