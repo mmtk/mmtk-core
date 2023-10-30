@@ -38,7 +38,7 @@ pub struct CommonGenPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> Self {
-        let nursery_spec = args.global_args.heap.specify_space(SpaceSpec::Extent {
+        let nursery_meta = args.global_args.heap.specify_space(SpaceSpec::Extent {
             extent: args.global_args.options.get_max_nursery_bytes(),
             top: false,
         });
@@ -47,7 +47,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let common = CommonPlan::new(args);
 
         let nursery = CopySpace::new(
-            args.get_space_args("nursery", true, nursery_spec.unwrap()),
+            args.get_space_args("nursery", true, nursery_meta.unwrap()),
             true,
         );
 

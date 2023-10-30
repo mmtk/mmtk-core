@@ -87,11 +87,11 @@ impl<VM: VMBinding> NoGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let nogc_space_spec = plan_args
+        let nogc_space_meta = plan_args
             .global_args
             .heap
             .specify_space(SpaceSpec::DontCare);
-        let immortal_spec = plan_args
+        let immortal_meta = plan_args
             .global_args
             .heap
             .specify_space(SpaceSpec::DontCare);
@@ -107,12 +107,12 @@ impl<VM: VMBinding> NoGC<VM> {
             nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
-                nogc_space_spec.unwrap(),
+                nogc_space_meta.unwrap(),
             )),
             immortal: ImmortalSpace::new(plan_args.get_space_args(
                 "immortal",
                 true,
-                immortal_spec.unwrap(),
+                immortal_meta.unwrap(),
             )),
             los: ImmortalSpace::new(plan_args.get_space_args("los", true, los.unwrap())),
             base,

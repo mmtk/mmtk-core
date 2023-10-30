@@ -192,7 +192,7 @@ impl<VM: VMBinding> MarkCompact<VM> {
             global_side_metadata_specs,
         };
 
-        let mc_space_spec = plan_args
+        let mc_space_meta = plan_args
             .global_args
             .heap
             .specify_space(SpaceSpec::DontCare);
@@ -201,7 +201,7 @@ impl<VM: VMBinding> MarkCompact<VM> {
         let common = CommonPlan::new(&mut plan_args);
 
         let mc_space =
-            MarkCompactSpace::new(plan_args.get_space_args("mc", true, mc_space_spec.unwrap()));
+            MarkCompactSpace::new(plan_args.get_space_args("mc", true, mc_space_meta.unwrap()));
 
         let res = MarkCompact { mc_space, common };
 

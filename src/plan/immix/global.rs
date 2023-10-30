@@ -140,7 +140,7 @@ impl<VM: VMBinding> Immix<VM> {
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
-        let immix_space_spec = plan_args
+        let immix_space_meta = plan_args
             .global_args
             .heap
             .specify_space(SpaceSpec::DontCare);
@@ -150,7 +150,7 @@ impl<VM: VMBinding> Immix<VM> {
 
         let immix = Immix {
             immix_space: ImmixSpace::new(
-                plan_args.get_space_args("immix", true, immix_space_spec.unwrap()),
+                plan_args.get_space_args("immix", true, immix_space_meta.unwrap()),
                 space_args,
             ),
             common,

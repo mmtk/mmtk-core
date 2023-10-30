@@ -102,7 +102,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
             global_side_metadata_specs,
         };
 
-        let ms_spec = plan_args
+        let ms_meta = plan_args
             .global_args
             .heap
             .specify_space(SpaceSpec::DontCare);
@@ -111,7 +111,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         let common = CommonPlan::new(&mut plan_args);
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(plan_args.get_space_args("ms", true, ms_spec.unwrap())),
+            ms: MarkSweepSpace::new(plan_args.get_space_args("ms", true, ms_meta.unwrap())),
             common,
         };
 

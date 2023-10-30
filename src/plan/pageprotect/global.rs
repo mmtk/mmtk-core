@@ -97,7 +97,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let space_spec = plan_args
+        let space_meta = plan_args
             .global_args
             .heap
             .specify_space(SpaceSpec::DontCare);
@@ -107,7 +107,7 @@ impl<VM: VMBinding> PageProtect<VM> {
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                plan_args.get_space_args("pageprotect", true, space_spec.unwrap()),
+                plan_args.get_space_args("pageprotect", true, space_meta.unwrap()),
                 true,
             ),
             common,
