@@ -17,7 +17,7 @@ use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::heap_meta::SpaceSpec;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -232,16 +232,16 @@ impl<VM: VMBinding> GenImmix<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
-        let immix_space_spec = plan_args
+        let immix_space_resp = plan_args
             .global_args
             .heap
-            .specify_space(SpaceSpec::DontCare);
+            .specify_space(VMRequest::Unrestricted);
 
         // Spaces will eventually be placed by `BasePlan`.
         let gen = CommonGenPlan::new(&mut plan_args);
 
         let immix_space = ImmixSpace::new(
-            plan_args.get_space_args("immix_mature", true, immix_space_spec.unwrap()),
+            plan_args.get_space_args("immix_mature", true, immix_space_resp.unwrap()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
                 // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.

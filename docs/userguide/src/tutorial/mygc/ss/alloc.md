@@ -99,8 +99,8 @@ spaces that will be created in the current plan.
 ```
 
 We do not have special requirements for either of the copy-spaces, so we just
-specify `SpaceSpec::DontCare` here.  At this step, the return values
-`copyspace0_meta` and `copyspace1_meta` has not become usable, yet.
+specify `VMRequest::Unrestricted` here.  At this step, the return values
+`copyspace0_resp` and `copyspace1_resp` has not become usable, yet.
 
 Then, we construct the parent structure `CommonPlan::new()`.
 
@@ -112,17 +112,18 @@ Then, we construct the parent structure `CommonPlan::new()`.
 `HeapMeta::place_spaces()`.  That will determine the address range of all
 spaces we specified.
 
-After this, we can call `copyspace0_meta.unwrap()` to retrieve the compute
-metadata for creating `copyspace0`, and `copyspace1` is similar.  We can now
-create the two `CopySpace` instances.
+After this, we can call `copyspace0_resp.unwrap()` to retrieve the computed
+placement information for creating `copyspace0`.  `copyspace1` is similar.  We
+can now create the two `CopySpace` instances.
 
 ```rust
 {{#include ../../code/mygc_semispace/global.rs:copyspaces_new}}
 ```
 
-Note that `CommonSpace` and `BaseSpace` define other spaces, such as the large
-object space.  Their constructors specify their spaces before determining their
-address ranges and instantiating them, just like we discribed here.
+Note that `CommonSpace` and `BaseSpace` also define other spaces, such as the
+large object space.  Their constructors specify their spaces before
+determining their address ranges and instantiating them, just like we
+discribed here.
 
 ### Access MyGC spaces
 

@@ -15,7 +15,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::heap_meta::SpaceSpec;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 #[cfg(not(feature = "vo_bit"))]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
@@ -192,16 +192,16 @@ impl<VM: VMBinding> MarkCompact<VM> {
             global_side_metadata_specs,
         };
 
-        let mc_space_meta = plan_args
+        let mc_space_resp = plan_args
             .global_args
             .heap
-            .specify_space(SpaceSpec::DontCare);
+            .specify_space(VMRequest::Unrestricted);
 
         // Spaces will eventually be placed by `BasePlan`.
         let common = CommonPlan::new(&mut plan_args);
 
         let mc_space =
-            MarkCompactSpace::new(plan_args.get_space_args("mc", true, mc_space_meta.unwrap()));
+            MarkCompactSpace::new(plan_args.get_space_args("mc", true, mc_space_resp.unwrap()));
 
         let res = MarkCompact { mc_space, common };
 

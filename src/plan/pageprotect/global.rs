@@ -8,7 +8,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::heap_meta::SpaceSpec;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
@@ -97,17 +97,17 @@ impl<VM: VMBinding> PageProtect<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let space_meta = plan_args
+        let space_resp = plan_args
             .global_args
             .heap
-            .specify_space(SpaceSpec::DontCare);
+            .specify_space(VMRequest::Unrestricted);
 
         // Spaces will eventually be placed by `BasePlan`.
         let common = CommonPlan::new(&mut plan_args);
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                plan_args.get_space_args("pageprotect", true, space_meta.unwrap()),
+                plan_args.get_space_args("pageprotect", true, space_resp.unwrap()),
                 true,
             ),
             common,

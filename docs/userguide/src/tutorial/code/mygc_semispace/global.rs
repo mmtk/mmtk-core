@@ -12,13 +12,13 @@ use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::heap_meta::SpaceSpec;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
-// ANCHOR_END: imports_no_gc_work
+                                               // ANCHOR_END: imports_no_gc_work
 
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
@@ -66,7 +66,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
             },
             space_mapping: vec![
                 // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), &self.copyspace0)
+                (CopySelector::CopySpace(0), &self.copyspace0),
             ],
             constraints: &MYGC_CONSTRAINTS,
         }
@@ -168,14 +168,14 @@ impl<VM: VMBinding> MyGC<VM> {
         };
 
         // ANCHOR: specify_spaces
-        let copyspace0_meta = plan_args
+        let copyspace0_resp = plan_args
             .global_args
             .heap
-            .specify_space(SpaceSpec::DontCare);
-        let copyspace1_meta = plan_args
+            .specify_space(VMRequest::Unrestricted);
+        let copyspace1_resp = plan_args
             .global_args
             .heap
-            .specify_space(SpaceSpec::DontCare);
+            .specify_space(VMRequest::Unrestricted);
         // ANCHOR_END: specify_spaces
 
         // ANCHOR: create_common_plan
@@ -187,11 +187,11 @@ impl<VM: VMBinding> MyGC<VM> {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspaces_new
             copyspace0: CopySpace::new(
-                plan_args.get_space_args("copyspace0", true, copyspace0_meta.unwrap()),
+                plan_args.get_space_args("copyspace0", true, copyspace0_resp.unwrap()),
                 false,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args("copyspace1", true, copyspace1_meta.unwrap()),
+                plan_args.get_space_args("copyspace1", true, copyspace1_resp.unwrap()),
                 true,
             ),
             // ANCHOR_END: copyspaces_new

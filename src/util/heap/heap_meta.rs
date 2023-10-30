@@ -5,18 +5,18 @@
 //! It is used as following.
 //!
 //! 1.  A plan declares all the spaces it wants to create using the `specify_space` method.  For
-//!     each space, it passes a [`SpaceSpec`] which specifies the requirements for each space,
+//!     each space, it passes a [`VMRequest`] which specifies the requirements for each space,
 //!     including whether the space is contiguous, whether it has a fixed extent, and whether it
 //!     should be place at the low end or high end of the heap range, etc.  The `specify_space`
-//!     method returns a [`FutureSpaceMeta`] for each space which can be used later.
+//!     method returns a [`PendingVMResponse`] for each space which can be used later.
 //! 2.  After all spaces are specified, the plan calls the `place_spaces` method.  It determines
 //!     the locations (starts and extends) and contiguousness of all spaces according to the policy
 //!     specified by [`crate::util::heap::layout::vm_layout::vm_layout`].
-//! 3.  Then the plan calls `unwrap()` on each [`FutureSpaceMeta`] to get a [`SpaceMeta`] which
+//! 3.  Then the plan calls `unwrap()` on each [`PendingVMResponse`] to get a [`VMResponse`] which
 //!     holds the the placement decision for each space (start, extent, contiguousness, etc.).
 //!     Using such information, the space can create each concrete spaces.
 //!
-//! In summary, the plan specifies all spaces before `HeapMeta` makes placement decision, and all
+//! In summary, the plan specifies all spaces before [`HeapMeta`] makes placement decision, and all
 //! spaces know their locations the moment they are created.
 //!
 //! By doing so, we can avoid creating spaces first and then computing their start addresses and
@@ -38,30 +38,36 @@ use crate::util::Address;
 ///
 /// TODO: This type needs a better name.
 pub struct HeapMeta {
+    /// The start of the heap range (inclusive).
     heap_start: Address,
+    /// The end of the heap range (exclusive).
     heap_limit: Address,
+    /// The address range for discontiguous spaces (if exists).
     discontiguous_range: Option<Range<Address>>,
+    /// Request-response pairs for each space.
     entries: Vec<SpaceEntry>,
 }
 
-/// A space specification and a "promise" for sending `SpaceMeta` to the user (plan).
+/// A request-response pair.
 struct SpaceEntry {
-    spec: SpaceSpec,
-    promise_meta: PromiseSpaceMeta,
+    req: VMRequest,
+    resp: PendingVMResponseWriter,
 }
 
-/// This enum specifies the requirement of space placement.
+/// A virtual memory (VM) request specifies the requirement for placing a space in the virtual
+/// address space.  It will be processed by [`HeapMeta`].
 ///
-/// Note that the result of space placement (represented by `SpaceMeta`) may give the space a
+/// Note that the result of space placement (represented by [`VMResponse`]) may give the space a
 /// larger address range than requested.  For example, on systems with a generous address space,
 /// the space placement strategy may give each space a contiguous 2TiB address space even if it
 /// requests a small extent.
-pub enum SpaceSpec {
+#[derive(Debug)]
+pub enum VMRequest {
     /// There is no size, location, or contiguousness requirement for the space.  In a confined
     /// address space, the space may be given a discontiguous address range shared with other
     /// spaces; in a generous address space, the space may be given a very large contiguous address
     /// range solely owned by this space.
-    DontCare,
+    Unrestricted,
     /// Require a contiguous range of address of a fixed size.
     Extent {
         /// The size of the space, in bytes.  Must be a multiple of chunks.
@@ -82,23 +88,25 @@ pub enum SpaceSpec {
     },
 }
 
-impl SpaceSpec {
-    fn dont_care(&self) -> bool {
-        matches!(self, SpaceSpec::DontCare)
+impl VMRequest {
+    /// Return `true` if the current `VMRequest` is unrestricted.
+    fn unrestricted(&self) -> bool {
+        matches!(self, VMRequest::Unrestricted)
     }
 
+    /// Return `true` if the space should be placed at the high end of the address space.
     fn top(&self) -> bool {
         match *self {
-            SpaceSpec::DontCare => false,
-            SpaceSpec::Extent { top, .. } => top,
-            SpaceSpec::Fraction { top, .. } => top,
+            VMRequest::Unrestricted => false,
+            VMRequest::Extent { top, .. } => top,
+            VMRequest::Fraction { top, .. } => top,
         }
     }
 }
 
 /// This struct represents the placement decision of a space.
 #[derive(Debug)]
-pub struct SpaceMeta {
+pub struct VMResponse {
     /// An assigned ID of the space.  Guaranteed to be unique.
     pub space_id: usize,
     /// The start of the address range of the space.  For discontiguous spaces, this range will be
@@ -110,8 +118,8 @@ pub struct SpaceMeta {
     pub contiguous: bool,
 }
 
-impl SpaceMeta {
-    /// Create a dummy `SpaceMeta for `VMSpace` because the address range of `VMSpace` is not
+impl VMResponse {
+    /// Create a dummy `VMResponse` for `VMSpace` because the address range of `VMSpace` is not
     /// determined by `HeapMeta`.
     pub(crate) fn vm_space_dummy() -> Self {
         Self {
@@ -123,36 +131,38 @@ impl SpaceMeta {
     }
 }
 
-/// A `SpaceMeta` that will be provided in the future.
+/// A `VMResponse` that will be provided in the future.
 #[derive(Clone)]
-pub struct FutureSpaceMeta {
-    inner: Rc<RefCell<Option<SpaceMeta>>>,
+pub struct PendingVMResponse {
+    inner: Rc<RefCell<Option<VMResponse>>>,
 }
 
-impl FutureSpaceMeta {
-    /// Unwrap `self` and get a `SpaceMeta` instance.  Can only be called after calling
+impl PendingVMResponse {
+    /// Unwrap `self` and get a `VMResponse` instance.  Can only be called after calling
     /// `HeapMeta::place_spaces()`.
-    pub fn unwrap(self) -> SpaceMeta {
+    pub fn unwrap(self) -> VMResponse {
         let mut opt = self.inner.borrow_mut();
         opt.take()
-            .expect("Attempt to get SpaceMeta before calling HeapMeta::place_spaces()")
+            .expect("Attempt to get VMResponse before calling HeapMeta::place_spaces()")
     }
 }
 
-/// The struct for `HeapMeta` to provide a `SpaceMeta` instance for its user.
-struct PromiseSpaceMeta {
-    inner: Rc<RefCell<Option<SpaceMeta>>>,
+/// The struct for `HeapMeta` to provide a `VMResponse` instance for its user.
+struct PendingVMResponseWriter {
+    inner: Rc<RefCell<Option<VMResponse>>>,
 }
 
-impl PromiseSpaceMeta {
-    fn provide(&mut self, space_meta: SpaceMeta) {
+impl PendingVMResponseWriter {
+    fn provide(&mut self, resp: VMResponse) {
         let mut opt = self.inner.borrow_mut();
         assert!(opt.is_none());
-        *opt = Some(space_meta);
+        *opt = Some(resp);
     }
 }
 
 impl HeapMeta {
+    /// Create a `HeapMeta` instance.  The heap range will be determined by
+    /// [`crate::util::heap::layout::vm_layout::vm_layout`].
     pub fn new() -> Self {
         HeapMeta {
             heap_start: vm_layout().heap_start,
@@ -163,14 +173,14 @@ impl HeapMeta {
     }
 
     /// Declare a space and specify the detailed requirements.
-    pub fn specify_space(&mut self, spec: SpaceSpec) -> FutureSpaceMeta {
-        let shared_meta = Rc::new(RefCell::new(None));
-        let future_meta = FutureSpaceMeta {
-            inner: shared_meta.clone(),
+    pub fn specify_space(&mut self, req: VMRequest) -> PendingVMResponse {
+        let shared_resp = Rc::new(RefCell::new(None));
+        let pending_resp = PendingVMResponse {
+            inner: shared_resp.clone(),
         };
-        let promise_meta = PromiseSpaceMeta { inner: shared_meta };
-        self.entries.push(SpaceEntry { spec, promise_meta });
-        future_meta
+        let resp = PendingVMResponseWriter { inner: shared_resp };
+        self.entries.push(SpaceEntry { req, resp });
+        pending_resp
     }
 
     /// Determine the locations of all specified spaces.
@@ -180,35 +190,41 @@ impl HeapMeta {
         let mut reserver = AddressRangeReserver::new(self.heap_start, self.heap_limit);
 
         if force_use_contiguous_spaces {
-            debug!("Placing spaces in a generous address space");
+            debug!(
+                "Placing spaces in a generous address space: [{}, {})",
+                self.heap_start, self.heap_limit
+            );
             let extent = vm_layout().max_space_extent();
 
             for (i, entry) in self.entries.iter_mut().enumerate() {
-                let top = entry.spec.top();
+                let top = entry.req.top();
                 let start = reserver.reserve(extent, top);
 
-                let meta = SpaceMeta {
+                let resp = VMResponse {
                     space_id: i,
                     start,
                     extent,
                     contiguous: true,
                 };
 
-                debug!("  SpaceMeta: {:?}", meta);
-                entry.promise_meta.provide(meta);
+                debug!("  VMResponse: {:?}", resp);
+                entry.resp.provide(resp);
             }
         } else {
-            debug!("Placing spaces in a confined address space");
+            debug!(
+                "Placing spaces in a confined address space: [{}, {})",
+                self.heap_start, self.heap_limit
+            );
             for (i, entry) in self.entries.iter_mut().enumerate() {
-                let (start, extent) = match entry.spec {
-                    SpaceSpec::DontCare => continue,
-                    SpaceSpec::Extent { extent, top } => {
+                let (start, extent) = match entry.req {
+                    VMRequest::Unrestricted => continue,
+                    VMRequest::Extent { extent, top } => {
                         let start = reserver.reserve(extent, top);
                         (start, extent)
                     }
-                    SpaceSpec::Fraction { frac, top } => {
+                    VMRequest::Fraction { frac, top } => {
                         // Taken from `crate::policy::space::get_frac_available`, but we currently
-                        // don't have any plans that actually uses it.
+                        // don't have any plans that actually use it.
                         let extent = {
                             trace!("AVAILABLE_START={}", self.heap_start);
                             trace!("AVAILABLE_END={}", self.heap_limit);
@@ -227,15 +243,15 @@ impl HeapMeta {
                     }
                 };
 
-                let meta = SpaceMeta {
+                let resp = VMResponse {
                     space_id: i,
                     start,
                     extent,
                     contiguous: true,
                 };
 
-                debug!("  SpaceMeta: {:?}", meta);
-                entry.promise_meta.provide(meta);
+                debug!("  VMResponse: {:?}", resp);
+                entry.resp.provide(resp);
             }
 
             let discontig_range = reserver.remaining_range();
@@ -252,19 +268,19 @@ impl HeapMeta {
 
             let discontig_extent = discontig_end - discontig_start;
             for (i, entry) in self.entries.iter_mut().enumerate() {
-                if !entry.spec.dont_care() {
+                if !entry.req.unrestricted() {
                     continue;
                 }
 
-                let meta = SpaceMeta {
+                let resp = VMResponse {
                     space_id: i,
                     start: discontig_start,
                     extent: discontig_extent,
                     contiguous: false,
                 };
 
-                debug!("  SpaceMeta: {:?}", meta);
-                entry.promise_meta.provide(meta);
+                debug!("  VMResponse: {:?}", resp);
+                entry.resp.provide(resp);
             }
         }
 

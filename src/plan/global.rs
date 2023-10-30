@@ -14,7 +14,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::heap_meta::{HeapMeta, SpaceMeta, SpaceSpec};
+use crate::util::heap::heap_meta::{HeapMeta, VMResponse, VMRequest};
 use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -365,7 +365,7 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
         &mut self,
         name: &'static str,
         zeroed: bool,
-        space_meta: SpaceMeta,
+        space_meta: VMResponse,
     ) -> PlanCreateSpaceArgs<VM> {
         PlanCreateSpaceArgs {
             name,
@@ -387,12 +387,12 @@ impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
     pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
         #[cfg(feature = "code_space")]
-        let code_space_meta = args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let code_space_resp = args.global_args.heap.specify_space(VMRequest::Unrestricted);
         #[cfg(feature = "code_space")]
-        let code_lo_space_meta = args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let code_lo_space_resp = args.global_args.heap.specify_space(VMRequest::Unrestricted);
         #[cfg(feature = "ro_space")]
-        let ro_space_meta = args.global_args.heap.specify_space(SpaceSpec::DontCare);
-        // NOTE: We don't specify VM space because it doesn't use SpaceMeta anyway.
+        let ro_space_resp = args.global_args.heap.specify_space(VMRequest::Unrestricted);
+        // NOTE: We don't specify VM space because it doesn't use any information in `VMResponse`.
 
         // BasePlan does not have any nested structs with spaces.  We now place spaces.
         args.global_args.heap.place_spaces();
@@ -402,25 +402,25 @@ impl<VM: VMBinding> BasePlan<VM> {
             code_space: ImmortalSpace::new(args.get_space_args(
                 "code_space",
                 true,
-                code_space_meta.unwrap(),
+                code_space_resp.unwrap(),
             )),
             #[cfg(feature = "code_space")]
             code_lo_space: ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
                 true,
-                code_lo_space_meta.unwrap(),
+                code_lo_space_resp.unwrap(),
             )),
             #[cfg(feature = "ro_space")]
             ro_space: ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
-                ro_space_meta.unwrap(),
+                ro_space_resp.unwrap(),
             )),
             #[cfg(feature = "vm_space")]
             vm_space: VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
-                SpaceMeta::vm_space_dummy(),
+                VMResponse::vm_space_dummy(),
             )),
 
             global_state: args.global_args.state.clone(),
@@ -560,9 +560,9 @@ pub struct CommonPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> CommonPlan<VM> {
-        let immortal_meta = args.global_args.heap.specify_space(SpaceSpec::DontCare);
-        let los_meta = args.global_args.heap.specify_space(SpaceSpec::DontCare);
-        let nonmoving_meta = args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let immortal_resp = args.global_args.heap.specify_space(VMRequest::Unrestricted);
+        let los_resp = args.global_args.heap.specify_space(VMRequest::Unrestricted);
+        let nonmoving_resp = args.global_args.heap.specify_space(VMRequest::Unrestricted);
 
         let base = BasePlan::new(args);
 
@@ -570,13 +570,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
             immortal: ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
-                immortal_meta.unwrap(),
+                immortal_resp.unwrap(),
             )),
-            los: LargeObjectSpace::new(args.get_space_args("los", true, los_meta.unwrap()), false),
+            los: LargeObjectSpace::new(args.get_space_args("los", true, los_resp.unwrap()), false),
             nonmoving: ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
-                nonmoving_meta.unwrap(),
+                nonmoving_resp.unwrap(),
             )),
             base,
         }

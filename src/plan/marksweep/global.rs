@@ -10,7 +10,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::heap_meta::SpaceSpec;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
@@ -102,16 +102,16 @@ impl<VM: VMBinding> MarkSweep<VM> {
             global_side_metadata_specs,
         };
 
-        let ms_meta = plan_args
+        let ms_resp = plan_args
             .global_args
             .heap
-            .specify_space(SpaceSpec::DontCare);
+            .specify_space(VMRequest::Unrestricted);
 
         // Spaces will eventually be placed by `BasePlan`.
         let common = CommonPlan::new(&mut plan_args);
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(plan_args.get_space_args("ms", true, ms_meta.unwrap())),
+            ms: MarkSweepSpace::new(plan_args.get_space_args("ms", true, ms_resp.unwrap())),
             common,
         };
 

@@ -2,7 +2,7 @@ use crate::global_state::GlobalState;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
-use crate::util::heap::heap_meta::SpaceMeta;
+use crate::util::heap::heap_meta::VMResponse;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
@@ -370,7 +370,7 @@ pub(crate) fn print_vm_map<VM: VMBinding>(
         write!(out, "N")?;
     }
     write!(out, " ")?;
-    let SpaceMeta {
+    let VMResponse {
         space_id,
         start,
         extent,
@@ -389,7 +389,7 @@ impl_downcast!(Space<VM> where VM: VMBinding);
 pub struct CommonSpace<VM: VMBinding> {
     pub name: &'static str,
     pub descriptor: SpaceDescriptor,
-    pub space_meta: SpaceMeta,
+    pub space_meta: VMResponse,
 
     /// For a copying space that allows sft_trace_object(), this should be set before each GC so we know
     /// the copy semantics for the space.
@@ -441,7 +441,7 @@ pub struct PolicyCreateSpaceArgs<'a, VM: VMBinding> {
 pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub name: &'static str,
     pub zeroed: bool,
-    pub space_meta: SpaceMeta,
+    pub space_meta: VMResponse,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
@@ -472,7 +472,7 @@ impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(args: PolicyCreateSpaceArgs<VM>) -> Self {
         let space_meta = args.plan_args.space_meta;
-        let SpaceMeta {
+        let VMResponse {
             space_id: _space_id, // TODO: Let SpaceDescriptor use this space_id
             start,
             extent,
