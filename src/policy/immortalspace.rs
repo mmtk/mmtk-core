@@ -145,7 +145,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         start: Address,
         size: usize,
     ) -> Self {
-        assert!(!!args.space_meta.contiguous);
+        assert!(args.space_meta.contiguous);
         ImmortalSpace {
             mark_state: MarkState::new(),
             pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),

@@ -16,10 +16,10 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
+use crate::util::heap::heap_meta::SpaceSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
-use crate::util::heap::heap_meta::SpaceSpec;
 use crate::vm::*;
 use crate::ObjectQueue;
 use enum_map::EnumMap;
@@ -200,8 +200,14 @@ impl<VM: VMBinding> GenCopy<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
-        let copyspace0_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
-        let copyspace1_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let copyspace0_spec = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
+        let copyspace1_spec = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
         let gen = CommonGenPlan::new(&mut plan_args);

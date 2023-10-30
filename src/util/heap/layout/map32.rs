@@ -104,8 +104,7 @@ impl VMMap for Map32 {
         Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
-    unsafe fn bind_freelist(&self, _pr: *const CommonFreeListPageResource) {
-    }
+    unsafe fn bind_freelist(&self, _pr: *const CommonFreeListPageResource) {}
 
     unsafe fn allocate_contiguous_chunks(
         &self,

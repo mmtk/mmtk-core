@@ -87,9 +87,18 @@ impl<VM: VMBinding> NoGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let nogc_space_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
-        let immortal_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
-        let los = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let nogc_space_spec = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
+        let immortal_spec = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
+        let los = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
         let base = BasePlan::new(&mut plan_args);

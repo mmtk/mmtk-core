@@ -47,11 +47,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         let common = CommonPlan::new(args);
 
         let nursery = CopySpace::new(
-            args.get_space_args(
-                "nursery",
-                true,
-                nursery_spec.unwrap(),
-            ),
+            args.get_space_args("nursery", true, nursery_spec.unwrap()),
             true,
         );
 

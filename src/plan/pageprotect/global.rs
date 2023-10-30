@@ -97,7 +97,10 @@ impl<VM: VMBinding> PageProtect<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
-        let space_spec = plan_args.global_args.heap.specify_space(SpaceSpec::DontCare);
+        let space_spec = plan_args
+            .global_args
+            .heap
+            .specify_space(SpaceSpec::DontCare);
 
         // Spaces will eventually be placed by `BasePlan`.
         let common = CommonPlan::new(&mut plan_args);
