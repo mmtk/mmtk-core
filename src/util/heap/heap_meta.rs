@@ -67,6 +67,7 @@ impl SpaceSpec {
 }
 
 /// This struct represents the placement decision of a space.
+#[derive(Debug)]
 pub struct SpaceMeta {
     pub space_id: usize,
     pub start: Address,
@@ -141,6 +142,7 @@ impl HeapMeta {
         let mut reserver = AddressRangeReserver::new(self.heap_start, self.heap_limit);
 
         if force_use_contiguous_spaces {
+            debug!("Placing spaces in a generous address space");
             let extent = vm_layout().max_space_extent();
 
             for (i, entry) in self.entries.iter_mut().enumerate() {
@@ -154,9 +156,11 @@ impl HeapMeta {
                     contiguous: true,
                 };
 
+                debug!("  SpaceMeta: {:?}", meta);
                 entry.promise_meta.provide(meta);
             }
         } else {
+            debug!("Placing spaces in a confined address space");
             for (i, entry) in self.entries.iter_mut().enumerate() {
                 let (start, extent) = match entry.spec {
                     SpaceSpec::DontCare => continue,
@@ -192,6 +196,7 @@ impl HeapMeta {
                     contiguous: true,
                 };
 
+                debug!("  SpaceMeta: {:?}", meta);
                 entry.promise_meta.provide(meta);
             }
 
@@ -199,6 +204,8 @@ impl HeapMeta {
             self.discontiguous_range = Some(discontig_range);
 
             let (discontig_start, discontig_end) = discontig_range;
+
+            debug!("Discontiguous range is [{}, {})", discontig_start, discontig_end);
 
             let discontig_extent = discontig_end - discontig_start;
             for (i, entry) in self.entries.iter_mut().enumerate() {
@@ -213,9 +220,12 @@ impl HeapMeta {
                     contiguous: false,
                 };
 
+                debug!("  SpaceMeta: {:?}", meta);
                 entry.promise_meta.provide(meta);
             }
         }
+
+        debug!("Space placement finished.");
     }
 
     pub fn get_discontiguous_range(&self) -> Option<(Address, Address)> {

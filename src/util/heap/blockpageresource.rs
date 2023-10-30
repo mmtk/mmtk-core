@@ -74,13 +74,12 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
     pub fn new_discontiguous(
         log_pages: usize,
         start: Address,
-        bytes: usize,
         vm_map: &'static dyn VMMap,
         num_workers: usize,
     ) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
-            flpr: FreeListPageResource::new_discontiguous(start, bytes, vm_map),
+            flpr: FreeListPageResource::new_discontiguous(start, vm_map),
             block_queue: BlockPool::new(num_workers),
             sync: Mutex::new(()),
         }

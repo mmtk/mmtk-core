@@ -392,7 +392,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub space_meta: SpaceMeta,
 
     /// For a copying space that allows sft_trace_object(), this should be set before each GC so we know
-    // the copy semantics for the space.
+    /// the copy semantics for the space.
     pub copy: Option<CopySemantics>,
 
     immortal: bool,
@@ -400,7 +400,15 @@ pub struct CommonSpace<VM: VMBinding> {
     pub contiguous: bool,
     pub zeroed: bool,
 
+    /// The lower bound of the address range of the space.
+    /// -   If this space is contiguous, this space owns the address range
+    ///     `start <= addr < start + extent`.
+    /// -   If discontiguous, this space shares the address range `start <= addr < start + extent`
+    ///     with other discontiguous spaces.  This space only owns individual chunks in this range
+    ///     managed by the `VMMap`.
     pub start: Address,
+
+    /// The length of the address range of the space.  See `start`.
     pub extent: usize,
 
     pub vm_map: &'static dyn VMMap,
@@ -471,7 +479,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
             contiguous,
         } = space_meta;
 
-        let descriptor = SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent);
+        let descriptor = if contiguous {
+            SpaceDescriptor::create_descriptor_from_heap_range(start, start + extent)
+        } else {
+            // TODO: `create_descriptor` simply allocates the next "space index".
+            // We should let it use `space_id` instead.
+            SpaceDescriptor::create_descriptor()
+        };
 
         let rtn = CommonSpace {
             name: args.plan_args.name,
@@ -497,30 +511,38 @@ impl<VM: VMBinding> CommonSpace<VM> {
             p: PhantomData,
         };
 
-        // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
-        // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
-        // insert into our vm map if the range overlaps with our heap.
-        {
-            use crate::util::heap::layout;
-            let overlap =
-                Address::range_intersection(&(start..start + extent), &layout::available_range());
-            if !overlap.is_empty() {
-                args.plan_args.vm_map.insert(
-                    overlap.start,
-                    overlap.end - overlap.start,
-                    rtn.descriptor,
-                );
-            }
-        }
+        if contiguous {
+            // If the space is contiguous, it implies that the address range
+            // `start <= addr < start + extent` is solely owned by one space.
+            // We can eagerly insert `SpaceDescriptor` entries and map metadata.
+            // If the space is discontiguous, we do this lazily when we allocate chunks from the
+            // global free list.
 
-        // For contiguous space, we know its address range so we reserve metadata memory for its range.
-        if rtn
-            .metadata
-            .try_map_metadata_address_range(rtn.start, rtn.extent)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
+            // We only initialize our vm map if the range of the space is in our available heap range. For normally spaces,
+            // they are definitely in our heap range. But for VM space, a runtime could give us an arbitrary range. We only
+            // insert into our vm map if the range overlaps with our heap.
+            {
+                use crate::util::heap::layout;
+                let overlap =
+                    Address::range_intersection(&(start..start + extent), &layout::available_range());
+                if !overlap.is_empty() {
+                    args.plan_args.vm_map.insert(
+                        overlap.start,
+                        overlap.end - overlap.start,
+                        rtn.descriptor,
+                    );
+                }
+            }
+
+            // For contiguous space, we know its address range so we reserve metadata memory for its range.
+            if rtn
+                .metadata
+                .try_map_metadata_address_range(rtn.start, rtn.extent)
+                .is_err()
+            {
+                // TODO(Javad): handle meta space allocation failure
+                panic!("failed to mmap meta memory");
+            }
         }
 
         debug!(

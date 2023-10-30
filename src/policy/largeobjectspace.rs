@@ -151,7 +151,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]),
         ));
         let mut pr = if is_discontiguous {
-            FreeListPageResource::new_discontiguous(common.start, common.extent, vm_map)
+            FreeListPageResource::new_discontiguous(common.start, vm_map)
         } else {
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };

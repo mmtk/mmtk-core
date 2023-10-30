@@ -191,7 +191,7 @@ impl<VM: VMBinding> MMTK<VM> {
         let (discontig_start, discontig_end) = heap.get_discontiguous_range().unwrap_or((Address::ZERO, Address::ZERO));
         // Map32 calls this to initialize the global freelists, which is reasonable.
         // Map64 calls this to fix the starting addresses of RawMemoryFreeList instances, which is a bug and should be fixed.
-        VM_MAP.finalize_static_space_map(discontig_start, discontig_end);
+        VM_MAP.finalize_static_space_map(discontig_start, discontig_end - 1);
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);

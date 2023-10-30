@@ -292,7 +292,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 BlockPageResource::new_discontiguous(
                     Block::LOG_PAGES,
                     common.start,
-                    common.extent,
                     vm_map,
                     scheduler.num_workers(),
                 )
