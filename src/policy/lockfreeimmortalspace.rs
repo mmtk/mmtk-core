@@ -1,7 +1,7 @@
 use atomic::Atomic;
 
-use std::marker::PhantomData;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
@@ -9,6 +9,7 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 
 use crate::util::conversions;
+use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
 use crate::util::memory::MmapStrategy;
@@ -38,7 +39,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
     metadata: SideMetadataContext,
-    phantom: PhantomData<VM>,
+    gc_trigger: Arc<GCTrigger<VM>>,
 }
 
 impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
@@ -97,6 +98,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
     fn common(&self) -> &CommonSpace<VM> {
         unimplemented!()
+    }
+
+    fn get_gc_trigger(&self) -> &GCTrigger<VM> {
+        &self.gc_trigger
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -196,7 +201,7 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
                 global: args.global_side_metadata_specs,
                 local: vec![],
             },
-            phantom: PhantomData,
+            gc_trigger: args.gc_trigger,
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
