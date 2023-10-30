@@ -9,9 +9,10 @@ pub struct PerfEventDiffable {
 }
 
 impl PerfEventDiffable {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, exclude_kernel: bool) -> Self {
         let mut pe = PerfEvent::new(name, true)
             .unwrap_or_else(|_| panic!("Failed to create perf event {}", name));
+        pe.set_exclude_kernel(exclude_kernel as u64);
         // measures the calling thread (and all child threads) on all CPUs
         pe.open(0, -1)
             .unwrap_or_else(|_| panic!("Failed to open perf event {}", name));
