@@ -11,8 +11,9 @@ use crate::util::Address;
 ///
 /// TODO: This type needs a better name.
 pub struct HeapMeta {
-    pub heap_start: Address,
-    pub heap_limit: Address,
+    heap_start: Address,
+    heap_limit: Address,
+    discontiguous_range: Option<(Address, Address)>,
     entries: Vec<SpaceEntry>,
 }
 
@@ -120,6 +121,7 @@ impl HeapMeta {
             heap_start: vm_layout().heap_start,
             heap_limit: vm_layout().heap_end,
             entries: Vec::default(),
+            discontiguous_range: None,
         }
     }
 
@@ -193,7 +195,11 @@ impl HeapMeta {
                 entry.promise_meta.provide(meta);
             }
 
-            let (discontig_start, discontig_end) = reserver.remaining_range();
+            let discontig_range = reserver.remaining_range();
+            self.discontiguous_range = Some(discontig_range);
+
+            let (discontig_start, discontig_end) = discontig_range;
+
             let discontig_extent = discontig_end - discontig_start;
             for (i, entry) in self.entries.iter_mut().enumerate() {
                 if !entry.spec.dont_care() {
@@ -210,6 +216,10 @@ impl HeapMeta {
                 entry.promise_meta.provide(meta);
             }
         }
+    }
+
+    pub fn get_discontiguous_range(&self) -> Option<(Address, Address)> {
+        self.discontiguous_range
     }
 }
 

@@ -15,7 +15,7 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::heap_meta::HeapMeta;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
-use crate::util::opaque_pointer::*;
+use crate::util::{opaque_pointer::*, Address};
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
@@ -188,8 +188,10 @@ impl<VM: VMBinding> MMTK<VM> {
 
         // TODO: This probably does not work if we have multiple MMTk instances.
         VM_MAP.boot();
-        // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        //VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
+        let (discontig_start, discontig_end) = heap.get_discontiguous_range().unwrap_or((Address::ZERO, Address::ZERO));
+        // Map32 calls this to initialize the global freelists, which is reasonable.
+        // Map64 calls this to fix the starting addresses of RawMemoryFreeList instances, which is a bug and should be fixed.
+        VM_MAP.finalize_static_space_map(discontig_start, discontig_end);
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);

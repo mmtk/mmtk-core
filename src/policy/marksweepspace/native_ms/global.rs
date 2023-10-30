@@ -221,7 +221,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
         MarkSweepSpace {
             pr: if is_discontiguous {
-                FreeListPageResource::new_discontiguous(vm_map)
+                FreeListPageResource::new_discontiguous(common.start, common.extent, vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
             },
