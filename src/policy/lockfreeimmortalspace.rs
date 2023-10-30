@@ -12,6 +12,7 @@ use crate::util::conversions;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::heap::PageResource;
+use crate::util::heap::VMRequest;
 use crate::util::memory::MmapStrategy;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -35,7 +36,7 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     /// start of this space
     start: Address,
     /// Total bytes for the space
-    extent: usize,
+    total_bytes: usize,
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
     metadata: SideMetadataContext,
@@ -109,7 +110,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
-        unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.extent) };
+        unsafe { sft_map.eager_initialize(self.as_sft(), self.start, self.total_bytes) };
     }
 
     fn reserved_pages(&self) -> usize {
@@ -120,6 +121,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn acquire(&self, _tls: VMThread, pages: usize) -> Address {
+        trace!("LockFreeImmortalSpace::acquire");
         let bytes = conversions::pages_to_bytes(pages);
         let start = self
             .cursor
@@ -130,9 +132,11 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         if start + bytes > self.limit {
             panic!("OutOfMemory")
         }
+        trace!("Going to zero");
         if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);
         }
+        trace!("Going to zero - done");
         start
     }
 
@@ -175,8 +179,8 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     #[allow(dead_code)] // Only used with certain features.
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let slow_path_zeroing = args.zeroed;
-        // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
-        // https://github.com/mmtk/mmtk-core/issues/314
+
+        // Get the total bytes for the heap.
         let total_bytes = match *args.options.gc_trigger {
             crate::util::options::GCTriggerSelector::FixedHeapSize(bytes) => bytes,
             _ => unimplemented!(),
@@ -187,15 +191,24 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             total_bytes,
             vm_layout().available_bytes()
         );
+        // Align up to chunks
+        let aligned_total_bytes = crate::util::conversions::raw_align_up(
+            total_bytes,
+            crate::util::heap::vm_layout::BYTES_IN_CHUNK,
+        );
 
-        // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
-        // https://github.com/mmtk/mmtk-core/issues/314
+        // Create a VM request of fixed size
+        let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
+        // Reserve the space
+        let VMRequest::Extent{ extent, top } = vmrequest else { unreachable!() };
+        let start = args.heap.reserve(extent, top);
+
         let space = Self {
             name: args.name,
-            cursor: Atomic::new(vm_layout().available_start()),
-            limit: vm_layout().available_start() + total_bytes,
-            start: vm_layout().available_start(),
-            extent: total_bytes,
+            cursor: Atomic::new(start),
+            limit: start + aligned_total_bytes,
+            start,
+            total_bytes: aligned_total_bytes,
             slow_path_zeroing,
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs,
@@ -210,11 +223,10 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         } else {
             MmapStrategy::Normal
         };
-        crate::util::memory::dzmmap_noreplace(vm_layout().available_start(), total_bytes, strategy)
-            .unwrap();
+        crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
         if space
             .metadata
-            .try_map_metadata_space(vm_layout().available_start(), total_bytes)
+            .try_map_metadata_space(start, aligned_total_bytes)
             .is_err()
         {
             // TODO(Javad): handle meta space allocation failure
