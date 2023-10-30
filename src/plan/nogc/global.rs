@@ -10,8 +10,6 @@ use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::heap_meta::SpaceSpec;
-#[allow(unused_imports)]
-use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
