@@ -40,12 +40,8 @@ pub const NEVER_MOVE_OBJECTS: bool = !DEFRAG && !PREFER_COPY_ON_NURSERY_GC;
 /// Otherwise, do it at mark time.
 pub const MARK_LINE_AT_SCAN_TIME: bool = true;
 
-/// Keep track of stats about # of objects traced / moved
 #[cfg(feature = "objects_moved_stats")]
-pub static mut OBJECTS_TRACED_AND_COPIED: AtomicUsize = AtomicUsize::new(0);
-
-#[cfg(feature = "objects_moved_stats")]
-pub static mut OBJECTS_TRACED: AtomicUsize = AtomicUsize::new(0);
+pub static mut IMMIXSPACE_OBJECTS_MARKED: AtomicUsize = AtomicUsize::new(0);
 
 macro_rules! validate {
     ($x: expr) => { assert!($x, stringify!($x)) };

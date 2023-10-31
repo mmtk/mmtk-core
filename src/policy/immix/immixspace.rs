@@ -4,9 +4,7 @@ use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 #[cfg(feature = "objects_moved_stats")]
-use crate::policy::immix::OBJECTS_TRACED;
-#[cfg(feature = "objects_moved_stats")]
-use crate::policy::immix::OBJECTS_TRACED_AND_COPIED;
+use crate::policy::immix::IMMIXSPACE_OBJECTS_MARKED;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
@@ -189,11 +187,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        #[cfg(feature = "objects_moved_stats")]
-        unsafe {
-            OBJECTS_TRACED.fetch_add(1, Ordering::SeqCst);
-        }
-
         if KIND == TRACE_KIND_TRANSITIVE_PIN {
             self.trace_object_without_moving(queue, object)
         } else if KIND == TRACE_KIND_DEFRAG {
@@ -648,11 +641,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 let new_object =
                     object_forwarding::forward_object::<VM>(object, semantics, copy_context);
 
-                #[cfg(feature = "objects_moved_stats")]
-                unsafe {
-                    OBJECTS_TRACED_AND_COPIED.fetch_add(1, Ordering::SeqCst);
-                }
-
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_forwarded::<VM>(new_object);
 
@@ -725,6 +713,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 break;
             }
+        }
+
+        #[cfg(feature = "objects_moved_stats")]
+        unsafe {
+            IMMIXSPACE_OBJECTS_MARKED.fetch_add(1, Ordering::SeqCst);
         }
         true
     }

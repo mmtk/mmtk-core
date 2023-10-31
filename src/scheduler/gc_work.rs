@@ -4,7 +4,9 @@ use crate::global_state::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
 #[cfg(feature = "objects_moved_stats")]
-use crate::policy::immix::{OBJECTS_TRACED, OBJECTS_TRACED_AND_COPIED};
+use crate::policy::immix::IMMIXSPACE_OBJECTS_MARKED;
+#[cfg(feature = "objects_moved_stats")]
+use crate::policy::{OBJECTS_COPIED, OBJECTS_SCANNED};
 use crate::util::*;
 use crate::vm::edge_shape::Edge;
 use crate::vm::*;
@@ -233,11 +235,12 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         #[cfg(feature = "objects_moved_stats")]
         unsafe {
             info!(
-                "# of objects traced: {:?}; # of objects copied: {:?}",
-                OBJECTS_TRACED, OBJECTS_TRACED_AND_COPIED
+                "# of objects scanned: {:?}; # of immixspace objects marked: {:?}, # of objects copied: {:?}",
+                OBJECTS_SCANNED, IMMIXSPACE_OBJECTS_MARKED, OBJECTS_COPIED
             );
-            OBJECTS_TRACED.store(0, Ordering::SeqCst);
-            OBJECTS_TRACED_AND_COPIED.store(0, Ordering::SeqCst);
+            OBJECTS_SCANNED.store(0, Ordering::SeqCst);
+            OBJECTS_COPIED.store(0, Ordering::SeqCst);
+            IMMIXSPACE_OBJECTS_MARKED.store(0, Ordering::SeqCst);
         }
 
         #[cfg(feature = "count_live_bytes_in_gc")]
@@ -850,6 +853,10 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                     trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
+                    #[cfg(feature = "objects_moved_stats")]
+                    unsafe {
+                        OBJECTS_SCANNED.fetch_add(1, Ordering::SeqCst);
+                    }
                     self.post_scan_object(object);
                 } else {
                     // If an object does not support edge-enqueuing, we have to use
@@ -879,6 +886,10 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                         object,
                         object_tracer,
                     );
+                    #[cfg(feature = "objects_moved_stats")]
+                    unsafe {
+                        OBJECTS_SCANNED.fetch_add(1, Ordering::SeqCst);
+                    }
                     self.post_scan_object(object);
                 }
             });

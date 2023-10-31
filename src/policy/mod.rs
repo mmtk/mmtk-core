@@ -30,3 +30,11 @@ pub mod markcompactspace;
 pub mod marksweepspace;
 #[cfg(feature = "vm_space")]
 pub mod vmspace;
+
+/// Keep track of stats about # of objects scanned and copied
+#[cfg(feature = "objects_moved_stats")]
+use std::sync::atomic::AtomicUsize;
+#[cfg(feature = "objects_moved_stats")]
+pub static mut OBJECTS_COPIED: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "objects_moved_stats")]
+pub static mut OBJECTS_SCANNED: AtomicUsize = AtomicUsize::new(0);
