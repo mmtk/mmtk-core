@@ -32,27 +32,27 @@ If the current version is `0.X.x`, the new version should be `0.X+1.0`.
 The PR should include these changes:
 
 1. Bump version in `Cargo.toml`.
-1. Bump version in `macros/Cargo.toml`. Use the new version for the `mmtk-macros` dependency in `Cargo.toml`
-1. Update `CHANGELOG.md`:
+2. Bump version in `macros/Cargo.toml`. Use the new version for the `mmtk-macros` dependency in `Cargo.toml`
+3. Update `CHANGELOG.md`:
    1. Add a section for the new version number and the cut-off date (when the PR is created)
-   1. Add change logs for the release. The following shows one convenient way to do it. If there is a better way, we should adopt.
+   2. Add change logs for the release. The following shows one convenient way to do it. If there is a better way, we should adopt.
       1. Auto generate the list of changes for the release on Github. Click on [`releases`](https://github.com/mmtk/mmtk-core/releases),
          then click [`Draft a new release`](https://github.com/mmtk/mmtk-core/releases/new). Enter the new version tag,
          and the `Generate release notes` button should be avaialble. Copy the notes as the change logs to `CHANGELOG.md`.
          Close the release page without tagging a release.
       2. Categorize the changes in `CHANGELOG.md`. We use these categories: Plan, Policy, Allocator, Scheduler, API, Misc.
-1. Update the pinned Rust version in `rust-toolchain` if necessary.
+4. Update the pinned Rust version in `rust-toolchain` if necessary.
    1. Talk with system admin for our CI machines, and check if there is a newer Rust version that we should be using.
-   1. If we update to a new Rust version, make necessary changes to the code base.
+   2. If we update to a new Rust version, make necessary changes to the code base.
 
 #### Bindings
 
 The PR should include these changes:
 
 1. Bump version in `mmtk/Cargo.toml`. Use the same version as MMTk core.
-1. Update `CHANGELOG.md`, similar to the process in MMTk core.
-1. Update the pinned Rust version in `rust-toolchain` if the Rust version is updated for MMTk core.
-2. Update the dependency of `mmtk` in `mmtk/Cargo.toml` to use the MMTk core PR. Update `Cargo.lock`.
+2. Update `CHANGELOG.md`, similar to the process in MMTk core.
+3. Update the pinned Rust version in `rust-toolchain` if the Rust version is updated for MMTk core.
+4. Update the dependency of `mmtk` in `mmtk/Cargo.toml` to use the MMTk core PR. Update `Cargo.lock`.
 
 #### Merging PRs
 
@@ -64,19 +64,19 @@ The merging is the same as ['Merging a PR with API breaking changes' in pull_req
 Once the PRs are merged, we can tag releases on Github.
 
 1. Go to 'Create a new release' for each involved repository. E.g. https://github.com/mmtk/mmtk-core/releases/new for `mmtk-core.`
-1. Enter the new version (prefixed with `v`) in the box of 'Choose a tag'. Use the default 'target' (`master`).
-1. Enter the release title
+2. Enter the new version (prefixed with `v`) in the box of 'Choose a tag'. Use the default 'target' (`master`).
+3. Enter the release title
    * `MMTk 0.x.0`
    * `MMTk OpenJDK Binding 0.x.0`
-1. Copy the markdown section for this version in the `CHANGELOG.md` as the description for the release.
-1. Tick 'Set as a pre-release'.
-1. Click 'Publish release'.
+4. Copy the markdown section for this version in the `CHANGELOG.md` as the description for the release.
+5. Tick 'Set as a pre-release'.
+6. Click 'Publish release'.
 
 ### Post release checklist
 
 1. Keep an eye on the badges in [README](https://github.com/mmtk/mmtk-core#mmtk)
-   1. crates.io: Once a release is tagged for `mmtk-core`, [cargo-publish.yml](https://github.com/mmtk/mmtk-core/blob/master/.github/workflows/cargo-publish.yml) should be trigger to publish `mmtk-core` to `crates.io`. https://crates.io/crates/mmtk should show the new version.
-   1. docs: Document hosting: Once `mmtk-core` is published to `crates.io`, a job should be queue'd for document generation on `docs.rs`. https://docs.rs/mmtk/latest/mmtk/ should show
+   * crates.io: Once a release is tagged for `mmtk-core`, [cargo-publish.yml](https://github.com/mmtk/mmtk-core/blob/master/.github/workflows/cargo-publish.yml) should be trigger to publish `mmtk-core` to `crates.io`. https://crates.io/crates/mmtk should show the new version.
+   * docs: Document hosting: Once `mmtk-core` is published to `crates.io`, a job should be queue'd for document generation on `docs.rs`. https://docs.rs/mmtk/latest/mmtk/ should show
    the docs for the new version once the generation is done.
 2. Keep an eye on the CI status for the latest commit in MMTk core.
 3. Do point release for fixing severe issues. Currently we normally do not need point releases. Normal bug fixes or any other issues can be fixed in the next release.
