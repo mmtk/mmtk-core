@@ -43,6 +43,7 @@ when an mmtk-core PR is merged and the `binding-refs` comment is present.
 
 1. Make sure there is no other PR in this merging process. If so, resolve those first.
 1. Make sure all the PRs (the mmtk-core PR, the binding PRs, and the associated PRs in the VM repo if any) are ready to merge.
+1. Make sure there is a comment that provides `binding-refs` for all the binding PRs.
 1. For each binding PR that we need to merge:
    1. If the binding PR has an assocate PR in the VM repo, merge the VM PR first. Once it is merged, we will have a commit hash (we refer to it as `{vm_commit}`).
    1. Update `mmtk/Cargo.toml` in the binding:
@@ -59,7 +60,7 @@ when an mmtk-core PR is merged and the `binding-refs` comment is present.
 
 If `auto-merge.yml` failed for any reason, or if we have to manually merge binding PRs, this is the process to follow:
 
-1. Follow Step 1-4 in the auto merging process.
+1. Follow Step 1-5 in the auto merging process. (Step 3 is optional)
 1. When a new commit is pushed to `master`, we record the commit hash (as `{mmtk_core_commit}`).
 1. For each binding PR that we need to merge:
    1. Update `mmtk/Cargo.toml` in the binding:
