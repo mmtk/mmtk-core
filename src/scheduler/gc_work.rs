@@ -3,10 +3,14 @@ use super::*;
 use crate::global_state::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
+#[cfg(feature = "objects_moved_stats")]
+use crate::policy::immix::{OBJECTS_TRACED, OBJECTS_TRACED_AND_COPIED};
 use crate::util::*;
 use crate::vm::edge_shape::Edge;
 use crate::vm::*;
 use crate::*;
+#[cfg(feature = "objects_moved_stats")]
+use atomic::Ordering;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -225,6 +229,16 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             mmtk.get_plan().get_total_pages(),
             self.elapsed.as_millis()
         );
+
+        #[cfg(feature = "objects_moved_stats")]
+        unsafe {
+            info!(
+                "# of objects traced: {:?}; # of objects copied: {:?}",
+                OBJECTS_TRACED, OBJECTS_TRACED_AND_COPIED
+            );
+            OBJECTS_TRACED.store(0, Ordering::SeqCst);
+            OBJECTS_TRACED_AND_COPIED.store(0, Ordering::SeqCst);
+        }
 
         #[cfg(feature = "count_live_bytes_in_gc")]
         {

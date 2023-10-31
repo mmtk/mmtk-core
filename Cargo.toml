@@ -110,6 +110,8 @@ immix_non_moving = []
 # if `immix_non_moving` is in use.
 sticky_immix_non_moving_nursery = []
 
+# Statistics about how many objects get moved in defrag GCs for Immix
+objects_moved_stats = []
 
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
