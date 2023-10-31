@@ -106,7 +106,7 @@ jobs:
             with:
               repository: mmtk/ci-perf-kit
               token: ${{ secrets.CI_ACCESS_TOKEN }}
-              ref: "0.6.8"
+              ref: "0.7-test"
               path: ci-perf-kit
               submodules: true
           # setup
@@ -129,7 +129,7 @@ jobs:
           - name: Compare Performance
             id: run
             run: |
-              JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
+              JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
           # set report.md to output
           - uses: pCYSl5EDgo/cat@master
             id: cat
@@ -208,7 +208,7 @@ jobs:
               with:
                 repository: mmtk/ci-perf-kit
                 token: ${{ secrets.CI_ACCESS_TOKEN }}
-                ref: "0.6.8"
+                ref: "0.7-test"
                 path: ci-perf-kit
                 submodules: true
             # setup
