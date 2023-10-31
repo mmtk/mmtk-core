@@ -219,10 +219,25 @@
 <a href="#219" id="219">219</a>
 <a href="#220" id="220">220</a>
 <a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
-<span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::sync::atomic::Ordering;
+<span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
@@ -230,8 +245,10 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::PageResource;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
@@ -255,11 +272,11 @@
     <span class="doccomment">/// start of this space
     </span>start: Address,
     <span class="doccomment">/// Total bytes for the space
-    </span>extent: usize,
+    </span>total_bytes: usize,
     <span class="doccomment">/// Zero memory after slow-path allocation
     </span>slow_path_zeroing: bool,
     metadata: SideMetadataContext,
-    phantom: PhantomData&lt;VM&gt;,
+    gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; SFT <span class="kw">for </span>LockFreeImmortalSpace&lt;VM&gt; {
@@ -320,12 +337,16 @@
         <span class="macro">unimplemented!</span>()
     }
 
+    <span class="kw">fn </span>get_gc_trigger(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCTrigger&lt;VM&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.gc_trigger
+    }
+
     <span class="kw">fn </span>release_multiple_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _start: Address) {
         <span class="macro">panic!</span>(<span class="string">&quot;immortalspace only releases pages enmasse&quot;</span>)
     }
 
     <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {
-        <span class="kw">unsafe </span>{ sft_map.eager_initialize(<span class="self">self</span>.as_sft(), <span class="self">self</span>.start, <span class="self">self</span>.extent) };
+        <span class="kw">unsafe </span>{ sft_map.eager_initialize(<span class="self">self</span>.as_sft(), <span class="self">self</span>.start, <span class="self">self</span>.total_bytes) };
     }
 
     <span class="kw">fn </span>reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
@@ -336,6 +357,7 @@
     }
 
     <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, _tls: VMThread, pages: usize) -&gt; Address {
+        <span class="macro">trace!</span>(<span class="string">&quot;LockFreeImmortalSpace::acquire&quot;</span>);
         <span class="kw">let </span>bytes = conversions::pages_to_bytes(pages);
         <span class="kw">let </span>start = <span class="self">self
             </span>.cursor
@@ -391,8 +413,8 @@
     <span class="attr">#[allow(dead_code)] </span><span class="comment">// Only used with certain features.
     </span><span class="kw">pub fn </span>new(args: <span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>slow_path_zeroing = args.zeroed;
-        <span class="comment">// FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
-        // https://github.com/mmtk/mmtk-core/issues/314
+
+        <span class="comment">// Get the total bytes for the heap.
         </span><span class="kw">let </span>total_bytes = <span class="kw">match </span><span class="kw-2">*</span>args.options.gc_trigger {
             <span class="kw">crate</span>::util::options::GCTriggerSelector::FixedHeapSize(bytes) =&gt; bytes,
             <span class="kw">_ </span>=&gt; <span class="macro">unimplemented!</span>(),
@@ -403,21 +425,30 @@
             total_bytes,
             vm_layout().available_bytes()
         );
+        <span class="comment">// Align up to chunks
+        </span><span class="kw">let </span>aligned_total_bytes = <span class="kw">crate</span>::util::conversions::raw_align_up(
+            total_bytes,
+            <span class="kw">crate</span>::util::heap::vm_layout::BYTES_IN_CHUNK,
+        );
 
-        <span class="comment">// FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
-        // https://github.com/mmtk/mmtk-core/issues/314
-        </span><span class="kw">let </span>space = <span class="self">Self </span>{
+        <span class="comment">// Create a VM request of fixed size
+        </span><span class="kw">let </span>vmrequest = VMRequest::fixed_size(aligned_total_bytes);
+        <span class="comment">// Reserve the space
+        </span><span class="kw">let </span>VMRequest::Extent{ extent, top } = vmrequest <span class="kw">else </span>{ <span class="macro">unreachable!</span>() };
+        <span class="kw">let </span>start = args.heap.reserve(extent, top);
+
+        <span class="kw">let </span>space = <span class="self">Self </span>{
             name: args.name,
-            cursor: Atomic::new(vm_layout().available_start()),
-            limit: vm_layout().available_start() + total_bytes,
-            start: vm_layout().available_start(),
-            extent: total_bytes,
+            cursor: Atomic::new(start),
+            limit: start + aligned_total_bytes,
+            start,
+            total_bytes: aligned_total_bytes,
             slow_path_zeroing,
             metadata: SideMetadataContext {
                 global: args.global_side_metadata_specs,
                 local: <span class="macro">vec!</span>[],
             },
-            phantom: PhantomData,
+            gc_trigger: args.gc_trigger,
         };
 
         <span class="comment">// Eagerly memory map the entire heap (also zero all the memory)
@@ -426,11 +457,10 @@
         } <span class="kw">else </span>{
             MmapStrategy::Normal
         };
-        <span class="kw">crate</span>::util::memory::dzmmap_noreplace(vm_layout().available_start(), total_bytes, strategy)
-            .unwrap();
+        <span class="kw">crate</span>::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
         <span class="kw">if </span>space
             .metadata
-            .try_map_metadata_space(vm_layout().available_start(), total_bytes)
+            .try_map_metadata_space(start, aligned_total_bytes)
             .is_err()
         {
             <span class="comment">// TODO(Javad): handle meta space allocation failure
