@@ -35,7 +35,7 @@ The PR should include these changes:
 1. Bump version in `macros/Cargo.toml`. Use the new version for the `mmtk-macros` dependency in `Cargo.toml`
 1. Update `CHANGELOG.md`:
    1. Add a section for the new version number and the cut-off date (when the PR is created)
-   1. Add change logs for the release. The following is what I currently do. If there is a better way, we should adopt.
+   1. Add change logs for the release. The following shows one convenient way to do it. If there is a better way, we should adopt.
       1. Auto generate the list of changes for the release on Github. Click on [`releases`](https://github.com/mmtk/mmtk-core/releases),
          then click [`Draft a new release`](https://github.com/mmtk/mmtk-core/releases/new). Enter the new version tag,
          and the `Generate release notes` button should be avaialble. Copy the notes as the change logs to `CHANGELOG.md`.
