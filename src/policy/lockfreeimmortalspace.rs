@@ -132,11 +132,9 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         if start + bytes > self.limit {
             panic!("OutOfMemory")
         }
-        trace!("Going to zero");
         if self.slow_path_zeroing {
             crate::util::memory::zero(start, bytes);
         }
-        trace!("Going to zero - done");
         start
     }
 
