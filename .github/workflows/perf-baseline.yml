@@ -15,7 +15,7 @@ on:
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'self-hosted'
+  RESULT_REPO_BRANCH: 'test'
 
 jobs:
   jikesrvm-baseline:
