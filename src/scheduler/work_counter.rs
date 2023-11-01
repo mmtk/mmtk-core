@@ -162,9 +162,10 @@ mod perf_event {
         /// 0, -1 measures the calling thread on all CPUs
         /// -1, 0 measures all threads on CPU 0
         /// -1, -1 is invalid
-        pub fn new(name: &str, pid: pid_t, cpu: c_int) -> WorkPerfEvent {
+        pub fn new(name: &str, pid: pid_t, cpu: c_int, exclude_kernel: bool) -> WorkPerfEvent {
             let mut pe = PerfEvent::new(name, false)
                 .unwrap_or_else(|_| panic!("Failed to create perf event {}", name));
+            pe.set_exclude_kernel(exclude_kernel as u64);
             pe.open(pid, cpu)
                 .unwrap_or_else(|_| panic!("Failed to open perf event {}", name));
             WorkPerfEvent {
