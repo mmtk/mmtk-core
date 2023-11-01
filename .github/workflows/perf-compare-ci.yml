@@ -63,6 +63,7 @@ jobs:
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
         needs: [binding-refs, mmtk-refs]
+        timeout-minutes: 1440
         steps:
           # Trunk - we always use master from the mmtk org
           # - binding
@@ -165,6 +166,7 @@ jobs:
     openjdk-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
         needs: [binding-refs, mmtk-refs]
+        timeout-minutes: 1440
         steps:
             # Trunk - we always use master from the mmtk org
             # - binding
