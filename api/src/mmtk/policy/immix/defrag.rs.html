@@ -259,7 +259,7 @@
     <span class="kw">const </span>NUM_BINS: usize = (Block::LINES &gt;&gt; <span class="number">1</span>) + <span class="number">1</span>;
     <span class="kw">const </span>DEFRAG_LINE_REUSE_RATIO: f32 = <span class="number">0.99</span>;
     <span class="kw">const </span>MIN_SPILL_THRESHOLD: usize = <span class="number">2</span>;
-    <span class="kw">const </span>DEFRAG_HEADROOM_PERCENT: usize = <span class="number">2</span>;
+    <span class="kw">const </span>DEFRAG_HEADROOM_PERCENT: usize = <span class="kw">super</span>::DEFRAG_HEADROOM_PERCENT;
 
     <span class="doccomment">/// Allocate a new local histogram.
     </span><span class="kw">pub const fn </span>new_histogram(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Histogram {
