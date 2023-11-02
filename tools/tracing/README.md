@@ -224,18 +224,25 @@ However, if we focus on root edges, the distribution is roughly bimodal, with a
 first peak around 8\~16 and a second peak around 4096\~8192.
 
 ## Attribution
-If used for research, please cite the following publication (the `BibTeX` record
-will be updated once a DOI is assigned).
+If used for research, please cite the following publication.
 ```bibtex
-@inproceedings{conf/mplr/Huang23,
+@inproceedings{DBLP:conf/pppj/HuangBC23,
   author       = {Claire Huang and
                   Stephen M. Blackburn and
                   Zixian Cai},
+  editor       = {Rodrigo Bruno and
+                  Eliot Moss},
   title        = {Improving Garbage Collection Observability with Performance Tracing},
-  booktitle    = {Proceedings of the 20th International Conference on Managed Programming
-                  Languages and Runtimes, {MPLR} 2023, Cascais, Portugal, October
-                  22, 2023},
+  booktitle    = {Proceedings of the 20th {ACM} {SIGPLAN} International Conference on
+                  Managed Programming Languages and Runtimes, {MPLR} 2023, Cascais,
+                  Portugal, 22 October 2023},
+  pages        = {85--99},
   publisher    = {{ACM}},
-  year         = {2023}
+  year         = {2023},
+  url          = {https://doi.org/10.1145/3617651.3622986},
+  doi          = {10.1145/3617651.3622986},
+  timestamp    = {Mon, 23 Oct 2023 17:57:18 +0200},
+  biburl       = {https://dblp.org/rec/conf/pppj/HuangBC23.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 ```
