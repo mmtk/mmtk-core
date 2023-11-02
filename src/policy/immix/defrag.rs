@@ -45,7 +45,7 @@ impl Defrag {
     const NUM_BINS: usize = (Block::LINES >> 1) + 1;
     const DEFRAG_LINE_REUSE_RATIO: f32 = 0.99;
     const MIN_SPILL_THRESHOLD: usize = 2;
-    const DEFRAG_HEADROOM_PERCENT: usize = 2;
+    const DEFRAG_HEADROOM_PERCENT: usize = super::DEFRAG_HEADROOM_PERCENT;
 
     /// Allocate a new local histogram.
     pub const fn new_histogram(&self) -> Histogram {
