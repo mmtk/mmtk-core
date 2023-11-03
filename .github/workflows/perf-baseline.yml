@@ -9,13 +9,13 @@ on:
   # READ BEFORE ENABLING THE TRIGGER BELOW
   # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
   # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
-  # pull_request:
-  #   branches:
-  #     - master
+  pull_request:
+    branches:
+      - master
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'self-hosted'
+  RESULT_REPO_BRANCH: 'test'
   # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
   CI_PERF_KIT_BUILD: ci-perf-kit/build
   CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
