@@ -16,6 +16,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/build
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
+
 jobs:
     # Figure out binding PRs.
     binding-refs:
@@ -137,10 +142,18 @@ jobs:
             with:
               path: jikesrvm-compare-report.md
           # upload run results
-          - uses: actions/upload-artifact@v2
+          - name: Upload build as artifacts
+            uses: actions/upload-artifact@v3
             with:
-              name: jikesrvm-log
-              path: ci-perf-kit/running/results/log
+              name: build
+              path: ${{ env.CI_PERF_KIT_BUILD }}
+              if-no-files-found: error
+          - name: Upload logs as artifacts
+            uses: actions/upload-artifact@v3
+            with:
+              name: logs
+              path: ${{ env.CI_PERF_KIT_LOG }}
+              if-no-files-found: error
           - uses: actions/upload-artifact@v2
             with:
               name: jikesrvm-compare-report.md
@@ -160,7 +173,7 @@ jobs:
           - name: Clean up logs and reports
             if: always()
             run: |
-              rm -rf ci-perf-kit/running/results/log/*
+              rm -rf ${{ env.CI_PERF_KIT_LOG }}
               rm jikesrvm-compare-report.md
 
     openjdk-perf-compare:
@@ -240,10 +253,18 @@ jobs:
               with:
                 path: openjdk-compare-report.md
             # upload run results
-            - uses: actions/upload-artifact@v2
+            - name: Upload build as artifacts
+              uses: actions/upload-artifact@v3
               with:
-                name: openjdk-log
-                path: ci-perf-kit/running/results/log
+                name: build
+                path: ${{ env.CI_PERF_KIT_BUILD }}
+                if-no-files-found: error
+            - name: Upload logs as artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                name: logs
+                path: ${{ env.CI_PERF_KIT_LOG }}
+                if-no-files-found: error
             - uses: actions/upload-artifact@v2
               with:
                 name: openjdk-compare-report.md
@@ -262,5 +283,5 @@ jobs:
             - name: Clean up logs and reports
               if: always()
               run: |
-                rm -rf ci-perf-kit/running/results/log/*
+                rm -rf ${{ env.CI_PERF_KIT_LOG }}
                 rm openjdk-compare-report.md

@@ -17,6 +17,9 @@ env:
   RESULT_REPO_BRANCH: 'self-hosted'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/build
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
 
 jobs:
   # JikesRVM
@@ -79,6 +82,18 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   # OpenJDK
   openjdk-perf-regression:
@@ -145,6 +160,18 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -211,3 +238,15 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error

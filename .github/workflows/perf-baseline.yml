@@ -16,6 +16,9 @@ on:
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
   RESULT_REPO_BRANCH: 'self-hosted'
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/build
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
 
 jobs:
   jikesrvm-baseline:
@@ -57,6 +60,18 @@ jobs:
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
           JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-stock.sh ./mmtk-jikesrvm/repos/jikesrvm
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   openjdk-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -97,3 +112,15 @@ jobs:
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-stock.sh ./mmtk-openjdk/repos/openjdk
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
