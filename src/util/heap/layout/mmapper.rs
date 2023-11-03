@@ -3,6 +3,7 @@ use crate::util::memory::*;
 use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
+use bytemuck::NoUninit;
 use std::io::Result;
 
 /// Generic mmap and protection functionality
@@ -65,7 +66,7 @@ pub trait Mmapper: Sync {
 
 /// The mmap state of a mmap chunk.
 #[repr(u8)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, NoUninit)]
 pub(super) enum MapState {
     /// The chunk is unmapped and not managed by MMTk.
     Unmapped,

@@ -19,12 +19,18 @@ pub type ThreadId = usize;
 
 thread_local! {
     /// Current worker's ordinal
-    static WORKER_ORDINAL: Atomic<Option<ThreadId>> = Atomic::new(None);
+    static WORKER_ORDINAL: Atomic<ThreadId> = Atomic::new(ThreadId::MAX);
 }
 
 /// Get current worker ordinal. Return `None` if the current thread is not a worker.
-pub fn current_worker_ordinal() -> Option<ThreadId> {
-    WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed))
+pub fn current_worker_ordinal() -> ThreadId {
+    let ordinal = WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed));
+    debug_assert_ne!(
+        ordinal,
+        ThreadId::MAX,
+        "Thread-local variable WORKER_ORDINAL not set yet."
+    );
+    ordinal
 }
 
 /// The part shared between a GCWorker and the scheduler.
@@ -360,7 +366,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
-        WORKER_ORDINAL.with(|x| x.store(Some(self.ordinal), Ordering::SeqCst));
+        WORKER_ORDINAL.with(|x| x.store(self.ordinal, Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
