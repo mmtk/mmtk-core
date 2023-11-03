@@ -83,13 +83,13 @@ jobs:
       - name: Upload build as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: build
+          name: jikesrvm-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: logs
+          name: jikesrvm-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
           if-no-files-found: error
 
@@ -159,13 +159,13 @@ jobs:
       - name: Upload build as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: build
+          name: openjdk-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: logs
+          name: openjdk-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
           if-no-files-found: error
 
@@ -235,12 +235,12 @@ jobs:
       - name: Upload build as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: build
+          name: mutator-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: logs
+          name: mutator-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
           if-no-files-found: error
