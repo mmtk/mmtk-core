@@ -1,3 +1,48 @@
+0.21.0 (2023-11-03)
+===
+
+## What's Changed
+
+### Plan
+
+* Move some states from BasePlan to GlobalState by @qinsoon in https://github.com/mmtk/mmtk-core/pull/949
+* Extract set_collection_kind and set_gc_status by @qinsoon in https://github.com/mmtk/mmtk-core/pull/957
+* Expose `is_emergency_collection` to VM bindings by @wks in https://github.com/mmtk/mmtk-core/pull/997
+
+### Policy
+
+* Clear all side forwarding bits by @wks in https://github.com/mmtk/mmtk-core/pull/974
+* Stop using the name "ForwardingWord" by @wks in https://github.com/mmtk/mmtk-core/pull/976
+* Implement get_gc_trigger() for LockFreeImmortalSpace by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1003
+
+### API
+
+* Expose alloc_slow. Add a section in user guide about allocation optimization by @qinsoon in https://github.com/mmtk/mmtk-core/pull/967
+* Use BumpPointer::default() by @qinsoon in https://github.com/mmtk/mmtk-core/pull/993
+* Fix mention of `to_object_reference()` in comment by @k-sareen in https://github.com/mmtk/mmtk-core/pull/998
+
+### Documentation
+
+* Fix rustdoc warnings in Rust 1.73 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/978
+* Add a section about debugging tips in user guide by @qinsoon in https://github.com/mmtk/mmtk-core/pull/987
+* Update doc comments by @wks in https://github.com/mmtk/mmtk-core/pull/1000
+* Add document for release by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1007
+* Move constants and add comments for stress copying by @wks in https://github.com/mmtk/mmtk-core/pull/1008
+* Update bibtex of the tracing paper to include the DOI by @caizixian in https://github.com/mmtk/mmtk-core/pull/1009
+
+### CI
+
+* Fix performance baseline workflow by @qinsoon in https://github.com/mmtk/mmtk-core/pull/971
+* Allow auto merge binding PRs by @qinsoon in https://github.com/mmtk/mmtk-core/pull/988
+* Apply a delay before we enable auto merge on a PR by @qinsoon in https://github.com/mmtk/mmtk-core/pull/992
+* Use `cargo generate-lockfile` to update JikesRVM's Cargo.lock by @qinsoon in https://github.com/mmtk/mmtk-core/pull/996
+
+### Misc
+
+* Add option to exclude kernel events from perf results by @k-sareen in https://github.com/mmtk/mmtk-core/pull/995
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.20.0...v0.21.0
+
 0.20.0 (2023-09-29)
 ===
 
