@@ -57,8 +57,6 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
       - id: branch
@@ -135,8 +133,6 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       - id: branch
@@ -215,8 +211,6 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       # run

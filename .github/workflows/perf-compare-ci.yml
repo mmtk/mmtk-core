@@ -119,10 +119,6 @@ jobs:
           # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
           - name: Setup Rust Toolchain
             run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-          - name: Setup
-            run: |
-              mkdir -p ci-perf-kit/running/benchmarks/dacapo
-              cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
           # run compare
           - uses: hasura/comment-progress@v2.1.0
             with:
@@ -230,10 +226,6 @@ jobs:
             # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
             - name: Setup Rust Toolchain
               run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-            - name: Setup
-              run: |
-                mkdir -p ci-perf-kit/running/benchmarks/dacapo
-                cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
             # run compare
             - uses: hasura/comment-progress@v2.1.0
               with:
