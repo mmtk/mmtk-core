@@ -16,6 +16,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/upload
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
+
 jobs:
     # Figure out binding PRs.
     binding-refs:
@@ -107,17 +112,13 @@ jobs:
             with:
               repository: mmtk/ci-perf-kit
               token: ${{ secrets.CI_ACCESS_TOKEN }}
-              ref: "0.7.0"
+              ref: "0.7.1"
               path: ci-perf-kit
               submodules: true
           # setup
           # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
           - name: Setup Rust Toolchain
             run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-          - name: Setup
-            run: |
-              mkdir -p ci-perf-kit/running/benchmarks/dacapo
-              cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
           # run compare
           - uses: hasura/comment-progress@v2.1.0
             with:
@@ -137,10 +138,18 @@ jobs:
             with:
               path: jikesrvm-compare-report.md
           # upload run results
-          - uses: actions/upload-artifact@v2
+          - name: Upload build as artifacts
+            uses: actions/upload-artifact@v3
             with:
-              name: jikesrvm-log
-              path: ci-perf-kit/running/results/log
+              name: jikesrvm-compare-build
+              path: ${{ env.CI_PERF_KIT_BUILD }}
+              if-no-files-found: error
+          - name: Upload logs as artifacts
+            uses: actions/upload-artifact@v3
+            with:
+              name: jikesrvm-compare-logs
+              path: ${{ env.CI_PERF_KIT_LOG }}
+              if-no-files-found: error
           - uses: actions/upload-artifact@v2
             with:
               name: jikesrvm-compare-report.md
@@ -160,7 +169,7 @@ jobs:
           - name: Clean up logs and reports
             if: always()
             run: |
-              rm -rf ci-perf-kit/running/results/log/*
+              rm -rf ${{ env.CI_PERF_KIT_LOG }}
               rm jikesrvm-compare-report.md
 
     openjdk-perf-compare:
@@ -210,17 +219,13 @@ jobs:
               with:
                 repository: mmtk/ci-perf-kit
                 token: ${{ secrets.CI_ACCESS_TOKEN }}
-                ref: "0.7.0"
+                ref: "0.7.1"
                 path: ci-perf-kit
                 submodules: true
             # setup
             # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
             - name: Setup Rust Toolchain
               run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-            - name: Setup
-              run: |
-                mkdir -p ci-perf-kit/running/benchmarks/dacapo
-                cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
             # run compare
             - uses: hasura/comment-progress@v2.1.0
               with:
@@ -240,10 +245,18 @@ jobs:
               with:
                 path: openjdk-compare-report.md
             # upload run results
-            - uses: actions/upload-artifact@v2
+            - name: Upload build as artifacts
+              uses: actions/upload-artifact@v3
               with:
-                name: openjdk-log
-                path: ci-perf-kit/running/results/log
+                name: openjdk-compare-build
+                path: ${{ env.CI_PERF_KIT_BUILD }}
+                if-no-files-found: error
+            - name: Upload logs as artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                name: openjdk-compare-logs
+                path: ${{ env.CI_PERF_KIT_LOG }}
+                if-no-files-found: error
             - uses: actions/upload-artifact@v2
               with:
                 name: openjdk-compare-report.md
@@ -262,5 +275,5 @@ jobs:
             - name: Clean up logs and reports
               if: always()
               run: |
-                rm -rf ci-perf-kit/running/results/log/*
+                rm -rf ${{ env.CI_PERF_KIT_LOG }}
                 rm openjdk-compare-report.md

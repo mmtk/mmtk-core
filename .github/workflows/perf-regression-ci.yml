@@ -17,6 +17,9 @@ env:
   RESULT_REPO_BRANCH: 'self-hosted'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/upload
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
 
 jobs:
   # JikesRVM
@@ -42,7 +45,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.0"
+          ref: "0.7.1"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -54,8 +57,6 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
       - id: branch
@@ -79,6 +80,18 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: jikesrvm-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: jikesrvm-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   # OpenJDK
   openjdk-perf-regression:
@@ -103,7 +116,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.0"
+          ref: "0.7.1"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -120,8 +133,6 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       - id: branch
@@ -145,6 +156,18 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: openjdk-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: openjdk-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -168,7 +191,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.0"
+          ref: "0.7.1"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -188,8 +211,6 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       # run
@@ -211,3 +232,15 @@ jobs:
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutator-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: mutator-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
