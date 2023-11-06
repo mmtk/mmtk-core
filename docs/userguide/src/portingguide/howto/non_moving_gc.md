@@ -58,7 +58,7 @@ the calling runtime thread, but passing in a `nullptr` will also suffice.
 
 ### MMTk-side changes
 
-The Rust side of the binding should simply defer the actual implementation to
+The MMTk-side of the binding should simply defer the actual implementation to
 [`mmtk::memory_manager::initialize_collection`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html).
 See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/0ed99cd8cf51bb5ff8184ef64f8236d85e960e87/mmtk/src/api.rs#L245-L248) for an example.
 
@@ -78,9 +78,82 @@ These function pointers essentially are the API exposed by the VM to MMTk. The
 Let's take the example of a simple upcall and implement that: getting the size
 of a given object.
 
+> **Note:** If your runtime is already implemented in Rust, then it should be
+> easy to directly call into your runtime from the MMTk binding, greatly
+> simplifying the bi-directional API.
+
 ### Runtime-side changes
 
+We define a new `struct` type with the desired upcall:
+
+```C
+[...]
+
+// API from the runtime "Rt" to MMTk
+typedef struct {
+  size_t (*size_of) (void* object);
+} RtUpcalls;
+
+[...]
+```
+
+where "`Rt`" is the name of the runtime (for example, OpenJDK would be
+`OpenjdkUpcalls`, etc.).
+
+We also change the initialization function to take in a pointer to the upcalls:
+
+```C
+[...]
+
+/**
+ * Initialize MMTk instance
+ *
+ * @param upcalls the set of Rt upcalls used by MMTk
+ */
+void mmtk_init(RtUpcalls* upcalls);
+
+[...]
+```
+
+Create a new file `mmtk_upcalls.h[pp]` (or whatever the naming scheme of your
+runtime is) in the runtime-side folder (`mmtk-X/X`) and declare a global
+instance of the upcalls:
+
+```C
+#ifndef MMTK_RT_MMTK_UPCALLS_H
+#define MMTK_RT_MMTK_UPCALLS_H
+
+#include "mmtk.h"
+
+// Single global instance of upcalls passed to MMTk
+extern RtUpcalls rt_upcalls;
+
+#endif  // MMTK_RT_MMTK_UPCALLS_H
+```
+
+This instance is then defined by `mmtk_upcalls.c[pp]`. We define it like so as
+all the functions are usually defined as `static` functions (`static` in C/C++
+means public in current file, but private to others) to avoid being made public
+to other users:
+
+```C
+#include "mmtk_upcalls.h"
+
+static size_t size_of(void* object) {
+  // Runtime-specific implementation of size_of function
+}
+
+RtUpcalls rt_upcalls = {
+  size_of,
+};
+```
+
+The `size_of` function above depends on how your runtime implements getting the
+size of an object.
+
 ### MMTk-side changes
+
+TODO(kunals): Astute readers may have noticed that there is an overhead of an indirect call which is not necessarily great for performance. For performance, duplication is required etc. etc.
 
 ## Spawning GC Threads
 
@@ -96,12 +169,47 @@ option](https://docs.mmtk.io/api/mmtk/util/options/struct.Options.html#structfie
 (See the [NoGC guide](./nogc.md#setting-options-for-mmtk) for more information
 about setting MMTk options).
 
-> **Note:** Since the Coordinator thread always exists, if we set the number of
-> GC threads to 1, the actual number of threads is spawned is still 2.
+> **Note:** Since the Coordinator thread always exists, if we set the number of GC threads to 1, the actual number of threads spawned is still 2.
+
+MMTk calls into the runtime to spawn GC threads since there are runtimes that expect all threads to be registered with it.
 
 ### Runtime-side changes
 
-Spawning GC threads is highly dependant on your runtime's threading subsystem.
+Spawning GC threads is highly dependant on your runtime's threading subsystem. Given MMTk expects the runtime to spawn the threads, we have to implement a new upcall:
+
+```C
+[...]
+
+// Type of GC worker
+enum GcThreadKind {
+  MmtkGcController,
+  MmtkGcWorker
+};
+
+// API from the runtime "Rt" to MMTk
+typedef struct {
+  size_t (*size_of) (void* object);
+  void (*spawn_gc_thread) (void* tls, GcThreadKind kind, void* ctx);
+} RtUpcalls;
+
+/**
+ * Start the GC Controller thread
+ *
+ * @param tls the thread that will be used as the GC Controller
+ * @param context the context for the GC Controller
+ */
+void mmtk_start_gc_controller_thread(void* tls, void* context);
+
+/**
+ * Start a GC Worker thread
+ *
+ * @param tls the thread that will be used as the GC Worker
+ * @param context the context for the GC Worker
+ */
+void mmtk_start_gc_worker_thread(void* tls, void* context);
+
+[...]
+```
 
 ### MMTk-side changes
 
