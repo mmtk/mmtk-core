@@ -86,7 +86,7 @@ And pseudo-code for how you would reset the `BumpPointer`s for all mutators in `
 impl Collection<RtName> for RtNameCollection {
   ...
   fn resume_mutators(tls: VMWorkerThread) {
-    // Reset the cached bump pointers of each mutator to 0x0 after a GC to
+    // Reset the cached bump pointers of each mutator (setting both cursor and limit to 0) after a GC to
     // ensure that the VM sees a cohesive state
     for mutator in mutators {
       mutator.storage.default_bump_pointer = BumpPointer::default();
