@@ -81,7 +81,7 @@ If a plan does not do bump-pointer allocation, we may still implement fast-paths
 {{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_embed_fast-path_struct}}
 ```
 
-And pseudo-code for how you would reset the `BumpPointer`s for all mutators in `resume_mutators`:
+And pseudo-code for how you would reset the `BumpPointer`s for all mutators in `resume_mutators`. Note that these mutators are the runtime's actual mutator threads (i.e. where the cached bump pointers are stored) and are different from MMTk's `Mutator` struct.
 ```rust
 impl Collection<RtName> for RtNameCollection {
   ...
