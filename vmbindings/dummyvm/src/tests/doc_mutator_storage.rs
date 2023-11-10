@@ -117,7 +117,7 @@ pub fn embed_fastpath_struct() {
 
         // Allocate: this will fail in the fastpath, and will get an allocation buffer from the slowpath
         let addr1 = allocate_default(8);
-        // Alloacte: this will allocate from the fastpath
+        // Allocate: this will allocate from the fastpath
         let addr2 = allocate_default(8);
         // ANCHOR_END: mutator_storage_embed_fastpath_struct
 
