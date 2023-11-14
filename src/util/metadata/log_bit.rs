@@ -28,6 +28,7 @@ impl VMGlobalLogBitSpec {
         }
     }
 
+    /// Check if the log bit represents the unlogged state (the bit is 1).
     pub fn is_unlogged<VM: VMBinding>(&self, object: ObjectReference, order: Ordering) -> bool {
         self.load_atomic::<VM, u8>(object, None, order) == 1
     }

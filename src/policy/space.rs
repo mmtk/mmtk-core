@@ -431,7 +431,7 @@ pub struct CommonSpace<VM: VMBinding> {
     pub vm_map: &'static dyn VMMap,
     pub mmapper: &'static dyn Mmapper,
 
-    pub metadata: SideMetadataContext,
+    pub(crate) metadata: SideMetadataContext,
 
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
