@@ -72,6 +72,12 @@
 <a href="#72" id="72">72</a>
 <a href="#73" id="73">73</a>
 <a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.
 //!
 //! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.
@@ -93,7 +99,8 @@
 
 <span class="kw">mod </span>active_plan;
 <span class="kw">mod </span>collection;
-<span class="kw">pub mod </span>edge_shape;
+<span class="doccomment">/// Allows MMTk to access edges in a VM-defined way.
+</span><span class="kw">pub mod </span>edge_shape;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_model;
 <span class="kw">mod </span>reference_glue;
 <span class="kw">mod </span>scanning;
@@ -118,11 +125,16 @@
 <span class="kw">where
     </span><span class="self">Self</span>: Sized + <span class="lifetime">&#39;static </span>+ Send + Sync + Default,
 {
-    <span class="kw">type </span>VMObjectModel: ObjectModel&lt;<span class="self">Self</span>&gt;;
-    <span class="kw">type </span>VMScanning: Scanning&lt;<span class="self">Self</span>&gt;;
-    <span class="kw">type </span>VMCollection: Collection&lt;<span class="self">Self</span>&gt;;
-    <span class="kw">type </span>VMActivePlan: ActivePlan&lt;<span class="self">Self</span>&gt;;
-    <span class="kw">type </span>VMReferenceGlue: ReferenceGlue&lt;<span class="self">Self</span>&gt;;
+    <span class="doccomment">/// The binding&#39;s implementation of [`crate::vm::ObjectModel`].
+    </span><span class="kw">type </span>VMObjectModel: ObjectModel&lt;<span class="self">Self</span>&gt;;
+    <span class="doccomment">/// The binding&#39;s implementation of [`crate::vm::Scanning`].
+    </span><span class="kw">type </span>VMScanning: Scanning&lt;<span class="self">Self</span>&gt;;
+    <span class="doccomment">/// The binding&#39;s implementation of [`crate::vm::Collection`].
+    </span><span class="kw">type </span>VMCollection: Collection&lt;<span class="self">Self</span>&gt;;
+    <span class="doccomment">/// The binding&#39;s implementation of [`crate::vm::ActivePlan`].
+    </span><span class="kw">type </span>VMActivePlan: ActivePlan&lt;<span class="self">Self</span>&gt;;
+    <span class="doccomment">/// The binding&#39;s implementation of [`crate::vm::ReferenceGlue`].
+    </span><span class="kw">type </span>VMReferenceGlue: ReferenceGlue&lt;<span class="self">Self</span>&gt;;
 
     <span class="doccomment">/// The type of edges in this VM.
     </span><span class="kw">type </span>VMEdge: edge_shape::Edge;

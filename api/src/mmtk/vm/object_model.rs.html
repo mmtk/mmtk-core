@@ -564,6 +564,73 @@
 <a href="#564" id="564">564</a>
 <a href="#565" id="565">565</a>
 <a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="self">self</span>::specs::<span class="kw-2">*</span>;
@@ -1054,18 +1121,37 @@
     <span class="comment">// This macro is invoked in define_vm_metadata_global_spec or define_vm_metadata_local_spec.
     // Use those two to define a new VM metadata spec.
     </span><span class="macro">macro_rules! </span>define_vm_metadata_spec {
-        (<span class="macro-nonterminal">$spec_name</span>: ident, <span class="macro-nonterminal">$is_global</span>: expr, <span class="macro-nonterminal">$log_num_bits</span>: expr, <span class="macro-nonterminal">$side_min_obj_size</span>: expr) =&gt; {
+        ($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$spec_name</span>: ident, <span class="macro-nonterminal">$is_global</span>: expr, <span class="macro-nonterminal">$log_num_bits</span>: expr, <span class="macro-nonterminal">$side_min_obj_size</span>: expr) =&gt; {
+            $(<span class="attr">#[<span class="macro-nonterminal">$outer</span>]</span>)*
             <span class="kw">pub struct </span><span class="macro-nonterminal">$spec_name</span>(MetadataSpec);
             <span class="kw">impl </span><span class="macro-nonterminal">$spec_name </span>{
-                <span class="kw">pub const </span>LOG_NUM_BITS: usize = <span class="macro-nonterminal">$log_num_bits</span>;
-                <span class="kw">pub const </span>IS_GLOBAL: bool = <span class="macro-nonterminal">$is_global</span>;
-                <span class="kw">pub const fn </span>in_header(bit_offset: isize) -&gt; <span class="self">Self </span>{
+                <span class="doccomment">/// The number of bits (in log2) that are needed for the spec.
+                </span><span class="kw">pub const </span>LOG_NUM_BITS: usize = <span class="macro-nonterminal">$log_num_bits</span>;
+
+                <span class="doccomment">/// Whether this spec is global or local. For side metadata, the binding needs to make sure
+                /// global specs are laid out after another global spec, and local specs are laid
+                /// out after another local spec. Otherwise, there will be an assertion failure.
+                </span><span class="kw">pub const </span>IS_GLOBAL: bool = <span class="macro-nonterminal">$is_global</span>;
+
+                <span class="doccomment">/// Declare that the VM uses in-header metadata for this metadata type.
+                /// For the specification of the `bit_offset` argument, please refer to
+                /// the document of `[crate::util::metadata::header_metadata::HeaderMetadataSpec.bit_offset]`.
+                /// The binding needs to make sure that the bits used for a spec in the header do not conflict with
+                /// the bits of another spec (unless it is specified that some bits may be reused).
+                </span><span class="kw">pub const fn </span>in_header(bit_offset: isize) -&gt; <span class="self">Self </span>{
                     <span class="self">Self</span>(MetadataSpec::InHeader(HeaderMetadataSpec {
                         bit_offset,
                         num_of_bits: <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_NUM_BITS,
                     }))
                 }
-                <span class="kw">pub const fn </span>side_first() -&gt; <span class="self">Self </span>{
+
+                <span class="doccomment">/// Declare that the VM uses side metadata for this metadata type,
+                /// and the side metadata is the first of its kind (global or local).
+                /// The first global or local side metadata should be declared with `side_first()`,
+                /// and the rest side metadata should be declared with `side_after()` after a defined
+                /// side metadata of the same kind (global or local). Logically, all the declarations
+                /// create two list of side metadata, one for global, and one for local.
+                </span><span class="kw">pub const fn </span>side_first() -&gt; <span class="self">Self </span>{
                     <span class="kw">if </span><span class="self">Self</span>::IS_GLOBAL {
                         <span class="self">Self</span>(MetadataSpec::OnSide(SideMetadataSpec {
                             name: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$spec_name</span>),
@@ -1084,7 +1170,14 @@
                         }))
                     }
                 }
-                <span class="kw">pub const fn </span>side_after(spec: <span class="kw-2">&amp;</span>MetadataSpec) -&gt; <span class="self">Self </span>{
+
+                <span class="doccomment">/// Declare that the VM uses side metadata for this metadata type,
+                /// and the side metadata should be laid out after the given side metadata spec.
+                /// The first global or local side metadata should be declared with `side_first()`,
+                /// and the rest side metadata should be declared with `side_after()` after a defined
+                /// side metadata of the same kind (global or local). Logically, all the declarations
+                /// create two list of side metadata, one for global, and one for local.
+                </span><span class="kw">pub const fn </span>side_after(spec: <span class="kw-2">&amp;</span>MetadataSpec) -&gt; <span class="self">Self </span>{
                     <span class="macro">assert!</span>(spec.is_on_side());
                     <span class="kw">let </span>side_spec = spec.extract_side_spec();
                     <span class="macro">assert!</span>(side_spec.is_global == <span class="self">Self</span>::IS_GLOBAL);
@@ -1096,10 +1189,14 @@
                         log_bytes_in_region: <span class="macro-nonterminal">$side_min_obj_size </span><span class="kw">as </span>usize,
                     }))
                 }
-                <span class="kw">pub const fn </span>as_spec(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MetadataSpec {
+
+                <span class="doccomment">/// Return the inner `[crate::util::metadata::MetadataSpec]` for the metadata type.
+                </span><span class="kw">pub const fn </span>as_spec(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MetadataSpec {
                     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
                 </span>}
-                <span class="kw">pub const fn </span>num_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+
+                <span class="doccomment">/// Return the number of bits for the metadata type.
+                </span><span class="kw">pub const fn </span>num_bits(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
                     <span class="number">1 </span>&lt;&lt; <span class="macro-nonterminal">$log_num_bits
                 </span>}
             }
@@ -1113,21 +1210,58 @@
     }
 
     <span class="comment">// Log bit: 1 bit per object, global
-    </span><span class="macro">define_vm_metadata_spec!</span>(VMGlobalLogBitSpec, <span class="bool-val">true</span>, <span class="number">0</span>, LOG_MIN_OBJECT_SIZE);
+    </span><span class="macro">define_vm_metadata_spec!</span>(
+        <span class="attr">#[doc = <span class="string">&quot;1-bit global metadata to log an object.&quot;</span>]
+        </span>VMGlobalLogBitSpec,
+        <span class="bool-val">true</span>,
+        <span class="number">0</span>,
+        LOG_MIN_OBJECT_SIZE
+    );
     <span class="comment">// Forwarding pointer: word size per object, local
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        VMLocalForwardingPointerSpec,
+        <span class="attr">#[doc = <span class="string">&quot;1-word local metadata for spaces that may copy objects.&quot;</span>]
+        #[doc = <span class="string">&quot;This metadata has to be stored in the header.&quot;</span>]
+        #[doc = <span class="string">&quot;This metadata can be defined at a position within the object payload.&quot;</span>]
+        #[doc = <span class="string">&quot;As a forwarding pointer is only stored in dead objects which is not&quot;</span>]
+        #[doc = <span class="string">&quot;accessible by the language, it is okay that store a forwarding pointer overwrites object payload&quot;</span>]
+        </span>VMLocalForwardingPointerSpec,
         <span class="bool-val">false</span>,
         LOG_BITS_IN_WORD,
         LOG_MIN_OBJECT_SIZE
     );
     <span class="comment">// Forwarding bits: 2 bits per object, local
-    </span><span class="macro">define_vm_metadata_spec!</span>(VMLocalForwardingBitsSpec, <span class="bool-val">false</span>, <span class="number">1</span>, LOG_MIN_OBJECT_SIZE);
+    </span><span class="macro">define_vm_metadata_spec!</span>(
+        <span class="attr">#[doc = <span class="string">&quot;2-bit local metadata for spaces that store a forwarding state for objects.&quot;</span>]
+        #[doc = <span class="string">&quot;If this spec is defined in the header, it can be defined with a position of the lowest 2 bits in the forwarding pointer.&quot;</span>]
+        </span>VMLocalForwardingBitsSpec,
+        <span class="bool-val">false</span>,
+        <span class="number">1</span>,
+        LOG_MIN_OBJECT_SIZE
+    );
     <span class="comment">// Mark bit: 1 bit per object, local
-    </span><span class="macro">define_vm_metadata_spec!</span>(VMLocalMarkBitSpec, <span class="bool-val">false</span>, <span class="number">0</span>, LOG_MIN_OBJECT_SIZE);
+    </span><span class="macro">define_vm_metadata_spec!</span>(
+        <span class="attr">#[doc = <span class="string">&quot;1-bit local metadata for spaces that need to mark an object.&quot;</span>]
+        </span>VMLocalMarkBitSpec,
+        <span class="bool-val">false</span>,
+        <span class="number">0</span>,
+        LOG_MIN_OBJECT_SIZE
+    );
     <span class="comment">// Pinning bit: 1 bit per object, local
-    </span><span class="macro">define_vm_metadata_spec!</span>(VMLocalPinningBitSpec, <span class="bool-val">false</span>, <span class="number">0</span>, LOG_MIN_OBJECT_SIZE);
+    </span><span class="macro">define_vm_metadata_spec!</span>(
+        <span class="attr">#[doc = <span class="string">&quot;1-bit local metadata for spaces that support pinning.&quot;</span>]
+        </span>VMLocalPinningBitSpec,
+        <span class="bool-val">false</span>,
+        <span class="number">0</span>,
+        LOG_MIN_OBJECT_SIZE
+    );
     <span class="comment">// Mark&amp;nursery bits for LOS: 2 bit per page, local
-    </span><span class="macro">define_vm_metadata_spec!</span>(VMLocalLOSMarkNurserySpec, <span class="bool-val">false</span>, <span class="number">1</span>, LOG_BYTES_IN_PAGE);
+    </span><span class="macro">define_vm_metadata_spec!</span>(
+        <span class="attr">#[doc = <span class="string">&quot;2-bits local metadata for the large object space. The two bits serve as&quot;</span>]
+        #[doc = <span class="string">&quot;the mark bit and the nursery bit.&quot;</span>]
+        </span>VMLocalLOSMarkNurserySpec,
+        <span class="bool-val">false</span>,
+        <span class="number">1</span>,
+        LOG_BYTES_IN_PAGE
+    );
 }
 </code></pre></div></section></main></body></html>

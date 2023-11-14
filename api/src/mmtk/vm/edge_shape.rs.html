@@ -268,6 +268,8 @@
 <a href="#268" id="268">268</a>
 <a href="#269" id="269">269</a>
 <a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::{fmt::Debug, ops::Range};
@@ -396,8 +398,10 @@
 
 <span class="doccomment">/// A abstract memory slice represents a piece of **heap** memory.
 </span><span class="kw">pub trait </span>MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
-    <span class="kw">type </span>Edge: Edge;
-    <span class="kw">type </span>EdgeIterator: Iterator&lt;Item = <span class="self">Self</span>::Edge&gt;;
+    <span class="doccomment">/// The associate type to define how to access edges from a memory slice.
+    </span><span class="kw">type </span>Edge: Edge;
+    <span class="doccomment">/// The associate type to define how to iterate edges in a memory slice.
+    </span><span class="kw">type </span>EdgeIterator: Iterator&lt;Item = <span class="self">Self</span>::Edge&gt;;
     <span class="doccomment">/// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
     </span><span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator;
     <span class="doccomment">/// The object which this slice belongs to. If we know the object for the slice, we will check the object state (e.g. mature or not), rather than the slice address.

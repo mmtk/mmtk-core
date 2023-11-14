@@ -327,6 +327,14 @@
 <a href="#327" id="327">327</a>
 <a href="#328" id="328">328</a>
 <a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -571,7 +579,15 @@
     <span class="doccomment">/// Return whether the VM supports return barriers. This is unused at the moment.
     </span><span class="kw">fn </span>supports_return_barrier() -&gt; bool;
 
-    <span class="kw">fn </span>prepare_for_roots_re_scanning();
+    <span class="doccomment">/// Prepare for another round of root scanning in the same GC. Some GC algorithms
+    /// need multiple transitive closures, and each transitive closure starts from
+    /// root scanning. We expect the binding to provide the same root set for every
+    /// round of root scanning in the same GC. Bindings can use this call to get
+    /// ready for another round of root scanning to make sure that the same root
+    /// set will be returned in the upcoming calls of root scanning methods,
+    /// such as [`crate::vm::Scanning::scan_roots_in_mutator_thread`] and
+    /// [`crate::vm::Scanning::scan_vm_specific_roots`].
+    </span><span class="kw">fn </span>prepare_for_roots_re_scanning();
 
     <span class="doccomment">/// Process weak references.
     ///
