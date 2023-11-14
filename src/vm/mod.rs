@@ -19,7 +19,7 @@ use crate::util::constants::*;
 
 mod active_plan;
 mod collection;
-/// Allows MMTk to access edges in a VM defined way.
+/// Allows MMTk to access edges in a VM-defined way.
 pub mod edge_shape;
 pub(crate) mod object_model;
 mod reference_glue;

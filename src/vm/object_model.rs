@@ -495,14 +495,16 @@ pub mod specs {
                 /// The number of bits (in log2) that are needed for the spec.
                 pub const LOG_NUM_BITS: usize = $log_num_bits;
 
-                /// Whether this spec is global or local. The binding needs to make sure
-                /// global specs are laid out after a global spec, and local specs are laid
-                /// out after a local spec. Otherwise, there will be an assertion failure.
+                /// Whether this spec is global or local. For side metadata, the binding needs to make sure
+                /// global specs are laid out after another global spec, and local specs are laid
+                /// out after another local spec. Otherwise, there will be an assertion failure.
                 pub const IS_GLOBAL: bool = $is_global;
 
                 /// Declare that the VM uses in-header metadata for this metadata type.
                 /// For the specification of the `bit_offset` argument, please refer to
                 /// the document of `[crate::util::metadata::header_metadata::HeaderMetadataSpec.bit_offset]`.
+                /// The binding needs to make sure that the bits used for a spec in the header do not conflict with
+                /// the bits of another spec (unless it is specified that some bits may be reused).
                 pub const fn in_header(bit_offset: isize) -> Self {
                     Self(MetadataSpec::InHeader(HeaderMetadataSpec {
                         bit_offset,

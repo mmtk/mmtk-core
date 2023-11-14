@@ -247,7 +247,7 @@ pub trait Scanning<VM: VMBinding> {
     /// root scanning. We expect the binding to provide the same root set for every
     /// round of root scanning in the same GC. Bindings can use this call to get
     /// ready for another round of root scanning to make sure that the same root
-    /// set will be returned in the upcoming calls of root scannig methods,
+    /// set will be returned in the upcoming calls of root scanning methods,
     /// such as [`crate::vm::Scanning::scan_roots_in_mutator_thread`] and
     /// [`crate::vm::Scanning::scan_vm_specific_roots`].
     fn prepare_for_roots_re_scanning();
