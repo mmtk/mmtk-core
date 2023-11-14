@@ -186,7 +186,7 @@ static mut VM_LAYOUT: VMLayout = VMLayout::new_64bit();
 static VM_LAYOUT_FETCHED: AtomicBool = AtomicBool::new(false);
 
 /// Get the current virtual memory layout in use.
-/// If the binding would like to set a custom virtual memory layout ([`crate::MMTK::set_vm_layout`]), they should not
+/// If the binding would like to set a custom virtual memory layout ([`crate::mmtk::MMTKBuilder::set_vm_layout`]), they should not
 /// call this function before they set a custom layout.
 pub fn vm_layout() -> &'static VMLayout {
     if cfg!(debug_assertions) {

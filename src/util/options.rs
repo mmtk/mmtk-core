@@ -27,7 +27,7 @@ pub enum NurseryZeroingOptions {
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum PlanSelector {
     /// Allocation only without a collector. This is usually used for debugging.
-    /// Similar to OpenJDK epsilon (https://openjdk.org/jeps/318).
+    /// Similar to OpenJDK epsilon (<https://openjdk.org/jeps/318>).
     NoGC,
     /// A semi-space collector, which divides the heap into two spaces and
     /// copies the live objects into the other space for every GC.
