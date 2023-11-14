@@ -19,6 +19,7 @@ use crate::util::constants::*;
 
 mod active_plan;
 mod collection;
+/// Allows MMTk to access edges in a VM-defined way.
 pub mod edge_shape;
 pub(crate) mod object_model;
 mod reference_glue;
@@ -44,10 +45,15 @@ pub trait VMBinding
 where
     Self: Sized + 'static + Send + Sync + Default,
 {
+    /// The binding's implementation of [`crate::vm::ObjectModel`].
     type VMObjectModel: ObjectModel<Self>;
+    /// The binding's implementation of [`crate::vm::Scanning`].
     type VMScanning: Scanning<Self>;
+    /// The binding's implementation of [`crate::vm::Collection`].
     type VMCollection: Collection<Self>;
+    /// The binding's implementation of [`crate::vm::ActivePlan`].
     type VMActivePlan: ActivePlan<Self>;
+    /// The binding's implementation of [`crate::vm::ReferenceGlue`].
     type VMReferenceGlue: ReferenceGlue<Self>;
 
     /// The type of edges in this VM.

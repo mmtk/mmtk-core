@@ -5,7 +5,9 @@ use crate::{scheduler::*, Mutator};
 
 /// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
 pub enum GCThreadContext<VM: VMBinding> {
+    /// The GC thread to spawn is a controller thread. There is only one controller thread.
     Controller(Box<GCController<VM>>),
+    /// The GC thread to spawn is a worker thread. There can be multiple worker threads.
     Worker(Box<GCWorker<VM>>),
 }
 

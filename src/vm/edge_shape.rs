@@ -126,7 +126,9 @@ fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
 
 /// A abstract memory slice represents a piece of **heap** memory.
 pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
+    /// The associate type to define how to access edges from a memory slice.
     type Edge: Edge;
+    /// The associate type to define how to iterate edges in a memory slice.
     type EdgeIterator: Iterator<Item = Self::Edge>;
     /// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
     fn iter_edges(&self) -> Self::EdgeIterator;
