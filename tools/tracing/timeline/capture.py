@@ -64,7 +64,7 @@ def main():
         # and doesn't work reliably.
         # See also https://github.com/anupli/running-ng/commit/b74e3a13f56dd97f73432d8a391e1d6cd9db8663
         os.execvp("sudo", ["sudo", args.bpftrace,
-                           "--unsafe", "-kk", tmp.name])
+                           "--unsafe", tmp.name])
 
 
 if __name__ == "__main__":

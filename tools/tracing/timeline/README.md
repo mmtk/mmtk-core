@@ -1,219 +1,124 @@
 # MMTk GC visualization
 
-## About
+This directory contains tools for visualizing the execution time of each work packet on a timeline. 
 
-## Running tracing tools
-The tracing tools are to be invoked by a wrapper script `run.py`.
-```
-usage: run.py [-h] [-b BPFTRACE] -m MMTK [-H] [-p] [-f {text,json}] tool
+## Before Running
 
-positional arguments:
-  tool                  Name of the bpftrace tool
+Before running, you should make sure the [bpftrace] command line utility is installed.
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -b BPFTRACE, --bpftrace BPFTRACE
-                        Path of the bpftrace executable
-  -m MMTK, --mmtk MMTK  Path of the MMTk binary
-  -H, --harness         Only collect data for the timing iteration (harness_begin/harness_end)
-  -p, --print-script    Print the content of the bpftrace script
-  -f {text,json}, --format {text,json}
-                        bpftrace output format
-```
+[bpftrace]: https://github.com/iovisor/bpftrace
 
-- `-b`: the path to the `bpftrace` executable. By default, it uses `bpftrace`
-executable in your `PATH`. We strongly recommend you use the latest statically
-complied `bpftrace` from [upstream](https://github.com/iovisor/bpftrace/releases).
-You need to be able to have sudo permission for whichever `bpftrace` you want to use.
-- `-m`: the path to a MMTk binary that contains the tracepoints.
-This depends on the binding you use.
-For the OpenJDK binding, it should be `jdk/lib/server/libmmtk_openjdk.so` under
-your build folder.
-To check whether the binary contains tracepoints, you can use `readelf -n`.
-You should see a bunch of `stapsdt` notes with `mmtk` as the provider.
-- `-H`: pass this flag is you want to only measure the timing iteration of a
-benchmark.
-By default, the tracing tools will measure the entire execution.
-- `-p`: print the entire tracing script before execution.
-This is mainly for debugging use.
-- `-f`: change the bpftrace output format.
-By default, it uses human-readable plain text output (`text`).
-You can set this to `json` for easy parsing.
+## Capture a log
 
-Please run the tracing tools **before** running the workload.
-If you use `-H`, the tracing tools will automatically end with `harness_end` is
-called.
-Otherwise, you will need to terminate the tools manually with `Ctrl-C`.
-These tools also have a timeout of 1200 seconds so not to stall unattended
-benchmark execution. 
+Run the `./capture.py` script to capture a log.
 
-## Tracing tools
-### Measuring the time spend in allocation slow path (`alloc_slow`)
-This tool measures the distribution of the allocation slow path time.
-The time unit is 400ns, so that we use the histogram bins with higher
-fidelity better.
+In this example, we use the OpenJDK binding to run the `lusearch` benchmark in the DaCapo Benchmark
+Suite.
 
-Sample output:
-```
-@alloc_slow_hist: 
-[4, 8)               304 |@                                                   |
-[8, 16)            12603 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
-[16, 32)            8040 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                   |
-[32, 64)             941 |@@@                                                 |
-[64, 128)            171 |                                                    |
-[128, 256)            13 |                                                    |
-[256, 512)             2 |                                                    |
-[512, 1K)              0 |                                                    |
-[1K, 2K)               0 |                                                    |
-[2K, 4K)               0 |                                                    |
-[4K, 8K)               0 |                                                    |
-[8K, 16K)              0 |                                                    |
-[16K, 32K)            14 |                                                    |
-[32K, 64K)            37 |                                                    |
-[64K, 128K)           19 |                                                    |
-[128K, 256K)           1 |                                                    |
+Run the following command with a **normal** user (*not* as `root` or using `sudo`):
+
+```shell
+./capture.py -e 50 -m /path/to/libmmtk_openjdk.so
 ```
 
-In the above output, we can see that most allocation slow paths finish between
-3.2us and 6.4us.
-However, there is a long tail, presumably due to GC pauses.
+`-e 50` means we only capture one GC in every 50 GCs because otherwise it will record too much log.
+Replace `/path/to/libmmtk_openjdk.so` with the actual path to the `.so` that contains MMTk and its
+binding.
 
-### Measuring the time spend in different GC stages (`gc_stages`)
-This tool measures the time spent in different stages of GC: before `Closure`,
-during `Closure`, and after `Closure`.
-The time unit is ns.
+Run the command and it will prompt you for root password because the script internally invokes
+`sudo` to run `bpftrace`.  If the specified path to the `.so` is correct, it should print something
+like:
 
-Sample output:
 ```
-@closure_time: 1405302743
-@post_closure_time: 81432919
-@pre_closure_time: 103886118
+Attaching 48 probes...
 ```
 
-In the above output, overall, the execution spends 1.4s in the main transitive
-closure, 103ms before that, and 81ms after that (a total of around 1.5s).
+Then open another terminal, and run OpenJDK with MMTk.
 
-### Measuring the time spend in lock contended state for Rust `Mutex` (`lock_contend`)
-This tools measures the time spent in the lock contended state for Rust `Mutex`s.
-The Rust standard library implements `Mutex` using the fast-slow-path paradigm.
-Most lock operations take place in inlined fast paths, when there's no contention.
-However, when there's contention,
-`std::sys::unix::locks::futex_mutex::Mutex::lock_contended` is called.
-
-```rust
-#[inline]
-pub fn lock(&self) {
-    if self.futex.compare_exchange(0, 1, Acquire, Relaxed).is_err() {
-        self.lock_contended();
-    }
-}
-
-#[cold]
-fn lock_contended(&self) {
-    <snip>
-}
+```shell
+/path/to/openjdk/build/linux-x86_64-normal-server-release/images/jdk/bin/java -XX:+UseThirdPartyHeap -Xm{s,x}100M -jar dacapo-23.11-chopin.jar lusearch
 ```
 
+You should see logs showing in the terminal that runs `./capture.py`, like this:
 
-MMTk uses Rust `Mutex`, e.g., in allocation slow paths for synchronization,
-and this tool can be useful to measure the contention in these parts of code.
-
-The time unit is 256ns.
-
-Sample output:
 ```
-@lock_dist[140637228007056]: 
-[1]                  447 |@@@@                                                |
-[2, 4)              3836 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@             |
-[4, 8)              3505 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                |
-[8, 16)             1354 |@@@@@@@@@@@@@@                                      |
-[16, 32)             832 |@@@@@@@@                                            |
-[32, 64)            1077 |@@@@@@@@@@@                                         |
-[64, 128)           2991 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                     |
-[128, 256)          4846 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  |
-[256, 512)          5013 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
-[512, 1K)           1203 |@@@@@@@@@@@@                                        |
-[1K, 2K)              34 |                                                    |
-[2K, 4K)              15 |                                                    |
+...
+WORK,E,23151,19072307551777,140188748267562
+WORK,B,23162,19072307551916,140188748272882,143
+WORK,E,23160,19072307551959,140188748279315
+WORK,B,23150,19072307552199,140188748259188,42
+WORK,B,23151,19072307552801,140188748259188,42
+WORK,E,23150,19072307553295,140188748259188
+WORK,B,23160,19072307553315,140188748259188,42
+WORK,E,23151,19072307553701,140188748259188
+WORK,E,23160,19072307554493,140188748259188
+WORK,E,23156,19072307554636,140188748272882
+WORK,B,23151,19072307554917,140188748272882,143
+WORK,B,23150,19072307555142,140188748327402,406
+WORK,E,23162,19072307555309,140188748272882
+Lost 2027780 events
 ```
 
-In the above output, we can see that the lock instance (140637228007056, or 0x7fe8a8047e90)
-roughly has a bimodal distribution in terms of the time spent in lock contended
-code path.
-The first peak is around 512ns\~1024ns, and the second peak is around 66us\~131us.
+Then press CTRL+C in the terminal that runs `./capture.py`.  It should print additional logs and
+then exit, like this:
 
-If you can't tell which lock instance is for which lock in MMTk, you can trace
-the allocation of the Mutex and record the stack trace (note that you might want
-to compile MMTk with `force-frame-pointers` to obtain better stack traces).
-
-### Measuring the distribution of `process_edges` packet sizes (`packet_size`)
-Most of the GC time is spend in the transitive closure for tracing-based GCs,
-and MMTk performs transitive closure via work packets that calls the `process_edges` method.
-This tool measures the distribution of the sizes of these work packets, and also
-count root edges separately.
-
-Sample output:
 ```
-@process_edges_packet_size: 
-[1]                  238 |@@@@@                                               |
-[2, 4)               806 |@@@@@@@@@@@@@@@@@                                   |
-[4, 8)              1453 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                     |
-[8, 16)             1105 |@@@@@@@@@@@@@@@@@@@@@@@                             |
-[16, 32)            2410 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
-[32, 64)            1317 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@                        |
-[64, 128)           1252 |@@@@@@@@@@@@@@@@@@@@@@@@@@@                         |
-[128, 256)          1131 |@@@@@@@@@@@@@@@@@@@@@@@@                            |
-[256, 512)          2017 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@         |
-[512, 1K)           1270 |@@@@@@@@@@@@@@@@@@@@@@@@@@@                         |
-[1K, 2K)            1028 |@@@@@@@@@@@@@@@@@@@@@@                              |
-[2K, 4K)             874 |@@@@@@@@@@@@@@@@@@                                  |
-[4K, 8K)            1024 |@@@@@@@@@@@@@@@@@@@@@@                              |
-[8K, 16K)             58 |@                                                   |
-[16K, 32K)             5 |                                                    |
-
-@process_edges_root_packet_size: 
-[1]                   71 |@@@@@@@                                             |
-[2, 4)                 4 |                                                    |
-[4, 8)               276 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@                        |
-[8, 16)              495 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
-[16, 32)             477 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  |
-[32, 64)             344 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                |
-[64, 128)            242 |@@@@@@@@@@@@@@@@@@@@@@@@@                           |
-[128, 256)           109 |@@@@@@@@@@@                                         |
-[256, 512)            31 |@@@                                                 |
-[512, 1K)             33 |@@@                                                 |
-[1K, 2K)              75 |@@@@@@@                                             |
-[2K, 4K)              75 |@@@@@@@                                             |
-[4K, 8K)             336 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                 |
-[8K, 16K)             56 |@@@@@                                               |
-[16K, 32K)             3 |                                                    |
+...
+@type_name[140188748468414]: mmtk::util::finalizable_processor::Finalization<mmtk::plan::gen
+@type_name[140188748468841]: mmtk::util::finalizable_processor::Finalization<mmtk::scheduler
+@type_name[140188748470271]: mmtk::util::finalizable_processor::Finalization<mmtk::scheduler
+@type_name[140188748475639]: mmtk::plan::generational::gc_work::ProcessModBuf<mmtk::plan::ge
+@type_name[140188748476795]: mmtk::plan::generational::gc_work::ProcessRegionModBuf<mmtk::pl
+@type_name[140188748477674]: mmtk::plan::generational::gc_work::GenNurseryProcessEdges<mmtk_
 ```
 
-In the above output, we can see that overall, the sizes of the `process_edges`
-has a unimodal distribution with a peak around 16\~32 edges per packet.
-However, if we focus on root edges, the distribution is roughly bimodal, with a
-first peak around 8\~16 and a second peak around 4096\~8192.
+This means things are working properly.  Now re-run `./capture.py` again, but pipe the STDOUT into a
+file.
 
-## Attribution
-If used for research, please cite the following publication.
-```bibtex
-@inproceedings{DBLP:conf/pppj/HuangBC23,
-  author       = {Claire Huang and
-                  Stephen M. Blackburn and
-                  Zixian Cai},
-  editor       = {Rodrigo Bruno and
-                  Eliot Moss},
-  title        = {Improving Garbage Collection Observability with Performance Tracing},
-  booktitle    = {Proceedings of the 20th {ACM} {SIGPLAN} International Conference on
-                  Managed Programming Languages and Runtimes, {MPLR} 2023, Cascais,
-                  Portugal, 22 October 2023},
-  pages        = {85--99},
-  publisher    = {{ACM}},
-  year         = {2023},
-  url          = {https://doi.org/10.1145/3617651.3622986},
-  doi          = {10.1145/3617651.3622986},
-  timestamp    = {Mon, 23 Oct 2023 17:57:18 +0200},
-  biburl       = {https://dblp.org/rec/conf/pppj/HuangBC23.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
-}
 ```
+./capture.py -m /path/to/libmmtk_openjdk.so > mybenchmark.log
+```
+
+Type the root password if prompted.
+
+Then run OpenJDK again.  This time, `./capture.py` should not print anything on the console.  When
+the benchmark finishes, press CTRL-C to quit `./capture.py`.  You should see the log content in the
+log file `mybenchmark.log`.
+
+### `harness_begin` and `harness_end`
+
+If your test harness calls `memory_manager::harness_begin` and `memory_manager::harness_end` before
+and after the main part of the benchmark, you can add the command line option `-H` to `./capture.py`
+so that it only records work packets between those two function calls, and will automatically exit
+once `harness_end` is called (i.e. You don't need to manually press CTRL-C to quit `./capture.py`).
+
+For the OpenJDK binding, it means you need to build the probes (<https://github.com/anupli/probes>)
+and specify the callbacks properly according to your benchmark suite. For example,
+
+```shell
+/path/to/openjdk/build/linux-x86_64-normal-server-release/images/jdk/bin/java \
+    -XX:+UseThirdPartyHeap \
+    -Xm{s,x}100M \
+    -Djava.library.path=/path/to/probes/out \
+    -Dprobes=RustMMTk
+    -cp /path/to/probes/out/probes.jar:/path/to/dacapo-23.11-chopin.jar \
+    Harness -c probe.DacapoChopinCallback lusearch
+```
+
+## Post-processing the log for visualization
+
+Then run `./visualize.py`.
+
+```shell
+./visualize.py mybenchmark.log
+```
+
+It will produce a file named `mybenchmark.log.json.gz`.
+
+Then open a browser and visit Perfetto UI (<https://www.ui.perfetto.dev/>), click "Open trace file"
+on the left, and choose the `mybenchmark.log.json.gz` file just produced.  It will process the log
+in your browser and show a timeline.  Zoom in to one GC, and you should see the timeline for the GC,
+like this:
+
+![Perfetto UI timeline](./perfetto-example.png)
+

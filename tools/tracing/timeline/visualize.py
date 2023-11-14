@@ -43,7 +43,11 @@ class LogProcessor:
 
     def process_log_line(self, line):
         parts = line.split(",")
-        name, be, tid, ts = parts[:4]
+        try:
+            name, be, tid, ts = parts[:4]
+        except:
+            print("Abnormal line: {}".format(line))
+            raise
         ts = int(ts)
         rest = parts[4:]
 

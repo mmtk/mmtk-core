@@ -61,7 +61,6 @@ usdt:$MMTK:mmtk:work_poll {
 usdt:$MMTK:mmtk:work {
     @thread_in_work[tid] = 1;
     if (!(@decoded[arg0]) && @gc_count >= 2) {
-        printf("Name: %s\n", str(arg0, arg1));
         @type_name[arg0] = str(arg0, arg1);
         @decoded[arg0] = 1;
     }
