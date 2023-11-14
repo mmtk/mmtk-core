@@ -492,29 +492,30 @@ pub mod specs {
             $(#[$outer])*
             pub struct $spec_name(MetadataSpec);
             impl $spec_name {
-                #[doc="The number of bits (in log2) that are needed for the spec."]
+                /// The number of bits (in log2) that are needed for the spec.
                 pub const LOG_NUM_BITS: usize = $log_num_bits;
 
-                #[doc="Whether this spec is global or local. The binding needs to make sure"]
-                #[doc="global specs are laid out after a global spec, and local specs are laid"]
-                #[doc="out after a local spec. Otherwise, there will be an assertion failure."]
+                /// Whether this spec is global or local. The binding needs to make sure
+                /// global specs are laid out after a global spec, and local specs are laid
+                /// out after a local spec. Otherwise, there will be an assertion failure.
                 pub const IS_GLOBAL: bool = $is_global;
 
-                #[doc="Declare that the VM uses in-header metadata for this metadata type."]
-                #[doc="For the specification of the `bit_offset` argument, please refer to"]
-                #[doc="the document of `[crate::util::metadata::header_metadata::HeaderMetadataSpec.bit_offset]`."]
+                /// Declare that the VM uses in-header metadata for this metadata type.
+                /// For the specification of the `bit_offset` argument, please refer to
+                /// the document of `[crate::util::metadata::header_metadata::HeaderMetadataSpec.bit_offset]`.
                 pub const fn in_header(bit_offset: isize) -> Self {
                     Self(MetadataSpec::InHeader(HeaderMetadataSpec {
                         bit_offset,
                         num_of_bits: 1 << Self::LOG_NUM_BITS,
                     }))
                 }
-                #[doc="Declare that the VM uses side metadata for this metadata type,"]
-                #[doc="and the side metadata is the first of its kind (global or local)."]
-                #[doc="The first global or local side metadata should be declared with `side_first()`,"]
-                #[doc="and the rest side metadata should be declared with `side_after()` after a defined"]
-                #[doc="side metadata of the same kind (global or local). Logically, all the declarations"]
-                #[doc="create two list of side metadata, one for global, and one for local."]
+
+                /// Declare that the VM uses side metadata for this metadata type,
+                /// and the side metadata is the first of its kind (global or local).
+                /// The first global or local side metadata should be declared with `side_first()`,
+                /// and the rest side metadata should be declared with `side_after()` after a defined
+                /// side metadata of the same kind (global or local). Logically, all the declarations
+                /// create two list of side metadata, one for global, and one for local.
                 pub const fn side_first() -> Self {
                     if Self::IS_GLOBAL {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
@@ -534,12 +535,13 @@ pub mod specs {
                         }))
                     }
                 }
-                #[doc="Declare that the VM uses side metadata for this metadata type,"]
-                #[doc="and the side metadata should be laid out after the given side metadata spec."]
-                #[doc="The first global or local side metadata should be declared with `side_first()`,"]
-                #[doc="and the rest side metadata should be declared with `side_after()` after a defined"]
-                #[doc="side metadata of the same kind (global or local). Logically, all the declarations"]
-                #[doc="create two list of side metadata, one for global, and one for local."]
+
+                /// Declare that the VM uses side metadata for this metadata type,
+                /// and the side metadata should be laid out after the given side metadata spec.
+                /// The first global or local side metadata should be declared with `side_first()`,
+                /// and the rest side metadata should be declared with `side_after()` after a defined
+                /// side metadata of the same kind (global or local). Logically, all the declarations
+                /// create two list of side metadata, one for global, and one for local.
                 pub const fn side_after(spec: &MetadataSpec) -> Self {
                     assert!(spec.is_on_side());
                     let side_spec = spec.extract_side_spec();
@@ -552,11 +554,13 @@ pub mod specs {
                         log_bytes_in_region: $side_min_obj_size as usize,
                     }))
                 }
-                #[doc="Return the inner `[crate::util::metadata::MetadataSpec]` for the metadata type."]
+
+                /// Return the inner `[crate::util::metadata::MetadataSpec]` for the metadata type.
                 pub const fn as_spec(&self) -> &MetadataSpec {
                     &self.0
                 }
-                #[doc="Return the number of bits for the metadata type."]
+
+                /// Return the number of bits for the metadata type.
                 pub const fn num_bits(&self) -> usize {
                     1 << $log_num_bits
                 }
