@@ -13,7 +13,7 @@ fi
 
 ./examples/build.py
 
-ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | xargs | grep -o '{.*}' | grep -o '\w\+')
+ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | sed -e 's/\/\/.*//g' -e '/^$/d' -e 's/,//g' | xargs | grep -o '{.*}' | grep -o '\w\+')
 
 # Test with DummyVM (each test in a separate run)
 cd vmbindings/dummyvm

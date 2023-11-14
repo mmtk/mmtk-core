@@ -10,8 +10,9 @@
 
 /// Malloc provided by libraries
 pub(crate) mod library;
-/// Using malloc as mark sweep free-list allocator
-pub(crate) mod malloc_ms_util;
+/// Using malloc as mark sweep free-list allocator.
+// This module is made public so we can test it from dummyvm. It should be pub(crate).
+pub mod malloc_ms_util;
 
 use crate::util::Address;
 #[cfg(feature = "malloc_counted_size")]
