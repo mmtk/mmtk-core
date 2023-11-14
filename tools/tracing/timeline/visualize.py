@@ -10,7 +10,12 @@ RE_TYPE_ID = re.compile(r"\d+")
 UNKNOWN_TYPE = "(unknown)"
 
 def get_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+            description="""
+This script is the second part of GC visualization.  It takes the output from
+`./capture.py` as input, and format it into a JSON file suitable to be consumed
+by Perfetto UI.
+""")
     parser.add_argument("input", type=str, help="Input file"),
     return parser.parse_args()
 

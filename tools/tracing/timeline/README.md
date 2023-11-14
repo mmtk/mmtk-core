@@ -1,35 +1,6 @@
-# MMTk performance tracing
+# MMTk GC visualization
 
-## Notes for MMTk developers
-Please open pull requests if you develop new tools that others might find useful.
-When you add new tools, please update this documentation.
-If you change MMTk internals that the tracing tools depend on (such as the
-definition of `enum WorkBucketStage`), please update the scripts accordingly.
-
-## Notes for MMTk users
-Since some of the tools depend on the MMTk internals, please use the tools
-shipped with the MMTk release you use.
-
-## Tracepoints
-Currently, the core provides the following tracepoints.
-- `mmtk:collection_initialized()`: GC is enabled
-- `mmtk:harness_begin()`: the timing iteration of a benchmark begins
-- `mmtk:harness_end()`: the timing iteration of a benchmark ends
-- `mmtk:gccontroller_run()`: the GC controller thread enters its work loop
-- `mmtk:gcworker_run()`: a GC worker thread enters its work loop
-- `mmtk:gc_start()`: a collection epoch starts
-- `mmtk:gc_end()`: a collection epoch ends
-- `mmtk:process_edges(num_edges: int, is_roots: bool)`: a invocation of the
-`process_edges` method. The first argument is the number of edges to be processed,
-and the second argument is whether these edges are root edges.
-- `mmtk:bucket_opened(id: int)`: a work bucket opened. The first argument is the
-numerical representation of `enum WorkBucketStage`.
-- `mmtk:work_poll()`: a work packet is to be polled.
-- `mmtk:work(type_name: char *, type_name_len: int)`: a work packet was just
-executed. The first argument is points to the string of the Rust type name of
-the work packet, and the second argument is the length of the string.
-- `mmtk:alloc_slow_once_start()`: the allocation slow path starts.
-- `mmtk:alloc_slow_once_end()`: the allocation slow path ends.
+## About
 
 ## Running tracing tools
 The tracing tools are to be invoked by a wrapper script `run.py`.

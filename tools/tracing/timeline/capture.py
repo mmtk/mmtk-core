@@ -9,7 +9,18 @@ import tempfile
 
 
 def get_args():
-    parser = ArgumentParser()
+    parser = ArgumentParser(
+            description="""
+This script is the first part of GC visualization.  It captures a trace,
+recording the start and end of every GC and every work packet.
+""",
+            epilog="""
+This script should be invoked as a normal user, but it will ask the user for
+root password because it will use `sudo` to run `bpftrace`.  The user should
+redirect the standard output to a log file so that the log file can be post-
+processed by the `./visualize.py` script.
+""")
+
     parser.add_argument("-b", "--bpftrace", type=str, default="bpftrace",
                         help="Path of the bpftrace executable")
     parser.add_argument("-m", "--mmtk", type=str, required=True,
@@ -35,8 +46,10 @@ def main():
     template = Template(bpftrace_script.read_text())
     with tempfile.NamedTemporaryFile(mode="w+t") as tmp:
         content = template.safe_substitute(
-            EVERY=args.every, HARNESS=1 if args.harness else 0,
-            MMTK=mmtk_bin, TMP_FILE=tmp.name)
+            EVERY=args.every,
+            HARNESS=int(args.harness),
+            MMTK=mmtk_bin,
+            TMP_FILE=tmp.name)
         if args.print_script:
             print(content)
         tmp.write(content)
