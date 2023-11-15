@@ -14,9 +14,10 @@ pub(crate) mod spec_defs;
 pub use constants::*;
 pub use global::*;
 
-// Helper modules. We should avoid exposing them to the bindings.
-
+// Re-export helper functions. Allow unused imports in case there is no function that can be re-exported.
+#[allow(unused_imports)]
 pub(crate) use helpers::*;
 #[cfg(target_pointer_width = "32")]
+#[allow(unused_imports)]
 pub(crate) use helpers_32::*;
 pub(crate) use sanity::SideMetadataSanity;
