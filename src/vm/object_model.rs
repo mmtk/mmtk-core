@@ -578,7 +578,7 @@ pub mod specs {
 
     // Log bit: 1 bit per object, global
     define_vm_metadata_spec!(
-        #[doc = "1-bit global metadata to log an object."]
+        /// 1-bit global metadata to log an object.
         VMGlobalLogBitSpec,
         true,
         0,
@@ -586,11 +586,11 @@ pub mod specs {
     );
     // Forwarding pointer: word size per object, local
     define_vm_metadata_spec!(
-        #[doc = "1-word local metadata for spaces that may copy objects."]
-        #[doc = "This metadata has to be stored in the header."]
-        #[doc = "This metadata can be defined at a position within the object payload."]
-        #[doc = "As a forwarding pointer is only stored in dead objects which is not"]
-        #[doc = "accessible by the language, it is okay that store a forwarding pointer overwrites object payload"]
+        /// 1-word local metadata for spaces that may copy objects.
+        /// This metadata has to be stored in the header.
+        /// This metadata can be defined at a position within the object payload.
+        /// As a forwarding pointer is only stored in dead objects which is not
+        /// accessible by the language, it is okay that store a forwarding pointer overwrites object payload
         VMLocalForwardingPointerSpec,
         false,
         LOG_BITS_IN_WORD,
@@ -598,8 +598,8 @@ pub mod specs {
     );
     // Forwarding bits: 2 bits per object, local
     define_vm_metadata_spec!(
-        #[doc = "2-bit local metadata for spaces that store a forwarding state for objects."]
-        #[doc = "If this spec is defined in the header, it can be defined with a position of the lowest 2 bits in the forwarding pointer."]
+        /// 2-bit local metadata for spaces that store a forwarding state for objects.
+        /// If this spec is defined in the header, it can be defined with a position of the lowest 2 bits in the forwarding pointer.
         VMLocalForwardingBitsSpec,
         false,
         1,
@@ -607,7 +607,7 @@ pub mod specs {
     );
     // Mark bit: 1 bit per object, local
     define_vm_metadata_spec!(
-        #[doc = "1-bit local metadata for spaces that need to mark an object."]
+        /// 1-bit local metadata for spaces that need to mark an object.
         VMLocalMarkBitSpec,
         false,
         0,
@@ -615,7 +615,7 @@ pub mod specs {
     );
     // Pinning bit: 1 bit per object, local
     define_vm_metadata_spec!(
-        #[doc = "1-bit local metadata for spaces that support pinning."]
+        /// 1-bit local metadata for spaces that support pinning.
         VMLocalPinningBitSpec,
         false,
         0,
@@ -623,8 +623,8 @@ pub mod specs {
     );
     // Mark&nursery bits for LOS: 2 bit per page, local
     define_vm_metadata_spec!(
-        #[doc = "2-bits local metadata for the large object space. The two bits serve as"]
-        #[doc = "the mark bit and the nursery bit."]
+        /// 2-bits local metadata for the large object space. The two bits serve as
+        /// the mark bit and the nursery bit.
         VMLocalLOSMarkNurserySpec,
         false,
         1,

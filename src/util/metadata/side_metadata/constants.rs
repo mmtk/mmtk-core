@@ -4,8 +4,6 @@ use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::Address;
 
-// Global side metadata start address
-
 // XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,
 // as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
 // reserved addresses such as 0x0.
@@ -16,6 +14,7 @@ use crate::util::Address;
 // the library/heap. So I move this to 0x1000_0000.
 // This is made public, as VM bingdings may need to use this.
 #[cfg(target_pointer_width = "32")]
+/// Global side metadata start address
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_usize(0x1000_0000) };
 
 // FIXME: The 64-bit base address is changed from 0x0600_0000_0000 to 0x0c00_0000_0000 so that it
@@ -23,13 +22,14 @@ pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = unsafe { Address::from_us
 // If there are more spaces, it will still overlap with some spaces.
 // See: https://github.com/mmtk/mmtk-core/issues/458
 #[cfg(target_pointer_width = "64")]
+/// Global side metadata start address
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     unsafe { Address::from_usize(0x0000_0c00_0000_0000usize) };
 
 pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
 
-// Base address of VO bit, public to VM bindings which may need to use this.
+/// Base address of VO bit, public to VM bindings which may need to use this.
 pub const VO_BIT_SIDE_METADATA_ADDR: Address =
     crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_ADDR;
 
@@ -49,7 +49,8 @@ pub(super) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
 #[cfg(target_pointer_width = "64")]
 pub(super) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 
-pub const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
+/// The max bytes (in log2) that may be used for global side metadata.
+pub(crate) const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
     VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
 // TODO - we should check this limit somewhere
 // pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =
