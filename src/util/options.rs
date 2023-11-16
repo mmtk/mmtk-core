@@ -787,8 +787,8 @@ options! {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::DEFAULT_STRESS_FACTOR;
+    use super::*;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
 
