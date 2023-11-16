@@ -167,27 +167,35 @@ impl<VM: VMBinding> Allocators<VM> {
     }
 }
 
-// This type describe which allocator in the allocators set.
-// For VM binding implementors, this type is equivalent to the following native types:
-// #[repr(C)]
-// struct AllocatorSelector {
-//   tag: AllocatorSelectorTag,
-//   payload: u8,
-// }
-// #[repr(u8)]
-// enum AllocatorSelectorTag {
-//   BumpPointer,
-//   LargeObject,
-// }
+/// This type describe an allocator in the [`Allocators`].
+/// For VM binding implementors, this type is equivalent to the following native types:
+/// #[repr(C)]
+/// struct AllocatorSelector {
+///   tag: AllocatorSelectorTag,
+///   payload: u8,
+/// }
+/// #[repr(u8)]
+/// enum AllocatorSelectorTag {
+///   BumpPointer,
+///   LargeObject,
+///   ...
+/// }
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorSelector {
+    /// The index of [`crate::util::alloc::bumpallocator::BumpAllocator`] in [`Allocators::bump_pointer`].
     BumpPointer(u8),
+    /// The index of [`crate::util::alloc::large_object_allocator::LargeObjectAllocator`] in [`Allocators::large_object`].
     LargeObject(u8),
+    /// The index of [`crate::util::alloc::malloc_allocator::MallocAllocator`] in [`Allocators::malloc`].
     Malloc(u8),
+    /// The index of [`crate::util::alloc::immix_allocator::ImmixAllocator`] in [`Allocators::immix`].
     Immix(u8),
+    /// The index of [`crate::util::alloc::markcompact_allocator::MarkCompactAllocator`] in [`Allocators::markcompact`].
     MarkCompact(u8),
+    /// The index of [`crate::util::alloc::free_list_allocator::FreeListAllocator`] in [`Allocators::free_list`].
     FreeList(u8),
+    /// No allocator found.
     #[default]
     None,
 }
@@ -197,11 +205,15 @@ pub enum AllocatorSelector {
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorInfo {
+    /// This allocator uses a [`crate::util::alloc::bumpallocator::BumpPointer`] as its fastpath.
     BumpPointer {
+        /// The byte offset from the mutator's pointer to the [`crate::util::alloc::bumpallocator::BumpPointer`].
         bump_pointer_offset: usize,
     },
+    /// This allocator uses a fastpath, but we haven't implemented it yet.
     // FIXME: Add free-list fast-path
     Unimplemented,
+    /// This allocator does not have a fastpath.
     #[default]
     None,
 }

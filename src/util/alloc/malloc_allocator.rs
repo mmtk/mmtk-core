@@ -9,6 +9,8 @@ use crate::vm::VMBinding;
 
 use super::allocator::AllocatorContext;
 
+/// The allocator that internally uses malloc for all the allocation requests.
+/// This allocator is only intended for experimental uses.
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance

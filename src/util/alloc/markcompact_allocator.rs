@@ -16,15 +16,15 @@ pub struct MarkCompactAllocator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MarkCompactAllocator<VM> {
-    pub fn set_limit(&mut self, cursor: Address, limit: Address) {
+    pub(crate) fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.bump_allocator.set_limit(cursor, limit);
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.bump_allocator.reset();
     }
 
-    pub fn rebind(&mut self, space: &'static dyn Space<VM>) {
+    pub(crate) fn rebind(&mut self, space: &'static dyn Space<VM>) {
         self.bump_allocator.rebind(space);
     }
 }
@@ -89,6 +89,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
 }
 
 impl<VM: VMBinding> MarkCompactAllocator<VM> {
+    /// The number of bytes that the allocator reserves for its own header.
     pub const HEADER_RESERVED_IN_BYTES: usize =
         crate::policy::markcompactspace::MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES;
     pub(crate) fn new(
