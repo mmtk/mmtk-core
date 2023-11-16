@@ -703,92 +703,92 @@ mod gc_trigger_tests {
 // Currently we allow all the options to be set by env var for the sake of convenience.
 // At some point, we may disallow this and all the options can only be set by command line.
 options! {
-    #[doc = "The plan to use."]
+    /// The GC plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::GenImmix,
-    #[doc = "Number of GC worker threads. (There is always one GC controller thread besides the GC workers)"]
+    /// Number of GC worker threads. (There is always one GC controller thread besides the GC workers)
     // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
-    #[doc = "Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)"]
+    /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    #[doc = "Enable a return barrier (not supported)"]
+    /// Enable a return barrier (not supported)
     use_return_barrier:    bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    #[doc = "Should we eagerly finish sweeping at the start of a collection? (not supported)"]
+    /// Should we eagerly finish sweeping at the start of a collection? (not supported)
     eager_complete_sweep:  bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    #[doc = "Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?"]
+    /// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_gc:      bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    #[doc = "The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a"]
-    #[doc = "Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls"]
-    #[doc = "both the upper and lower bounds. The nursery size can be set like 'Fixed:8192', for example,"]
-    #[doc = "to have a Fixed nursery size of 8192 bytes"]
+    /// The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
+    /// Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
+    /// both the upper and lower bounds. The nursery size can be set like 'Fixed:8192', for example,
+    /// to have a Fixed nursery size of 8192 bytes
     // FIXME: This is not a good way to have conflicting options -- we should refactor this
     nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.min > 0 && v.max.map(|max| max > 0 && max >= v.min).unwrap_or(true)]
         = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: None },
-    #[doc = "Should a major GC be performed when a system GC is required?"]
+    /// Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    #[doc = "Should finalization be disabled?"]
+    /// Should finalization be disabled?
     no_finalizer:          bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    #[doc = "Should reference type processing be disabled?"]
-    #[doc = "If reference type processing is disabled, no weak reference processing work is scheduled,"]
-    #[doc = "and we expect a binding to treat weak references as strong references."]
-    #[doc = "We disable weak reference processing by default, as we are still working on it. This will be changed to `false`"]
-    #[doc = "once weak reference processing is implemented properly."]
+    /// Should reference type processing be disabled?
+    /// If reference type processing is disabled, no weak reference processing work is scheduled,
+    /// and we expect a binding to treat weak references as strong references.
+    /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
+    /// once weak reference processing is implemented properly.
     no_reference_types:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    #[doc = "The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)"]
+    /// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     nursery_zeroing:       NurseryZeroingOptions[env_var: true, command_line: true]  [always_valid] = NurseryZeroingOptions::Temporal,
-    #[doc = "How frequent (every X bytes) should we do a stress GC?"]
+    /// How frequent (every X bytes) should we do a stress GC?
     stress_factor:         usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    #[doc = "How frequent (every X bytes) should we run analysis (a STW event that collects data)"]
+    /// How frequent (every X bytes) should we run analysis (a STW event that collects data)
     analysis_factor:       usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    #[doc = "Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness"]
-    #[doc = "and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches"]
-    #[doc = "the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC."]
-    #[doc = "But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress"]
-    #[doc = "factor (e.g. tens of metabytes)."]
+    /// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
+    /// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
+    /// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
+    /// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
+    /// factor (e.g. tens of metabytes).
     precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    #[doc = "The start of vmspace."]
+    /// The start of vmspace.
     vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
-    #[doc = "The size of vmspace."]
+    /// The size of vmspace.
     vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0xdc0_0000,
-    #[doc = "Perf events to measure"]
-    #[doc = "Semicolons are used to separate events"]
-    #[doc = "Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)."]
-    #[doc = "For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores."]
-    #[doc = "Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance."]
+    /// Perf events to measure
+    /// Semicolons are used to separate events
+    /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
+    /// For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
+    /// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
     // TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
     work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
-    #[doc = "Measuring perf events for GC and mutators"]
+    /// Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
-    #[doc = "Should we exclude perf events occurring in kernel space. By default we include the kernel."]
-    #[doc = "Only set this option if you know the implications of excluding the kernel!"]
+    /// Should we exclude perf events occurring in kernel space. By default we include the kernel.
+    /// Only set this option if you know the implications of excluding the kernel!
     perf_exclude_kernel:    bool                  [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = false,
-    #[doc = "Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS"]
-    #[doc = "scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin"]
-    #[doc = "fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are"]
-    #[doc = "separated by commas and may include ranges. There should be no spaces in the core list. For"]
-    #[doc = "example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads."]
-    #[doc = "Note that in the case the program has only been allocated a certain number of cores using"]
-    #[doc = "`taskset`, the core ids in the list should be specified by their perceived index as using"]
-    #[doc = "`taskset` will essentially re-label the core ids. For example, running the program with"]
-    #[doc = "`MMTK_THREAD_AFFINITY=\"0-4\" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will"]
-    #[doc = "be used to pin threads even though we specified the core ids \"0,1,2,3,4\"."]
-    #[doc = "`MMTK_THREAD_AFFINITY=\"12\" taskset -c 6-12 <program>` will not work, on the other hand, as"]
-    #[doc = "there is no core with (perceived) id 12."]
+    /// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
+    /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
+    /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    /// separated by commas and may include ranges. There should be no spaces in the core list. For
+    /// example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    /// Note that in the case the program has only been allocated a certain number of cores using
+    /// `taskset`, the core ids in the list should be specified by their perceived index as using
+    /// `taskset` will essentially re-label the core ids. For example, running the program with
+    /// `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
+    /// be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
+    /// there is no core with (perceived) id 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
-    #[doc = "Set the GC trigger. This defines the heap size and how MMTk triggers a GC."]
-    #[doc = "Default to a fixed heap size of 0.5x physical memory."]
+    /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
+    /// Default to a fixed heap size of 0.5x physical memory.
     gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
-    #[doc = "Enable transparent hugepage support via madvise (only Linux is supported)"]
+    /// Enable transparent hugepage support via madvise (only Linux is supported)
     transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::constants::DEFAULT_STRESS_FACTOR;
+    use super::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
 

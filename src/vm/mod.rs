@@ -15,8 +15,6 @@
 //! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
 //! `rlib` does *not* support LTO.
 
-use crate::util::constants::*;
-
 mod active_plan;
 mod collection;
 /// Allows MMTk to access edges in a VM-defined way.
