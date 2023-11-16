@@ -6,17 +6,21 @@ use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
 use sysinfo::{RefreshKind, System, SystemExt};
 
-pub fn result_is_mapped(result: Result<()>) -> bool {
+/// Check the result from an mmap function in this module.
+/// Return true if the mmap has failed due to an existing conflicting mapping.
+pub(crate) fn result_is_mapped(result: Result<()>) -> bool {
     match result {
         Ok(_) => false,
         Err(err) => err.raw_os_error().unwrap() == libc::EEXIST,
     }
 }
 
+/// Set a range of memory to 0.
 pub fn zero(start: Address, len: usize) {
     set(start, 0, len);
 }
 
+/// Set a range of memory to the given value. Similar to memset.
 pub fn set(start: Address, val: u8, len: usize) {
     unsafe {
         std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
@@ -59,7 +63,9 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 /// repetition.
 #[derive(Debug, Copy, Clone)]
 pub enum MmapStrategy {
+    /// The default mmap strategy.
     Normal,
+    /// Enable transparent huge pages for the pages that are mapped. This option is only for linux.
     TransparentHugePages,
 }
 
@@ -89,7 +95,7 @@ pub fn mmap_noreserve(start: Address, size: usize, strategy: MmapStrategy) -> Re
     mmap_fixed(start, size, prot, flags, strategy)
 }
 
-pub fn mmap_fixed(
+fn mmap_fixed(
     start: Address,
     size: usize,
     prot: libc::c_int,
@@ -119,6 +125,7 @@ pub fn mmap_fixed(
     }
 }
 
+/// Unmap the given memory (in page granularity). This wraps the unsafe libc munmap call.
 pub fn munmap(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
 }
@@ -182,6 +189,7 @@ pub fn panic_if_unmapped(_start: Address, _size: usize) {
     // Possibly we can use posix_mem_offset for both OS/s.
 }
 
+/// Unprotect the given memory (in page granularity) to allow access (PROT_READ/WRITE/EXEC).
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(
         &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) },
@@ -189,6 +197,7 @@ pub fn munprotect(start: Address, size: usize) -> Result<()> {
     )
 }
 
+/// Protect the given memory (in page granularity) to forbid any access (PROT_NONE).
 pub fn mprotect(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(
         &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_NONE) },

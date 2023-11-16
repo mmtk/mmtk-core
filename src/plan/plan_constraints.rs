@@ -51,7 +51,7 @@ impl PlanConstraints {
             num_specialized_scans: 0,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
-            needs_linear_scan: SUPPORT_CARD_SCANNING || LAZY_SWEEP,
+            needs_linear_scan: false,
             needs_concurrent_workers: false,
             generate_gc_trace: false,
             may_trace_duplicate_edges: false,

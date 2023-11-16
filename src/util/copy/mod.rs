@@ -32,12 +32,12 @@ type CopySpaceMapping<VM> = Vec<(CopySelector, &'static dyn Space<VM>)>;
 /// We expect each copying plan to provide a CopyConfig.
 pub struct CopyConfig<VM: VMBinding> {
     /// Mapping CopySemantics to the actual copying allocators (CopySelector)
-    pub copy_mapping: EnumMap<CopySemantics, CopySelector>,
+    pub(crate) copy_mapping: EnumMap<CopySemantics, CopySelector>,
     /// Mapping copying allocators with space
-    pub space_mapping: CopySpaceMapping<VM>,
+    pub(crate) space_mapping: CopySpaceMapping<VM>,
     /// A reference to the plan constraints.
     /// GCWorkerCopyContext may have plan-specific behaviors dependson the plan constraints.
-    pub constraints: &'static PlanConstraints,
+    pub(crate) constraints: &'static PlanConstraints,
 }
 
 impl<VM: VMBinding> Default for CopyConfig<VM> {
@@ -236,7 +236,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
 /// This enum may be expanded in the future to describe more semantics.
 #[derive(Clone, Copy, Enum, Debug)]
 pub enum CopySemantics {
-    /// Copy for non generational plans.
+    /// The default copy behavior.
     DefaultCopy,
     /// Copy in nursery generation.
     Nursery,
@@ -247,6 +247,7 @@ pub enum CopySemantics {
 }
 
 impl CopySemantics {
+    /// Are we copying to a mature space?
     pub fn is_mature(&self) -> bool {
         matches!(self, CopySemantics::PromoteToMature | CopySemantics::Mature)
     }
@@ -254,7 +255,7 @@ impl CopySemantics {
 
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, Default)]
-pub enum CopySelector {
+pub(crate) enum CopySelector {
     CopySpace(u8),
     Immix(u8),
     ImmixHybrid(u8),

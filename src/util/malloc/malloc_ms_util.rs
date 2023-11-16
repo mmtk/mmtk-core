@@ -16,8 +16,9 @@ pub fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
     address
 }
 
-// Beside returning the allocation result,
-// this will store the malloc result at (result - BYTES_IN_ADDRESS)
+/// Allocate with alignment and offset.
+/// Beside returning the allocation result, this will store the malloc result at (result - BYTES_IN_ADDRESS)
+/// so we know the original malloc result.
 pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> Address {
     // we allocate extra `align` bytes here, so we are able to handle offset
     let actual_size = size + align + BYTES_IN_ADDRESS;
@@ -37,13 +38,14 @@ pub fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: usiz
     result
 }
 
+/// Get the malloc usable size for an address that is returned by [`crate::util::malloc::malloc_ms_util::align_offset_alloc`].
 pub fn offset_malloc_usable_size(address: Address) -> usize {
     let malloc_res_ptr: *mut usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
     let malloc_res = unsafe { malloc_res_ptr.read_unaligned() } as *mut libc::c_void;
     unsafe { malloc_usable_size(malloc_res) }
 }
 
-/// free an address that is allocated with some offset
+/// Free an address that is allocated with an offset (returned by [`crate::util::malloc::malloc_ms_util::align_offset_alloc`]).
 pub fn offset_free(address: Address) {
     let malloc_res_ptr: *mut usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
     let malloc_res = unsafe { malloc_res_ptr.read_unaligned() } as *mut libc::c_void;
