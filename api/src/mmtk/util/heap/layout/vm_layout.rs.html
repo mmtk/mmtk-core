@@ -194,8 +194,9 @@
 <a href="#194" id="194">194</a>
 <a href="#195" id="195">195</a>
 <a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::atomic::AtomicBool;
+</pre></div><pre class="rust"><code><span class="doccomment">//! The module defines virutal memory layout parameters.
+
+</span><span class="kw">use </span>std::sync::atomic::AtomicBool;
 
 <span class="kw">use </span>atomic::Ordering;
 
@@ -205,27 +206,18 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::{chunk_align_down, chunk_align_up};
 
-<span class="doccomment">/**
- * log_2 of the coarsest unit of address space allocation.
- *
- * In the 32-bit VM layout, this determines the granularity of
- * allocation in a discontigouous space.  In the 64-bit layout,
- * this determines the growth factor of the large contiguous spaces
- * that we provide.
- */
+<span class="doccomment">/// log_2 of the coarsest unit of address space allocation.
 </span><span class="kw">pub const </span>LOG_BYTES_IN_CHUNK: usize = <span class="number">22</span>;
-
-<span class="doccomment">/** Coarsest unit of address space allocation. */
+<span class="doccomment">/// Coarsest unit of address space allocation.
 </span><span class="kw">pub const </span>BYTES_IN_CHUNK: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHUNK;
-<span class="kw">pub const </span>CHUNK_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHUNK) - <span class="number">1</span>;
-
-<span class="doccomment">/** Coarsest unit of address space allocation, in pages */
+<span class="doccomment">/// Mask for chunk size.
+</span><span class="kw">pub const </span>CHUNK_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHUNK) - <span class="number">1</span>;
+<span class="doccomment">/// Coarsest unit of address space allocation, in pages
 </span><span class="kw">pub const </span>PAGES_IN_CHUNK: usize = <span class="number">1 </span>&lt;&lt; (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize);
-
-<span class="doccomment">/** Granularity at which we map and unmap virtual address space in the heap */
+<span class="doccomment">/// log_2 of the granularity at which we map and unmap virtual address space in the heap
 </span><span class="kw">pub const </span>LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
-
-<span class="kw">pub const </span>MMAP_CHUNK_BYTES: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_CHUNK_BYTES;
+<span class="doccomment">/// Granularity at which we map and unmap virtual address space in the heap
+</span><span class="kw">pub const </span>MMAP_CHUNK_BYTES: usize = <span class="number">1 </span>&lt;&lt; LOG_MMAP_CHUNK_BYTES;
 
 <span class="doccomment">/// Runtime-initialized virtual memory constants
 </span><span class="attr">#[derive(Clone, Debug)]
@@ -247,9 +239,12 @@
 
 <span class="kw">impl </span>VMLayout {
     <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="doccomment">/// The maximum virtual memory address space that can be used on the target.
     </span><span class="kw">pub const </span>LOG_ARCH_ADDRESS_SPACE: usize = <span class="number">32</span>;
     <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+    </span><span class="doccomment">/// The maximum virtual memory address space that can be used on the target.
     </span><span class="kw">pub const </span>LOG_ARCH_ADDRESS_SPACE: usize = <span class="number">47</span>;
+
     <span class="doccomment">/// An upper bound on the extent of any space in the
     /// current memory layout
     </span><span class="kw">pub const fn </span>max_space_extent(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
@@ -386,7 +381,10 @@
 
 <span class="kw">static </span>VM_LAYOUT_FETCHED: AtomicBool = AtomicBool::new(<span class="bool-val">false</span>);
 
-<span class="kw">pub fn </span>vm_layout() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMLayout {
+<span class="doccomment">/// Get the current virtual memory layout in use.
+/// If the binding would like to set a custom virtual memory layout ([`crate::mmtk::MMTKBuilder::set_vm_layout`]), they should not
+/// call this function before they set a custom layout.
+</span><span class="kw">pub fn </span>vm_layout() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>VMLayout {
     <span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
         VM_LAYOUT_FETCHED.store(<span class="bool-val">true</span>, Ordering::SeqCst);
     }

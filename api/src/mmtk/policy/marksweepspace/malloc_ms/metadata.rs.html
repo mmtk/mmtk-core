@@ -395,7 +395,7 @@
 <span class="doccomment">/// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
-</span><span class="kw">pub fn </span>map_meta_space(metadata: <span class="kw-2">&amp;</span>SideMetadataContext, addr: Address, size: usize) {
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>map_meta_space(metadata: <span class="kw-2">&amp;</span>SideMetadataContext, addr: Address, size: usize) {
     <span class="comment">// In order to prevent race conditions, we synchronize on the lock first and then
     // check if we need to map the active chunk metadata for `chunk_start`
     </span><span class="kw">let </span>_lock = CHUNK_MAP_LOCK.lock().unwrap();
@@ -484,7 +484,7 @@
     ACTIVE_PAGE_METADATA_SPEC.load::&lt;u8&gt;(page_addr) == <span class="number">1
 </span>}
 
-<span class="kw">pub fn </span>is_chunk_mapped(chunk_start: Address) -&gt; bool {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>is_chunk_mapped(chunk_start: Address) -&gt; bool {
     <span class="comment">// Since `address_to_meta_address` will translate a data address to a metadata address without caring
     // if it goes across metadata boundaries, we have to check if we have accidentally gone over the bounds
     // of the active chunk metadata spec before we check if the metadata has been mapped or not

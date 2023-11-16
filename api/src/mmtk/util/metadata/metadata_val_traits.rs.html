@@ -197,6 +197,12 @@
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>core::sync::atomic::<span class="kw-2">*</span>;
 <span class="kw">use </span>num_traits::{FromPrimitive, ToPrimitive};
@@ -205,8 +211,10 @@
 <span class="doccomment">/// Describes bits and log2 bits for the numbers.
 /// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/247&gt;
 </span><span class="kw">pub trait </span>Bits {
-    <span class="kw">const </span>BITS: u32;
-    <span class="kw">const </span>LOG2: u32;
+    <span class="doccomment">/// The size of this atomic type in bits.
+    </span><span class="kw">const </span>BITS: u32;
+    <span class="doccomment">/// The size (in log2) of this atomic type in bits.
+    </span><span class="kw">const </span>LOG2: u32;
 }
 <span class="macro">macro_rules! </span>impl_bits_trait {
     (<span class="macro-nonterminal">$t</span>: ty) =&gt; {
@@ -225,10 +233,14 @@
 <span class="doccomment">/// Describes bitwise operations.
 /// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/232&gt;
 </span><span class="kw">pub trait </span>BitwiseOps {
-    <span class="kw">fn </span>bitand(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
-    <span class="kw">fn </span>bitor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
-    <span class="kw">fn </span>bitxor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
-    <span class="kw">fn </span>inv(<span class="self">self</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Perform bitwise and for two values.
+    </span><span class="kw">fn </span>bitand(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Perform bitwise or for two values.
+    </span><span class="kw">fn </span>bitor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Perform bitwise xor for two values.
+    </span><span class="kw">fn </span>bitxor(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Perform bitwise invert (not) for the value.
+    </span><span class="kw">fn </span>inv(<span class="self">self</span>) -&gt; <span class="self">Self</span>;
 }
 <span class="macro">macro_rules! </span>impl_bitwise_ops_trait {
     (<span class="macro-nonterminal">$t</span>: ty) =&gt; {

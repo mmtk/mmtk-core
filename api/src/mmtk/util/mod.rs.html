@@ -77,7 +77,6 @@
 <a href="#77" id="77">77</a>
 <a href="#78" id="78">78</a>
 <a href="#79" id="79">79</a>
-<a href="#80" id="80">80</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
 </span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
@@ -105,8 +104,6 @@
 </span><span class="kw">pub mod </span>opaque_pointer;
 <span class="doccomment">/// MMTk command line options.
 </span><span class="kw">pub mod </span>options;
-<span class="doccomment">/// Reference processing implementation.
-</span><span class="kw">pub mod </span>reference_processor;
 
 <span class="comment">// The following modules are only public in the mmtk crate. They should only be used in MMTk core.
 </span><span class="doccomment">/// An analysis framework for collecting data and profiling in GC.
@@ -131,6 +128,8 @@
 </span><span class="kw">pub mod </span>metadata;
 <span class="doccomment">/// Forwarding word in object copying.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_forwarding;
+<span class="doccomment">/// Reference processing implementation.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>reference_processor;
 <span class="doccomment">/// Utilities funcitons for Rust
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>rust_util;
 <span class="doccomment">/// Sanity checker for GC.
@@ -157,5 +156,4 @@
 <span class="kw">pub use </span><span class="self">self</span>::address::Address;
 <span class="kw">pub use </span><span class="self">self</span>::address::ObjectReference;
 <span class="kw">pub use </span><span class="self">self</span>::opaque_pointer::<span class="kw-2">*</span>;
-<span class="kw">pub use </span><span class="self">self</span>::reference_processor::ReferenceProcessor;
 </code></pre></div></section></main></body></html>

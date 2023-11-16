@@ -1713,6 +1713,35 @@
 <a href="#1713" id="1713">1713</a>
 <a href="#1714" id="1714">1714</a>
 <a href="#1715" id="1715">1715</a>
+<a href="#1716" id="1716">1716</a>
+<a href="#1717" id="1717">1717</a>
+<a href="#1718" id="1718">1718</a>
+<a href="#1719" id="1719">1719</a>
+<a href="#1720" id="1720">1720</a>
+<a href="#1721" id="1721">1721</a>
+<a href="#1722" id="1722">1722</a>
+<a href="#1723" id="1723">1723</a>
+<a href="#1724" id="1724">1724</a>
+<a href="#1725" id="1725">1725</a>
+<a href="#1726" id="1726">1726</a>
+<a href="#1727" id="1727">1727</a>
+<a href="#1728" id="1728">1728</a>
+<a href="#1729" id="1729">1729</a>
+<a href="#1730" id="1730">1730</a>
+<a href="#1731" id="1731">1731</a>
+<a href="#1732" id="1732">1732</a>
+<a href="#1733" id="1733">1733</a>
+<a href="#1734" id="1734">1734</a>
+<a href="#1735" id="1735">1735</a>
+<a href="#1736" id="1736">1736</a>
+<a href="#1737" id="1737">1737</a>
+<a href="#1738" id="1738">1738</a>
+<a href="#1739" id="1739">1739</a>
+<a href="#1740" id="1740">1740</a>
+<a href="#1741" id="1741">1741</a>
+<a href="#1742" id="1742">1742</a>
+<a href="#1743" id="1743">1743</a>
+<a href="#1744" id="1744">1744</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
@@ -1735,9 +1764,13 @@
 /// For performance reasons, objects of this struct should be constants.
 </span><span class="attr">#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 </span><span class="kw">pub struct </span>SideMetadataSpec {
-    <span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
-    <span class="kw">pub </span>is_global: bool,
-    <span class="kw">pub </span>offset: SideMetadataOffset,
+    <span class="doccomment">/// The name for this side metadata.
+    </span><span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+    <span class="doccomment">/// Is this side metadata global? Local metadata is used by certain spaces,
+    /// while global metadata is used by all the spaces.
+    </span><span class="kw">pub </span>is_global: bool,
+    <span class="doccomment">/// The offset for this side metadata.
+    </span><span class="kw">pub </span>offset: SideMetadataOffset,
     <span class="doccomment">/// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     </span><span class="kw">pub </span>log_num_of_bits: usize,
     <span class="doccomment">/// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
@@ -1749,17 +1782,20 @@
     </span><span class="kw">pub const fn </span>is_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.is_global || <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>)
     }
+
     <span class="doccomment">/// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
     </span><span class="kw">pub const fn </span>is_rel_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         !<span class="self">self</span>.is_absolute_offset()
     }
 
-    <span class="kw">pub const fn </span>get_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+    <span class="doccomment">/// Get the absolute offset for the spec.
+    </span><span class="kw">pub const fn </span>get_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_absolute_offset());
         <span class="kw">unsafe </span>{ <span class="self">self</span>.offset.addr }
     }
 
-    <span class="kw">pub const fn </span>get_rel_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="doccomment">/// Get the relative offset for the spec.
+    </span><span class="kw">pub const fn </span>get_rel_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_rel_offset());
         <span class="kw">unsafe </span>{ <span class="self">self</span>.offset.rel_offset }
     }
@@ -2261,7 +2297,9 @@
         )
     }
 
-    <span class="kw">pub fn </span>load_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, order: Ordering) -&gt; T {
+    <span class="doccomment">/// Loads a value from the side metadata for the given address.
+    /// This method has similar semantics to `store` in Rust atomics.
+    </span><span class="kw">pub fn </span>load_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, order: Ordering) -&gt; T {
         <span class="self">self</span>.side_metadata_access::&lt;T, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
             data_addr,
             <span class="prelude-val">None</span>,
@@ -2284,7 +2322,9 @@
         )
     }
 
-    <span class="kw">pub fn </span>store_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, metadata: T, order: Ordering) {
+    <span class="doccomment">/// Store the given value to the side metadata for the given address.
+    /// This method has similar semantics to `store` in Rust atomics.
+    </span><span class="kw">pub fn </span>store_atomic&lt;T: MetadataValue&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, metadata: T, order: Ordering) {
         <span class="self">self</span>.side_metadata_access::&lt;T, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;(
             data_addr,
             <span class="prelude-val">Some</span>(metadata),
@@ -2376,7 +2416,11 @@
         }
     }
 
-    <span class="kw">pub fn </span>compare_exchange_atomic&lt;T: MetadataValue&gt;(
+    <span class="doccomment">/// Stores the new value into the side metadata for the gien address if the current value is the same as the old value.
+    /// This method has similar semantics to `compare_exchange` in Rust atomics.
+    /// The return value is a result indicating whether the new value was written and containing the previous value.
+    /// On success this value is guaranteed to be equal to current.
+    </span><span class="kw">pub fn </span>compare_exchange_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         old_metadata: T,
@@ -2461,7 +2505,9 @@
         (old_raw_byte &amp; mask) &gt;&gt; lshift
     }
 
-    <span class="doccomment">/// Wraps around on overflow.
+    <span class="doccomment">/// Adds the value to the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_add` in Rust atomics.
+    /// Returns the previous value.
     </span><span class="kw">pub fn </span>fetch_add_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
@@ -2494,7 +2540,10 @@
         )
     }
 
-    <span class="kw">pub fn </span>fetch_sub_atomic&lt;T: MetadataValue&gt;(
+    <span class="doccomment">/// Subtracts the value from the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_sub` in Rust atomics.
+    /// Returns the previous value.
+    </span><span class="kw">pub fn </span>fetch_sub_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         val: T,
@@ -2525,7 +2574,10 @@
         )
     }
 
-    <span class="kw">pub fn </span>fetch_and_atomic&lt;T: MetadataValue&gt;(
+    <span class="doccomment">/// Bitwise &#39;and&#39; the value with the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_and` in Rust atomics.
+    /// Returns the previous value.
+    </span><span class="kw">pub fn </span>fetch_and_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         val: T,
@@ -2556,7 +2608,10 @@
         )
     }
 
-    <span class="kw">pub fn </span>fetch_or_atomic&lt;T: MetadataValue&gt;(
+    <span class="doccomment">/// Bitwise &#39;or&#39; the value with the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_or` in Rust atomics.
+    /// Returns the previous value.
+    </span><span class="kw">pub fn </span>fetch_or_atomic&lt;T: MetadataValue&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         val: T,
@@ -2587,7 +2642,10 @@
         )
     }
 
-    <span class="kw">pub fn </span>fetch_update_atomic&lt;T: MetadataValue, F: FnMut(T) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; + Copy&gt;(
+    <span class="doccomment">/// Fetches the value for this side metadata for the given address, and applies a function to it that returns an optional new value.
+    /// This method has similar semantics to `fetch_update` in Rust atomics.
+    /// Returns a Result of Ok(previous_value) if the function returned Some(_), else Err(previous_value).
+    </span><span class="kw">pub fn </span>fetch_update_atomic&lt;T: MetadataValue, F: FnMut(T) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; + Copy&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
         set_order: Ordering,
@@ -2668,12 +2726,12 @@
 }
 
 <span class="kw">impl </span>SideMetadataOffset {
-    <span class="comment">// Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    <span class="doccomment">/// Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
     </span><span class="kw">pub const fn </span>addr(addr: Address) -&gt; <span class="self">Self </span>{
         SideMetadataOffset { addr }
     }
 
-    <span class="comment">// Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    <span class="doccomment">/// Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
     </span><span class="kw">pub const fn </span>rel(rel_offset: usize) -&gt; <span class="self">Self </span>{
         SideMetadataOffset { rel_offset }
     }
@@ -2718,7 +2776,7 @@
 
 <span class="doccomment">/// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan&#39;s specs.
-</span><span class="kw">pub struct </span>SideMetadataContext {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>SideMetadataContext {
     <span class="comment">// For plans
     </span><span class="kw">pub </span>global: Vec&lt;SideMetadataSpec&gt;,
     <span class="comment">// For policies

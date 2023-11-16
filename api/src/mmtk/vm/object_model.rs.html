@@ -1211,7 +1211,7 @@
 
     <span class="comment">// Log bit: 1 bit per object, global
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        <span class="attr">#[doc = <span class="string">&quot;1-bit global metadata to log an object.&quot;</span>]
+        <span class="doccomment">/// 1-bit global metadata to log an object.
         </span>VMGlobalLogBitSpec,
         <span class="bool-val">true</span>,
         <span class="number">0</span>,
@@ -1219,11 +1219,11 @@
     );
     <span class="comment">// Forwarding pointer: word size per object, local
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        <span class="attr">#[doc = <span class="string">&quot;1-word local metadata for spaces that may copy objects.&quot;</span>]
-        #[doc = <span class="string">&quot;This metadata has to be stored in the header.&quot;</span>]
-        #[doc = <span class="string">&quot;This metadata can be defined at a position within the object payload.&quot;</span>]
-        #[doc = <span class="string">&quot;As a forwarding pointer is only stored in dead objects which is not&quot;</span>]
-        #[doc = <span class="string">&quot;accessible by the language, it is okay that store a forwarding pointer overwrites object payload&quot;</span>]
+        <span class="doccomment">/// 1-word local metadata for spaces that may copy objects.
+        /// This metadata has to be stored in the header.
+        /// This metadata can be defined at a position within the object payload.
+        /// As a forwarding pointer is only stored in dead objects which is not
+        /// accessible by the language, it is okay that store a forwarding pointer overwrites object payload
         </span>VMLocalForwardingPointerSpec,
         <span class="bool-val">false</span>,
         LOG_BITS_IN_WORD,
@@ -1231,8 +1231,8 @@
     );
     <span class="comment">// Forwarding bits: 2 bits per object, local
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        <span class="attr">#[doc = <span class="string">&quot;2-bit local metadata for spaces that store a forwarding state for objects.&quot;</span>]
-        #[doc = <span class="string">&quot;If this spec is defined in the header, it can be defined with a position of the lowest 2 bits in the forwarding pointer.&quot;</span>]
+        <span class="doccomment">/// 2-bit local metadata for spaces that store a forwarding state for objects.
+        /// If this spec is defined in the header, it can be defined with a position of the lowest 2 bits in the forwarding pointer.
         </span>VMLocalForwardingBitsSpec,
         <span class="bool-val">false</span>,
         <span class="number">1</span>,
@@ -1240,7 +1240,7 @@
     );
     <span class="comment">// Mark bit: 1 bit per object, local
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        <span class="attr">#[doc = <span class="string">&quot;1-bit local metadata for spaces that need to mark an object.&quot;</span>]
+        <span class="doccomment">/// 1-bit local metadata for spaces that need to mark an object.
         </span>VMLocalMarkBitSpec,
         <span class="bool-val">false</span>,
         <span class="number">0</span>,
@@ -1248,7 +1248,7 @@
     );
     <span class="comment">// Pinning bit: 1 bit per object, local
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        <span class="attr">#[doc = <span class="string">&quot;1-bit local metadata for spaces that support pinning.&quot;</span>]
+        <span class="doccomment">/// 1-bit local metadata for spaces that support pinning.
         </span>VMLocalPinningBitSpec,
         <span class="bool-val">false</span>,
         <span class="number">0</span>,
@@ -1256,8 +1256,8 @@
     );
     <span class="comment">// Mark&amp;nursery bits for LOS: 2 bit per page, local
     </span><span class="macro">define_vm_metadata_spec!</span>(
-        <span class="attr">#[doc = <span class="string">&quot;2-bits local metadata for the large object space. The two bits serve as&quot;</span>]
-        #[doc = <span class="string">&quot;the mark bit and the nursery bit.&quot;</span>]
+        <span class="doccomment">/// 2-bits local metadata for the large object space. The two bits serve as
+        /// the mark bit and the nursery bit.
         </span>VMLocalLOSMarkNurserySpec,
         <span class="bool-val">false</span>,
         <span class="number">1</span>,

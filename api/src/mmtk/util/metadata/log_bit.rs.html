@@ -32,6 +32,7 @@
 <a href="#32" id="32">32</a>
 <a href="#33" id="33">33</a>
 <a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMGlobalLogBitSpec;
@@ -62,7 +63,8 @@
         }
     }
 
-    <span class="kw">pub fn </span>is_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) -&gt; bool {
+    <span class="doccomment">/// Check if the log bit represents the unlogged state (the bit is 1).
+    </span><span class="kw">pub fn </span>is_unlogged&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, order: Ordering) -&gt; bool {
         <span class="self">self</span>.load_atomic::&lt;VM, u8&gt;(object, <span class="prelude-val">None</span>, order) == <span class="number">1
     </span>}
 }

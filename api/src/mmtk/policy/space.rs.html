@@ -1070,7 +1070,7 @@
     <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
     <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
 
-    <span class="kw">pub </span>metadata: SideMetadataContext,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) metadata: SideMetadataContext,
 
     <span class="doccomment">/// This field equals to needs_log_bit in the plan constraints.
     </span><span class="comment">// TODO: This should be a constant for performance.

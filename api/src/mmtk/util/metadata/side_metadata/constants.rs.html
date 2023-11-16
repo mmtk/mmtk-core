@@ -84,15 +84,14 @@
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataOffset;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-<span class="comment">// Global side metadata start address
-
-// XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,
+<span class="comment">// XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,
 // as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
 // reserved addresses such as 0x0.
 // XXXX: I updated the base address for 32 bit to 0x1000_0000. For what I tested on, the library
@@ -102,6 +101,7 @@
 // the library/heap. So I move this to 0x1000_0000.
 // This is made public, as VM bingdings may need to use this.
 </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="doccomment">/// Global side metadata start address
 </span><span class="kw">pub const </span>GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address = <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x1000_0000</span>) };
 
 <span class="comment">// FIXME: The 64-bit base address is changed from 0x0600_0000_0000 to 0x0c00_0000_0000 so that it
@@ -109,13 +109,14 @@
 // If there are more spaces, it will still overlap with some spaces.
 // See: https://github.com/mmtk/mmtk-core/issues/458
 </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="doccomment">/// Global side metadata start address
 </span><span class="kw">pub const </span>GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     <span class="kw">unsafe </span>{ Address::from_usize(<span class="number">0x0000_0c00_0000_0000usize</span>) };
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
 
-<span class="comment">// Base address of VO bit, public to VM bindings which may need to use this.
+<span class="doccomment">/// Base address of VO bit, public to VM bindings which may need to use this.
 </span><span class="kw">pub const </span>VO_BIT_SIDE_METADATA_ADDR: Address =
     <span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_ADDR;
 
@@ -135,7 +136,8 @@
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const </span>LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = <span class="number">1</span>;
 
-<span class="kw">pub const </span>LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
+<span class="doccomment">/// The max bytes (in log2) that may be used for global side metadata.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
     VMLayout::LOG_ARCH_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
 <span class="comment">// TODO - we should check this limit somewhere
 // pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =

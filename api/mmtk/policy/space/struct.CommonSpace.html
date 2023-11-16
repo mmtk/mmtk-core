@@ -11,7 +11,7 @@
     pub extent: <a class="primitive" href="https://doc.rust-lang.org/1.71.1/std/primitive.usize.html">usize</a>,
     pub vm_map: &amp;'static dyn <a class="trait" href="../../util/heap/layout/map/trait.VMMap.html" title="trait mmtk::util::heap::layout::map::VMMap">VMMap</a>,
     pub mmapper: &amp;'static dyn <a class="trait" href="../../util/heap/layout/mmapper/trait.Mmapper.html" title="trait mmtk::util::heap::layout::mmapper::Mmapper">Mmapper</a>,
-    pub metadata: <a class="struct" href="../../util/metadata/side_metadata/global/struct.SideMetadataContext.html" title="struct mmtk::util::metadata::side_metadata::global::SideMetadataContext">SideMetadataContext</a>,
+    pub(crate) metadata: <a class="struct" href="../../util/metadata/side_metadata/global/struct.SideMetadataContext.html" title="struct mmtk::util::metadata::side_metadata::global::SideMetadataContext">SideMetadataContext</a>,
     pub needs_log_bit: <a class="primitive" href="https://doc.rust-lang.org/1.71.1/std/primitive.bool.html">bool</a>,
     pub acquire_lock: <a class="struct" href="https://doc.rust-lang.org/1.71.1/std/sync/mutex/struct.Mutex.html" title="struct std::sync::mutex::Mutex">Mutex</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.71.1/std/primitive.unit.html">()</a>&gt;,
     pub gc_trigger: <a class="struct" href="https://doc.rust-lang.org/1.71.1/alloc/sync/struct.Arc.html" title="struct alloc::sync::Arc">Arc</a>&lt;<a class="struct" href="../../util/heap/gc_trigger/struct.GCTrigger.html" title="struct mmtk::util::heap::gc_trigger::GCTrigger">GCTrigger</a>&lt;VM&gt;&gt;,

@@ -145,7 +145,7 @@
 <span class="kw">use </span>std::io::Result;
 
 <span class="doccomment">/// Performs address translation in contiguous metadata spaces (e.g. global and policy-specific in 64-bits, and global in 32-bits)
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>address_to_contiguous_meta_address(
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>address_to_contiguous_meta_address(
     metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
     data_addr: Address,
 ) -&gt; Address {
@@ -163,7 +163,7 @@
 
 <span class="doccomment">/// Unmaps the specified metadata range, or panics.
 </span><span class="attr">#[cfg(test)]
-</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>ensure_munmap_metadata(start: Address, size: usize) {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>ensure_munmap_metadata(start: Address, size: usize) {
     <span class="kw">use </span><span class="kw">crate</span>::util::memory;
     <span class="macro">trace!</span>(<span class="string">&quot;ensure_munmap_metadata({}, 0x{:x})&quot;</span>, start, size);
 
@@ -193,7 +193,7 @@
 <span class="doccomment">/// Tries to mmap the metadata space (`spec`) for the specified data address range (`start` and `size`).
 /// Setting `no_reserve` to true means the function will only map address range, without reserving swap-space/physical memory.
 /// Returns the size in bytes that gets mmapped in the function if success.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>try_mmap_contiguous_metadata_space(
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>try_mmap_contiguous_metadata_space(
     start: Address,
     size: usize,
     spec: <span class="kw-2">&amp;</span>SideMetadataSpec,
@@ -246,17 +246,17 @@
     res
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const fn </span>addr_rshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; i32 {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>addr_rshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; i32 {
     ((LOG_BITS_IN_BYTE <span class="kw">as </span>usize) + metadata_spec.log_bytes_in_region
         - (metadata_spec.log_num_of_bits)) <span class="kw">as </span>i32
 }
 
 <span class="attr">#[allow(dead_code)]
-</span><span class="kw">pub const fn </span>metadata_address_range_size(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; usize {
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const fn </span>metadata_address_range_size(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; usize {
     <span class="number">1usize </span>&lt;&lt; (VMLayout::LOG_ARCH_ADDRESS_SPACE - addr_rshift(metadata_spec) <span class="kw">as </span>usize)
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_lshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u8 {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>meta_byte_lshift(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, data_addr: Address) -&gt; u8 {
     <span class="kw">let </span>bits_num_log = metadata_spec.log_num_of_bits <span class="kw">as </span>i32;
     <span class="kw">if </span>bits_num_log &gt;= <span class="number">3 </span>{
         <span class="kw">return </span><span class="number">0</span>;
@@ -266,7 +266,7 @@
         <span class="kw">as </span>u8
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>meta_byte_mask(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; u8 {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>meta_byte_mask(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec) -&gt; u8 {
     <span class="kw">let </span>bits_num_log = metadata_spec.log_num_of_bits;
     ((<span class="number">1usize </span>&lt;&lt; (<span class="number">1usize </span>&lt;&lt; bits_num_log)) - <span class="number">1</span>) <span class="kw">as </span>u8
 }

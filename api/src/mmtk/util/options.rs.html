@@ -1165,6 +1165,31 @@
 <a href="#1165" id="1165">1165</a>
 <a href="#1166" id="1166">1166</a>
 <a href="#1167" id="1167">1167</a>
+<a href="#1168" id="1168">1168</a>
+<a href="#1169" id="1169">1169</a>
+<a href="#1170" id="1170">1170</a>
+<a href="#1171" id="1171">1171</a>
+<a href="#1172" id="1172">1172</a>
+<a href="#1173" id="1173">1173</a>
+<a href="#1174" id="1174">1174</a>
+<a href="#1175" id="1175">1175</a>
+<a href="#1176" id="1176">1176</a>
+<a href="#1177" id="1177">1177</a>
+<a href="#1178" id="1178">1178</a>
+<a href="#1179" id="1179">1179</a>
+<a href="#1180" id="1180">1180</a>
+<a href="#1181" id="1181">1181</a>
+<a href="#1182" id="1182">1182</a>
+<a href="#1183" id="1183">1183</a>
+<a href="#1184" id="1184">1184</a>
+<a href="#1185" id="1185">1185</a>
+<a href="#1186" id="1186">1186</a>
+<a href="#1187" id="1187">1187</a>
+<a href="#1188" id="1188">1188</a>
+<a href="#1189" id="1189">1189</a>
+<a href="#1190" id="1190">1190</a>
+<a href="#1191" id="1191">1191</a>
+<a href="#1192" id="1192">1192</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
@@ -1176,25 +1201,44 @@
 
 <span class="kw">use </span><span class="kw">super</span>::heap::vm_layout::vm_layout;
 
-<span class="attr">#[derive(Copy, Clone, EnumString, Debug)]
+<span class="doccomment">/// The zeroing approach to use for new object allocations.
+/// Affects each plan differently.
+</span><span class="attr">#[derive(Copy, Clone, EnumString, Debug)]
 </span><span class="kw">pub enum </span>NurseryZeroingOptions {
-    Temporal,
-    Nontemporal,
-    Concurrent,
-    Adaptive,
+    <span class="doccomment">/// Zeroing with normal temporal write.
+    </span>Temporal,
+    <span class="doccomment">/// Zeroing with cache-bypassing non-temporal write.
+    </span>Nontemporal,
+    <span class="doccomment">/// Zeroing with a separate zeroing thread.
+    </span>Concurrent,
+    <span class="doccomment">/// An adaptive approach using both non-temporal write and a concurrent zeroing thread.
+    </span>Adaptive,
 }
 
-<span class="attr">#[derive(Copy, Clone, EnumString, Debug)]
+<span class="doccomment">/// Select a GC plan for MMTk.
+</span><span class="attr">#[derive(Copy, Clone, EnumString, Debug)]
 </span><span class="kw">pub enum </span>PlanSelector {
-    NoGC,
-    SemiSpace,
-    GenCopy,
-    GenImmix,
-    MarkSweep,
-    PageProtect,
-    Immix,
-    MarkCompact,
-    StickyImmix,
+    <span class="doccomment">/// Allocation only without a collector. This is usually used for debugging.
+    /// Similar to OpenJDK epsilon (&lt;https://openjdk.org/jeps/318&gt;).
+    </span>NoGC,
+    <span class="doccomment">/// A semi-space collector, which divides the heap into two spaces and
+    /// copies the live objects into the other space for every GC.
+    </span>SemiSpace,
+    <span class="doccomment">/// A generational collector that uses a copying nursery, and the semi-space policy as its mature space.
+    </span>GenCopy,
+    <span class="doccomment">/// A generational collector that uses a copying nursery, and Immix as its mature space.
+    </span>GenImmix,
+    <span class="doccomment">/// A mark-sweep collector, which marks live objects and sweeps dead objects during GC.
+    </span>MarkSweep,
+    <span class="doccomment">/// A debugging collector that allocates memory at page granularity, and protects pages for dead objects
+    /// to prevent future access.
+    </span>PageProtect,
+    <span class="doccomment">/// A mark-region collector that allows an opportunistic defragmentation mechanism.
+    </span>Immix,
+    <span class="doccomment">/// A mark-compact collector that marks objects and performs Cheney-style copying.
+    </span>MarkCompact,
+    <span class="doccomment">/// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
+    </span>StickyImmix,
 }
 
 <span class="doccomment">/// MMTk option for perf events
@@ -1206,7 +1250,8 @@
 /// ```
 </span><span class="attr">#[derive(Debug, Clone, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>PerfEventOptions {
-    <span class="kw">pub </span>events: Vec&lt;(String, i32, i32)&gt;,
+    <span class="doccomment">/// A vector of perf events in tuples of (event name, PID, CPU)
+    </span><span class="kw">pub </span>events: Vec&lt;(String, i32, i32)&gt;,
 }
 
 <span class="kw">impl </span>PerfEventOptions {
@@ -1341,13 +1386,14 @@
         }
     };
 
-    ($(<span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[env_var: <span class="macro-nonterminal">$env_var</span>:expr, command_line: <span class="macro-nonterminal">$command_line</span>:expr][<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>,) =&gt; [
-        <span class="macro">options!</span>($(<span class="macro-nonterminal">$name</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>[<span class="macro-nonterminal">env_var</span>: <span class="macro-nonterminal">$env_var</span>, command_line: <span class="macro-nonterminal">$command_line</span>, mutable: <span class="macro-nonterminal">$mutable</span>][<span class="macro-nonterminal">$validator</span>] = <span class="macro-nonterminal">$default</span>),<span class="kw-2">*</span>);
+    ($($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[env_var: <span class="macro-nonterminal">$env_var</span>:expr, command_line: <span class="macro-nonterminal">$command_line</span>:expr][<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>,) =&gt; [
+        <span class="macro">options!</span>($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>]</span>)<span class="kw-2">*</span>$(<span class="macro-nonterminal">$name</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>[<span class="macro-nonterminal">env_var</span>: <span class="macro-nonterminal">$env_var</span>, command_line: <span class="macro-nonterminal">$command_line</span>, mutable: <span class="macro-nonterminal">$mutable</span>][<span class="macro-nonterminal">$validator</span>] = <span class="macro-nonterminal">$default</span>),<span class="kw-2">*</span>);
     ];
-    ($(<span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[env_var: <span class="macro-nonterminal">$env_var</span>:expr, command_line: <span class="macro-nonterminal">$command_line</span>:expr][<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>) =&gt; [
-        <span class="attr">#[derive(Clone)]
+    ($($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>:meta]</span>)<span class="kw-2">*</span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[env_var: <span class="macro-nonterminal">$env_var</span>:expr, command_line: <span class="macro-nonterminal">$command_line</span>:expr][<span class="macro-nonterminal">$validator</span>:expr] = <span class="macro-nonterminal">$default</span>:expr),<span class="kw-2">*</span>) =&gt; [
+        <span class="doccomment">/// MMTk command line options.
+        </span><span class="attr">#[derive(Clone)]
         </span><span class="kw">pub struct </span>Options {
-            $(<span class="kw">pub </span><span class="macro-nonterminal">$name</span>: MMTKOption&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;),*
+            $($(<span class="attr">#[<span class="macro-nonterminal">$outer</span>]</span>)<span class="kw-2">*</span><span class="kw">pub </span><span class="macro-nonterminal">$name</span>: MMTKOption&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;),*
         }
         <span class="kw">impl </span><span class="macro-nonterminal">Options </span>{
             <span class="doccomment">/// Set an option from env var
@@ -1559,7 +1605,9 @@
 }
 
 <span class="kw">impl </span>NurserySize {
-    <span class="kw">pub fn </span>new(kind: NurseryKind, value: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Create a NurserySize with the given kind. The value argument specifies the nursery size
+    /// for a fixed nursery, or specifies the max size for a bounded nursery.
+    </span><span class="kw">pub fn </span>new(kind: NurseryKind, value: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">match </span>kind {
             NurseryKind::Bounded =&gt; NurserySize {
                 kind,
@@ -1632,11 +1680,16 @@
     }
 }
 
-<span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+<span class="doccomment">/// Select a GC trigger for MMTk.
+</span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 </span><span class="kw">pub enum </span>GCTriggerSelector {
-    FixedHeapSize(usize),
-    DynamicHeapSize(usize, usize),
-    Delegated,
+    <span class="doccomment">/// GC is triggered when a fix-sized heap is full. The value specifies the fixed heap size in bytes.
+    </span>FixedHeapSize(usize),
+    <span class="doccomment">/// GC is triggered by internal herusticis, and the heap size is varying between the two given values.
+    /// The two values are the lower and the upper bound of the heap size.
+    </span>DynamicHeapSize(usize, usize),
+    <span class="doccomment">/// Delegate the GC triggering to the binding. This is not supported at the moment.
+    </span>Delegated,
 }
 
 <span class="kw">impl </span>GCTriggerSelector {
@@ -1839,88 +1892,85 @@
 <span class="comment">// Currently we allow all the options to be set by env var for the sake of convenience.
 // At some point, we may disallow this and all the options can only be set by command line.
 </span><span class="macro">options! </span>{
-    <span class="comment">// The plan to use.
+    <span class="doccomment">/// The GC plan to use.
     </span>plan:                  PlanSelector         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [always_valid] = PlanSelector::GenImmix,
-    <span class="comment">// Number of GC worker threads. (There is always one GC controller thread.)
-    // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
+    <span class="doccomment">/// Number of GC worker threads. (There is always one GC controller thread besides the GC workers)
+    </span><span class="comment">// FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
     </span>threads:               usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = num_cpus::get(),
-    <span class="comment">// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
+    <span class="doccomment">/// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     </span>use_short_stack_scans: bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
-    <span class="comment">// Enable a return barrier (not supported)
+    <span class="doccomment">/// Enable a return barrier (not supported)
     </span>use_return_barrier:    bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
-    <span class="comment">// Should we eagerly finish sweeping at the start of a collection? (not supported)
+    <span class="doccomment">/// Should we eagerly finish sweeping at the start of a collection? (not supported)
     </span>eager_complete_sweep:  bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
-    <span class="comment">// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
+    <span class="doccomment">/// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     </span>ignore_system_gc:      bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
-    <span class="comment">// FIXME: This is not a good way to have conflicting options -- we should refactor this
-    // The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
-    // Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
-    // both the upper and lower bounds. The nursery size can be set like &quot;Fixed:8192&quot;, for example,
-    // to have a Fixed nursery size of 8192 bytes
+    <span class="doccomment">/// The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
+    /// Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
+    /// both the upper and lower bounds. The nursery size can be set like &#39;Fixed:8192&#39;, for example,
+    /// to have a Fixed nursery size of 8192 bytes
+    </span><span class="comment">// FIXME: This is not a good way to have conflicting options -- we should refactor this
     </span>nursery:               NurserySize          [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>NurserySize| v.min &gt; <span class="number">0 </span>&amp;&amp; v.max.map(|max| max &gt; <span class="number">0 </span>&amp;&amp; max &gt;= v.min).unwrap_or(<span class="bool-val">true</span>)]
         = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: <span class="prelude-val">None </span>},
-    <span class="comment">// Should a major GC be performed when a system GC is required?
+    <span class="doccomment">/// Should a major GC be performed when a system GC is required?
     </span>full_heap_system_gc:   bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
-    <span class="comment">// Should we shrink/grow the heap to adjust to application working set? (not supported)
-    </span>variable_size_heap:    bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">true</span>,
-    <span class="comment">// Should finalization be disabled?
+    <span class="doccomment">/// Should finalization be disabled?
     </span>no_finalizer:          bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
-    <span class="comment">// Should reference type processing be disabled?
-    // If reference type processing is disabled, no weak reference processing work is scheduled,
-    // and we expect a binding to treat weak references as strong references.
-    // We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
-    // once weak reference processing is implemented properly.
+    <span class="doccomment">/// Should reference type processing be disabled?
+    /// If reference type processing is disabled, no weak reference processing work is scheduled,
+    /// and we expect a binding to treat weak references as strong references.
+    /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
+    /// once weak reference processing is implemented properly.
     </span>no_reference_types:    bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">true</span>,
-    <span class="comment">// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
+    <span class="doccomment">/// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     </span>nursery_zeroing:       NurseryZeroingOptions[env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = NurseryZeroingOptions::Temporal,
-    <span class="comment">// How frequent (every X bytes) should we do a stress GC?
+    <span class="doccomment">/// How frequent (every X bytes) should we do a stress GC?
     </span>stress_factor:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    <span class="comment">// How frequent (every X bytes) should we run analysis (a STW event that collects data)
+    <span class="doccomment">/// How frequent (every X bytes) should we run analysis (a STW event that collects data)
     </span>analysis_factor:       usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    <span class="comment">// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
-    // and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
-    // the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
-    // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
-    // factor (e.g. tens of metabytes).
+    <span class="doccomment">/// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
+    /// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
+    /// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
+    /// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
+    /// factor (e.g. tens of metabytes).
     </span>precise_stress:        bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">true</span>,
-    <span class="comment">// The start of vmspace.
+    <span class="doccomment">/// The start of vmspace.
     </span>vm_space_start:        Address              [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = Address::ZERO,
-    <span class="comment">// The size of vmspace.
+    <span class="doccomment">/// The size of vmspace.
     </span>vm_space_size:         usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = <span class="number">0xdc0_0000</span>,
-    <span class="comment">// Perf events to measure
-    // Semicolons are used to separate events
-    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
-    // For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
-    //
-    // Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
-    // TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; and &#39;work_packet_stats&#39; are enabled. The current macro does not allow us to do this.
+    <span class="doccomment">/// Perf events to measure
+    /// Semicolons are used to separate events
+    /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
+    /// For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
+    /// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
+    </span><span class="comment">// TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; and &#39;work_packet_stats&#39; are enabled. The current macro does not allow us to do this.
     </span>work_perf_events:       PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(all(feature = <span class="string">&quot;perf_counter&quot;</span>, feature = <span class="string">&quot;work_packet_stats&quot;</span>))] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
-    <span class="comment">// Measuring perf events for GC and mutators
-    // TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; are enabled. The current macro does not allow us to do this.
+    <span class="doccomment">/// Measuring perf events for GC and mutators
+    </span><span class="comment">// TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; are enabled. The current macro does not allow us to do this.
     </span>phase_perf_events:      PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">&quot;perf_counter&quot;</span>)] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
-    <span class="comment">// Should we exclude perf events occurring in kernel space. By default we include the kernel.
-    // Only set this option if you know the implications of excluding the kernel!
+    <span class="doccomment">/// Should we exclude perf events occurring in kernel space. By default we include the kernel.
+    /// Only set this option if you know the implications of excluding the kernel!
     </span>perf_exclude_kernel:    bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">&quot;perf_counter&quot;</span>)] = <span class="bool-val">false</span>,
-    <span class="comment">// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
-    // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
-    // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
-    // separated by commas and may include ranges. There should be no spaces in the core list. For
-    // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
-    // Note that in the case the program has only been allocated a certain number of cores using
-    // `taskset`, the core ids in the list should be specified by their perceived index as using
-    // `taskset` will essentially re-label the core ids. For example, running the program with
-    // `MMTK_THREAD_AFFINITY=&quot;0-4&quot; taskset -c 6-12 &lt;program&gt;` means that the cores 6,7,8,9,10 will
-    // be used to pin threads even though we specified the core ids &quot;0,1,2,3,4&quot;.
-    // `MMTK_THREAD_AFFINITY=&quot;12&quot; taskset -c 6-12 &lt;program&gt;` will not work, on the other hand, as
-    // there is no core with (perceived) id 12.
-    // XXX: This option is currently only supported on Linux.
+    <span class="doccomment">/// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
+    /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
+    /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    /// separated by commas and may include ranges. There should be no spaces in the core list. For
+    /// example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    /// Note that in the case the program has only been allocated a certain number of cores using
+    /// `taskset`, the core ids in the list should be specified by their perceived index as using
+    /// `taskset` will essentially re-label the core ids. For example, running the program with
+    /// `MMTK_THREAD_AFFINITY=&quot;0-4&quot; taskset -c 6-12 &lt;program&gt;` means that the cores 6,7,8,9,10 will
+    /// be used to pin threads even though we specified the core ids &quot;0,1,2,3,4&quot;.
+    /// `MMTK_THREAD_AFFINITY=&quot;12&quot; taskset -c 6-12 &lt;program&gt;` will not work, on the other hand, as
+    /// there is no core with (perceived) id 12.
+    </span><span class="comment">// XXX: This option is currently only supported on Linux.
     </span>thread_affinity:        AffinityKind         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>AffinityKind| v.validate()] = AffinityKind::OsDefault,
-    <span class="comment">// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
-    // Default to a fixed heap size of 0.5x physical memory.
+    <span class="doccomment">/// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
+    /// Default to a fixed heap size of 0.5x physical memory.
     </span>gc_trigger:             GCTriggerSelector    [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
-    <span class="comment">// Enable transparent hugepage support via madvise (only Linux is supported)
+    <span class="doccomment">/// Enable transparent hugepage support via madvise (only Linux is supported)
     </span>transparent_hugepages: bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">&quot;linux&quot;</span>)] = <span class="bool-val">false
 </span>}
 

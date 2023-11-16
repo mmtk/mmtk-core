@@ -335,6 +335,10 @@
 <a href="#335" id="335">335</a>
 <a href="#336" id="336">336</a>
 <a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::header_metadata::HeaderMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
@@ -351,16 +355,20 @@
 /// For performance reasons, objects of this struct should be constants.
 </span><span class="attr">#[derive(Clone, Copy, Debug)]
 </span><span class="kw">pub enum </span>MetadataSpec {
-    InHeader(HeaderMetadataSpec),
-    OnSide(SideMetadataSpec),
+    <span class="doccomment">/// In-header metadata uses bits from an object header.
+    </span>InHeader(HeaderMetadataSpec),
+    <span class="doccomment">/// On-side metadata uses a side table.
+    </span>OnSide(SideMetadataSpec),
 }
 
 <span class="kw">impl </span>MetadataSpec {
-    <span class="kw">pub const fn </span>is_on_side(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Is this metadata stored in the side table?
+    </span><span class="kw">pub const fn </span>is_on_side(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span>MetadataSpec::OnSide(<span class="kw">_</span>))
     }
 
-    <span class="kw">pub const fn </span>is_in_header(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Is this metadata stored in the object header?
+    </span><span class="kw">pub const fn </span>is_in_header(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span>MetadataSpec::InHeader(<span class="kw">_</span>))
     }
 

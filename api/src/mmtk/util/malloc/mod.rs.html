@@ -79,9 +79,34 @@
 <a href="#79" id="79">79</a>
 <a href="#80" id="80">80</a>
 <a href="#81" id="81">81</a>
-</pre></div><pre class="rust"><code><span class="doccomment">/// Malloc provided by libraries
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! This module exposes a set of malloc API. They are currently implemented with
+//! the library malloc. This may change in the future, and will be replaced
+//! with a native MMTk implementation.
+
+//! We have two versions for each function:
+//! * a normal version: it has the signature that is compatible with the standard malloc library.
+//! * a counted version: the allocated/freed bytes are calculated into MMTk&#39;s heap. So extra arguments
+//!   are needed to maintain allocated bytes properly. The API is inspired by Julia&#39;s counted malloc.
+//!   The counted version is only available with the feature `malloc_counted_size`.
+
+/// Malloc provided by libraries
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>library;
-<span class="doccomment">/// Using malloc as mark sweep free-list allocator
+<span class="doccomment">/// Using malloc as mark sweep free-list allocator.
+</span><span class="comment">// This module is made public so we can test it from dummyvm. It should be pub(crate).
 </span><span class="kw">pub mod </span>malloc_ms_util;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -90,21 +115,14 @@
 <span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::MMTK;
 
-<span class="comment">// The following expose a set of malloc API. They are currently implemented with
-// the library malloc. When we have native malloc implementation, we should change
-// their implementation to point to our native malloc.
-
-// We have two versions for each function:
-// * a normal version: it has the signature that is compatible with the standard malloc library.
-// * a counted version: the allocated/freed bytes are calculated into MMTk&#39;s heap. So extra arguments
-//   are needed to maintain allocated bytes properly. The API is inspired by Julia&#39;s counted malloc.
-//   The counted version is only available with the feature `malloc_counted_size`.
-
+<span class="doccomment">/// Manually allocate memory. Similar to libc&#39;s malloc.
 </span><span class="kw">pub fn </span>malloc(size: usize) -&gt; Address {
     Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::malloc(size) })
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+<span class="doccomment">/// Manually allocate memory. Similar to libc&#39;s malloc.
+/// This also counts the allocated memory into the heap size of the given MMTk instance.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
 </span><span class="kw">pub fn </span>counted_malloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, size: usize) -&gt; Address {
     <span class="kw">let </span>res = malloc(size);
     <span class="kw">if </span>!res.is_zero() {
@@ -113,11 +131,14 @@
     res
 }
 
-<span class="kw">pub fn </span>calloc(num: usize, size: usize) -&gt; Address {
+<span class="doccomment">/// Manually allocate memory and initialize the bytes in the allocated memory to zero. Similar to libc&#39;s calloc.
+</span><span class="kw">pub fn </span>calloc(num: usize, size: usize) -&gt; Address {
     Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::calloc(num, size) })
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+<span class="doccomment">/// Manually allocate memory and initialize the bytes in the allocated memory to zero. Similar to libc&#39;s calloc.
+/// This also counts the allocated memory into the heap size of the given MMTk instance.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
 </span><span class="kw">pub fn </span>counted_calloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, num: usize, size: usize) -&gt; Address {
     <span class="kw">let </span>res = calloc(num, size);
     <span class="kw">if </span>!res.is_zero() {
@@ -126,11 +147,15 @@
     res
 }
 
-<span class="kw">pub fn </span>realloc(addr: Address, size: usize) -&gt; Address {
+<span class="doccomment">/// Reallocate the given area of memory. Similar to libc&#39;s realloc.
+</span><span class="kw">pub fn </span>realloc(addr: Address, size: usize) -&gt; Address {
     Address::from_mut_ptr(<span class="kw">unsafe </span>{ <span class="self">self</span>::library::realloc(addr.to_mut_ptr(), size) })
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+<span class="doccomment">/// Reallocate the given area of memory. Similar to libc&#39;s realloc.
+/// This also adjusts the allocated memory size based on the original allocation and the new allocation, and counts
+/// that into the heap size for the given MMTk instance.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
 </span><span class="kw">pub fn </span>realloc_with_old_size&lt;VM: VMBinding&gt;(
     mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;,
     addr: Address,
@@ -149,11 +174,14 @@
     res
 }
 
-<span class="kw">pub fn </span>free(addr: Address) {
+<span class="doccomment">/// Manually free the memory that is returned from other manual allocation functions in this module.
+</span><span class="kw">pub fn </span>free(addr: Address) {
     <span class="kw">unsafe </span>{ <span class="self">self</span>::library::free(addr.to_mut_ptr()) }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+<span class="doccomment">/// Manually free the memory that is returned from other manual allocation functions in this module.
+/// This also reduces the allocated memory size.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
 </span><span class="kw">pub fn </span>free_with_size&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, addr: Address, old_size: usize) {
     free(addr);
     <span class="kw">if </span>!addr.is_zero() {
