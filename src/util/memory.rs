@@ -164,10 +164,10 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 }
 
 /// Checks if the memory has already been mapped. If not, we panic.
-// Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
-// Be very careful about using this function.
+/// Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
+/// Be very careful about using this function.
 #[cfg(target_os = "linux")]
-pub fn panic_if_unmapped(start: Address, size: usize) {
+pub(crate) fn panic_if_unmapped(start: Address, size: usize) {
     let prot = PROT_READ | PROT_WRITE;
     let flags = MMAP_FLAGS;
     match mmap_fixed(start, size, prot, flags, MmapStrategy::Normal) {
@@ -182,8 +182,11 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
     }
 }
 
+/// Checks if the memory has already been mapped. If not, we panic.
+/// This function is currently left empty for non-linux, and should be implemented in the future.
+/// As the function is only used for assertions, MMTk will still run even if we never panic.
 #[cfg(not(target_os = "linux"))]
-pub fn panic_if_unmapped(_start: Address, _size: usize) {
+pub(crate) fn panic_if_unmapped(_start: Address, _size: usize) {
     // This is only used for assertions, so MMTk will still run even if we never panic.
     // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
     // Possibly we can use posix_mem_offset for both OS/s.

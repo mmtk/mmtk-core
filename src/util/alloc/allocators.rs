@@ -167,8 +167,8 @@ impl<VM: VMBinding> Allocators<VM> {
     }
 }
 
-/// This type describe an allocator in the [`Allocators`].
-/// For VM binding implementors, this type is equivalent to the following native types:
+/// This type describe an allocator in the [`crate::Mutator`].
+/// For some VM bindings, they may need to access this type from native code. This type is equivalent to the following native types:
 /// #[repr(C)]
 /// struct AllocatorSelector {
 ///   tag: AllocatorSelectorTag,
@@ -183,17 +183,17 @@ impl<VM: VMBinding> Allocators<VM> {
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorSelector {
-    /// The index of [`crate::util::alloc::bumpallocator::BumpAllocator`] in [`Allocators::bump_pointer`].
+    /// Represents a [`crate::util::alloc::bumpallocator::BumpAllocator`].
     BumpPointer(u8),
-    /// The index of [`crate::util::alloc::large_object_allocator::LargeObjectAllocator`] in [`Allocators::large_object`].
+    /// Represents a [`crate::util::alloc::large_object_allocator::LargeObjectAllocator`].
     LargeObject(u8),
-    /// The index of [`crate::util::alloc::malloc_allocator::MallocAllocator`] in [`Allocators::malloc`].
+    /// Represents a [`crate::util::alloc::malloc_allocator::MallocAllocator`].
     Malloc(u8),
-    /// The index of [`crate::util::alloc::immix_allocator::ImmixAllocator`] in [`Allocators::immix`].
+    /// Represents a [`crate::util::alloc::immix_allocator::ImmixAllocator`].
     Immix(u8),
-    /// The index of [`crate::util::alloc::markcompact_allocator::MarkCompactAllocator`] in [`Allocators::markcompact`].
+    /// Represents a [`crate::util::alloc::markcompact_allocator::MarkCompactAllocator`].
     MarkCompact(u8),
-    /// The index of [`crate::util::alloc::free_list_allocator::FreeListAllocator`] in [`Allocators::free_list`].
+    /// Represents a [`crate::util::alloc::free_list_allocator::FreeListAllocator`].
     FreeList(u8),
     /// No allocator found.
     #[default]

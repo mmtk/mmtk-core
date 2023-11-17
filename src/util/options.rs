@@ -116,9 +116,9 @@ pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
+const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
