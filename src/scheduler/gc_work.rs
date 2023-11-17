@@ -573,15 +573,32 @@ pub type EdgeOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMEdge;
 pub trait ProcessEdgesWork:
     Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self::VM>>
 {
+    /// The associate type for the VM.
     type VM: VMBinding;
 
     /// The work packet type for scanning objects when using this ProcessEdgesWork.
     type ScanObjectsWorkType: ScanObjectsWork<Self::VM>;
 
+    /// The maximum number of edges that should be put to one of this work packets.
+    /// The caller who creates a work packet of this trait should be responsible to
+    /// comply with this capacity.
+    /// Higher capacity means the packet will take longer to finish, and may lead to
+    /// bad load balancing. On the other hand, lower capacity would lead to higher cost
+    /// on scheduling many small work packets. It is important to find a proper capacity.
     const CAPACITY: usize = 4096;
+    /// Do we update object reference? This has to be true for a moving GC.
     const OVERWRITE_REFERENCE: bool = true;
+    /// If true, we do object scanning in this work packet with the same worker without scheduling overhead.
+    /// If false, we will add object scanning work packets to the global queue and allow other workers to work on it.
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
+    /// Create a [`ProcessEdgesWork`].
+    ///
+    /// Arguments:
+    /// * `edges`: a vector of the edges.
+    /// * `roots`: are the objects root reachable objects?
+    /// * `mmtk`: a reference to the MMTK instance.
+    /// * `bucket`: which work bucket this packet belongs to. Further work generated from this packet will also be put to the same bucket.
     fn new(
         edges: Vec<EdgeOf<Self>>,
         roots: bool,
@@ -640,6 +657,8 @@ pub trait ProcessEdgesWork:
         }
     }
 
+    /// Process an edge, including loading the object reference from the memory slot,
+    /// trace the object and store back the new object reference if necessary.
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
         let new_object = self.trace_object(object);
@@ -648,6 +667,7 @@ pub trait ProcessEdgesWork:
         }
     }
 
+    /// Process all the edges in the work packet.
     fn process_edges(&mut self) {
         probe!(mmtk, process_edges, self.edges.len(), self.is_roots());
         for i in 0..self.edges.len() {
