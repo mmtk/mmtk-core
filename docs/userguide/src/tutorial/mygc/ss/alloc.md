@@ -18,7 +18,6 @@ We will make the following changes:
 
 1. Initialize `gc_header_bits` to 2. We reserve 2 bits in the header for GC use.
 1. Initialize `moves_objects` to `true`.
-1. Initialize `num_specialized_scans` to 1.
 
 Finished code (step 1-3):
 ```

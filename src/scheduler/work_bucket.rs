@@ -223,7 +223,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 }
 
 /// This enum defines all the work bucket types. The scheduler
-/// will instantiate a [`WorkBucket`] for each stage defined here.
+/// will instantiate a work bucket for each stage defined here.
 #[derive(Debug, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum WorkBucketStage {
     /// This bucket is always open.

@@ -332,7 +332,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.is_coordinator
     }
 
-    /// Get the [`GCWorkScheduler`]. There is only one scheduler per MMTk instance.
+    /// Get the scheduler. There is only one scheduler per MMTk instance.
     pub fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
     }

@@ -150,21 +150,21 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         CopyConfig::default()
     }
 
-    /// Get a immutable reference to the base plan. [`crate::plan::global::BasePlan`] is included by all the MMTk GC plans.
+    /// Get a immutable reference to the base plan. `BasePlan` is included by all the MMTk GC plans.
     fn base(&self) -> &BasePlan<Self::VM>;
 
-    /// Get a mutable reference to the base plan. [`crate::plan::global::BasePlan`] is included by all the MMTk GC plans.
+    /// Get a mutable reference to the base plan. `BasePlan` is included by all the MMTk GC plans.
     fn base_mut(&mut self) -> &mut BasePlan<Self::VM>;
 
     /// Schedule work for the upcoming GC.
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
 
-    /// Get the common plan. [`crate::plan::global::CommonPlan`] is included by most of MMTk GC plans.
+    /// Get the common plan. CommonPlan is included by most of MMTk GC plans.
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
 
-    /// Return a reference to [`crate::plan::generational::global::GenerationalPlan`] to allow
+    /// Return a reference to `GenerationalPlan` to allow
     /// access methods specific to generational plans if the plan is a generational plan.
     fn generational(
         &self,
