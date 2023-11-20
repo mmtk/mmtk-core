@@ -129,6 +129,9 @@ pub(super) fn try_map_per_chunk_metadata_space(
                 } else {
                     start.align_down(BYTES_IN_CHUNK) + BYTES_IN_CHUNK
                 };
+                // The code that was intended to deal with the failing cases is commented out.
+                // See the comment below. Suppress the warning for now.
+                #[allow(clippy::never_loop)]
                 // Failure: munmap what has been mmapped before
                 while munmap_start < aligned_start {
                     // Commented out the following as we do not have unmap in Mmapper.

@@ -22,6 +22,37 @@ pub const LOG_BYTES_IN_KBYTE: u8 = 10;
 /// The number of bytes in a kilobyte
 pub const BYTES_IN_KBYTE: usize = 1 << LOG_BYTES_IN_KBYTE;
 
+/// Some card scanning constants ported from Java MMTK.
+/// As we haven't implemented card scanning, these are not used at the moment.
+mod card_scanning {
+    use crate::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
+
+    pub const SUPPORT_CARD_SCANNING: bool = false;
+    /// each card consumes four bytes of metadata
+    pub const LOG_CARD_META_SIZE: usize = 2;
+    /// number of units tracked per card
+    pub const LOG_CARD_UNITS: usize = 10;
+    /// track at byte grain, save shifting
+    pub const LOG_CARD_GRAIN: usize = 0;
+    pub const LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
+    pub const LOG_CARD_META_BYTES: usize =
+        LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
+    pub const LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - super::LOG_BYTES_IN_PAGE as usize;
+    // FIXME: Card scanning is not supported at the moment. Move this to side-metadata in the future.
+    pub const CARD_META_PAGES_PER_REGION: usize = if SUPPORT_CARD_SCANNING {
+        1 << LOG_CARD_META_PAGES
+    } else {
+        0
+    };
+    pub const CARD_MASK: usize = (1 << LOG_CARD_BYTES) - 1;
+}
+pub(crate) use card_scanning::*;
+
+/// Lazy sweeping - controlled from here because PlanConstraints needs to
+/// tell the VM that we need to support linear scan.
+// FIXME: we are not really using this constant to decide lazy sweep or not.
+pub(crate) const LAZY_SWEEP: bool = true;
+
 // Java-specific sizes currently used by MMTk
 // TODO: MMTk should really become independent of these Java types: https://github.com/mmtk/mmtk-core/issues/922
 mod java_specific_constants {

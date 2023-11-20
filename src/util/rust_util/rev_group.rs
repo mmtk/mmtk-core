@@ -219,6 +219,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::never_loop)] // We are testing with empty slices. The panic in the loop body should not run.
     fn test_empty_outer_slice() {
         let slice_of_slices: &[&[i32]] = &[];
         for _group in slice_of_slices
@@ -233,6 +234,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::never_loop)] // We are testing with empty slices. The panic in the loop body should not run.
     fn test_empty_inner_slice() {
         let slice_of_slices: &[&[i32]] = &[&[], &[], &[]];
         for _group in slice_of_slices

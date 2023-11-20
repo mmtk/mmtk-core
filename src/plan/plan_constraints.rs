@@ -51,7 +51,10 @@ impl PlanConstraints {
             num_specialized_scans: 0,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
-            needs_linear_scan: false,
+            // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
+            // https://github.com/mmtk/mmtk-core/issues/1027 trackes the issue.
+            needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
+                || crate::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: false,
             generate_gc_trace: false,
             may_trace_duplicate_edges: false,
