@@ -612,6 +612,8 @@ pub trait ProcessEdgesWork:
     /// `ActivePlan::vm_trace_object()` to let the binding handle the tracing.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
+    /// If the work includes roots, we will store the roots somewhere so for sanity GC, we can do another
+    /// transitive closure from the roots.
     #[cfg(feature = "sanity")]
     fn cache_roots_for_sanity_gc(&mut self) {
         assert!(self.roots);

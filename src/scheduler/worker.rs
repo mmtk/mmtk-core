@@ -327,19 +327,33 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.local_work_buffer.push(Box::new(work));
     }
 
+    /// Is this worker a coordinator or a normal GC worker?
     pub fn is_coordinator(&self) -> bool {
         self.is_coordinator
     }
 
+    /// Get the [`GCWorkScheduler`]. There is only one scheduler per MMTk instance.
     pub fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
     }
 
+    /// Get a mutable reference of the copy context for this worker.
     pub fn get_copy_context_mut(&mut self) -> &mut GCWorkerCopyContext<VM> {
         &mut self.copy
     }
 
+    /// Explicitly execute a work packet in the current context (the given worker, and the current work packet).
+    /// The statistics collected for executing the work are counted into the current context.
+    /// This is NOT the normal way to execute a work packet: most work packets are polled and executed in
+    /// the worker's main loop ([`GCWorker::run`]). This method is only intended for cases where you would like to
+    /// explicitly execute a work packet under the current context.
     pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
+        work.do_work(self, self.mmtk);
+    }
+
+    /// Explicitly execute a boxed work packet in the current context.
+    /// See [`GCWorker::do_work`] for more information.
+    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
         work.do_work(self, self.mmtk);
     }
 
@@ -355,10 +369,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             .pop()
             .or_else(|| self.local_work_buffer.pop())
             .unwrap_or_else(|| self.scheduler().poll(self))
-    }
-
-    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
-        work.do_work(self, self.mmtk);
     }
 
     /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.

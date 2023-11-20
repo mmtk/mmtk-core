@@ -4,6 +4,13 @@ use crate::vm::VMBinding;
 #[cfg(feature = "work_packet_stats")]
 use std::any::{type_name, TypeId};
 
+/// This defines a GC work packet which are assigned to the [`GCWorker`]s by the scheduler.
+/// Work packets carry payloads that indicate the work to be done. For example, a work packet may
+/// contain a pointer to a stack that must be scanned, or it may contain a large buffer of pointers
+/// that need to be traced, or it might contain a range of static variables to be scanned, etc. The size
+/// of the work packet will need to consider at least two points of tension: the work packet must be large
+/// enough to ensure that the costs of managing the work packets do not dominate, and the packet must be
+/// small enough that good load balancing is achieved.
 pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// Define the work for this packet. However, this is not supposed to be called directly.
     /// Usually `do_work_with_stat()` should be used.

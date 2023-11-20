@@ -46,7 +46,6 @@ pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 0,
-    num_specialized_scans: 1,
     needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     barrier: ACTIVE_BARRIER,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.

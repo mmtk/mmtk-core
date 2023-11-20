@@ -40,6 +40,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
 }
 
+/// The plan constraints for the generational copying plan.
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
 
 impl<VM: VMBinding> Plan for GenCopy<VM> {
