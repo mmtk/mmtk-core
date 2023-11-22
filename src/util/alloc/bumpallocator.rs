@@ -34,7 +34,7 @@ pub struct BumpAllocator<VM: VMBinding> {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BumpPointer {
-    /// The current address of the allocation buffer. This is what will be allocated next.
+    /// The cursor inside the allocation buffer where the next object will be allocated.
     pub cursor: Address,
     /// The upperbound of the allocation buffer.
     pub limit: Address,

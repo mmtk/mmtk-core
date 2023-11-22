@@ -131,7 +131,7 @@ impl Shl<usize> for Address {
 impl Address {
     /// The lowest possible address.
     pub const ZERO: Self = Address(0);
-    /// The largest possible address.
+    /// The highest possible address.
     pub const MAX: Self = Address(usize::max_value());
 
     /// creates Address from a pointer
@@ -183,12 +183,12 @@ impl Address {
     // These const functions are duplicated with the operator traits. But we need them,
     // as we need them to declare constants.
 
-    /// Get the size in bytes between two addresses. The current address needs to be larger than the other address.
+    /// Get the number of bytes between two addresses. The current address needs to be higher than the other address.
     pub const fn get_extent(self, other: Address) -> ByteSize {
         self.0 - other.0
     }
 
-    /// Get the offset between two addresses.
+    /// Get the offset from `other` to `self`. The result is negative is `self` is lower than `other`.
     pub const fn get_offset(self, other: Address) -> ByteOffset {
         self.0 as isize - other.0 as isize
     }
@@ -481,7 +481,7 @@ use crate::vm::VMBinding;
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
-    /// The null object reference.
+    /// The null object reference, represented as zero.
     pub const NULL: ObjectReference = ObjectReference(0);
 
     /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
