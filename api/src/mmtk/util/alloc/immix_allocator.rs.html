@@ -398,6 +398,8 @@
 <a href="#398" id="398">398</a>
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">super</span>::allocator::{align_allocation_no_fill, fill_alignment_gap, AllocatorContext};
@@ -416,8 +418,10 @@
 <span class="doccomment">/// Immix allocator
 </span><span class="attr">#[repr(C)]
 </span><span class="kw">pub struct </span>ImmixAllocator&lt;VM: VMBinding&gt; {
-    <span class="kw">pub </span>tls: VMThread,
-    <span class="kw">pub </span>bump_pointer: BumpPointer,
+    <span class="doccomment">/// [`VMThread`] associated with this allocator instance
+    </span><span class="kw">pub </span>tls: VMThread,
+    <span class="doccomment">/// The fastpath bump pointer.
+    </span><span class="kw">pub </span>bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt;,
     context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
@@ -434,7 +438,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmixAllocator&lt;VM&gt; {
-    <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.bump_pointer.reset(Address::ZERO, Address::ZERO);
         <span class="self">self</span>.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
         <span class="self">self</span>.request_for_large = <span class="bool-val">false</span>;
@@ -583,7 +587,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>immix_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt; {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>immix_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt; {
         <span class="self">self</span>.space
     }
 

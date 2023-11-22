@@ -507,6 +507,7 @@
 <a href="#507" id="507">507</a>
 <a href="#508" id="508">508</a>
 <a href="#509" id="509">509</a>
+<a href="#510" id="510">510</a>
 </pre></div><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft&#39;s mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 </span><span class="kw">use </span>std::sync::Arc;
@@ -524,7 +525,8 @@
 <span class="doccomment">/// A MiMalloc free list allocator
 </span><span class="attr">#[repr(C)]
 </span><span class="kw">pub struct </span>FreeListAllocator&lt;VM: VMBinding&gt; {
-    <span class="kw">pub </span>tls: VMThread,
+    <span class="doccomment">/// [`VMThread`] associated with this allocator instance
+    </span><span class="kw">pub </span>tls: VMThread,
     space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MarkSweepSpace&lt;VM&gt;,
     context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     <span class="doccomment">/// blocks with free space

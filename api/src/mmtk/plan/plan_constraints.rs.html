@@ -67,6 +67,9 @@
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
 <a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSelector;
@@ -120,7 +123,10 @@
             num_specialized_scans: <span class="number">0</span>,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
-            needs_linear_scan: SUPPORT_CARD_SCANNING || LAZY_SWEEP,
+            <span class="comment">// As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.
+            // https://github.com/mmtk/mmtk-core/issues/1027 trackes the issue.
+            </span>needs_linear_scan: <span class="kw">crate</span>::util::constants::SUPPORT_CARD_SCANNING
+                || <span class="kw">crate</span>::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: <span class="bool-val">false</span>,
             generate_gc_trace: <span class="bool-val">false</span>,
             may_trace_duplicate_edges: <span class="bool-val">false</span>,

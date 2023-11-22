@@ -246,6 +246,18 @@
 <a href="#246" id="246">246</a>
 <a href="#247" id="247">247</a>
 <a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -415,28 +427,36 @@
     }
 }
 
-<span class="comment">// This type describe which allocator in the allocators set.
-// For VM binding implementors, this type is equivalent to the following native types:
-// #[repr(C)]
-// struct AllocatorSelector {
-//   tag: AllocatorSelectorTag,
-//   payload: u8,
-// }
-// #[repr(u8)]
-// enum AllocatorSelectorTag {
-//   BumpPointer,
-//   LargeObject,
-// }
+<span class="doccomment">/// This type describe an allocator in the [`crate::Mutator`].
+/// For some VM bindings, they may need to access this type from native code. This type is equivalent to the following native types:
+/// #[repr(C)]
+/// struct AllocatorSelector {
+///   tag: AllocatorSelectorTag,
+///   payload: u8,
+/// }
+/// #[repr(u8)]
+/// enum AllocatorSelectorTag {
+///   BumpPointer,
+///   LargeObject,
+///   ...
+/// }
 </span><span class="attr">#[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 </span><span class="kw">pub enum </span>AllocatorSelector {
-    BumpPointer(u8),
-    LargeObject(u8),
-    Malloc(u8),
-    Immix(u8),
-    MarkCompact(u8),
-    FreeList(u8),
-    <span class="attr">#[default]
+    <span class="doccomment">/// Represents a [`crate::util::alloc::bumpallocator::BumpAllocator`].
+    </span>BumpPointer(u8),
+    <span class="doccomment">/// Represents a [`crate::util::alloc::large_object_allocator::LargeObjectAllocator`].
+    </span>LargeObject(u8),
+    <span class="doccomment">/// Represents a [`crate::util::alloc::malloc_allocator::MallocAllocator`].
+    </span>Malloc(u8),
+    <span class="doccomment">/// Represents a [`crate::util::alloc::immix_allocator::ImmixAllocator`].
+    </span>Immix(u8),
+    <span class="doccomment">/// Represents a [`crate::util::alloc::markcompact_allocator::MarkCompactAllocator`].
+    </span>MarkCompact(u8),
+    <span class="doccomment">/// Represents a [`crate::util::alloc::free_list_allocator::FreeListAllocator`].
+    </span>FreeList(u8),
+    <span class="doccomment">/// No allocator found.
+    </span><span class="attr">#[default]
     </span><span class="prelude-val">None</span>,
 }
 
@@ -445,12 +465,16 @@
 </span><span class="attr">#[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 </span><span class="kw">pub enum </span>AllocatorInfo {
-    BumpPointer {
-        bump_pointer_offset: usize,
+    <span class="doccomment">/// This allocator uses a [`crate::util::alloc::bumpallocator::BumpPointer`] as its fastpath.
+    </span>BumpPointer {
+        <span class="doccomment">/// The byte offset from the mutator&#39;s pointer to the [`crate::util::alloc::bumpallocator::BumpPointer`].
+        </span>bump_pointer_offset: usize,
     },
-    <span class="comment">// FIXME: Add free-list fast-path
+    <span class="doccomment">/// This allocator uses a fastpath, but we haven&#39;t implemented it yet.
+    </span><span class="comment">// FIXME: Add free-list fast-path
     </span>Unimplemented,
-    <span class="attr">#[default]
+    <span class="doccomment">/// This allocator does not have a fastpath.
+    </span><span class="attr">#[default]
     </span><span class="prelude-val">None</span>,
 }
 

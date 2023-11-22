@@ -77,6 +77,7 @@
 <a href="#77" id="77">77</a>
 <a href="#78" id="78">78</a>
 <a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
 </span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
@@ -118,7 +119,8 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>finalizable_processor;
 <span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.
 </span><span class="kw">pub mod </span>heap;
-<span class="attr">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+<span class="doccomment">/// Checking if an address is an valid MMTk object.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
 </span><span class="kw">pub mod </span>is_mmtk_object;
 <span class="doccomment">/// Logger initialization
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>logger;

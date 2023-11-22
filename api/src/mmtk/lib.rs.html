@@ -68,6 +68,8 @@
 <a href="#68" id="68">68</a>
 <a href="#69" id="69">69</a>
 <a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
 </pre></div><pre class="rust"><code><span class="comment">// TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 
@@ -131,8 +133,10 @@
 <span class="kw">pub mod </span>memory_manager;
 <span class="kw">pub mod </span>plan;
 <span class="kw">pub mod </span>scheduler;
-<span class="kw">pub mod </span>util;
-<span class="kw">pub mod </span>vm;
+<span class="attr">#[deny(missing_docs)]
+</span><span class="kw">pub mod </span>util;
+<span class="attr">#[deny(missing_docs)]
+</span><span class="kw">pub mod </span>vm;
 
 <span class="kw">pub use </span><span class="kw">crate</span>::plan::{
     AllocationSemantics, BarrierSelector, Mutator, MutatorContext, ObjectQueue, Plan,

@@ -605,7 +605,7 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; FreeListPageResource&lt;VM&gt; {
     <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>pages = conversions::bytes_to_pages(bytes);
+        <span class="kw">let </span>pages = conversions::bytes_to_pages_up(bytes);
         <span class="kw">let </span>common_flpr = {
             <span class="kw">let </span>common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION <span class="kw">as _</span>),
@@ -742,7 +742,7 @@
             .grow_discontiguous_space(space_descriptor, required_chunks);
 
         <span class="kw">if </span>!region.is_zero() {
-            <span class="kw">let </span>region_start = conversions::bytes_to_pages(region - <span class="self">self</span>.start);
+            <span class="kw">let </span>region_start = conversions::bytes_to_pages_up(region - <span class="self">self</span>.start);
             <span class="kw">let </span>region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - <span class="number">1</span>;
             <span class="self">self</span>.inner_mut()
                 .free_list
@@ -767,7 +767,7 @@
     <span class="kw">unsafe fn </span>free_contiguous_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk: Address, sync: <span class="kw-2">&amp;mut </span>FreeListPageResourceSync) {
         <span class="kw">let </span>num_chunks = <span class="self">self</span>.vm_map().get_contiguous_region_chunks(chunk);
         <span class="comment">/* nail down all pages associated with the chunk, so it is no longer on our free list */
-        </span><span class="kw">let </span><span class="kw-2">mut </span>chunk_start = conversions::bytes_to_pages(chunk - <span class="self">self</span>.start);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>chunk_start = conversions::bytes_to_pages_up(chunk - <span class="self">self</span>.start);
         <span class="kw">let </span>chunk_end = chunk_start + (num_chunks * PAGES_IN_CHUNK);
         <span class="kw">while </span>chunk_start &lt; chunk_end {
             <span class="self">self</span>.inner_mut()
@@ -789,7 +789,7 @@
 
     <span class="kw">pub fn </span>release_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, first: Address) {
         <span class="macro">debug_assert!</span>(conversions::is_page_aligned(first));
-        <span class="kw">let </span>page_offset = conversions::bytes_to_pages(first - <span class="self">self</span>.start);
+        <span class="kw">let </span>page_offset = conversions::bytes_to_pages_up(first - <span class="self">self</span>.start);
         <span class="kw">let </span>pages = <span class="self">self</span>.free_list.size(page_offset <span class="kw">as _</span>);
         <span class="comment">// if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
@@ -817,7 +817,7 @@
         pages_freed: usize,
         sync: <span class="kw-2">&amp;mut </span>FreeListPageResourceSync,
     ) {
-        <span class="kw">let </span>page_offset = conversions::bytes_to_pages(freed_page - <span class="self">self</span>.start);
+        <span class="kw">let </span>page_offset = conversions::bytes_to_pages_up(freed_page - <span class="self">self</span>.start);
 
         <span class="comment">// may be multiple chunks
         </span><span class="kw">if </span>pages_freed % PAGES_IN_CHUNK == <span class="number">0 </span>{

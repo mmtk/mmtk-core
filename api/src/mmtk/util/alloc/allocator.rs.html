@@ -434,6 +434,7 @@
 <a href="#434" id="434">434</a>
 <a href="#435" id="435">435</a>
 <a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
 <span class="attr">#[cfg(feature = <span class="string">&quot;analysis&quot;</span>)]
@@ -519,7 +520,8 @@
     region + delta
 }
 
-<span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(immut_start: Address, end: Address) {
+<span class="doccomment">/// Fill the specified region with the alignment value.
+</span><span class="kw">pub fn </span>fill_alignment_gap&lt;VM: VMBinding&gt;(immut_start: Address, end: Address) {
     <span class="kw">let </span><span class="kw-2">mut </span>start = immut_start;
 
     <span class="kw">if </span>VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {

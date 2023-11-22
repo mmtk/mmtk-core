@@ -137,80 +137,77 @@
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
 <a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
-<a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
-<a href="#149" id="149">149</a>
-<a href="#150" id="150">150</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 
-<span class="comment">/* Alignment */
-
+<span class="doccomment">/// Is the address aligned to word boundary?
 </span><span class="kw">pub fn </span>is_address_aligned(addr: Address) -&gt; bool {
     addr.is_aligned_to(BYTES_IN_ADDRESS)
 }
 
-<span class="kw">pub fn </span>page_align_down(address: Address) -&gt; Address {
+<span class="doccomment">/// Align down an address to the nearest page.
+</span><span class="kw">pub fn </span>page_align_down(address: Address) -&gt; Address {
     address.align_down(BYTES_IN_PAGE)
 }
 
-<span class="kw">pub fn </span>is_page_aligned(address: Address) -&gt; bool {
+<span class="doccomment">/// Is the address aligned to page boundary?
+</span><span class="kw">pub fn </span>is_page_aligned(address: Address) -&gt; bool {
     address.is_aligned_to(BYTES_IN_PAGE)
 }
 
-<span class="comment">// const function cannot have conditional expression
+<span class="doccomment">/// Align up an address to the nearest chunk.
 </span><span class="kw">pub const fn </span>chunk_align_up(addr: Address) -&gt; Address {
     addr.align_up(BYTES_IN_CHUNK)
 }
 
-<span class="comment">// const function cannot have conditional expression
+<span class="doccomment">/// Align down an address to the nearest chunk.
 </span><span class="kw">pub const fn </span>chunk_align_down(addr: Address) -&gt; Address {
     addr.align_down(BYTES_IN_CHUNK)
 }
 
-<span class="kw">pub const fn </span>mmap_chunk_align_up(addr: Address) -&gt; Address {
+<span class="doccomment">/// Align up an address to the nearest chunk at which granularity we mmap memory.
+</span><span class="kw">pub const fn </span>mmap_chunk_align_up(addr: Address) -&gt; Address {
     addr.align_up(MMAP_CHUNK_BYTES)
 }
 
-<span class="kw">pub const fn </span>mmap_chunk_align_down(addr: Address) -&gt; Address {
+<span class="doccomment">/// Align down an address to the nearest chunk at which granularity we mmap memory.
+</span><span class="kw">pub const fn </span>mmap_chunk_align_down(addr: Address) -&gt; Address {
     addr.align_down(MMAP_CHUNK_BYTES)
 }
 
-<span class="kw">pub fn </span>bytes_to_chunks_up(bytes: usize) -&gt; usize {
+<span class="doccomment">/// Convert size in bytes to the number of chunks (aligned up).
+</span><span class="kw">pub fn </span>bytes_to_chunks_up(bytes: usize) -&gt; usize {
     (bytes + BYTES_IN_CHUNK - <span class="number">1</span>) &gt;&gt; LOG_BYTES_IN_CHUNK
 }
 
-<span class="kw">pub fn </span>address_to_chunk_index(addr: Address) -&gt; usize {
+<span class="doccomment">/// Convert an address to the chunk index (aligned down).
+</span><span class="kw">pub fn </span>address_to_chunk_index(addr: Address) -&gt; usize {
     addr &gt;&gt; LOG_BYTES_IN_CHUNK
 }
 
-<span class="kw">pub fn </span>chunk_index_to_address(chunk: usize) -&gt; Address {
+<span class="doccomment">/// Convert a chunk index to the start address of the chunk.
+</span><span class="kw">pub fn </span>chunk_index_to_address(chunk: usize) -&gt; Address {
     <span class="kw">unsafe </span>{ Address::from_usize(chunk &lt;&lt; LOG_BYTES_IN_CHUNK) }
 }
 
-<span class="kw">pub const fn </span>raw_align_up(val: usize, align: usize) -&gt; usize {
+<span class="doccomment">/// Align up an integer to the given alignment. `align` must be a power of two.
+</span><span class="kw">pub const fn </span>raw_align_up(val: usize, align: usize) -&gt; usize {
     <span class="comment">// See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
     </span>val.wrapping_add(align).wrapping_sub(<span class="number">1</span>) &amp; !align.wrapping_sub(<span class="number">1</span>)
 }
 
-<span class="kw">pub const fn </span>raw_align_down(val: usize, align: usize) -&gt; usize {
+<span class="doccomment">/// Align down an integer to the given alignment. `align` must be a power of two.
+</span><span class="kw">pub const fn </span>raw_align_down(val: usize, align: usize) -&gt; usize {
     val &amp; !align.wrapping_sub(<span class="number">1</span>)
 }
 
-<span class="kw">pub const fn </span>raw_is_aligned(val: usize, align: usize) -&gt; bool {
+<span class="doccomment">/// Is the integer aligned to the given alignment? `align` must be a power of two.
+</span><span class="kw">pub const fn </span>raw_is_aligned(val: usize, align: usize) -&gt; bool {
     val &amp; align.wrapping_sub(<span class="number">1</span>) == <span class="number">0
 </span>}
 
-<span class="comment">/* Conversion */
-
+<span class="doccomment">/// Convert the number of pages to bytes.
 </span><span class="kw">pub fn </span>pages_to_bytes(pages: usize) -&gt; usize {
     pages &lt;&lt; LOG_BYTES_IN_PAGE
 }
@@ -218,25 +215,6 @@
 <span class="doccomment">/// Convert size in bytes to the number of pages (aligned up)
 </span><span class="kw">pub fn </span>bytes_to_pages_up(bytes: usize) -&gt; usize {
     raw_align_up(bytes, BYTES_IN_PAGE) &gt;&gt; LOG_BYTES_IN_PAGE
-}
-
-<span class="kw">pub fn </span>bytes_to_pages(bytes: usize) -&gt; usize {
-    <span class="kw">let </span>pages = bytes_to_pages_up(bytes);
-
-    <span class="kw">if </span><span class="macro">cfg!</span>(debug = <span class="string">&quot;true&quot;</span>) {
-        <span class="kw">let </span>computed_extent = pages &lt;&lt; LOG_BYTES_IN_PAGE;
-        <span class="kw">let </span>bytes_match_pages = computed_extent == bytes;
-        <span class="macro">assert!</span>(
-            bytes_match_pages,
-            <span class="string">&quot;ERROR: number of bytes computed from pages must match original byte amount!\
-             bytes = {}\
-             pages = {}\
-             bytes computed from pages = {}&quot;</span>,
-            bytes, pages, computed_extent
-        );
-    }
-
-    pages
 }
 
 <span class="doccomment">/// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.

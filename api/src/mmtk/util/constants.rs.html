@@ -118,124 +118,132 @@
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
 <a href="#120" id="120">120</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
-
-<span class="doccomment">/**
- * Modes.
- */
-</span><span class="kw">pub const </span>INSTANCE_FIELD: usize = <span class="number">0</span>;
-<span class="kw">pub const </span>ARRAY_ELEMENT: usize = <span class="number">1</span>;
-
-<span class="comment">/****************************************************************************
- *
- * Generic sizes
- */
-
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+</pre></div><pre class="rust"><code><span class="doccomment">/// log2 of the number of bytes in a byte
 </span><span class="kw">pub const </span>LOG_BYTES_IN_BYTE: u8 = <span class="number">0</span>;
-<span class="kw">pub const </span>BYTES_IN_BYTE: usize = <span class="number">1</span>;
-<span class="kw">pub const </span>LOG_BITS_IN_BYTE: u8 = <span class="number">3</span>;
-<span class="kw">pub const </span>BITS_IN_BYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_BYTE;
+<span class="doccomment">/// The number of bytes in a byte
+</span><span class="kw">pub const </span>BYTES_IN_BYTE: usize = <span class="number">1</span>;
+<span class="doccomment">/// log2 of the number of bits in a byte
+</span><span class="kw">pub const </span>LOG_BITS_IN_BYTE: u8 = <span class="number">3</span>;
+<span class="doccomment">/// The number of bits in a byte
+</span><span class="kw">pub const </span>BITS_IN_BYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_BYTE;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_GBYTE: u8 = <span class="number">30</span>;
-<span class="kw">pub const </span>BYTES_IN_GBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_GBYTE;
+<span class="doccomment">/// log2 of the number of bytes in a gigabyte
+</span><span class="kw">pub const </span>LOG_BYTES_IN_GBYTE: u8 = <span class="number">30</span>;
+<span class="doccomment">/// The number of bytes in a gigabyte
+</span><span class="kw">pub const </span>BYTES_IN_GBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_GBYTE;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_MBYTE: u8 = <span class="number">20</span>;
-<span class="kw">pub const </span>BYTES_IN_MBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
+<span class="doccomment">/// log2 of the number of bytes in a megabyte
+</span><span class="kw">pub const </span>LOG_BYTES_IN_MBYTE: u8 = <span class="number">20</span>;
+<span class="doccomment">/// The number of bytes in a megabyte
+</span><span class="kw">pub const </span>BYTES_IN_MBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_KBYTE: u8 = <span class="number">10</span>;
-<span class="kw">pub const </span>BYTES_IN_KBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_KBYTE;
+<span class="doccomment">/// log2 of the number of bytes in a kilobyte
+</span><span class="kw">pub const </span>LOG_BYTES_IN_KBYTE: u8 = <span class="number">10</span>;
+<span class="doccomment">/// The number of bytes in a kilobyte
+</span><span class="kw">pub const </span>BYTES_IN_KBYTE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_KBYTE;
 
-<span class="comment">/****************************************************************************
- *
- * Card scanning
- */
+<span class="doccomment">/// Some card scanning constants ported from Java MMTK.
+/// As we haven&#39;t implemented card scanning, these are not used at the moment.
+</span><span class="kw">mod </span>card_scanning {
+    <span class="kw">use </span><span class="kw">crate</span>::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION;
 
-</span><span class="kw">pub const </span>SUPPORT_CARD_SCANNING: bool = <span class="bool-val">false</span>;
-<span class="kw">pub const </span>LOG_CARD_META_SIZE: usize = <span class="number">2</span>; <span class="comment">// each card consumes four bytes of metadata
-</span><span class="kw">pub const </span>LOG_CARD_UNITS: usize = <span class="number">10</span>; <span class="comment">// number of units tracked per card
-</span><span class="kw">pub const </span>LOG_CARD_GRAIN: usize = <span class="number">0</span>; <span class="comment">// track at byte grain, save shifting
-</span><span class="kw">pub const </span>LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
-<span class="kw">pub const </span>LOG_CARD_META_BYTES: usize = LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
-<span class="kw">pub const </span>LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
-<span class="doccomment">/// FIXME: Card scanning is not supported at the moment. Move this to side-metadata in the future.
-</span><span class="kw">pub const </span>CARD_META_PAGES_PER_REGION: usize = <span class="kw">if </span>SUPPORT_CARD_SCANNING {
-    <span class="number">1 </span>&lt;&lt; LOG_CARD_META_PAGES
-} <span class="kw">else </span>{
-    <span class="number">0
-</span>};
-<span class="kw">pub const </span>CARD_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_CARD_BYTES) - <span class="number">1</span>;
+    <span class="kw">pub const </span>SUPPORT_CARD_SCANNING: bool = <span class="bool-val">false</span>;
+    <span class="doccomment">/// each card consumes four bytes of metadata
+    </span><span class="kw">pub const </span>LOG_CARD_META_SIZE: usize = <span class="number">2</span>;
+    <span class="doccomment">/// number of units tracked per card
+    </span><span class="kw">pub const </span>LOG_CARD_UNITS: usize = <span class="number">10</span>;
+    <span class="doccomment">/// track at byte grain, save shifting
+    </span><span class="kw">pub const </span>LOG_CARD_GRAIN: usize = <span class="number">0</span>;
+    <span class="kw">pub const </span>LOG_CARD_BYTES: usize = LOG_CARD_UNITS + LOG_CARD_GRAIN;
+    <span class="kw">pub const </span>LOG_CARD_META_BYTES: usize =
+        LOG_BYTES_IN_REGION - LOG_CARD_BYTES + LOG_CARD_META_SIZE;
+    <span class="kw">pub const </span>LOG_CARD_META_PAGES: usize = LOG_CARD_META_BYTES - <span class="kw">super</span>::LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+    <span class="comment">// FIXME: Card scanning is not supported at the moment. Move this to side-metadata in the future.
+    </span><span class="kw">pub const </span>CARD_META_PAGES_PER_REGION: usize = <span class="kw">if </span>SUPPORT_CARD_SCANNING {
+        <span class="number">1 </span>&lt;&lt; LOG_CARD_META_PAGES
+    } <span class="kw">else </span>{
+        <span class="number">0
+    </span>};
+    <span class="kw">pub const </span>CARD_MASK: usize = (<span class="number">1 </span>&lt;&lt; LOG_CARD_BYTES) - <span class="number">1</span>;
+}
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>card_scanning::<span class="kw-2">*</span>;
 
-<span class="doccomment">/**
- * Lazy sweeping - controlled from here because PlanConstraints needs to
- * tell the VM that we need to support linear scan.
- */
-</span><span class="kw">pub const </span>LAZY_SWEEP: bool = <span class="bool-val">true</span>;
+<span class="doccomment">/// Lazy sweeping - controlled from here because PlanConstraints needs to
+/// tell the VM that we need to support linear scan.
+</span><span class="comment">// FIXME: we are not really using this constant to decide lazy sweep or not.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>LAZY_SWEEP: bool = <span class="bool-val">true</span>;
 
-<span class="comment">/****************************************************************************
- *
- * Java-specific sizes currently required by MMTk
- *
- * TODO MMTk should really become independent of these Java types
- */
+<span class="comment">// Java-specific sizes currently used by MMTk
+// TODO: MMTk should really become independent of these Java types: https://github.com/mmtk/mmtk-core/issues/922
+</span><span class="kw">mod </span>java_specific_constants {
+    <span class="kw">use </span><span class="kw">super</span>::LOG_BITS_IN_BYTE;
 
-</span><span class="kw">pub const </span>LOG_BYTES_IN_CHAR: u8 = <span class="number">1</span>;
-<span class="kw">pub const </span>BYTES_IN_CHAR: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHAR;
-<span class="kw">pub const </span>LOG_BITS_IN_CHAR: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_CHAR;
-<span class="kw">pub const </span>BITS_IN_CHAR: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_CHAR;
+    <span class="kw">pub const </span>LOG_BYTES_IN_CHAR: u8 = <span class="number">1</span>;
+    <span class="kw">pub const </span>BYTES_IN_CHAR: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_CHAR;
+    <span class="kw">pub const </span>LOG_BITS_IN_CHAR: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_CHAR;
+    <span class="kw">pub const </span>BITS_IN_CHAR: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_CHAR;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_SHORT: u8 = <span class="number">1</span>;
-<span class="kw">pub const </span>BYTES_IN_SHORT: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_SHORT;
-<span class="kw">pub const </span>LOG_BITS_IN_SHORT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_SHORT;
-<span class="kw">pub const </span>BITS_IN_SHORT: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_SHORT;
+    <span class="kw">pub const </span>LOG_BYTES_IN_SHORT: u8 = <span class="number">1</span>;
+    <span class="kw">pub const </span>BYTES_IN_SHORT: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_SHORT;
+    <span class="kw">pub const </span>LOG_BITS_IN_SHORT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_SHORT;
+    <span class="kw">pub const </span>BITS_IN_SHORT: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_SHORT;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_INT: u8 = <span class="number">2</span>;
-<span class="kw">pub const </span>BYTES_IN_INT: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_INT;
-<span class="kw">pub const </span>LOG_BITS_IN_INT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_INT;
-<span class="kw">pub const </span>BITS_IN_INT: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_INT;
+    <span class="kw">pub const </span>LOG_BYTES_IN_INT: u8 = <span class="number">2</span>;
+    <span class="kw">pub const </span>BYTES_IN_INT: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_INT;
+    <span class="kw">pub const </span>LOG_BITS_IN_INT: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_INT;
+    <span class="kw">pub const </span>BITS_IN_INT: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_INT;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_LONG: u8 = <span class="number">3</span>;
-<span class="kw">pub const </span>BYTES_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_LONG;
-<span class="kw">pub const </span>LOG_BITS_IN_LONG: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_LONG;
-<span class="kw">pub const </span>BITS_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_LONG;
+    <span class="kw">pub const </span>LOG_BYTES_IN_LONG: u8 = <span class="number">3</span>;
+    <span class="kw">pub const </span>BYTES_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_LONG;
+    <span class="kw">pub const </span>LOG_BITS_IN_LONG: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_LONG;
+    <span class="kw">pub const </span>BITS_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_LONG;
 
-<span class="kw">pub const </span>MAX_INT: usize = i32::max_value() <span class="kw">as </span>usize; <span class="comment">// 0x7fff_ffff
-</span><span class="kw">pub const </span>MIN_INT: usize = i32::min_value() <span class="kw">as </span>u32 <span class="kw">as </span>usize; <span class="comment">// 0x8000_0000
+    <span class="kw">pub const </span>MAX_INT: usize = i32::max_value() <span class="kw">as </span>usize; <span class="comment">// 0x7fff_ffff
+    </span><span class="kw">pub const </span>MIN_INT: usize = i32::min_value() <span class="kw">as </span>u32 <span class="kw">as </span>usize; <span class="comment">// 0x8000_0000
+</span>}
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>java_specific_constants::<span class="kw-2">*</span>;
 
-/****************************************************************************
- *
- * VM-Specific sizes
- */
-
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+<span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="doccomment">/// log2 of the number of bytes in an address
 </span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS: u8 = <span class="number">2</span>;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="doccomment">/// log2 of the number of bytes in an address
 </span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS: u8 = <span class="number">3</span>;
-<span class="kw">pub const </span>BYTES_IN_ADDRESS: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_ADDRESS;
-<span class="kw">pub const </span>LOG_BITS_IN_ADDRESS: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize;
-<span class="kw">pub const </span>BITS_IN_ADDRESS: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_ADDRESS;
+<span class="doccomment">/// The number of bytes in an address
+</span><span class="kw">pub const </span>BYTES_IN_ADDRESS: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_ADDRESS;
+<span class="doccomment">/// log2 of the number of bits in an address
+</span><span class="kw">pub const </span>LOG_BITS_IN_ADDRESS: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize;
+<span class="doccomment">/// The number of bits in an address
+</span><span class="kw">pub const </span>BITS_IN_ADDRESS: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_ADDRESS;
 
-<span class="comment">// Note that in MMTk we currently define WORD &amp; ADDRESS to be the same size
+<span class="doccomment">/// log2 of the number of bytes in a word
 </span><span class="kw">pub const </span>LOG_BYTES_IN_WORD: u8 = LOG_BYTES_IN_ADDRESS;
-<span class="kw">pub const </span>BYTES_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_WORD;
-<span class="kw">pub const </span>LOG_BITS_IN_WORD: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_WORD <span class="kw">as </span>usize;
-<span class="kw">pub const </span>BITS_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_WORD;
+<span class="doccomment">/// The number of bytes in a word
+</span><span class="kw">pub const </span>BYTES_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_WORD;
+<span class="doccomment">/// log2 of the number of bits in a word
+</span><span class="kw">pub const </span>LOG_BITS_IN_WORD: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_WORD <span class="kw">as </span>usize;
+<span class="doccomment">/// The number of bits in a word
+</span><span class="kw">pub const </span>BITS_IN_WORD: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_WORD;
 
-<span class="kw">pub const </span>LOG_BYTES_IN_PAGE: u8 = <span class="number">12</span>; <span class="comment">// XXX: This is a lie
+<span class="doccomment">/// log2 of the number of bytes in a page
+</span><span class="kw">pub const </span>LOG_BYTES_IN_PAGE: u8 = <span class="number">12</span>;
+<span class="doccomment">/// The number of bytes in a page
 </span><span class="kw">pub const </span>BYTES_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_PAGE;
-<span class="kw">pub const </span>LOG_BITS_IN_PAGE: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
-<span class="kw">pub const </span>BITS_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_PAGE;
+<span class="doccomment">/// log2 of the number of bits in a page
+</span><span class="kw">pub const </span>LOG_BITS_IN_PAGE: usize = LOG_BITS_IN_BYTE <span class="kw">as </span>usize + LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+<span class="doccomment">/// The number of bits in a page
+</span><span class="kw">pub const </span>BITS_IN_PAGE: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_PAGE;
 
-<span class="comment">/* Assume byte-addressability */
+<span class="doccomment">/// log2 of the number of bytes in the address space
 </span><span class="kw">pub const </span>LOG_BYTES_IN_ADDRESS_SPACE: u8 = BITS_IN_ADDRESS <span class="kw">as </span>u8;
 
-<span class="comment">// TODO: Should this be VM specific?
+<span class="doccomment">/// log2 of the minimal object size in bytes.
+</span><span class="comment">// TODO: this should be VM specific.
 </span><span class="kw">pub const </span>LOG_MIN_OBJECT_SIZE: u8 = LOG_BYTES_IN_WORD;
-<span class="kw">pub const </span>MIN_OBJECT_SIZE: usize = <span class="number">1 </span>&lt;&lt; LOG_MIN_OBJECT_SIZE;
-
-<span class="comment">/****************************************************************************
- *
- * Default options
- */
-
-</span><span class="kw">pub const </span>DEFAULT_STRESS_FACTOR: usize = usize::max_value();
+<span class="doccomment">/// The minimal object size in bytes
+</span><span class="kw">pub const </span>MIN_OBJECT_SIZE: usize = <span class="number">1 </span>&lt;&lt; LOG_MIN_OBJECT_SIZE;
 </code></pre></div></section></main></body></html>

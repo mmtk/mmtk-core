@@ -221,6 +221,11 @@
 <a href="#221" id="221">221</a>
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -228,7 +233,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::Allocator;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
-<span class="kw">use </span><span class="kw">crate</span>::util::conversions::bytes_to_pages;
+<span class="kw">use </span><span class="kw">crate</span>::util::conversions::bytes_to_pages_up;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
@@ -236,7 +241,9 @@
 <span class="kw">const </span>BLOCK_SIZE: usize = <span class="number">8 </span>* BYTES_IN_PAGE;
 <span class="kw">const </span>BLOCK_MASK: usize = BLOCK_SIZE - <span class="number">1</span>;
 
-<span class="attr">#[repr(C)]
+<span class="doccomment">/// A bump pointer allocator. It keeps a thread local allocation buffer,
+/// and bumps a cursor to allocate from the buffer.
+</span><span class="attr">#[repr(C)]
 </span><span class="kw">pub struct </span>BumpAllocator&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// [`VMThread`] associated with this allocator instance
     </span><span class="kw">pub </span>tls: VMThread,
@@ -255,12 +262,15 @@
 </span><span class="attr">#[repr(C)]
 #[derive(Copy, Clone)]
 </span><span class="kw">pub struct </span>BumpPointer {
-    <span class="kw">pub </span>cursor: Address,
-    <span class="kw">pub </span>limit: Address,
+    <span class="doccomment">/// The cursor inside the allocation buffer where the next object will be allocated.
+    </span><span class="kw">pub </span>cursor: Address,
+    <span class="doccomment">/// The upperbound of the allocation buffer.
+    </span><span class="kw">pub </span>limit: Address,
 }
 
 <span class="kw">impl </span>BumpPointer {
-    <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, end: Address) {
+    <span class="doccomment">/// Reset the cursor and limit to the given values.
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, end: Address) {
         <span class="self">self</span>.cursor = start;
         <span class="self">self</span>.limit = end;
     }
@@ -269,7 +279,7 @@
 <span class="kw">impl </span>std::default::Default <span class="kw">for </span>BumpPointer {
     <span class="doccomment">/// Defaults to 0,0. In this case, the first
     /// allocation would naturally fail the check
-    /// `cursor + size &lt; limit`, and go to the slowpath.    
+    /// `cursor + size &lt; limit`, and go to the slowpath.
     </span><span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         BumpPointer {
             cursor: Address::ZERO,
@@ -279,16 +289,16 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; BumpAllocator&lt;VM&gt; {
-    <span class="kw">pub fn </span>set_limit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, limit: Address) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_limit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address, limit: Address) {
         <span class="self">self</span>.bump_pointer.reset(start, limit);
     }
 
-    <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>zero = <span class="kw">unsafe </span>{ Address::zero() };
         <span class="self">self</span>.bump_pointer.reset(zero, zero);
     }
 
-    <span class="kw">pub fn </span>rebind(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>rebind(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;) {
         <span class="self">self</span>.reset();
         <span class="self">self</span>.space = space;
     }
@@ -417,7 +427,7 @@
         }
 
         <span class="kw">let </span>block_size = (size + BLOCK_MASK) &amp; (!BLOCK_MASK);
-        <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(<span class="self">self</span>.tls, bytes_to_pages(block_size));
+        <span class="kw">let </span>acquired_start = <span class="self">self</span>.space.acquire(<span class="self">self</span>.tls, bytes_to_pages_up(block_size));
         <span class="kw">if </span>acquired_start.is_zero() {
             <span class="macro">trace!</span>(<span class="string">&quot;Failed to acquire a new block&quot;</span>);
             acquired_start

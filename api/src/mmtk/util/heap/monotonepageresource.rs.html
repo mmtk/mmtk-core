@@ -453,7 +453,7 @@
 
     <span class="kw">fn </span>get_available_physical_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        <span class="kw">let </span><span class="kw-2">mut </span>rtn = bytes_to_pages(sync.sentinel - sync.cursor);
+        <span class="kw">let </span><span class="kw-2">mut </span>rtn = bytes_to_pages_up(sync.sentinel - sync.cursor);
         <span class="kw">if </span>!<span class="self">self</span>.common.contiguous {
             rtn += <span class="self">self</span>.common.vm_map.get_available_discontiguous_chunks() * PAGES_IN_CHUNK;
         }
@@ -658,7 +658,7 @@
                 MonotonePageResourceConditional::Contiguous { start, .. } =&gt; start,
                 <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
             };
-            <span class="kw">let </span>pages = bytes_to_pages(top - space_start);
+            <span class="kw">let </span>pages = bytes_to_pages_up(top - space_start);
             <span class="self">self</span>.common.accounting.reset();
             <span class="self">self</span>.common.accounting.reserve_and_commit(pages);
             guard.current_chunk = chunk;
@@ -691,7 +691,7 @@
                 }
                 chunk_start = next_chunk_start;
             }
-            <span class="kw">let </span>pages = bytes_to_pages(live_size);
+            <span class="kw">let </span>pages = bytes_to_pages_up(live_size);
             <span class="self">self</span>.common.accounting.reset();
             <span class="self">self</span>.common.accounting.reserve_and_commit(pages);
         }
@@ -764,7 +764,7 @@
     }
 
     <span class="kw">fn </span>release_pages_extent(<span class="kw-2">&amp;</span><span class="self">self</span>, _first: Address, bytes: usize) {
-        <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages(bytes);
+        <span class="kw">let </span>pages = <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(bytes);
         <span class="macro">debug_assert!</span>(bytes == <span class="kw">crate</span>::util::conversions::pages_to_bytes(pages));
         <span class="comment">// FIXME ZERO_PAGES_ON_RELEASE
         // FIXME Options.protectOnRelease

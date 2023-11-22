@@ -246,6 +246,11 @@
 <a href="#246" id="246">246</a>
 <a href="#247" id="247">247</a>
 <a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -312,7 +317,8 @@
 <span class="doccomment">/// Describe object size for linear scan. Different policies may have
 /// different object sizes (e.g. extra metadata, etc)
 </span><span class="kw">pub trait </span>LinearScanObjectSize {
-    <span class="kw">fn </span>size(object: ObjectReference) -&gt; usize;
+    <span class="doccomment">/// The object size in bytes for the given object.
+    </span><span class="kw">fn </span>size(object: ObjectReference) -&gt; usize;
 }
 
 <span class="doccomment">/// Default object size as ObjectModel::get_current_size()
@@ -326,8 +332,10 @@
 <span class="doccomment">/// Region represents a memory region with a properly aligned address as its start and a fixed size for the region.
 /// Region provides a set of utility methods, along with a RegionIterator that linearly scans at the step of a region.
 </span><span class="kw">pub trait </span>Region: Copy + PartialEq + PartialOrd {
-    <span class="kw">const </span>LOG_BYTES: usize;
-    <span class="kw">const </span>BYTES: usize = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_BYTES;
+    <span class="doccomment">/// log2 of the size in bytes for the region.
+    </span><span class="kw">const </span>LOG_BYTES: usize;
+    <span class="doccomment">/// The size in bytes for the region.
+    </span><span class="kw">const </span>BYTES: usize = <span class="number">1 </span>&lt;&lt; <span class="self">Self</span>::LOG_BYTES;
 
     <span class="doccomment">/// Create a region from an address that is aligned to the region boundary. The method should panic if the address
     /// is not properly aligned to the region. For performance, this method should always be inlined.
@@ -372,13 +380,15 @@
     }
 }
 
-<span class="kw">pub struct </span>RegionIterator&lt;R: Region&gt; {
+<span class="doccomment">/// An iterator for contiguous regions.
+</span><span class="kw">pub struct </span>RegionIterator&lt;R: Region&gt; {
     current: R,
     end: R,
 }
 
 <span class="kw">impl</span>&lt;R: Region&gt; RegionIterator&lt;R&gt; {
-    <span class="kw">pub fn </span>new(start: R, end: R) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Create an iterator from the start region (inclusive) to the end region (exclusive).
+    </span><span class="kw">pub fn </span>new(start: R, end: R) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             current: start,
             end,

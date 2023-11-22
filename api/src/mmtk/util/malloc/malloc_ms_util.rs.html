@@ -98,6 +98,8 @@
 <a href="#98" id="98">98</a>
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS;
 <span class="kw">use </span><span class="kw">crate</span>::util::malloc::library::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -116,8 +118,9 @@
     address
 }
 
-<span class="comment">// Beside returning the allocation result,
-// this will store the malloc result at (result - BYTES_IN_ADDRESS)
+<span class="doccomment">/// Allocate with alignment and offset.
+/// Beside returning the allocation result, this will store the malloc result at (result - BYTES_IN_ADDRESS)
+/// so we know the original malloc result.
 </span><span class="kw">pub fn </span>align_offset_alloc&lt;VM: VMBinding&gt;(size: usize, align: usize, offset: usize) -&gt; Address {
     <span class="comment">// we allocate extra `align` bytes here, so we are able to handle offset
     </span><span class="kw">let </span>actual_size = size + align + BYTES_IN_ADDRESS;
@@ -137,13 +140,14 @@
     result
 }
 
-<span class="kw">pub fn </span>offset_malloc_usable_size(address: Address) -&gt; usize {
+<span class="doccomment">/// Get the malloc usable size for an address that is returned by [`crate::util::malloc::malloc_ms_util::align_offset_alloc`].
+</span><span class="kw">pub fn </span>offset_malloc_usable_size(address: Address) -&gt; usize {
     <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
     <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ malloc_res_ptr.read_unaligned() } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;
     <span class="kw">unsafe </span>{ malloc_usable_size(malloc_res) }
 }
 
-<span class="doccomment">/// free an address that is allocated with some offset
+<span class="doccomment">/// Free an address that is allocated with an offset (returned by [`crate::util::malloc::malloc_ms_util::align_offset_alloc`]).
 </span><span class="kw">pub fn </span>offset_free(address: Address) {
     <span class="kw">let </span>malloc_res_ptr: <span class="kw-2">*mut </span>usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
     <span class="kw">let </span>malloc_res = <span class="kw">unsafe </span>{ malloc_res_ptr.read_unaligned() } <span class="kw">as </span><span class="kw-2">*mut </span>libc::c_void;

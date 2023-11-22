@@ -669,8 +669,8 @@
     }
 
     <span class="kw">fn </span>current_capacity(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i32 {
-        <span class="kw">let </span>list_blocks =
-            conversions::bytes_to_pages(<span class="self">self</span>.high_water - <span class="self">self</span>.base) <span class="kw">as </span>i32 / <span class="self">self</span>.pages_per_block;
+        <span class="kw">let </span>list_blocks = conversions::bytes_to_pages_up(<span class="self">self</span>.high_water - <span class="self">self</span>.base) <span class="kw">as </span>i32
+            / <span class="self">self</span>.pages_per_block;
         <span class="self">self</span>.units_in_first_block() + (list_blocks - <span class="number">1</span>) * <span class="self">self</span>.units_per_block()
     }
 

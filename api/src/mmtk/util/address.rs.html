@@ -603,6 +603,21 @@
 <a href="#603" id="603">603</a>
 <a href="#604" id="604">604</a>
 <a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
 
 <span class="kw">use </span>std::fmt;
@@ -734,15 +749,18 @@
 }
 
 <span class="kw">impl </span>Address {
-    <span class="kw">pub const </span>ZERO: <span class="self">Self </span>= Address(<span class="number">0</span>);
-    <span class="kw">pub const </span>MAX: <span class="self">Self </span>= Address(usize::max_value());
+    <span class="doccomment">/// The lowest possible address.
+    </span><span class="kw">pub const </span>ZERO: <span class="self">Self </span>= Address(<span class="number">0</span>);
+    <span class="doccomment">/// The highest possible address.
+    </span><span class="kw">pub const </span>MAX: <span class="self">Self </span>= Address(usize::max_value());
 
     <span class="doccomment">/// creates Address from a pointer
     </span><span class="kw">pub fn </span>from_ptr&lt;T&gt;(ptr: <span class="kw-2">*const </span>T) -&gt; Address {
         Address(ptr <span class="kw">as </span>usize)
     }
 
-    <span class="kw">pub fn </span>from_ref&lt;T&gt;(r: <span class="kw-2">&amp;</span>T) -&gt; Address {
+    <span class="doccomment">/// creates Address from a Rust reference
+    </span><span class="kw">pub fn </span>from_ref&lt;T&gt;(r: <span class="kw-2">&amp;</span>T) -&gt; Address {
         Address(r <span class="kw">as </span><span class="kw-2">*const </span>T <span class="kw">as </span>usize)
     }
 
@@ -785,11 +803,13 @@
     <span class="comment">// These const functions are duplicated with the operator traits. But we need them,
     // as we need them to declare constants.
 
+    </span><span class="doccomment">/// Get the number of bytes between two addresses. The current address needs to be higher than the other address.
     </span><span class="kw">pub const fn </span>get_extent(<span class="self">self</span>, other: Address) -&gt; ByteSize {
         <span class="self">self</span>.<span class="number">0 </span>- other.<span class="number">0
     </span>}
 
-    <span class="kw">pub const fn </span>get_offset(<span class="self">self</span>, other: Address) -&gt; ByteOffset {
+    <span class="doccomment">/// Get the offset from `other` to `self`. The result is negative is `self` is lower than `other`.
+    </span><span class="kw">pub const fn </span>get_offset(<span class="self">self</span>, other: Address) -&gt; ByteOffset {
         <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>isize - other.<span class="number">0 </span><span class="kw">as </span>isize
     }
 
@@ -797,6 +817,7 @@
     // The add() function is const fn, and we can use it to declare Address constants.
     // The Add trait function cannot be const.
     </span><span class="attr">#[allow(clippy::should_implement_trait)]
+    </span><span class="doccomment">/// Add an offset to the address.
     </span><span class="kw">pub const fn </span>add(<span class="self">self</span>, size: usize) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0 </span>+ size)
     }
@@ -805,15 +826,17 @@
     // The sub() function is const fn, and we can use it to declare Address constants.
     // The Sub trait function cannot be const.
     </span><span class="attr">#[allow(clippy::should_implement_trait)]
+    </span><span class="doccomment">/// Subtract an offset from the address.
     </span><span class="kw">pub const fn </span>sub(<span class="self">self</span>, size: usize) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0 </span>- size)
     }
 
-    <span class="kw">pub const fn </span>and(<span class="self">self</span>, mask: usize) -&gt; usize {
+    <span class="doccomment">/// Bitwise &#39;and&#39; with a mask.
+    </span><span class="kw">pub const fn </span>and(<span class="self">self</span>, mask: usize) -&gt; usize {
         <span class="self">self</span>.<span class="number">0 </span>&amp; mask
     }
 
-    <span class="comment">// Perform a saturating subtract on the Address
+    <span class="doccomment">/// Perform a saturating subtract on the Address
     </span><span class="kw">pub const fn </span>saturating_sub(<span class="self">self</span>, size: usize) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0</span>.saturating_sub(size))
     }
@@ -1078,7 +1101,8 @@
 </span><span class="kw">pub struct </span>ObjectReference(usize);
 
 <span class="kw">impl </span>ObjectReference {
-    <span class="kw">pub const </span>NULL: ObjectReference = ObjectReference(<span class="number">0</span>);
+    <span class="doccomment">/// The null object reference, represented as zero.
+    </span><span class="kw">pub const </span>NULL: ObjectReference = ObjectReference(<span class="number">0</span>);
 
     <span class="doccomment">/// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
@@ -1116,7 +1140,10 @@
         VM::VMObjectModel::ref_to_header(<span class="self">self</span>)
     }
 
-    <span class="kw">pub fn </span>to_object_start&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
+    <span class="doccomment">/// Get the start of the allocation address for the object. This method is used by MMTk to get the start of the allocation
+    /// address originally returned from [`crate::memory_manager::alloc`] for the object.
+    /// This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_object_start`]. See comments on [`crate::vm::ObjectModel::ref_to_object_start`].
+    </span><span class="kw">pub fn </span>to_object_start&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
         <span class="kw">let </span>object_start = VM::VMObjectModel::ref_to_object_start(<span class="self">self</span>);
         <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == <span class="self">self</span>.to_raw_address(), <span class="string">&quot;The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}&quot;</span>, <span class="self">self</span>, object_start);
@@ -1162,7 +1189,8 @@
         }
     }
 
-    <span class="kw">pub fn </span>is_movable(<span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Can the object be moved?
+    </span><span class="kw">pub fn </span>is_movable(<span class="self">self</span>) -&gt; bool {
         <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_movable()
     }
 
@@ -1171,11 +1199,13 @@
         <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.get_forwarded_object(<span class="self">self</span>)
     }
 
-    <span class="kw">pub fn </span>is_in_any_space(<span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Is the object in any MMTk spaces?
+    </span><span class="kw">pub fn </span>is_in_any_space(<span class="self">self</span>) -&gt; bool {
         <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_in_space(<span class="self">self</span>)
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    <span class="doccomment">/// Is the object sane?
+    </span><span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
     </span><span class="kw">pub fn </span>is_sane(<span class="self">self</span>) -&gt; bool {
         <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_sane()
     }

@@ -70,6 +70,8 @@
 <a href="#70" id="70">70</a>
 <a href="#71" id="71">71</a>
 <a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
@@ -81,7 +83,9 @@
 
 <span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
 
-<span class="attr">#[repr(C)]
+<span class="doccomment">/// An allocator that only allocates at page granularity.
+/// This is intended for large objects.
+</span><span class="attr">#[repr(C)]
 </span><span class="kw">pub struct </span>LargeObjectAllocator&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// [`VMThread`] associated with this allocator instance
     </span><span class="kw">pub </span>tls: VMThread,

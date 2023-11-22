@@ -410,8 +410,8 @@
         </span><span class="kw">let </span>free_list = <span class="self">self</span>.inner().fl_map[<span class="self">Self</span>::space_index(descriptor.get_start()).unwrap()];
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>free_list) = free_list {
             <span class="kw">let </span>free_list = free_list.as_mut();
-            free_list.grow_freelist(conversions::bytes_to_pages(extent) <span class="kw">as _</span>);
-            <span class="kw">let </span>base_page = conversions::bytes_to_pages(rtn - <span class="self">self</span>.inner().base_address[index]);
+            free_list.grow_freelist(conversions::bytes_to_pages_up(extent) <span class="kw">as _</span>);
+            <span class="kw">let </span>base_page = conversions::bytes_to_pages_up(rtn - <span class="self">self</span>.inner().base_address[index]);
             <span class="kw">for </span>offset <span class="kw">in </span>(<span class="number">0</span>..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
                 free_list.set_uncoalescable((base_page + offset) <span class="kw">as _</span>);
                 <span class="comment">/* The 32-bit implementation requires that pages are returned allocated to the caller */

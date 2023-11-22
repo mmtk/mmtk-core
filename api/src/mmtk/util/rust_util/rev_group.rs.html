@@ -401,6 +401,8 @@
 <a href="#401" id="401">401</a>
 <a href="#402" id="402">402</a>
 <a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module provides an iterator that groups adjacent items with the same key.
 //!
 //! It gives all `Iterator + Clone` iterators a new method: `.revisitable_group_by`. It is similar
@@ -622,6 +624,7 @@
     }
 
     <span class="attr">#[test]
+    #[allow(clippy::never_loop)] </span><span class="comment">// We are testing with empty slices. The panic in the loop body should not run.
     </span><span class="kw">fn </span>test_empty_outer_slice() {
         <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[];
         <span class="kw">for </span>_group <span class="kw">in </span>slice_of_slices
@@ -636,6 +639,7 @@
     }
 
     <span class="attr">#[test]
+    #[allow(clippy::never_loop)] </span><span class="comment">// We are testing with empty slices. The panic in the loop body should not run.
     </span><span class="kw">fn </span>test_empty_inner_slice() {
         <span class="kw">let </span>slice_of_slices: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[i32]] = <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[], <span class="kw-2">&amp;</span>[]];
         <span class="kw">for </span>_group <span class="kw">in </span>slice_of_slices

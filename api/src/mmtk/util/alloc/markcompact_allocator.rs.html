@@ -101,6 +101,7 @@
 <a href="#101" id="101">101</a>
 <a href="#102" id="102">102</a>
 <a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span><span class="kw">super</span>::allocator::AllocatorContext;
@@ -119,15 +120,15 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompactAllocator&lt;VM&gt; {
-    <span class="kw">pub fn </span>set_limit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, cursor: Address, limit: Address) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>set_limit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, cursor: Address, limit: Address) {
         <span class="self">self</span>.bump_allocator.set_limit(cursor, limit);
     }
 
-    <span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.bump_allocator.reset();
     }
 
-    <span class="kw">pub fn </span>rebind(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>rebind(<span class="kw-2">&amp;mut </span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;) {
         <span class="self">self</span>.bump_allocator.rebind(space);
     }
 }
@@ -192,7 +193,8 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MarkCompactAllocator&lt;VM&gt; {
-    <span class="kw">pub const </span>HEADER_RESERVED_IN_BYTES: usize =
+    <span class="doccomment">/// The number of bytes that the allocator reserves for its own header.
+    </span><span class="kw">pub const </span>HEADER_RESERVED_IN_BYTES: usize =
         <span class="kw">crate</span>::policy::markcompactspace::MarkCompactSpace::&lt;VM&gt;::HEADER_RESERVED_IN_BYTES;
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,

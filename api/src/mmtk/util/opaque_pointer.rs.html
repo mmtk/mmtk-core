@@ -61,13 +61,16 @@
 <a href="#61" id="61">61</a>
 <a href="#62" id="62">62</a>
 <a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>libc::c_void;
 
-<span class="comment">// OpaquePointer does not provide any method for dereferencing, as we should not dereference it in MMTk.
-// However, there are occurrences that we may need to dereference tls in the VM binding code.
-// In JikesRVM&#39;s implementation of ActivePlan, we need to dereference tls to get mutator and collector context.
-// This is done by transmute (unsafe).
+<span class="doccomment">/// OpaquePointer represents pointers that MMTk needs to know about but will not deferefence it.
+/// For example, a pointer to the thread or the thread local storage is an opaque pointer for MMTK.
+/// The type does not provide any method for dereferencing.
 </span><span class="attr">#[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 </span><span class="kw">pub struct </span>OpaquePointer(<span class="kw-2">*mut </span>c_void);
@@ -83,17 +86,21 @@
 }
 
 <span class="kw">impl </span>OpaquePointer {
-    <span class="kw">pub const </span>UNINITIALIZED: <span class="self">Self </span>= <span class="self">Self</span>(<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>c_void);
+    <span class="doccomment">/// Represents an uninitialized value for [`OpaquePointer`].
+    </span><span class="kw">pub const </span>UNINITIALIZED: <span class="self">Self </span>= <span class="self">Self</span>(<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span>c_void);
 
-    <span class="kw">pub fn </span>from_address(addr: Address) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Cast an [`Address`] type to an [`OpaquePointer`].
+    </span><span class="kw">pub fn </span>from_address(addr: Address) -&gt; <span class="self">Self </span>{
         OpaquePointer(addr.to_mut_ptr::&lt;c_void&gt;())
     }
 
-    <span class="kw">pub fn </span>to_address(<span class="self">self</span>) -&gt; Address {
+    <span class="doccomment">/// Cast the opaque pointer to an [`Address`] type.
+    </span><span class="kw">pub fn </span>to_address(<span class="self">self</span>) -&gt; Address {
         Address::from_mut_ptr(<span class="self">self</span>.<span class="number">0</span>)
     }
 
-    <span class="kw">pub fn </span>is_null(<span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Is this opaque pointer null?
+    </span><span class="kw">pub fn </span>is_null(<span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.<span class="number">0</span>.is_null()
     }
 }
@@ -108,7 +115,8 @@
 </span><span class="kw">pub struct </span>VMThread(<span class="kw">pub </span>OpaquePointer);
 
 <span class="kw">impl </span>VMThread {
-    <span class="kw">pub const </span>UNINITIALIZED: <span class="self">Self </span>= <span class="self">Self</span>(OpaquePointer::UNINITIALIZED);
+    <span class="doccomment">/// Represents an uninitialized value for [`VMThread`].
+    </span><span class="kw">pub const </span>UNINITIALIZED: <span class="self">Self </span>= <span class="self">Self</span>(OpaquePointer::UNINITIALIZED);
 }
 
 <span class="doccomment">/// A VMMutatorThread is a VMThread that associates with a [`crate::plan::Mutator`].

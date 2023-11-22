@@ -95,9 +95,7 @@
 //! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
 //! `rlib` does *not* support LTO.
 
-</span><span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
-
-<span class="kw">mod </span>active_plan;
+</span><span class="kw">mod </span>active_plan;
 <span class="kw">mod </span>collection;
 <span class="doccomment">/// Allows MMTk to access edges in a VM-defined way.
 </span><span class="kw">pub mod </span>edge_shape;
@@ -117,8 +115,10 @@
 <span class="kw">pub use </span><span class="self">self</span>::scanning::RootsWorkFactory;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::Scanning;
 
-<span class="kw">const </span>DEFAULT_LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT <span class="kw">as </span>usize;
-<span class="kw">const </span>DEFAULT_LOG_MAX_ALIGNMENT: usize = LOG_BYTES_IN_LONG <span class="kw">as </span>usize;
+<span class="doccomment">/// Default min alignment 4 bytes
+</span><span class="kw">const </span>DEFAULT_LOG_MIN_ALIGNMENT: usize = <span class="number">2</span>;
+<span class="doccomment">/// Default max alignment 8 bytes
+</span><span class="kw">const </span>DEFAULT_LOG_MAX_ALIGNMENT: usize = <span class="number">3</span>;
 
 <span class="doccomment">/// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 </span><span class="kw">pub trait </span>VMBinding

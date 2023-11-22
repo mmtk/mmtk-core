@@ -261,6 +261,7 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -295,12 +296,12 @@
 /// We expect each copying plan to provide a CopyConfig.
 </span><span class="kw">pub struct </span>CopyConfig&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Mapping CopySemantics to the actual copying allocators (CopySelector)
-    </span><span class="kw">pub </span>copy_mapping: EnumMap&lt;CopySemantics, CopySelector&gt;,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) copy_mapping: EnumMap&lt;CopySemantics, CopySelector&gt;,
     <span class="doccomment">/// Mapping copying allocators with space
-    </span><span class="kw">pub </span>space_mapping: CopySpaceMapping&lt;VM&gt;,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) space_mapping: CopySpaceMapping&lt;VM&gt;,
     <span class="doccomment">/// A reference to the plan constraints.
     /// GCWorkerCopyContext may have plan-specific behaviors dependson the plan constraints.
-    </span><span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) constraints: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Default <span class="kw">for </span>CopyConfig&lt;VM&gt; {
@@ -499,7 +500,7 @@
 /// This enum may be expanded in the future to describe more semantics.
 </span><span class="attr">#[derive(Clone, Copy, Enum, Debug)]
 </span><span class="kw">pub enum </span>CopySemantics {
-    <span class="doccomment">/// Copy for non generational plans.
+    <span class="doccomment">/// The default copy behavior.
     </span>DefaultCopy,
     <span class="doccomment">/// Copy in nursery generation.
     </span>Nursery,
@@ -510,14 +511,15 @@
 }
 
 <span class="kw">impl </span>CopySemantics {
-    <span class="kw">pub fn </span>is_mature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Are we copying to a mature space?
+    </span><span class="kw">pub fn </span>is_mature(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">matches!</span>(<span class="self">self</span>, CopySemantics::PromoteToMature | CopySemantics::Mature)
     }
 }
 
 <span class="attr">#[repr(C, u8)]
 #[derive(Copy, Clone, Debug, Default)]
-</span><span class="kw">pub enum </span>CopySelector {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>CopySelector {
     CopySpace(u8),
     Immix(u8),
     ImmixHybrid(u8),

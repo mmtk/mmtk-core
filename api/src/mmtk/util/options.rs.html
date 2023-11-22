@@ -1190,8 +1190,10 @@
 <a href="#1190" id="1190">1190</a>
 <a href="#1191" id="1191">1191</a>
 <a href="#1192" id="1192">1192</a>
+<a href="#1193" id="1193">1193</a>
+<a href="#1194" id="1194">1194</a>
+<a href="#1195" id="1195">1195</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
-<span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::default::Default;
@@ -1200,6 +1202,10 @@
 <span class="kw">use </span>strum_macros::EnumString;
 
 <span class="kw">use </span><span class="kw">super</span>::heap::vm_layout::vm_layout;
+
+<span class="doccomment">/// The default stress factor. This is set to the max usize,
+/// which means we will never trigger a stress GC for the default value.
+</span><span class="kw">pub const </span>DEFAULT_STRESS_FACTOR: usize = usize::max_value();
 
 <span class="doccomment">/// The zeroing approach to use for new object allocations.
 /// Affects each plan differently.
@@ -1305,10 +1311,10 @@
 /// only used in the GC trigger check.
 </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
 </span><span class="kw">pub const </span>DEFAULT_MIN_NURSERY: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
+<span class="kw">const </span>DEFAULT_MAX_NURSERY_32: usize = <span class="number">32 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="doccomment">/// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-</span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY_32: usize = <span class="number">32 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
-<span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
 </span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
 <span class="kw">fn </span>always_valid&lt;T&gt;(<span class="kw">_</span>: <span class="kw-2">&amp;</span>T) -&gt; bool {
@@ -1976,8 +1982,8 @@
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests {
+    <span class="kw">use </span><span class="kw">super</span>::DEFAULT_STRESS_FACTOR;
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use </span><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR;
     <span class="kw">use </span><span class="kw">crate</span>::util::options::Options;
     <span class="kw">use </span><span class="kw">crate</span>::util::test_util::{serial_test, with_cleanup};
 
