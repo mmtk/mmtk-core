@@ -16,7 +16,9 @@ use crate::vm::*;
 /// Immix allocator
 #[repr(C)]
 pub struct ImmixAllocator<VM: VMBinding> {
+    /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
+    /// The fastpath bump pointer.
     pub bump_pointer: BumpPointer,
     /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
@@ -34,7 +36,7 @@ pub struct ImmixAllocator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.bump_pointer.reset(Address::ZERO, Address::ZERO);
         self.large_bump_pointer.reset(Address::ZERO, Address::ZERO);
         self.request_for_large = false;
@@ -183,7 +185,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         }
     }
 
-    pub fn immix_space(&self) -> &'static ImmixSpace<VM> {
+    pub(crate) fn immix_space(&self) -> &'static ImmixSpace<VM> {
         self.space
     }
 

@@ -410,7 +410,7 @@ mod dense_chunk_map {
 
         pub fn new() -> Self {
             Self {
-                /// Empty space is at index 0
+                // Empty space is at index 0
                 sft: vec![SFTRefStorage::default()],
                 index_map: HashMap::new(),
             }

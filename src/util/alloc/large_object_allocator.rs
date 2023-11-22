@@ -9,6 +9,8 @@ use crate::vm::VMBinding;
 
 use super::allocator::AllocatorContext;
 
+/// An allocator that only allocates at page granularity.
+/// This is intended for large objects.
 #[repr(C)]
 pub struct LargeObjectAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance

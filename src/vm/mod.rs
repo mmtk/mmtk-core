@@ -15,8 +15,6 @@
 //! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
 //! `rlib` does *not* support LTO.
 
-use crate::util::constants::*;
-
 mod active_plan;
 mod collection;
 /// Allows MMTk to access edges in a VM-defined way.
@@ -37,8 +35,10 @@ pub use self::scanning::ObjectTracerContext;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 
-const DEFAULT_LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
-const DEFAULT_LOG_MAX_ALIGNMENT: usize = LOG_BYTES_IN_LONG as usize;
+/// Default min alignment 4 bytes
+const DEFAULT_LOG_MIN_ALIGNMENT: usize = 2;
+/// Default max alignment 8 bytes
+const DEFAULT_LOG_MAX_ALIGNMENT: usize = 3;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding

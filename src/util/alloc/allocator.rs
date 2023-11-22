@@ -83,6 +83,7 @@ pub fn align_allocation_inner<VM: VMBinding>(
     region + delta
 }
 
+/// Fill the specified region with the alignment value.
 pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
     let mut start = immut_start;
 

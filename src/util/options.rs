@@ -1,5 +1,4 @@
 use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::Address;
 use std::default::Default;
@@ -8,6 +7,10 @@ use std::str::FromStr;
 use strum_macros::EnumString;
 
 use super::heap::vm_layout::vm_layout;
+
+/// The default stress factor. This is set to the max usize,
+/// which means we will never trigger a stress GC for the default value.
+pub const DEFAULT_STRESS_FACTOR: usize = usize::max_value();
 
 /// The zeroing approach to use for new object allocations.
 /// Affects each plan differently.
@@ -113,9 +116,9 @@ pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
+const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
@@ -784,8 +787,8 @@ options! {
 
 #[cfg(test)]
 mod tests {
+    use super::DEFAULT_STRESS_FACTOR;
     use super::*;
-    use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
 

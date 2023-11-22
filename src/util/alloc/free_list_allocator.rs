@@ -15,6 +15,7 @@ use super::allocator::AllocatorContext;
 /// A MiMalloc free list allocator
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
+    /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
     context: Arc<AllocatorContext<VM>>,

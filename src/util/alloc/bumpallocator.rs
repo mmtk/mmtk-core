@@ -5,7 +5,7 @@ use crate::util::Address;
 use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
-use crate::util::conversions::bytes_to_pages;
+use crate::util::conversions::bytes_to_pages_up;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
@@ -13,6 +13,8 @@ const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
 const BLOCK_MASK: usize = BLOCK_SIZE - 1;
 
+/// A bump pointer allocator. It keeps a thread local allocation buffer,
+/// and bumps a cursor to allocate from the buffer.
 #[repr(C)]
 pub struct BumpAllocator<VM: VMBinding> {
     /// [`VMThread`] associated with this allocator instance
@@ -32,11 +34,14 @@ pub struct BumpAllocator<VM: VMBinding> {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BumpPointer {
+    /// The cursor inside the allocation buffer where the next object will be allocated.
     pub cursor: Address,
+    /// The upperbound of the allocation buffer.
     pub limit: Address,
 }
 
 impl BumpPointer {
+    /// Reset the cursor and limit to the given values.
     pub fn reset(&mut self, start: Address, end: Address) {
         self.cursor = start;
         self.limit = end;
@@ -46,7 +51,7 @@ impl BumpPointer {
 impl std::default::Default for BumpPointer {
     /// Defaults to 0,0. In this case, the first
     /// allocation would naturally fail the check
-    /// `cursor + size < limit`, and go to the slowpath.    
+    /// `cursor + size < limit`, and go to the slowpath.
     fn default() -> Self {
         BumpPointer {
             cursor: Address::ZERO,
@@ -56,16 +61,16 @@ impl std::default::Default for BumpPointer {
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
-    pub fn set_limit(&mut self, start: Address, limit: Address) {
+    pub(crate) fn set_limit(&mut self, start: Address, limit: Address) {
         self.bump_pointer.reset(start, limit);
     }
 
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         let zero = unsafe { Address::zero() };
         self.bump_pointer.reset(zero, zero);
     }
 
-    pub fn rebind(&mut self, space: &'static dyn Space<VM>) {
+    pub(crate) fn rebind(&mut self, space: &'static dyn Space<VM>) {
         self.reset();
         self.space = space;
     }
@@ -194,7 +199,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self.space.acquire(self.tls, bytes_to_pages(block_size));
+        let acquired_start = self.space.acquire(self.tls, bytes_to_pages_up(block_size));
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start

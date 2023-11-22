@@ -1,10 +1,9 @@
 use crate::util::Address;
 use libc::c_void;
 
-// OpaquePointer does not provide any method for dereferencing, as we should not dereference it in MMTk.
-// However, there are occurrences that we may need to dereference tls in the VM binding code.
-// In JikesRVM's implementation of ActivePlan, we need to dereference tls to get mutator and collector context.
-// This is done by transmute (unsafe).
+/// OpaquePointer represents pointers that MMTk needs to know about but will not deferefence it.
+/// For example, a pointer to the thread or the thread local storage is an opaque pointer for MMTK.
+/// The type does not provide any method for dereferencing.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct OpaquePointer(*mut c_void);
@@ -20,16 +19,20 @@ impl Default for OpaquePointer {
 }
 
 impl OpaquePointer {
+    /// Represents an uninitialized value for [`OpaquePointer`].
     pub const UNINITIALIZED: Self = Self(0 as *mut c_void);
 
+    /// Cast an [`Address`] type to an [`OpaquePointer`].
     pub fn from_address(addr: Address) -> Self {
         OpaquePointer(addr.to_mut_ptr::<c_void>())
     }
 
+    /// Cast the opaque pointer to an [`Address`] type.
     pub fn to_address(self) -> Address {
         Address::from_mut_ptr(self.0)
     }
 
+    /// Is this opaque pointer null?
     pub fn is_null(self) -> bool {
         self.0.is_null()
     }
@@ -45,6 +48,7 @@ impl OpaquePointer {
 pub struct VMThread(pub OpaquePointer);
 
 impl VMThread {
+    /// Represents an uninitialized value for [`VMThread`].
     pub const UNINITIALIZED: Self = Self(OpaquePointer::UNINITIALIZED);
 }
 
