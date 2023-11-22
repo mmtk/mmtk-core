@@ -180,7 +180,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 
 impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
-        let pages = conversions::bytes_to_pages(bytes);
+        let pages = conversions::bytes_to_pages_up(bytes);
         let common_flpr = {
             let common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _),
@@ -317,7 +317,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             .grow_discontiguous_space(space_descriptor, required_chunks);
 
         if !region.is_zero() {
-            let region_start = conversions::bytes_to_pages(region - self.start);
+            let region_start = conversions::bytes_to_pages_up(region - self.start);
             let region_end = region_start + (required_chunks * PAGES_IN_CHUNK) - 1;
             self.inner_mut()
                 .free_list
@@ -342,7 +342,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     unsafe fn free_contiguous_chunk(&self, chunk: Address, sync: &mut FreeListPageResourceSync) {
         let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
-        let mut chunk_start = conversions::bytes_to_pages(chunk - self.start);
+        let mut chunk_start = conversions::bytes_to_pages_up(chunk - self.start);
         let chunk_end = chunk_start + (num_chunks * PAGES_IN_CHUNK);
         while chunk_start < chunk_end {
             self.inner_mut()
@@ -364,7 +364,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
 
     pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
-        let page_offset = conversions::bytes_to_pages(first - self.start);
+        let page_offset = conversions::bytes_to_pages_up(first - self.start);
         let pages = self.free_list.size(page_offset as _);
         // if (VM.config.ZERO_PAGES_ON_RELEASE)
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
@@ -392,7 +392,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         pages_freed: usize,
         sync: &mut FreeListPageResourceSync,
     ) {
-        let page_offset = conversions::bytes_to_pages(freed_page - self.start);
+        let page_offset = conversions::bytes_to_pages_up(freed_page - self.start);
 
         // may be multiple chunks
         if pages_freed % PAGES_IN_CHUNK == 0 {

@@ -78,26 +78,6 @@ pub fn bytes_to_pages_up(bytes: usize) -> usize {
     raw_align_up(bytes, BYTES_IN_PAGE) >> LOG_BYTES_IN_PAGE
 }
 
-/// Convert size in bytes to the number of pages (aligned down)
-pub fn bytes_to_pages(bytes: usize) -> usize {
-    let pages = bytes_to_pages_up(bytes);
-
-    if cfg!(debug = "true") {
-        let computed_extent = pages << LOG_BYTES_IN_PAGE;
-        let bytes_match_pages = computed_extent == bytes;
-        assert!(
-            bytes_match_pages,
-            "ERROR: number of bytes computed from pages must match original byte amount!\
-             bytes = {}\
-             pages = {}\
-             bytes computed from pages = {}",
-            bytes, pages, computed_extent
-        );
-    }
-
-    pages
-}
-
 /// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.
 pub fn bytes_to_formatted_string(bytes: usize) -> String {
     const UNITS: [&str; 6] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
