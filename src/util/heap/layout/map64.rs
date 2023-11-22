@@ -147,8 +147,8 @@ impl VMMap for Map64 {
         let free_list = self.inner().fl_map[Self::space_index(descriptor.get_start()).unwrap()];
         if let Some(mut free_list) = free_list {
             let free_list = free_list.as_mut();
-            free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
-            let base_page = conversions::bytes_to_pages(rtn - self.inner().base_address[index]);
+            free_list.grow_freelist(conversions::bytes_to_pages_up(extent) as _);
+            let base_page = conversions::bytes_to_pages_up(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
                 free_list.set_uncoalescable((base_page + offset) as _);
                 /* The 32-bit implementation requires that pages are returned allocated to the caller */

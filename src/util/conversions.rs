@@ -52,18 +52,18 @@ pub fn chunk_index_to_address(chunk: usize) -> Address {
     unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
 }
 
-/// Align up an integer to the given alignment.
+/// Align up an integer to the given alignment. `align` must be a power of two.
 pub const fn raw_align_up(val: usize, align: usize) -> usize {
     // See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
     val.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1)
 }
 
-/// Align down an integer to the given alignment.
+/// Align down an integer to the given alignment. `align` must be a power of two.
 pub const fn raw_align_down(val: usize, align: usize) -> usize {
     val & !align.wrapping_sub(1)
 }
 
-/// Is the integer aligned to the given alignment?
+/// Is the integer aligned to the given alignment? `align` must be a power of two.
 pub const fn raw_is_aligned(val: usize, align: usize) -> bool {
     val & align.wrapping_sub(1) == 0
 }
@@ -76,26 +76,6 @@ pub fn pages_to_bytes(pages: usize) -> usize {
 /// Convert size in bytes to the number of pages (aligned up)
 pub fn bytes_to_pages_up(bytes: usize) -> usize {
     raw_align_up(bytes, BYTES_IN_PAGE) >> LOG_BYTES_IN_PAGE
-}
-
-/// Convert size in bytes to the number of pages (aligned down)
-pub fn bytes_to_pages(bytes: usize) -> usize {
-    let pages = bytes_to_pages_up(bytes);
-
-    if cfg!(debug = "true") {
-        let computed_extent = pages << LOG_BYTES_IN_PAGE;
-        let bytes_match_pages = computed_extent == bytes;
-        assert!(
-            bytes_match_pages,
-            "ERROR: number of bytes computed from pages must match original byte amount!\
-             bytes = {}\
-             pages = {}\
-             bytes computed from pages = {}",
-            bytes, pages, computed_extent
-        );
-    }
-
-    pages
 }
 
 /// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.

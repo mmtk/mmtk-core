@@ -5,7 +5,7 @@ use crate::util::Address;
 use crate::util::alloc::Allocator;
 
 use crate::policy::space::Space;
-use crate::util::conversions::bytes_to_pages;
+use crate::util::conversions::bytes_to_pages_up;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
@@ -34,7 +34,7 @@ pub struct BumpAllocator<VM: VMBinding> {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct BumpPointer {
-    /// The current address of the allocation buffer. This is what will be allocated next.
+    /// The cursor inside the allocation buffer where the next object will be allocated.
     pub cursor: Address,
     /// The upperbound of the allocation buffer.
     pub limit: Address,
@@ -199,7 +199,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         }
 
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);
-        let acquired_start = self.space.acquire(self.tls, bytes_to_pages(block_size));
+        let acquired_start = self.space.acquire(self.tls, bytes_to_pages_up(block_size));
         if acquired_start.is_zero() {
             trace!("Failed to acquire a new block");
             acquired_start
