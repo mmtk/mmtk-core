@@ -139,4 +139,8 @@ pub trait Collection<VM: VMBinding> {
         // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
         0
     }
+
+    fn is_collection_disabled() -> bool {
+        false
+    }
 }
