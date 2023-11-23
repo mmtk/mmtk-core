@@ -342,21 +342,6 @@ impl<VM: VMBinding> GCWorker<VM> {
         &mut self.copy
     }
 
-    /// Explicitly execute a work packet in the current context (the given worker, and the current work packet).
-    /// The statistics collected for executing the work are counted into the current context.
-    /// This is NOT the normal way to execute a work packet: most work packets are polled and executed in
-    /// the worker's main loop ([`GCWorker::run`]). This method is only intended for cases where you would like to
-    /// explicitly execute a work packet under the current context.
-    pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
-        work.do_work(self, self.mmtk);
-    }
-
-    /// Explicitly execute a boxed work packet in the current context.
-    /// See [`GCWorker::do_work`] for more information.
-    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
-        work.do_work(self, self.mmtk);
-    }
-
     /// Poll a ready-to-execute work packet in the following order:
     ///
     /// 1. Any packet that should be processed only by this worker.
