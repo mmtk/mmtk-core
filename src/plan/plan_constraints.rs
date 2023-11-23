@@ -12,12 +12,6 @@ pub struct PlanConstraints {
     pub collects_garbage: bool,
     /// True if the plan moves objects.
     pub moves_objects: bool,
-    /// The number of header bits that are required. This is deprecated. See [`crate::vm::ObjectModel`]
-    /// for the GC metadata that MMTk uses.
-    pub gc_header_bits: usize,
-    /// The number of header words that are required. This is deprecated. See [`crate::vm::ObjectModel`]
-    /// for the GC metadata that MMTk uses.
-    pub gc_header_words: usize,
     /// Size (in bytes) beyond which new regular objects must be allocated to the LOS.
     /// This usually depends on the restriction of the default allocator, e.g. block size for Immix,
     /// nursery size, max possible cell for freelist, etc.
@@ -54,8 +48,6 @@ impl PlanConstraints {
         PlanConstraints {
             collects_garbage: true,
             moves_objects: false,
-            gc_header_bits: 0,
-            gc_header_words: 0,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,
             // As `LAZY_SWEEP` is true, needs_linear_scan is true for all the plans. This is strange.

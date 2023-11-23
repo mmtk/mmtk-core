@@ -38,8 +38,6 @@ pub struct Immix<VM: VMBinding> {
 /// The plan constraints for the immix plan.
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: crate::policy::immix::DEFRAG,
-    gc_header_bits: 2,
-    gc_header_words: 0,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: false,
