@@ -4,7 +4,7 @@
 # If the output path is changed in this script, we need to update rustdoc.yml as well.
 
 # deny warnings for rustdoc
-export RUSTDOCFLAGS="-D warnings"
+export RUSTDOCFLAGS="-D warnings -D missing_docs"
 
 # Check cargo doc
 # We document public and private items for MMTk developers (GC implementers).

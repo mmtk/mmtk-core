@@ -1,6 +1,3 @@
-// Deny missing_docs: if any public item does not have a proper rustdoc comment, the build will fail.
-// We try to keep the code well documented, especially for items in our public API.
-#![deny(missing_docs)]
 // Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
 // According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
 // with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
