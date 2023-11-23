@@ -936,6 +936,7 @@
 <a href="#936" id="936">936</a>
 <a href="#937" id="937">937</a>
 <a href="#938" id="938">938</a>
+<a href="#939" id="939">939</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1372,7 +1373,8 @@
     <span class="kw">crate</span>::util::malloc::free_with_size(mmtk, addr, old_size)
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+<span class="doccomment">/// Get the current active malloc&#39;d bytes. Here MMTk only accounts for bytes that are done through those &#39;counted malloc&#39; functions.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
 </span><span class="kw">pub fn </span>get_malloc_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
     mmtk.state.malloc_bytes.load(Ordering::SeqCst)
 }

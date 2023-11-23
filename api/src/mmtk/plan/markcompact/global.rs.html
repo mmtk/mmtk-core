@@ -209,8 +209,6 @@
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a>
-<a href="#213" id="213">213</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
@@ -248,11 +246,9 @@
     </span><span class="kw">pub </span>common: CommonPlan&lt;VM&gt;,
 }
 
-<span class="kw">pub const </span>MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
+<span class="doccomment">/// The plan constraints for the mark compact plan.
+</span><span class="kw">pub const </span>MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="bool-val">true</span>,
-    gc_header_bits: <span class="number">2</span>,
-    gc_header_words: <span class="number">1</span>,
-    num_specialized_scans: <span class="number">2</span>,
     needs_forward_after_liveness: <span class="bool-val">true</span>,
     max_non_los_default_alloc_bytes:
         <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,

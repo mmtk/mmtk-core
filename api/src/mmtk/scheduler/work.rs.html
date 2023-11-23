@@ -63,15 +63,47 @@
 <a href="#63" id="63">63</a>
 <a href="#64" id="64">64</a>
 <a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="attr">#[cfg(feature = <span class="string">&quot;work_packet_stats&quot;</span>)]
 </span><span class="kw">use </span>std::any::{type_name, TypeId};
 
-<span class="kw">pub trait </span>GCWork&lt;VM: VMBinding&gt;: <span class="lifetime">&#39;static </span>+ Send {
+<span class="doccomment">/// This defines a GC work packet which are assigned to the [`GCWorker`]s by the scheduler.
+/// Work packets carry payloads that indicate the work to be done. For example, a work packet may
+/// contain a pointer to a stack that must be scanned, or it may contain a large buffer of pointers
+/// that need to be traced, or it might contain a range of static variables to be scanned, etc. The size
+/// of the work packet will need to consider at least two points of tension: the work packet must be large
+/// enough to ensure that the costs of managing the work packets do not dominate, and the packet must be
+/// small enough that good load balancing is achieved.
+</span><span class="kw">pub trait </span>GCWork&lt;VM: VMBinding&gt;: <span class="lifetime">&#39;static </span>+ Send {
     <span class="doccomment">/// Define the work for this packet. However, this is not supposed to be called directly.
     /// Usually `do_work_with_stat()` should be used.
+    ///
+    /// Most work packets are polled and executed in the worker&#39;s main loop ([`GCWorker::run`])
+    /// using `do_work_with_stat`.  If `do_work` is called directly during the execution of another
+    /// work packet, bypassing `do_work_with_stat()`, this work packet will not be counted into the
+    /// number of work packets executed, and the execution time of this work packet will be counted
+    /// as part of the execution time of the other work packet.  Only call this method directly if
+    /// this is what you intend.  But you should always consider adding the work packet
+    /// into a bucket so that other GC workers can execute it in parallel, unless the context-
+    /// switching overhead is a problem.
     </span><span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;);
 
     <span class="doccomment">/// Do work and collect statistics. This internally calls `do_work()`. In most cases,

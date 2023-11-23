@@ -583,14 +583,10 @@ We will make the following changes:</p>
 <ol>
 <li>Initialize <code>gc_header_bits</code> to 2. We reserve 2 bits in the header for GC use.</li>
 <li>Initialize <code>moves_objects</code> to <code>true</code>.</li>
-<li>Initialize <code>num_specialized_scans</code> to 1.</li>
 </ol>
 <p>Finished code (step 1-3):</p>
 <pre><code>pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
     ..PlanConstraints::default()
 };
 </code></pre>

@@ -27,7 +27,7 @@
 <a href="#27" id="27">27</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
-</span><span class="kw">pub mod </span>affinity;
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>affinity;
 
 <span class="attr">#[allow(clippy::module_inception)]
 </span><span class="kw">mod </span>scheduler;

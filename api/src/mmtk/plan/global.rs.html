@@ -723,6 +723,24 @@
 <a href="#723" id="723">723</a>
 <a href="#724" id="724">724</a>
 <a href="#725" id="725">725</a>
+<a href="#726" id="726">726</a>
+<a href="#727" id="727">727</a>
+<a href="#728" id="728">728</a>
+<a href="#729" id="729">729</a>
+<a href="#730" id="730">730</a>
+<a href="#731" id="731">731</a>
+<a href="#732" id="732">732</a>
+<a href="#733" id="733">733</a>
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
@@ -864,7 +882,9 @@
 /// they may call a wrong method by mistake.
 </span><span class="comment">// TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
 </span><span class="kw">pub trait </span>Plan: <span class="lifetime">&#39;static </span>+ HasSpaces + Sync + Downcast {
-    <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints;
+    <span class="doccomment">/// Get the plan constraints for the plan.
+    /// This returns a non-constant value. A constant value can be found in each plan&#39;s module if needed.
+    </span><span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints;
 
     <span class="doccomment">/// Create a copy config for this plan. A copying GC plan MUST override this method,
     /// and provide a valid config.
@@ -873,22 +893,36 @@
         </span>CopyConfig::default()
     }
 
-    <span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
-    <span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
-    <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, _scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;);
-    <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;<span class="self">Self</span>::VM&gt; {
+    <span class="doccomment">/// Get a immutable reference to the base plan. `BasePlan` is included by all the MMTk GC plans.
+    </span><span class="kw">fn </span>base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
+
+    <span class="doccomment">/// Get a mutable reference to the base plan. `BasePlan` is included by all the MMTk GC plans.
+    </span><span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
+
+    <span class="doccomment">/// Schedule work for the upcoming GC.
+    </span><span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, _scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;);
+
+    <span class="doccomment">/// Get the common plan. CommonPlan is included by most of MMTk GC plans.
+    </span><span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;<span class="self">Self</span>::VM&gt; {
         <span class="macro">panic!</span>(<span class="string">&quot;Common Plan not handled!&quot;</span>)
     }
-    <span class="kw">fn </span>generational(
+
+    <span class="doccomment">/// Return a reference to `GenerationalPlan` to allow
+    /// access methods specific to generational plans if the plan is a generational plan.
+    </span><span class="kw">fn </span>generational(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan&lt;VM = <span class="self">Self</span>::VM&gt;&gt; {
         <span class="prelude-val">None
     </span>}
-    <span class="kw">fn </span>options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
+
+    <span class="doccomment">/// Get the current run time options.
+    </span><span class="kw">fn </span>options(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Options {
         <span class="kw-2">&amp;</span><span class="self">self</span>.base().options
     }
 
-    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;;
+    <span class="doccomment">/// Get the allocator mapping between [`crate::AllocationSemantics`] and [`crate::util::alloc::AllocatorSelector`].
+    /// This defines what space this plan will allocate objects into for different semantics.
+    </span><span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;;
 
     <span class="doccomment">/// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -907,7 +941,9 @@
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     </span><span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {}
 
-    <span class="kw">fn </span>notify_emergency_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="doccomment">/// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
+    /// The default implementation will force a full heap collection for generational plans.
+    </span><span class="kw">fn </span>notify_emergency_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(gen) = <span class="self">self</span>.generational() {
             gen.force_full_heap_collection();
         }

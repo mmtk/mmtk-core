@@ -185,8 +185,6 @@
 <a href="#185" id="185">185</a>
 <a href="#186" id="186">186</a>
 <a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
@@ -224,11 +222,9 @@
     last_gc_was_defrag: AtomicBool,
 }
 
-<span class="kw">pub const </span>IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+<span class="doccomment">/// The plan constraints for the immix plan.
+</span><span class="kw">pub const </span>IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="kw">crate</span>::policy::immix::DEFRAG,
-    gc_header_bits: <span class="number">2</span>,
-    gc_header_words: <span class="number">0</span>,
-    num_specialized_scans: <span class="number">1</span>,
     <span class="comment">// Max immix object size is half of a block.
     </span>max_non_los_default_alloc_bytes: <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     needs_prepare_mutator: <span class="bool-val">false</span>,

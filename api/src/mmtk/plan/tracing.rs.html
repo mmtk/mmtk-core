@@ -121,6 +121,19 @@
 <a href="#121" id="121">121</a>
 <a href="#122" id="122">122</a>
 <a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,
 //! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
@@ -135,7 +148,8 @@
     </span><span class="kw">fn </span>enqueue(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference);
 }
 
-<span class="kw">pub type </span>VectorObjectQueue = VectorQueue&lt;ObjectReference&gt;;
+<span class="doccomment">/// A vector queue for object references.
+</span><span class="kw">pub type </span>VectorObjectQueue = VectorQueue&lt;ObjectReference&gt;;
 
 <span class="doccomment">/// An implementation of `ObjectQueue` using a `Vec`.
 ///
@@ -174,7 +188,12 @@
         <span class="self">self</span>.buffer.len() &gt;= <span class="self">Self</span>::CAPACITY
     }
 
-    <span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, v: T) {
+    <span class="doccomment">/// Push an element to the queue. If the queue is empty, it will reserve
+    /// space to hold the number of elements defined by the capacity.
+    /// The user of this method needs to make sure the queue length does
+    /// not exceed the capacity to avoid allocating more space
+    /// (this method will not check the length against the capacity).
+    </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;mut </span><span class="self">self</span>, v: T) {
         <span class="kw">if </span><span class="self">self</span>.buffer.is_empty() {
             <span class="self">self</span>.buffer.reserve(<span class="self">Self</span>::CAPACITY);
         }
@@ -194,7 +213,9 @@
     }
 }
 
-<span class="doccomment">/// A transitive closure visitor to collect all the edges of an object.
+<span class="doccomment">/// A transitive closure visitor to collect the edges from objects.
+/// It maintains a buffer for the edges, and flushes edges to a new work packet
+/// if the buffer is full or if the type gets dropped.
 </span><span class="kw">pub struct </span>ObjectsClosure&lt;<span class="lifetime">&#39;a</span>, E: ProcessEdgesWork&gt; {
     buffer: VectorQueue&lt;EdgeOf&lt;E&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) worker: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>GCWorker&lt;E::VM&gt;,
@@ -202,7 +223,12 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, E: ProcessEdgesWork&gt; ObjectsClosure&lt;<span class="lifetime">&#39;a</span>, E&gt; {
-    <span class="kw">pub fn </span>new(worker: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>GCWorker&lt;E::VM&gt;, bucket: WorkBucketStage) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Create an [`ObjectsClosure`].
+    ///
+    /// Arguments:
+    /// * `worker`: the current worker. The objects closure should not leave the context of this worker.
+    /// * `bucket`: new work generated will be push ed to the bucket.
+    </span><span class="kw">pub fn </span>new(worker: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>GCWorker&lt;E::VM&gt;, bucket: WorkBucketStage) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             buffer: VectorQueue::new(),
             worker,

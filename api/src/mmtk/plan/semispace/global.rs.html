@@ -185,8 +185,6 @@
 <a href="#185" id="185">185</a>
 <a href="#186" id="186">186</a>
 <a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::SSGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -223,11 +221,9 @@
     </span><span class="kw">pub </span>common: CommonPlan&lt;VM&gt;,
 }
 
-<span class="kw">pub const </span>SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
+<span class="doccomment">/// The plan constraints for the semispace plan.
+</span><span class="kw">pub const </span>SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="bool-val">true</span>,
-    gc_header_bits: <span class="number">2</span>,
-    gc_header_words: <span class="number">0</span>,
-    num_specialized_scans: <span class="number">1</span>,
     max_non_los_default_alloc_bytes:
         <span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     needs_prepare_mutator: <span class="bool-val">false</span>,

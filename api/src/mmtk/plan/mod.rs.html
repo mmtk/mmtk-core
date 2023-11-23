@@ -102,7 +102,7 @@
 
 <span class="kw">mod </span>plan_constraints;
 <span class="kw">pub use </span>plan_constraints::PlanConstraints;
-<span class="kw">pub use </span>plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
 <span class="kw">mod </span>tracing;
 <span class="kw">pub use </span>tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};

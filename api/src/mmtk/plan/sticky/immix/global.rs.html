@@ -352,6 +352,7 @@
 <a href="#352" id="352">352</a>
 <a href="#353" id="353">353</a>
 <a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -388,7 +389,8 @@
     full_heap_gc_count: Arc&lt;Mutex&lt;EventCounter&gt;&gt;,
 }
 
-<span class="kw">pub const </span>STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+<span class="doccomment">/// The plan constraints for the sticky immix plan.
+</span><span class="kw">pub const </span>STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: <span class="kw">crate</span>::policy::immix::DEFRAG || <span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC,
     needs_log_bit: <span class="bool-val">true</span>,
     barrier: <span class="kw">crate</span>::plan::BarrierSelector::ObjectBarrier,

@@ -247,6 +247,9 @@
 <a href="#247" id="247">247</a>
 <a href="#248" id="248">248</a>
 <a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::{Edge, MemorySlice};
@@ -266,12 +269,15 @@
 /// VM bindings may also use this to enable the correct fast-path, if the fast-path is implemented in the binding.
 </span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq)]
 </span><span class="kw">pub enum </span>BarrierSelector {
-    NoBarrier,
-    ObjectBarrier,
+    <span class="doccomment">/// No barrier is used.
+    </span>NoBarrier,
+    <span class="doccomment">/// Object remembering barrier is used.
+    </span>ObjectBarrier,
 }
 
 <span class="kw">impl </span>BarrierSelector {
-    <span class="kw">pub const fn </span>equals(<span class="kw-2">&amp;</span><span class="self">self</span>, other: BarrierSelector) -&gt; bool {
+    <span class="doccomment">/// A const function to check if two barrier selectors are the same.
+    </span><span class="kw">pub const fn </span>equals(<span class="kw-2">&amp;</span><span class="self">self</span>, other: BarrierSelector) -&gt; bool {
         <span class="comment">// cast enum to u8 then compare. Otherwise, we cannot do it in a const fn.
         </span><span class="kw-2">*</span><span class="self">self </span><span class="kw">as </span>u8 == other <span class="kw">as </span>u8
     }

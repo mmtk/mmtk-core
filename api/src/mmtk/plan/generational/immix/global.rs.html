@@ -259,6 +259,7 @@
 <a href="#259" id="259">259</a>
 <a href="#260" id="260">260</a>
 <a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -311,7 +312,8 @@
     </span><span class="kw">pub </span>last_gc_was_full_heap: AtomicBool,
 }
 
-<span class="kw">pub const </span>GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+<span class="doccomment">/// The plan constraints for the generational immix plan.
+</span><span class="kw">pub const </span>GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     <span class="comment">// The maximum object size that can be allocated without LOS is restricted by the max immix object size.
     // This might be too restrictive, as our default allocator is bump pointer (nursery allocator) which
     // can allocate objects larger than max immix object size. However, for copying, we haven&#39;t implemented

@@ -450,11 +450,6 @@
 <a href="#450" id="450">450</a>
 <a href="#451" id="451">451</a>
 <a href="#452" id="452">452</a>
-<a href="#453" id="453">453</a>
-<a href="#454" id="454">454</a>
-<a href="#455" id="455">455</a>
-<a href="#456" id="456">456</a>
-<a href="#457" id="457">457</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -784,20 +779,19 @@
         <span class="self">self</span>.local_work_buffer.push(Box::new(work));
     }
 
-    <span class="kw">pub fn </span>is_coordinator(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="doccomment">/// Is this worker a coordinator or a normal GC worker?
+    </span><span class="kw">pub fn </span>is_coordinator(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.is_coordinator
     }
 
-    <span class="kw">pub fn </span>scheduler(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt; {
+    <span class="doccomment">/// Get the scheduler. There is only one scheduler per MMTk instance.
+    </span><span class="kw">pub fn </span>scheduler(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.scheduler
     }
 
-    <span class="kw">pub fn </span>get_copy_context_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt; {
+    <span class="doccomment">/// Get a mutable reference of the copy context for this worker.
+    </span><span class="kw">pub fn </span>get_copy_context_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>GCWorkerCopyContext&lt;VM&gt; {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.copy
-    }
-
-    <span class="kw">pub fn </span>do_work(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span><span class="self">self</span>, <span class="kw-2">mut </span>work: <span class="kw">impl </span>GCWork&lt;VM&gt;) {
-        work.do_work(<span class="self">self</span>, <span class="self">self</span>.mmtk);
     }
 
     <span class="doccomment">/// Poll a ready-to-execute work packet in the following order:
@@ -812,10 +806,6 @@
             .pop()
             .or_else(|| <span class="self">self</span>.local_work_buffer.pop())
             .unwrap_or_else(|| <span class="self">self</span>.scheduler().poll(<span class="self">self</span>))
-    }
-
-    <span class="kw">pub fn </span>do_boxed_work(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span><span class="self">self</span>, <span class="kw-2">mut </span>work: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
-        work.do_work(<span class="self">self</span>, <span class="self">self</span>.mmtk);
     }
 
     <span class="doccomment">/// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
