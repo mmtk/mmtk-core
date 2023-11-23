@@ -34,6 +34,7 @@ pub struct NoGC<VM: VMBinding> {
     pub los: ImmortalSpace<VM>,
 }
 
+/// The plan constraints for the no gc plan.
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
     collects_garbage: false,
     ..PlanConstraints::default()

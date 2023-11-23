@@ -34,11 +34,9 @@ pub struct SemiSpace<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
+/// The plan constraints for the semispace plan.
 pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     needs_prepare_mutator: false,

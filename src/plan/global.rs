@@ -139,6 +139,8 @@ pub fn create_gc_worker_context<VM: VMBinding>(
 /// they may call a wrong method by mistake.
 // TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
 pub trait Plan: 'static + HasSpaces + Sync + Downcast {
+    /// Get the plan constraints for the plan.
+    /// This returns a non-constant value. A constant value can be found in each plan's module if needed.
     fn constraints(&self) -> &'static PlanConstraints;
 
     /// Create a copy config for this plan. A copying GC plan MUST override this method,
@@ -148,21 +150,35 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         CopyConfig::default()
     }
 
+    /// Get a immutable reference to the base plan. `BasePlan` is included by all the MMTk GC plans.
     fn base(&self) -> &BasePlan<Self::VM>;
+
+    /// Get a mutable reference to the base plan. `BasePlan` is included by all the MMTk GC plans.
     fn base_mut(&mut self) -> &mut BasePlan<Self::VM>;
+
+    /// Schedule work for the upcoming GC.
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
+
+    /// Get the common plan. CommonPlan is included by most of MMTk GC plans.
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
+
+    /// Return a reference to `GenerationalPlan` to allow
+    /// access methods specific to generational plans if the plan is a generational plan.
     fn generational(
         &self,
     ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
         None
     }
+
+    /// Get the current run time options.
     fn options(&self) -> &Options {
         &self.base().options
     }
 
+    /// Get the allocator mapping between [`crate::AllocationSemantics`] and [`crate::util::alloc::AllocatorSelector`].
+    /// This defines what space this plan will allocate objects into for different semantics.
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
@@ -182,6 +198,8 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
 
+    /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
+    /// The default implementation will force a full heap collection for generational plans.
     fn notify_emergency_collection(&self) {
         if let Some(gen) = self.generational() {
             gen.force_full_heap_collection();

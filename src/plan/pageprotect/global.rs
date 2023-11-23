@@ -27,6 +27,7 @@ pub struct PageProtect<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
+/// The plan constraints for the page protect plan.
 pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
     needs_prepare_mutator: false,

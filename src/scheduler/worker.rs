@@ -327,20 +327,19 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.local_work_buffer.push(Box::new(work));
     }
 
+    /// Is this worker a coordinator or a normal GC worker?
     pub fn is_coordinator(&self) -> bool {
         self.is_coordinator
     }
 
+    /// Get the scheduler. There is only one scheduler per MMTk instance.
     pub fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
     }
 
+    /// Get a mutable reference of the copy context for this worker.
     pub fn get_copy_context_mut(&mut self) -> &mut GCWorkerCopyContext<VM> {
         &mut self.copy
-    }
-
-    pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
-        work.do_work(self, self.mmtk);
     }
 
     /// Poll a ready-to-execute work packet in the following order:
@@ -355,10 +354,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             .pop()
             .or_else(|| self.local_work_buffer.pop())
             .unwrap_or_else(|| self.scheduler().poll(self))
-    }
-
-    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
-        work.do_work(self, self.mmtk);
     }
 
     /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.

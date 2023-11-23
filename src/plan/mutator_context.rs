@@ -88,12 +88,13 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
 // - MutatorConfig only has pointers/refs (including fat pointers), and is fixed sized.
 #[repr(C)]
 pub struct Mutator<VM: VMBinding> {
-    pub allocators: Allocators<VM>,
+    pub(crate) allocators: Allocators<VM>,
+    /// Holds some thread-local states for the barrier.
     pub barrier: Box<dyn Barrier<VM>>,
     /// The mutator thread that is bound with this Mutator struct.
     pub mutator_tls: VMMutatorThread,
-    pub plan: &'static dyn Plan<VM = VM>,
-    pub config: MutatorConfig<VM>,
+    pub(crate) plan: &'static dyn Plan<VM = VM>,
+    pub(crate) config: MutatorConfig<VM>,
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
@@ -266,8 +267,17 @@ impl<VM: VMBinding> Mutator<VM> {
 // TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.
 // The Mutator struct above is the only type that implements this trait. We should be able to merge them.
 pub trait MutatorContext<VM: VMBinding>: Send + 'static {
+    /// Do the prepare work for this mutator.
     fn prepare(&mut self, tls: VMWorkerThread);
+    /// Do the release work for this mutator.
     fn release(&mut self, tls: VMWorkerThread);
+    /// Allocate memory for an object.
+    ///
+    /// Arguments:
+    /// * `size`: the number of bytes required for the object.
+    /// * `align`: required alignment for the object.
+    /// * `offset`: offset associated with the alignment. The result plus the offset will be aligned to the given alignment.
+    /// * `allocator`: the allocation semantic used for this object.
     fn alloc(
         &mut self,
         size: usize,
@@ -275,6 +285,9 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
+    /// The slow path allocation. This is only useful when the binding
+    /// implements the fast path allocation, and would like to explicitly
+    /// call the slow path after the fast path allocation fails.
     fn alloc_slow(
         &mut self,
         size: usize,
@@ -282,13 +295,24 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
+    /// Perform post-allocation actions.  For many allocators none are
+    /// required.
+    ///
+    /// Arguments:
+    /// * `refer`: the newly allocated object.
+    /// * `bytes`: the size of the space allocated (in bytes).
+    /// * `allocator`: the allocation semantic used.
     fn post_alloc(&mut self, refer: ObjectReference, bytes: usize, allocator: AllocationSemantics);
+    /// Flush per-mutator remembered sets and create GC work for the remembered sets.
     fn flush_remembered_sets(&mut self) {
         self.barrier().flush();
     }
+    /// Flush the mutator context.
     fn flush(&mut self) {
         self.flush_remembered_sets();
     }
+    /// Get the mutator thread for this mutator context. This is the same value as the argument supplied in
+    /// [`crate::memory_manager::bind_mutator`] when this mutator is created.
     fn get_tls(&self) -> VMMutatorThread;
     /// Get active barrier trait object
     fn barrier(&mut self) -> &mut dyn Barrier<VM>;
