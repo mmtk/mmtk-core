@@ -14,11 +14,15 @@ use std::any::{type_name, TypeId};
 pub trait GCWork<VM: VMBinding>: 'static + Send {
     /// Define the work for this packet. However, this is not supposed to be called directly.
     /// Usually `do_work_with_stat()` should be used.
-    /// Only call this method if you would like to explicitly execute a work packet in the current context
-    /// (the given worker, and the current work packet). The statistics collected for executing the work are
-    /// counted into the current context. This is NOT the normal way to execute a work packet: most work packets
-    /// are polled and executed in the worker's main loop ([`GCWorker::run`]) using `do_work_with_stat`.
-    /// This method should only be called directly if you would like to explicitly execute a work packet under the current context.
+    ///
+    /// Most work packets are polled and executed in the worker's main loop ([`GCWorker::run`])
+    /// using `do_work_with_stat`.  If `do_work` is called directly during the execution of another
+    /// work packet, bypassing `do_work_with_stat()`, this work packet will not be counted into the
+    /// number of work packets executed, and the execution time of this work packet will be counted
+    /// as part of the execution time of the other work packet.  Only call this method directly if
+    /// this is what you intend.  But you should always consider adding the work packet
+    /// into a bucket so that other GC workers can execute it in parallel, unless the context-
+    /// switching overhead is a problem.
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>);
 
     /// Do work and collect statistics. This internally calls `do_work()`. In most cases,
