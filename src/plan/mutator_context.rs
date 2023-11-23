@@ -89,7 +89,7 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
 #[repr(C)]
 pub struct Mutator<VM: VMBinding> {
     pub(crate) allocators: Allocators<VM>,
-    /// Holds some thread loal states for the barrier.
+    /// Holds some thread-local states for the barrier.
     pub barrier: Box<dyn Barrier<VM>>,
     /// The mutator thread that is bound with this Mutator struct.
     pub mutator_tls: VMMutatorThread,

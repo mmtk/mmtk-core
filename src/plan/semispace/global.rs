@@ -34,7 +34,7 @@ pub struct SemiSpace<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
-/// The plan constraints for the semi space plan.
+/// The plan constraints for the semispace plan.
 pub const SS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,

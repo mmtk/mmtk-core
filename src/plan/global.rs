@@ -198,7 +198,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
 
-    /// Notify the plan that an emergency collection will happen. The plan should try free as much memory as possible.
+    /// Notify the plan that an emergency collection will happen. The plan should try to free as much memory as possible.
     /// The default implementation will force a full heap collection for generational plans.
     fn notify_emergency_collection(&self) {
         if let Some(gen) = self.generational() {
