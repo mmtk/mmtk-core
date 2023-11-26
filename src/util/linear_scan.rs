@@ -64,6 +64,7 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std
 /// Describe object size for linear scan. Different policies may have
 /// different object sizes (e.g. extra metadata, etc)
 pub trait LinearScanObjectSize {
+    /// The object size in bytes for the given object.
     fn size(object: ObjectReference) -> usize;
 }
 
@@ -78,7 +79,9 @@ impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
 /// Region represents a memory region with a properly aligned address as its start and a fixed size for the region.
 /// Region provides a set of utility methods, along with a RegionIterator that linearly scans at the step of a region.
 pub trait Region: Copy + PartialEq + PartialOrd {
+    /// log2 of the size in bytes for the region.
     const LOG_BYTES: usize;
+    /// The size in bytes for the region.
     const BYTES: usize = 1 << Self::LOG_BYTES;
 
     /// Create a region from an address that is aligned to the region boundary. The method should panic if the address
@@ -124,12 +127,14 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     }
 }
 
+/// An iterator for contiguous regions.
 pub struct RegionIterator<R: Region> {
     current: R,
     end: R,
 }
 
 impl<R: Region> RegionIterator<R> {
+    /// Create an iterator from the start region (inclusive) to the end region (exclusive).
     pub fn new(start: R, end: R) -> Self {
         Self {
             current: start,

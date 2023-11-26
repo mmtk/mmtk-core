@@ -434,6 +434,7 @@ pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: u
     crate::util::malloc::free_with_size(mmtk, addr, old_size)
 }
 
+/// Get the current active malloc'd bytes. Here MMTk only accounts for bytes that are done through those 'counted malloc' functions.
 #[cfg(feature = "malloc_counted_size")]
 pub fn get_malloc_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.state.malloc_bytes.load(Ordering::SeqCst)
@@ -735,7 +736,7 @@ pub fn is_mapped_address(address: Address) -> bool {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The weak reference to add.
 pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.reference_processors.add_weak_candidate::<VM>(reff);
+    mmtk.reference_processors.add_weak_candidate(reff);
 }
 
 /// Add a reference to the list of soft references. A binding may
@@ -745,7 +746,7 @@ pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The soft reference to add.
 pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.reference_processors.add_soft_candidate::<VM>(reff);
+    mmtk.reference_processors.add_soft_candidate(reff);
 }
 
 /// Add a reference to the list of phantom references. A binding may
@@ -755,7 +756,7 @@ pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The phantom reference to add.
 pub fn add_phantom_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.reference_processors.add_phantom_candidate::<VM>(reff);
+    mmtk.reference_processors.add_phantom_candidate(reff);
 }
 
 /// Generic hook to allow benchmarks to be harnessed. We do a full heap

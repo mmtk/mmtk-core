@@ -108,7 +108,7 @@ fn map_active_chunk_metadata(chunk_start: Address) {
 /// We map the active chunk metadata (if not previously mapped), as well as the VO bit metadata
 /// and active page metadata here. Note that if [addr, addr + size) crosses multiple chunks, we
 /// will map for each chunk.
-pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize) {
+pub(super) fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize) {
     // In order to prevent race conditions, we synchronize on the lock first and then
     // check if we need to map the active chunk metadata for `chunk_start`
     let _lock = CHUNK_MAP_LOCK.lock().unwrap();
@@ -197,7 +197,7 @@ pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
     ACTIVE_PAGE_METADATA_SPEC.load::<u8>(page_addr) == 1
 }
 
-pub fn is_chunk_mapped(chunk_start: Address) -> bool {
+pub(super) fn is_chunk_mapped(chunk_start: Address) -> bool {
     // Since `address_to_meta_address` will translate a data address to a metadata address without caring
     // if it goes across metadata boundaries, we have to check if we have accidentally gone over the bounds
     // of the active chunk metadata spec before we check if the metadata has been mapped or not

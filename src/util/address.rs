@@ -129,7 +129,9 @@ impl Shl<usize> for Address {
 }
 
 impl Address {
+    /// The lowest possible address.
     pub const ZERO: Self = Address(0);
+    /// The highest possible address.
     pub const MAX: Self = Address(usize::max_value());
 
     /// creates Address from a pointer
@@ -137,6 +139,7 @@ impl Address {
         Address(ptr as usize)
     }
 
+    /// creates Address from a Rust reference
     pub fn from_ref<T>(r: &T) -> Address {
         Address(r as *const T as usize)
     }
@@ -180,10 +183,12 @@ impl Address {
     // These const functions are duplicated with the operator traits. But we need them,
     // as we need them to declare constants.
 
+    /// Get the number of bytes between two addresses. The current address needs to be higher than the other address.
     pub const fn get_extent(self, other: Address) -> ByteSize {
         self.0 - other.0
     }
 
+    /// Get the offset from `other` to `self`. The result is negative is `self` is lower than `other`.
     pub const fn get_offset(self, other: Address) -> ByteOffset {
         self.0 as isize - other.0 as isize
     }
@@ -192,6 +197,7 @@ impl Address {
     // The add() function is const fn, and we can use it to declare Address constants.
     // The Add trait function cannot be const.
     #[allow(clippy::should_implement_trait)]
+    /// Add an offset to the address.
     pub const fn add(self, size: usize) -> Address {
         Address(self.0 + size)
     }
@@ -200,15 +206,17 @@ impl Address {
     // The sub() function is const fn, and we can use it to declare Address constants.
     // The Sub trait function cannot be const.
     #[allow(clippy::should_implement_trait)]
+    /// Subtract an offset from the address.
     pub const fn sub(self, size: usize) -> Address {
         Address(self.0 - size)
     }
 
+    /// Bitwise 'and' with a mask.
     pub const fn and(self, mask: usize) -> usize {
         self.0 & mask
     }
 
-    // Perform a saturating subtract on the Address
+    /// Perform a saturating subtract on the Address
     pub const fn saturating_sub(self, size: usize) -> Address {
         Address(self.0.saturating_sub(size))
     }
@@ -473,6 +481,7 @@ use crate::vm::VMBinding;
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
+    /// The null object reference, represented as zero.
     pub const NULL: ObjectReference = ObjectReference(0);
 
     /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
@@ -511,6 +520,9 @@ impl ObjectReference {
         VM::VMObjectModel::ref_to_header(self)
     }
 
+    /// Get the start of the allocation address for the object. This method is used by MMTk to get the start of the allocation
+    /// address originally returned from [`crate::memory_manager::alloc`] for the object.
+    /// This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_object_start`]. See comments on [`crate::vm::ObjectModel::ref_to_object_start`].
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
@@ -557,6 +569,7 @@ impl ObjectReference {
         }
     }
 
+    /// Can the object be moved?
     pub fn is_movable(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_movable()
     }
@@ -566,10 +579,12 @@ impl ObjectReference {
         unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.get_forwarded_object(self)
     }
 
+    /// Is the object in any MMTk spaces?
     pub fn is_in_any_space(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_in_space(self)
     }
 
+    /// Is the object sane?
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
         unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_sane()

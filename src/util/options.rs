@@ -1,5 +1,4 @@
 use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::Address;
 use std::default::Default;
@@ -9,24 +8,47 @@ use strum_macros::EnumString;
 
 use super::heap::vm_layout::vm_layout;
 
+/// The default stress factor. This is set to the max usize,
+/// which means we will never trigger a stress GC for the default value.
+pub const DEFAULT_STRESS_FACTOR: usize = usize::max_value();
+
+/// The zeroing approach to use for new object allocations.
+/// Affects each plan differently.
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum NurseryZeroingOptions {
+    /// Zeroing with normal temporal write.
     Temporal,
+    /// Zeroing with cache-bypassing non-temporal write.
     Nontemporal,
+    /// Zeroing with a separate zeroing thread.
     Concurrent,
+    /// An adaptive approach using both non-temporal write and a concurrent zeroing thread.
     Adaptive,
 }
 
+/// Select a GC plan for MMTk.
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum PlanSelector {
+    /// Allocation only without a collector. This is usually used for debugging.
+    /// Similar to OpenJDK epsilon (<https://openjdk.org/jeps/318>).
     NoGC,
+    /// A semi-space collector, which divides the heap into two spaces and
+    /// copies the live objects into the other space for every GC.
     SemiSpace,
+    /// A generational collector that uses a copying nursery, and the semi-space policy as its mature space.
     GenCopy,
+    /// A generational collector that uses a copying nursery, and Immix as its mature space.
     GenImmix,
+    /// A mark-sweep collector, which marks live objects and sweeps dead objects during GC.
     MarkSweep,
+    /// A debugging collector that allocates memory at page granularity, and protects pages for dead objects
+    /// to prevent future access.
     PageProtect,
+    /// A mark-region collector that allows an opportunistic defragmentation mechanism.
     Immix,
+    /// A mark-compact collector that marks objects and performs Cheney-style copying.
     MarkCompact,
+    /// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     StickyImmix,
 }
 
@@ -39,6 +61,7 @@ pub enum PlanSelector {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PerfEventOptions {
+    /// A vector of perf events in tuples of (event name, PID, CPU)
     pub events: Vec<(String, i32, i32)>,
 }
 
@@ -93,9 +116,9 @@ pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
+const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
@@ -174,13 +197,14 @@ macro_rules! options {
         }
     };
 
-    ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*,) => [
-        options!($($name: $type[env_var: $env_var, command_line: $command_line, mutable: $mutable][$validator] = $default),*);
+    ($($(#[$outer:meta])*$name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*,) => [
+        options!($(#[$outer])*$($name: $type[env_var: $env_var, command_line: $command_line, mutable: $mutable][$validator] = $default),*);
     ];
-    ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*) => [
+    ($($(#[$outer:meta])*$name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*) => [
+        /// MMTk command line options.
         #[derive(Clone)]
         pub struct Options {
-            $(pub $name: MMTKOption<$type>),*
+            $($(#[$outer])*pub $name: MMTKOption<$type>),*
         }
         impl Options {
             /// Set an option from env var
@@ -392,6 +416,8 @@ pub struct NurserySize {
 }
 
 impl NurserySize {
+    /// Create a NurserySize with the given kind. The value argument specifies the nursery size
+    /// for a fixed nursery, or specifies the max size for a bounded nursery.
     pub fn new(kind: NurseryKind, value: Option<usize>) -> Self {
         match kind {
             NurseryKind::Bounded => NurserySize {
@@ -465,10 +491,15 @@ impl Options {
     }
 }
 
+/// Select a GC trigger for MMTk.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GCTriggerSelector {
+    /// GC is triggered when a fix-sized heap is full. The value specifies the fixed heap size in bytes.
     FixedHeapSize(usize),
+    /// GC is triggered by internal herusticis, and the heap size is varying between the two given values.
+    /// The two values are the lower and the upper bound of the heap size.
     DynamicHeapSize(usize, usize),
+    /// Delegate the GC triggering to the binding. This is not supported at the moment.
     Delegated,
 }
 
@@ -672,95 +703,92 @@ mod gc_trigger_tests {
 // Currently we allow all the options to be set by env var for the sake of convenience.
 // At some point, we may disallow this and all the options can only be set by command line.
 options! {
-    // The plan to use.
+    /// The GC plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::GenImmix,
-    // Number of GC worker threads. (There is always one GC controller thread.)
+    /// Number of GC worker threads. (There is always one GC controller thread besides the GC workers)
     // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
-    // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
+    /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Enable a return barrier (not supported)
+    /// Enable a return barrier (not supported)
     use_return_barrier:    bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should we eagerly finish sweeping at the start of a collection? (not supported)
+    /// Should we eagerly finish sweeping at the start of a collection? (not supported)
     eager_complete_sweep:  bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
+    /// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_gc:      bool                 [env_var: true, command_line: true]  [always_valid] = false,
+    /// The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
+    /// Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
+    /// both the upper and lower bounds. The nursery size can be set like 'Fixed:8192', for example,
+    /// to have a Fixed nursery size of 8192 bytes
     // FIXME: This is not a good way to have conflicting options -- we should refactor this
-    // The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
-    // Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
-    // both the upper and lower bounds. The nursery size can be set like "Fixed:8192", for example,
-    // to have a Fixed nursery size of 8192 bytes
     nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.min > 0 && v.max.map(|max| max > 0 && max >= v.min).unwrap_or(true)]
         = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: None },
-    // Should a major GC be performed when a system GC is required?
+    /// Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should we shrink/grow the heap to adjust to application working set? (not supported)
-    variable_size_heap:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // Should finalization be disabled?
+    /// Should finalization be disabled?
     no_finalizer:          bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should reference type processing be disabled?
-    // If reference type processing is disabled, no weak reference processing work is scheduled,
-    // and we expect a binding to treat weak references as strong references.
-    // We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
-    // once weak reference processing is implemented properly.
+    /// Should reference type processing be disabled?
+    /// If reference type processing is disabled, no weak reference processing work is scheduled,
+    /// and we expect a binding to treat weak references as strong references.
+    /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
+    /// once weak reference processing is implemented properly.
     no_reference_types:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
+    /// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     nursery_zeroing:       NurseryZeroingOptions[env_var: true, command_line: true]  [always_valid] = NurseryZeroingOptions::Temporal,
-    // How frequent (every X bytes) should we do a stress GC?
+    /// How frequent (every X bytes) should we do a stress GC?
     stress_factor:         usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    // How frequent (every X bytes) should we run analysis (a STW event that collects data)
+    /// How frequent (every X bytes) should we run analysis (a STW event that collects data)
     analysis_factor:       usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    // Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
-    // and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
-    // the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
-    // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
-    // factor (e.g. tens of metabytes).
+    /// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
+    /// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
+    /// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
+    /// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
+    /// factor (e.g. tens of metabytes).
     precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // The start of vmspace.
+    /// The start of vmspace.
     vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
-    // The size of vmspace.
+    /// The size of vmspace.
     vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0xdc0_0000,
-    // Perf events to measure
-    // Semicolons are used to separate events
-    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
-    // For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
-    //
-    // Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
+    /// Perf events to measure
+    /// Semicolons are used to separate events
+    /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
+    /// For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
+    /// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
     // TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
     work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
-    // Measuring perf events for GC and mutators
+    /// Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
-    // Should we exclude perf events occurring in kernel space. By default we include the kernel.
-    // Only set this option if you know the implications of excluding the kernel!
+    /// Should we exclude perf events occurring in kernel space. By default we include the kernel.
+    /// Only set this option if you know the implications of excluding the kernel!
     perf_exclude_kernel:    bool                  [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = false,
-    // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
-    // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
-    // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
-    // separated by commas and may include ranges. There should be no spaces in the core list. For
-    // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
-    // Note that in the case the program has only been allocated a certain number of cores using
-    // `taskset`, the core ids in the list should be specified by their perceived index as using
-    // `taskset` will essentially re-label the core ids. For example, running the program with
-    // `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
-    // be used to pin threads even though we specified the core ids "0,1,2,3,4".
-    // `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
-    // there is no core with (perceived) id 12.
+    /// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
+    /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
+    /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    /// separated by commas and may include ranges. There should be no spaces in the core list. For
+    /// example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    /// Note that in the case the program has only been allocated a certain number of cores using
+    /// `taskset`, the core ids in the list should be specified by their perceived index as using
+    /// `taskset` will essentially re-label the core ids. For example, running the program with
+    /// `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
+    /// be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
+    /// there is no core with (perceived) id 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
-    // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
-    // Default to a fixed heap size of 0.5x physical memory.
+    /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
+    /// Default to a fixed heap size of 0.5x physical memory.
     gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
-    // Enable transparent hugepage support via madvise (only Linux is supported)
+    /// Enable transparent hugepage support via madvise (only Linux is supported)
     transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
 
 #[cfg(test)]
 mod tests {
+    use super::DEFAULT_STRESS_FACTOR;
     use super::*;
-    use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
 

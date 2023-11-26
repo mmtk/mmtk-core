@@ -27,7 +27,7 @@ pub use malloc_allocator::MallocAllocator;
 pub mod immix_allocator;
 pub use self::immix_allocator::ImmixAllocator;
 
-// Free list allocator based on Mimalloc
+/// Free list allocator based on Mimalloc
 pub mod free_list_allocator;
 pub use free_list_allocator::FreeListAllocator;
 

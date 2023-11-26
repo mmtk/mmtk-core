@@ -1,6 +1,3 @@
-// TODO: We should fix missing docs for public items and turn this on (Issue #309).
-// #![deny(missing_docs)]
-
 // Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
 // According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
 // with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
@@ -61,10 +58,11 @@ pub mod build_info;
 pub mod memory_manager;
 pub mod plan;
 pub mod scheduler;
+#[deny(missing_docs)]
 pub mod util;
+#[deny(missing_docs)]
 pub mod vm;
 
 pub use crate::plan::{
     AllocationSemantics, BarrierSelector, Mutator, MutatorContext, ObjectQueue, Plan,
 };
-pub use crate::policy::copy_context::PolicyCopyContext;

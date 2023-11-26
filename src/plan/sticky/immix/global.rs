@@ -34,6 +34,7 @@ pub struct StickyImmix<VM: VMBinding> {
     full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
+/// The plan constraints for the sticky immix plan.
 pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: crate::policy::immix::DEFRAG || crate::policy::immix::PREFER_COPY_ON_NURSERY_GC,
     needs_log_bit: true,

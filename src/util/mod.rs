@@ -25,8 +25,6 @@ pub mod memory;
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
-/// Reference processing implementation.
-pub mod reference_processor;
 
 // The following modules are only public in the mmtk crate. They should only be used in MMTk core.
 /// An analysis framework for collecting data and profiling in GC.
@@ -41,6 +39,7 @@ pub(crate) mod erase_vm;
 pub(crate) mod finalizable_processor;
 /// Heap implementation, including page resource, mmapper, etc.
 pub mod heap;
+/// Checking if an address is an valid MMTk object.
 #[cfg(feature = "is_mmtk_object")]
 pub mod is_mmtk_object;
 /// Logger initialization
@@ -51,6 +50,8 @@ pub mod malloc;
 pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
+/// Reference processing implementation.
+pub(crate) mod reference_processor;
 /// Utilities funcitons for Rust
 pub(crate) mod rust_util;
 /// Sanity checker for GC.
@@ -77,4 +78,3 @@ mod raw_memory_freelist;
 pub use self::address::Address;
 pub use self::address::ObjectReference;
 pub use self::opaque_pointer::*;
-pub use self::reference_processor::ReferenceProcessor;

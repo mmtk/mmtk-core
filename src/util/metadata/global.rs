@@ -14,15 +14,19 @@ use atomic::Ordering;
 /// For performance reasons, objects of this struct should be constants.
 #[derive(Clone, Copy, Debug)]
 pub enum MetadataSpec {
+    /// In-header metadata uses bits from an object header.
     InHeader(HeaderMetadataSpec),
+    /// On-side metadata uses a side table.
     OnSide(SideMetadataSpec),
 }
 
 impl MetadataSpec {
+    /// Is this metadata stored in the side table?
     pub const fn is_on_side(&self) -> bool {
         matches!(self, &MetadataSpec::OnSide(_))
     }
 
+    /// Is this metadata stored in the object header?
     pub const fn is_in_header(&self) -> bool {
         matches!(self, &MetadataSpec::InHeader(_))
     }

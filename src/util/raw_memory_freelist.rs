@@ -115,8 +115,8 @@ impl RawMemoryFreeList {
     }
 
     fn current_capacity(&self) -> i32 {
-        let list_blocks =
-            conversions::bytes_to_pages(self.high_water - self.base) as i32 / self.pages_per_block;
+        let list_blocks = conversions::bytes_to_pages_up(self.high_water - self.base) as i32
+            / self.pages_per_block;
         self.units_in_first_block() + (list_blocks - 1) * self.units_per_block()
     }
 

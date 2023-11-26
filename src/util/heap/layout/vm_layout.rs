@@ -1,3 +1,5 @@
+//! The module defines virutal memory layout parameters.
+
 use std::sync::atomic::AtomicBool;
 
 use atomic::Ordering;
@@ -8,26 +10,17 @@ use crate::util::Address;
 
 use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
-/**
- * log_2 of the coarsest unit of address space allocation.
- *
- * In the 32-bit VM layout, this determines the granularity of
- * allocation in a discontigouous space.  In the 64-bit layout,
- * this determines the growth factor of the large contiguous spaces
- * that we provide.
- */
+/// log_2 of the coarsest unit of address space allocation.
 pub const LOG_BYTES_IN_CHUNK: usize = 22;
-
-/** Coarsest unit of address space allocation. */
+/// Coarsest unit of address space allocation.
 pub const BYTES_IN_CHUNK: usize = 1 << LOG_BYTES_IN_CHUNK;
+/// Mask for chunk size.
 pub const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
-
-/** Coarsest unit of address space allocation, in pages */
+/// Coarsest unit of address space allocation, in pages
 pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize);
-
-/** Granularity at which we map and unmap virtual address space in the heap */
+/// log_2 of the granularity at which we map and unmap virtual address space in the heap
 pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
-
+/// Granularity at which we map and unmap virtual address space in the heap
 pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 
 /// Runtime-initialized virtual memory constants
@@ -50,9 +43,12 @@ pub struct VMLayout {
 
 impl VMLayout {
     #[cfg(target_pointer_width = "32")]
+    /// The maximum virtual memory address space that can be used on the target.
     pub const LOG_ARCH_ADDRESS_SPACE: usize = 32;
     #[cfg(target_pointer_width = "64")]
+    /// The maximum virtual memory address space that can be used on the target.
     pub const LOG_ARCH_ADDRESS_SPACE: usize = 47;
+
     /// An upper bound on the extent of any space in the
     /// current memory layout
     pub const fn max_space_extent(&self) -> usize {
@@ -189,6 +185,9 @@ static mut VM_LAYOUT: VMLayout = VMLayout::new_64bit();
 
 static VM_LAYOUT_FETCHED: AtomicBool = AtomicBool::new(false);
 
+/// Get the current virtual memory layout in use.
+/// If the binding would like to set a custom virtual memory layout ([`crate::mmtk::MMTKBuilder::set_vm_layout`]), they should not
+/// call this function before they set a custom layout.
 pub fn vm_layout() -> &'static VMLayout {
     if cfg!(debug_assertions) {
         VM_LAYOUT_FETCHED.store(true, Ordering::SeqCst);
