@@ -164,15 +164,15 @@ pub fn mmtk_init(upcalls: *const RtUpcalls) {
 
 ```
 
-Now, in the `VMObjectModel` trait, we can implement the [`get_current_size`](TODO(kunals)) function:
+Now, in the `VMObjectModel` trait, we can implement the [`get_current_size`](TODO(kunals): API) function:
 
 ```Rust
 [...]
 
-    fn get_current_size(object: ObjectReference) -> usize {
-        use mmtk::util::conversions;
-        conversions::raw_align_up(unsafe { ((*UPCALLS).size_of)(object) }, RtName::MIN_ALIGNMENT)
-    }
+fn get_current_size(object: ObjectReference) -> usize {
+    use mmtk::util::conversions;
+    conversions::raw_align_up(unsafe { ((*UPCALLS).size_of)(object) }, RtName::MIN_ALIGNMENT)
+}
 
 [...]
 ```
@@ -274,10 +274,10 @@ pub enum GcThreadKind {
 ```
 
 The MMTk-side changes then should simply call the above upcalls function.
-See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/96e868b107b5b13c40c7f4946dff9ac96145c64e/mmtk/src/collection.rs#L39-L52) for an example. (Note the OpenJDK binding uses `int`s directly to signify what kind of GC thread is being spawned, but we define the above `enum` which is more sensible).
+See the [OpenJDK binding](https://github.com/mmtk/mmtk-openjdk/blob/96e868b107b5b13c40c7f4946dff9ac96145c64e/mmtk/src/collection.rs#L39-L52) for an example. (Note the OpenJDK binding uses `int`s directly to signify what kind of GC thread is being spawned, but we define the above `enum`).
 
 If your runtime is single-threaded or perhaps it is too difficult to support creating MMTk GC threads, then you could spawn GC threads in the MMTk-side of the binding instead.
-For example, MMTk-Ruby does this.
+For example, the Ruby binding does this.
 
 ## Suspending (and Resuming) Mutator Threads
 
