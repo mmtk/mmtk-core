@@ -86,12 +86,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
-        let should_poll = VM::VMActivePlan::is_mutator(tls)
-            && self
-                .common()
-                .global_state
-                .should_trigger_gc_when_heap_is_full()
-            && !(VM::VMCollection::is_collection_disabled());
+        let should_poll =
+            VM::VMActivePlan::is_mutator(tls) && !(VM::VMCollection::is_collection_disabled());
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
         let allow_gc = should_poll && self.common().global_state.is_initialized();

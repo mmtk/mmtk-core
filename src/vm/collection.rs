@@ -140,6 +140,7 @@ pub trait Collection<VM: VMBinding> {
         0
     }
 
+    /// FIXME: Document method
     fn is_collection_disabled() -> bool {
         false
     }
