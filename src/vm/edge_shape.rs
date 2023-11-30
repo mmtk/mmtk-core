@@ -41,9 +41,35 @@ use crate::util::{Address, ObjectReference};
 /// in a word as a pointer, it can also use `SimpleEdge` for weak reference fields.
 pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// Load object reference from the edge.
+    ///
+    /// If the slot is not holding an object reference, it should return `ObjectReference::NULL`.
+    /// Specifically,
+    ///
+    /// -   If the langauge has the concept of "null pointer" which does not point to any object in
+    ///     the heap, this method should return `ObjectReference::NULL` regardless how a null
+    ///     pointer is encoded in the VM.  However, if the VM uses a special object in the heap to
+    ///     represent a null value, such as the `None` object of `NoneType` in Python, this method
+    ///     should still return the object reference to such `None` objects so that they are
+    ///     properly traced, kept alive, and they have their references forwarded.
+    /// -   If, in a VM, the data type a slot can hold is a union of references and non-reference
+    ///     values, and the slot is currently holding a non-reference value, such as a small
+    ///     integer, a floating-point number, or any special value such as `true`, `false` or `nil`
+    ///     that do not point to any object, the slot is considered not holding an reference.  This
+    ///     method should return `ObjectReference::NULL` in such cases.
+    ///
+    /// If the slot holds an object reference with tag bits, the returned value shall be the object
+    /// reference with the tag bits removed.
     fn load(&self) -> ObjectReference;
 
     /// Store the object reference `object` into the edge.
+    ///
+    /// If the slot holds an object reference with tag bits, this method must preserve the tag
+    /// bits while updating the object reference so that it points to the forwarded object given by
+    /// the parameter `object`.
+    ///
+    /// FIXME: This design is inefficient for handling object references with tag bits.  Consider
+    /// introducing a new updating function to do the load, trace and store in one function.
+    /// See: https://github.com/mmtk/mmtk-core/issues/1033
     fn store(&self, object: ObjectReference);
 
     /// Prefetch the edge so that a subsequent `load` will be faster.
