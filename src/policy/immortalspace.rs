@@ -187,6 +187,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
+        debug_assert!(!object.is_null());
         #[cfg(feature = "vo_bit")]
         debug_assert!(
             crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
