@@ -149,9 +149,7 @@ In `gc_work.rs`:
  the tospace and fromspace:
     ```rust
         fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-            if object.is_null() {
-                return object;
-            }
+            debug_assert!(!object.is_null());
 
             // Add this!
             else if self.plan().youngspace().in_space(object) {
