@@ -9,7 +9,6 @@ use crate::scheduler::ProcessEdgesWork;
 use crate::scheduler::WorkBucketStage;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
-use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 
 /// Holds all reference processors for each weak reference Semantics.
@@ -244,8 +243,8 @@ impl ReferenceProcessor {
             sync.references.iter().for_each(|reff| {
                 debug_assert!(!reff.is_null());
                 debug_assert!(reff.is_in_any_space());
-                let referent = VM::VMReferenceGlue::get_referent(*reff);
-                if !VM::VMReferenceGlue::is_referent_cleared(referent) {
+                let referent = VM::weakref_get_referent(*reff);
+                if !VM::weakref_is_referent_cleared(referent) {
                     debug_assert!(
                         referent.is_in_any_space(),
                         "Referent {:?} (of reference {:?}) is not in any space",
@@ -258,14 +257,14 @@ impl ReferenceProcessor {
             sync.enqueued_references.iter().for_each(|reff| {
                 debug_assert!(!reff.is_null());
                 debug_assert!(reff.is_in_any_space());
-                let referent = VM::VMReferenceGlue::get_referent(*reff);
-                debug_assert!(VM::VMReferenceGlue::is_referent_cleared(referent));
+                let referent = VM::weakref_get_referent(*reff);
+                debug_assert!(VM::weakref_is_referent_cleared(referent));
             });
         }
 
         if !sync.enqueued_references.is_empty() {
             trace!("enqueue: {:?}", sync.enqueued_references);
-            VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references, tls);
+            VM::weakref_enqueue_references(&sync.enqueued_references, tls);
             sync.enqueued_references.clear();
         }
 
@@ -284,16 +283,15 @@ impl ReferenceProcessor {
             trace: &mut E,
             reference: ObjectReference,
         ) -> ObjectReference {
-            let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
+            let old_referent = <E::VM as VMBinding>::weakref_get_referent(reference);
             let new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
-            <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
+            <E::VM as VMBinding>::weakref_set_referent(reference, new_referent);
             let new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
             {
-                use crate::vm::ObjectModel;
                 trace!(
                     "Forwarding reference: {} (size: {})",
                     reference,
-                    <E::VM as VMBinding>::VMObjectModel::get_current_size(reference)
+                    <E::VM as VMBinding>::get_object_size(reference)
                 );
                 trace!(
                     " referent: {} (forwarded to {})",
@@ -395,8 +393,8 @@ impl ReferenceProcessor {
             }
 
             // Reference is definitely reachable.  Retain the referent.
-            let referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference);
-            if !<E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(referent) {
+            let referent = <E::VM as VMBinding>::weakref_get_referent(*reference);
+            if !<E::VM as VMBinding>::weakref_is_referent_cleared(referent) {
                 Self::keep_referent_alive(trace, referent);
             }
             trace!(" ~> {:?} (retained)", referent);
@@ -425,7 +423,7 @@ impl ReferenceProcessor {
         // If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
         if !reference.is_live() {
-            <E::VM as VMBinding>::VMReferenceGlue::clear_referent(reference);
+            <E::VM as VMBinding>::weakref_clear_referent(reference);
             trace!(" UNREACHABLE reference: {}", reference);
             trace!(" (unreachable)");
             return None;
@@ -433,14 +431,14 @@ impl ReferenceProcessor {
 
         // The reference object is live
         let new_reference = Self::get_forwarded_reference(trace, reference);
-        let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
+        let old_referent = <E::VM as VMBinding>::weakref_get_referent(reference);
         trace!(" ~> {}", old_referent);
 
         // If the application has cleared the referent the Java spec says
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
-        if <E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(old_referent) {
+        if <E::VM as VMBinding>::weakref_is_referent_cleared(old_referent) {
             trace!(" (cleared referent) ");
             return None;
         }
@@ -461,13 +459,13 @@ impl ReferenceProcessor {
             // copying collector.
 
             // Update the referent
-            <E::VM as VMBinding>::VMReferenceGlue::set_referent(new_reference, new_referent);
+            <E::VM as VMBinding>::weakref_set_referent(new_reference, new_referent);
             Some(new_reference)
         } else {
             // Referent is unreachable. Clear the referent and enqueue the reference object.
             trace!(" UNREACHABLE referent: {}", old_referent);
 
-            <E::VM as VMBinding>::VMReferenceGlue::clear_referent(new_reference);
+            <E::VM as VMBinding>::weakref_clear_referent(new_reference);
             enqueued_references.push(new_reference);
             None
         }

@@ -1,7 +1,6 @@
 //! Read/Write barrier implementations.
 
 use crate::vm::edge_shape::{Edge, MemorySlice};
-use crate::vm::ObjectModel;
 use crate::{
     util::{metadata::MetadataSpec, *},
     vm::VMBinding,
@@ -134,8 +133,7 @@ impl<VM: VMBinding> Barrier<VM> for NoBarrier {}
 pub trait BarrierSemantics: 'static + Send {
     type VM: VMBinding;
 
-    const UNLOG_BIT_SPEC: MetadataSpec =
-        *<Self::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec();
+    const UNLOG_BIT_SPEC: MetadataSpec = *<Self::VM as VMBinding>::GLOBAL_LOG_BIT_SPEC.as_spec();
 
     /// Flush thread-local buffers or remembered sets.
     /// Normally this is called by the slow-path implementation whenever the thread-local buffers are full.

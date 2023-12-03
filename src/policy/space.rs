@@ -11,7 +11,6 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout::{vm_layout, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
-use crate::vm::{ActivePlan, Collection};
 
 use crate::util::constants::{LOG_BYTES_IN_MBYTE, LOG_BYTES_IN_PAGE};
 use crate::util::conversions;
@@ -66,10 +65,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let max_pages = self.get_gc_trigger().policy.get_max_heap_size_in_pages();
         let requested_pages = size >> LOG_BYTES_IN_PAGE;
         if requested_pages > max_pages {
-            VM::VMCollection::out_of_memory(
-                tls,
-                crate::util::alloc::AllocationError::HeapOutOfMemory,
-            );
+            VM::out_of_memory(tls, crate::util::alloc::AllocationError::HeapOutOfMemory);
             return true;
         }
         false
@@ -86,7 +82,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
-        let should_poll = VM::VMActivePlan::is_mutator(tls)
+        let should_poll = VM::is_mutator(tls)
             && self
                 .common()
                 .global_state
@@ -111,7 +107,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .policy
                 .on_pending_allocation(pages_reserved);
 
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            VM::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -224,7 +220,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         .policy
                         .on_pending_allocation(pages_reserved);
 
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
+                    VM::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
             }

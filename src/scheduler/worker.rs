@@ -4,7 +4,7 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
-use crate::vm::{Collection, GCThreadContext, VMBinding};
+use crate::vm::{GCThreadContext, VMBinding};
 use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{self, Stealer};
@@ -425,7 +425,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
                 shared.clone(),
                 unspawned_local_work_queues.pop().unwrap(),
             ));
-            VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
+            VM::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
         debug_assert!(unspawned_local_work_queues.is_empty());
     }

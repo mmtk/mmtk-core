@@ -1,7 +1,7 @@
 use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
-use crate::vm::{Collection, VMBinding};
+use crate::vm::VMBinding;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
 use sysinfo::{RefreshKind, System, SystemExt};
@@ -140,7 +140,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
         ErrorKind::OutOfMemory => {
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
             trace!("Signal MmapOutOfMemory!");
-            VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
+            VM::out_of_memory(tls, AllocationError::MmapOutOfMemory);
             unreachable!()
         }
         // Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.
@@ -152,7 +152,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
                 if os_errno == libc::ENOMEM {
                     // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
                     trace!("Signal MmapOutOfMemory!");
-                    VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
+                    VM::out_of_memory(tls, AllocationError::MmapOutOfMemory);
                     unreachable!()
                 }
             }

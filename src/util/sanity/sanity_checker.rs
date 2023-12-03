@@ -132,7 +132,7 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
         }
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in <P::VM as VMBinding>::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
@@ -157,7 +157,7 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         info!("Sanity GC release");
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in <P::VM as VMBinding>::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
@@ -221,11 +221,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             );
 
             // Let VM check object
-            assert!(
-                VM::VMObjectModel::is_object_sane(object),
-                "Invalid reference {:?}",
-                object
-            );
+            assert!(VM::is_object_sane(object), "Invalid reference {:?}", object);
 
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it

@@ -1,6 +1,5 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::vm::VMLocalMarkBitSpec;
 use std::sync::atomic::Ordering;
@@ -52,11 +51,7 @@ impl MarkState {
 
     /// Check if the object is marked
     pub fn is_marked<VM: VMBinding>(&self, object: ObjectReference) -> bool {
-        let state = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
+        let state = VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
         state == self.state
     }
 
@@ -64,16 +59,13 @@ impl MarkState {
     /// Otherwise return false -- the object was marked by others.
     pub fn test_and_mark<VM: VMBinding>(&self, object: ObjectReference) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
+            let old_value =
+                VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
             if old_value == self.state {
                 return false;
             }
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+            if VM::LOCAL_MARK_BIT_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
@@ -93,8 +85,8 @@ impl MarkState {
     /// This has to be called during object initialization.
     pub fn on_object_metadata_initialization<VM: VMBinding>(&self, object: ObjectReference) {
         // If it is in header, we have to set the mark bit for every newly allocated object
-        if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_in_header() {
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
+        if VM::LOCAL_MARK_BIT_SPEC.is_in_header() {
+            VM::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
                 object,
                 self.unmarked_state(),
                 None,
@@ -110,16 +102,14 @@ impl MarkState {
     /// after a GC tracing (eagerly). This method will reset the mark bit. The policy should not use the mark bit before
     /// doing another tracing.
     pub fn on_block_reset<VM: VMBinding>(&self, start: Address, size: usize) {
-        if let crate::util::metadata::MetadataSpec::OnSide(side) =
-            *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-        {
+        if let crate::util::metadata::MetadataSpec::OnSide(side) = *VM::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(start, size);
         }
     }
 
     /// This has to be called in the global release of a space
     pub fn on_global_release<VM: VMBinding>(&mut self) {
-        if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_in_header() {
+        if VM::LOCAL_MARK_BIT_SPEC.is_in_header() {
             // If it is in header, we flip it. In this case, we do not need to reset the bits for marked objects
             self.state = self.unmarked_state()
         }

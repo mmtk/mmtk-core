@@ -6,7 +6,6 @@ use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
-use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
 use enum_map::{Enum, EnumMap};
@@ -97,7 +96,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.clone(),
             coordinator_worker,
         );
-        VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
+        VM::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
 
         self.worker_group.spawn(mmtk, tls)
     }

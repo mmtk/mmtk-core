@@ -1,7 +1,6 @@
 use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
@@ -68,11 +67,11 @@ pub trait LinearScanObjectSize {
     fn size(object: ObjectReference) -> usize;
 }
 
-/// Default object size as ObjectModel::get_current_size()
+/// Default object size as ObjectModel::get_object_size()
 pub struct DefaultObjectSize<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
     fn size(object: ObjectReference) -> usize {
-        VM::VMObjectModel::get_current_size(object)
+        VM::get_object_size(object)
     }
 }
 

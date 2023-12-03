@@ -11,7 +11,7 @@ use crate::util::{metadata, ObjectReference};
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 
 use crate::policy::sft::GCWorkerMutRef;
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the
@@ -58,7 +58,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
@@ -125,7 +125,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         let common = CommonSpace::new(args.into_policy_args(
             false,
             true,
-            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+            metadata::extract_side_metadata(&[*VM::LOCAL_MARK_BIT_SPEC]),
         ));
         ImmortalSpace {
             mark_state: MarkState::new(),
@@ -152,7 +152,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             common: CommonSpace::new(args.into_policy_args(
                 false,
                 true,
-                metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+                metadata::extract_side_metadata(&[*VM::LOCAL_MARK_BIT_SPEC]),
             )),
             vm_space: true,
         }

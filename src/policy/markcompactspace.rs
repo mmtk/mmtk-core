@@ -202,7 +202,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
-        let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
+        let local_specs = extract_side_metadata(&[*VM::LOCAL_MARK_BIT_SPEC]);
         let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         MarkCompactSpace {
             pr: if is_discontiguous {
@@ -255,16 +255,13 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
+            let old_value =
+                VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
             let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit != 0 {
                 return false;
             }
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+            if VM::LOCAL_MARK_BIT_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
@@ -283,17 +280,14 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn test_and_clear_mark(object: ObjectReference) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
+            let old_value =
+                VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
             let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit == 0 {
                 return false;
             }
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+            if VM::LOCAL_MARK_BIT_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
@@ -311,11 +305,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     pub fn is_marked(object: ObjectReference) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
+        let old_value =
+            VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
         let mark_bit = old_value & GC_MARK_BIT_MASK;
         mark_bit != 0
     }
@@ -346,9 +337,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 .filter(Self::to_be_compacted)
             {
                 let copied_size =
-                    VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
-                let align = VM::VMObjectModel::get_align_when_copied(obj);
-                let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
+                    VM::get_object_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
+                let align = VM::get_object_align_when_copied(obj);
+                let offset = VM::get_object_align_offset_when_copied(obj);
                 // move to_cursor to aliged start address
                 to_cursor = align_allocation_no_fill::<VM>(to_cursor, align, offset);
                 // move to next to-block if there is no sufficient memory in current region
@@ -359,7 +350,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     debug_assert!(to_cursor + copied_size <= to_end);
                 }
                 // Get copied object
-                let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
+                let new_obj = VM::get_object_reference_when_copied_to(
                     obj,
                     to_cursor + Self::HEADER_RESERVED_IN_BYTES,
                 );
@@ -368,7 +359,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 trace!(
                     "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
                     obj,
-                    VM::VMObjectModel::get_size_when_copied(obj),
+                    VM::get_object_size_when_copied(obj),
                     to_cursor,
                     copied_size
                 );
@@ -383,7 +374,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         for (from_start, size) in self.pr.iterate_allocated_regions() {
             let from_end = from_start + size;
             for obj in self.linear_scan_objects(from_start..from_end) {
-                let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
+                let copied_size = VM::get_object_size_when_copied(obj);
                 // clear the VO bit
                 vo_bit::unset_vo_bit::<VM>(obj);
 
@@ -396,8 +387,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
                     // copy object
                     trace!(" copy from {} to {}", obj, new_object);
-                    let end_of_new_object =
-                        VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                    let end_of_new_object = VM::copy_object_to(obj, new_object, Address::ZERO);
                     // update VO bit,
                     vo_bit::set_vo_bit::<VM>(new_object);
                     to = new_object.to_object_start::<VM>() + copied_size;
@@ -416,6 +406,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
     fn size(object: ObjectReference) -> usize {
-        VM::VMObjectModel::get_current_size(object)
+        VM::get_object_size(object)
     }
 }

@@ -86,7 +86,7 @@ pub(crate) fn generate_trace_object<'a>(
         }
     } else {
         quote! {
-            <VM::VMActivePlan as crate::vm::ActivePlan<VM>>::vm_trace_object::<Q>(__mmtk_queue, __mmtk_objref, __mmtk_worker)
+            VM::vm_trace_object::<Q>(__mmtk_queue, __mmtk_objref, __mmtk_worker)
         }
     };
 

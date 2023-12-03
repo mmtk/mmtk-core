@@ -13,7 +13,6 @@ use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, Collection};
 use downcast_rs::Downcast;
 
 #[repr(C)]
@@ -181,7 +180,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).
     ///
     /// Note that in the case where the VM is out of memory, we invoke
-    /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
+    /// [`VMBinding::out_of_memory`] to inform the binding and then return a null pointer back to
     /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
     ///
     /// An allocator needs to make sure the object reference for the returned address is in the same
@@ -213,7 +212,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// being used, the [`alloc_slow_once_precise_stress`](Allocator::alloc_slow_once_precise_stress) function is used instead.
     ///
     /// Note that in the case where the VM is out of memory, we invoke
-    /// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform
+    /// [`VMBinding::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform
     /// the binding and then return a null pointer back to it. We have no assumptions on whether
     /// the VM will continue executing or abort immediately on a
     /// [`AllocationError::HeapOutOfMemory`] error.
@@ -224,7 +223,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `offset` the required offset in bytes.
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: usize) -> Address {
         let tls = self.get_tls();
-        let is_mutator = VM::VMActivePlan::is_mutator(tls);
+        let is_mutator = VM::is_mutator(tls);
         let stress_test = self.get_context().options.is_stress_test_gc_enabled();
 
         // Information about the previous collection.
@@ -330,7 +329,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
-                    VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+                    VM::out_of_memory(tls, AllocationError::HeapOutOfMemory);
                     self.get_context()
                         .state
                         .allocation_success

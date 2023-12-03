@@ -6,7 +6,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::vo_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
@@ -171,11 +171,11 @@ pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<Obje
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, ordering) == 1
+    VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, ordering) == 1
 }
 
 pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) == 1
+    VM::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) == 1
 }
 
 /// Set the page mark from 0 to 1. Return true if we set it successfully in this call.
@@ -223,7 +223,7 @@ pub fn set_vo_bit<VM: VMBinding>(object: ObjectReference) {
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(object, 1, None, ordering);
+    VM::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(object, 1, None, ordering);
 }
 
 #[allow(unused)]
@@ -261,7 +261,7 @@ pub unsafe fn unset_vo_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
 
 #[allow(unused)]
 pub unsafe fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None);
+    VM::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None);
 }
 
 #[allow(unused)]

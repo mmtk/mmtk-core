@@ -2,8 +2,8 @@
 // GITHUB-CI: FEATURES=is_mmtk_object
 
 use crate::api::*;
-use crate::object_model::OBJECT_REF_OFFSET;
 use crate::test_fixtures::{Fixture, SingleObject};
+use crate::OBJECT_REF_OFFSET;
 use mmtk::util::constants::LOG_BITS_IN_WORD;
 use mmtk::util::is_mmtk_object::VO_BIT_REGION_SIZE;
 use mmtk::util::*;

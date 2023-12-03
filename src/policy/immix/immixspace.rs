@@ -116,15 +116,15 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
+        VM::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
+        VM::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
     }
     #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
+        VM::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
     fn is_movable(&self) -> bool {
         !super::NEVER_MOVE_OBJECTS
@@ -241,11 +241,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
-                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+                *VM::LOCAL_MARK_BIT_SPEC,
+                *VM::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
-                *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
+                *VM::LOCAL_PINNING_BIT_SPEC,
             ]
         } else {
             vec![
@@ -253,11 +253,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
-                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+                *VM::LOCAL_MARK_BIT_SPEC,
+                *VM::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::LOCAL_FORWARDING_POINTER_SPEC,
                 #[cfg(feature = "object_pinning")]
-                *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
+                *VM::LOCAL_PINNING_BIT_SPEC,
             ]
         })
     }
@@ -362,7 +362,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn prepare(&mut self, major_gc: bool, plan_stats: StatsForDefrag) {
         if major_gc {
             // Update mark_state
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
+            if VM::LOCAL_MARK_BIT_SPEC.is_on_side() {
                 self.mark_state = Self::MARKED_STATE;
             } else {
                 // For header metadata, we use cyclic mark bits.
@@ -666,15 +666,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                             + crate::util::constants::LOG_MIN_OBJECT_SIZE))
             );
             const_assert_eq!(
-                crate::vm::object_model::specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
+                crate::vm::metadata_specs::VMGlobalLogBitSpec::LOG_NUM_BITS,
                 0
             ); // We should put this to the addition, but type casting is not allowed in constant assertions.
 
             // Every immix line is 256 bytes, which is mapped to 4 bytes in the side metadata.
             // If we have one object in the line that is mature, we can assume all the objects in the line are mature objects.
             // So we can just mark the byte.
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                .mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
+            VM::GLOBAL_LOG_BIT_SPEC.mark_byte_as_unlogged::<VM>(object, Ordering::Relaxed);
         }
     }
 
@@ -688,16 +687,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Atomically mark an object.
     fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-                object,
-                None,
-                Ordering::SeqCst,
-            );
+            let old_value =
+                VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
             if old_value == mark_state {
                 return false;
             }
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+            if VM::LOCAL_MARK_BIT_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
@@ -716,11 +712,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Check if an object is marked.
     fn is_marked_with(&self, object: ObjectReference, mark_state: u8) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
+        let old_value =
+            VM::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
         old_value == mark_state
     }
 
@@ -795,7 +788,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Post copy routine for Immix copy contexts
     fn post_copy(&self, object: ObjectReference, _bytes: usize) {
         // Mark the object
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
+        VM::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
             object,
             self.mark_state,
             None,
@@ -821,11 +814,11 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     fn reset_object_mark(&self) {
         // NOTE: We reset the mark bits because cyclic mark bit is currently not supported, yet.
         // See `ImmixSpace::prepare`.
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        if let MetadataSpec::OnSide(side) = *VM::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
         }
         if self.space.space_args.reset_log_bit_in_major_gc {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+            if let MetadataSpec::OnSide(side) = *VM::GLOBAL_LOG_BIT_SPEC {
                 // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.
                 side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
             } else {
@@ -836,7 +829,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
             }
         }
         // If the forwarding bits are on the side, we need to clear them, too.
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+        if let MetadataSpec::OnSide(side) = *VM::LOCAL_FORWARDING_BITS_SPEC {
             side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
         }
     }
