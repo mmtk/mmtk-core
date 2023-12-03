@@ -6,8 +6,6 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::vm::ActivePlan;
-use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -41,7 +39,7 @@ unsafe impl<VM: VMBinding> Send for UpdateReferences<VM> {}
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
-        VM::VMScanning::prepare_for_roots_re_scanning();
+        VM::prepare_for_roots_re_scanning();
         mmtk.state.prepare_for_stack_scanning();
         // Prepare common and base spaces for the 2nd round of transitive closure
         let plan_mut = unsafe { &mut *(self.plan as *mut MarkCompact<VM>) };
@@ -56,7 +54,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
             .worker_group
             .get_and_clear_worker_live_bytes();
 
-        for mutator in VM::VMActivePlan::mutators() {
+        for mutator in VM::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots].add(ScanMutatorRoots::<
                 MarkCompactForwardingGCWorkContext<VM>,
             >(mutator));

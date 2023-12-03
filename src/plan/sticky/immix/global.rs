@@ -12,7 +12,6 @@ use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::statistics::counter::EventCounter;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
 
@@ -166,7 +165,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn sanity_check_object(&self, object: crate::util::ObjectReference) -> bool {
         if self.is_current_gc_nursery() {
             // Every reachable object should be logged
-            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+            if !VM::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
                 error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
                 return false;
             }

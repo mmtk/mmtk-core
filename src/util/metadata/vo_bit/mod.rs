@@ -21,7 +21,7 @@
 //! visible to the VM binding.  By default, if the "vo_bit" cargo feature is enabled, the VO bits
 //! metadata will be available to the VM binding during stack scanning time.  The VM binding can
 //! further require the VO bits to be available during tracing (for object scanning) by setting
-//! [`crate::vm::ObjectModel::NEED_VO_BITS_DURING_TRACING`] to `true`.  mmtk-core does not
+//! [`crate::vm::VMBinding::NEED_VO_BITS_DURING_TRACING`] to `true`.  mmtk-core does not
 //! guarantee the VO bits are available to the VM binding during other time.
 //!
 //! Internally, mmtk-core will also make the VO bits available when necessary if mmtk-core needs to
@@ -51,7 +51,6 @@ use atomic::Ordering;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::object_model::ObjectModel;
 use crate::vm::VMBinding;
 
 /// A VO bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
@@ -150,7 +149,7 @@ pub fn bzero_vo_bit(start: Address, size: usize) {
 /// The caller needs to ensure the mark bits are set exactly wherever VO bits need to be set before
 /// calling this function.
 pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
-    let mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
+    let mark_bit_spec = VM::LOCAL_MARK_BIT_SPEC;
     debug_assert!(
         mark_bit_spec.is_on_side(),
         "bcopy_vo_bit_from_mark_bits can only be used with on-the-side mark bits."

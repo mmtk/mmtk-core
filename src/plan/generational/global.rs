@@ -11,7 +11,7 @@ use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -87,8 +87,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// Returns `true` if the nursery has grown to the extent that it may not be able to be copied
     /// into the mature space.
     fn virtual_memory_exhausted(plan: &dyn GenerationalPlan<VM = VM>) -> bool {
-        ((plan.get_collection_reserved_pages() as f64
-            * VM::VMObjectModel::VM_WORST_CASE_COPY_EXPANSION) as usize)
+        ((plan.get_collection_reserved_pages() as f64 * VM::VM_WORST_CASE_COPY_EXPANSION) as usize)
             > plan.get_mature_physical_pages_available()
     }
 

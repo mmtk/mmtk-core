@@ -1,7 +1,6 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
 use crate::util::{constants, ObjectReference};
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -24,7 +23,7 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     loop {
         let old_value = get_forwarding_status::<VM>(object);
         if old_value != FORWARDING_NOT_TRIGGERED_YET
-            || VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC
+            || VM::LOCAL_FORWARDING_BITS_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
@@ -79,9 +78,9 @@ pub fn forward_object<VM: VMBinding>(
     semantics: CopySemantics,
     copy_context: &mut GCWorkerCopyContext<VM>,
 ) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
+    let new_object = VM::copy_object(object, semantics, copy_context);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
-        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
+        VM::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
             new_object.to_raw_address().as_usize() | ((FORWARDED as usize) << shift),
             None,
@@ -89,7 +88,7 @@ pub fn forward_object<VM: VMBinding>(
         )
     } else {
         write_forwarding_pointer::<VM>(object, new_object);
-        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
+        VM::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
             object,
             FORWARDED,
             None,
@@ -101,11 +100,7 @@ pub fn forward_object<VM: VMBinding>(
 
 /// Return the forwarding bits for a given `ObjectReference`.
 pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
-    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(
-        object,
-        None,
-        Ordering::SeqCst,
-    )
+    VM::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst)
 }
 
 pub fn is_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
@@ -131,12 +126,7 @@ pub fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
 /// Zero the forwarding bits of an object.
 /// This function is used on new objects.
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
-        object,
-        0,
-        None,
-        Ordering::SeqCst,
-    )
+    VM::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(object, 0, None, Ordering::SeqCst)
 }
 
 /// Read the forwarding pointer of an object.
@@ -151,7 +141,7 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
     // We write the forwarding poiner. We know it is an object reference.
     unsafe {
         ObjectReference::from_raw_address(crate::util::Address::from_usize(
-            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
+            VM::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
                 object,
                 Some(FORWARDING_POINTER_MASK),
                 Ordering::SeqCst,
@@ -174,7 +164,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
     );
 
     trace!("write_forwarding_pointer({}, {})", object, new_object);
-    VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
+    VM::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_raw_address().as_usize(),
         Some(FORWARDING_POINTER_MASK),
@@ -194,8 +184,8 @@ pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> O
     use std::ops::Deref;
     // if both forwarding bits and forwarding pointer are in-header
     match (
-        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.deref(),
-        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.deref(),
+        VM::LOCAL_FORWARDING_POINTER_SPEC.deref(),
+        VM::LOCAL_FORWARDING_BITS_SPEC.deref(),
     ) {
         (MetadataSpec::InHeader(fp), MetadataSpec::InHeader(fb)) => {
             let maybe_shift = fb.bit_offset - fp.bit_offset;

@@ -474,7 +474,7 @@ use crate::vm::VMBinding;
 ///
 /// We currently do not allow an opaque `ObjectReference` type for which a binding can define
 /// their layout. We now only allow a binding to define their semantics through a set of
-/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
+/// methods in [`crate::vm::VMBinding`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven't seen a use case for now.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
@@ -488,7 +488,7 @@ impl ObjectReference {
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
-    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
+    /// setting object metadata, MMTk should use [`crate::vm::VMBinding::ref_to_address()`] or [`crate::vm::VMBinding::ref_to_header()`].
     pub fn to_raw_address(self) -> Address {
         Address(self.0)
     }
@@ -496,47 +496,43 @@ impl ObjectReference {
     /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
     /// This is how a binding creates `ObjectReference` instances.
     ///
-    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
-    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::VMBinding::address_to_ref()`]
+    /// to turn addresses that are from [`crate::vm::VMBinding::ref_to_address()`] back to object.
     pub fn from_raw_address(addr: Address) -> ObjectReference {
         ObjectReference(addr.0)
     }
 
     /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
-    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
-    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    /// for an object reference. This method is syntactic sugar for [`crate::vm::VMBinding::ref_to_address`]. See the
+    /// comments on [`crate::vm::VMBinding::ref_to_address`].
     pub fn to_address<VM: VMBinding>(self) -> Address {
-        use crate::vm::ObjectModel;
-        let to_address = VM::VMObjectModel::ref_to_address(self);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, to_address);
+        let to_address = VM::ref_to_address(self);
+        debug_assert!(!VM::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, to_address);
         to_address
     }
 
     /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
-    /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
-    /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
+    /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::VMBinding::ref_to_header`].
+    /// See the comments on [`crate::vm::VMBinding::ref_to_header`].
     pub fn to_header<VM: VMBinding>(self) -> Address {
-        use crate::vm::ObjectModel;
-        VM::VMObjectModel::ref_to_header(self)
+        VM::ref_to_header(self)
     }
 
     /// Get the start of the allocation address for the object. This method is used by MMTk to get the start of the allocation
     /// address originally returned from [`crate::memory_manager::alloc`] for the object.
-    /// This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_object_start`]. See comments on [`crate::vm::ObjectModel::ref_to_object_start`].
+    /// This method is syntactic sugar for [`crate::vm::VMBinding::ref_to_object_start`]. See comments on [`crate::vm::VMBinding::ref_to_object_start`].
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
-        use crate::vm::ObjectModel;
-        let object_start = VM::VMObjectModel::ref_to_object_start(self);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, object_start);
+        let object_start = VM::ref_to_object_start(self);
+        debug_assert!(!VM::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, object_start);
         object_start
     }
 
     /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
-    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
-    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    /// or [`crate::vm::VMBinding::ref_to_address`]. This method is syntactic sugar for [`crate::vm::VMBinding::address_to_ref`].
+    /// See the comments on [`crate::vm::VMBinding::address_to_ref`].
     pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
-        use crate::vm::ObjectModel;
-        let obj = VM::VMObjectModel::address_to_ref(addr);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
+        let obj = VM::address_to_ref(addr);
+        debug_assert!(!VM::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
         obj
     }
 

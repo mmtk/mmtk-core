@@ -3,9 +3,9 @@
 
 // Run the test with any plan that uses object barrier, and we also need both VO bit and extreme assertions.
 
-use crate::object_model::OBJECT_REF_OFFSET;
 use crate::test_fixtures::FixtureContent;
 use crate::test_fixtures::MMTKSingleton;
+use crate::OBJECT_REF_OFFSET;
 use crate::{api::*, edges};
 use atomic::Atomic;
 use mmtk::util::{Address, ObjectReference};

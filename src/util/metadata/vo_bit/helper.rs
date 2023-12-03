@@ -31,7 +31,7 @@ use crate::{
         metadata::{vo_bit, MetadataSpec},
         ObjectReference,
     },
-    vm::{ObjectModel, VMBinding},
+    vm::VMBinding,
 };
 
 /// The strategy to update the valid object (VO) bits.
@@ -85,7 +85,7 @@ const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
     // VO bits during tracing. We use it as the default strategy.
     // TODO: Revisit this choice in the future if non-trivial changes are made and the performance
     // characterestics may change for the strategies.
-    match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.as_spec() {
+    match VM::LOCAL_MARK_BIT_SPEC.as_spec() {
         // Note that currently ImmixSpace doesn't support in-header mark bits,
         // but the DummyVM for testing declares mark bits to be "in header" as a place holder
         // because it never runs GC.
@@ -96,10 +96,7 @@ const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
 
 pub(crate) fn validate_config<VM: VMBinding>() {
     assert!(
-        !(VM::VMObjectModel::NEED_VO_BITS_DURING_TRACING
-            && VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .as_spec()
-                .is_in_header()),
+        !(VM::NEED_VO_BITS_DURING_TRACING && VM::LOCAL_MARK_BIT_SPEC.as_spec().is_in_header()),
         "The VM binding needs VO bits during tracing but also has in-header mark bits.  \
 We currently don't have an appropriate strategy for this case."
     );
@@ -110,7 +107,7 @@ We currently don't have an appropriate strategy for this case."
             // Always valid
         }
         VOBitUpdateStrategy::CopyFromMarkBits => {
-            let mark_bit_spec = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC;
+            let mark_bit_spec = VM::LOCAL_MARK_BIT_SPEC;
             assert!(
                 mark_bit_spec.is_on_side(),
                 "The {s:?} strategy requires the mark bits to be on the side."
@@ -170,12 +167,7 @@ pub(crate) fn on_object_forwarded<VM: VMBinding>(new_object: ObjectReference) {
         VOBitUpdateStrategy::CopyFromMarkBits => {
             // In this strategy, we will copy mark bits to VO bits.
             // We need to set mark bits for to-space objects, too.
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
-                new_object,
-                1,
-                None,
-                Ordering::SeqCst,
-            );
+            VM::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(new_object, 1, None, Ordering::SeqCst);
 
             // We set the VO bit for the to-space object eagerly.
             vo_bit::set_vo_bit::<VM>(new_object);

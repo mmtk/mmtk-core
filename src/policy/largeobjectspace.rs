@@ -11,7 +11,6 @@ use crate::util::metadata;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 #[allow(unused)]
@@ -57,16 +56,13 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        );
+        let old_value =
+            VM::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst);
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
+        VM::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
             object,
             new_value,
             None,
@@ -75,7 +71,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 
         // If this object is freshly allocated, we do not set it as unlogged
         if !alloc && self.common.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
         #[cfg(feature = "vo_bit")]
@@ -148,7 +144,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         let common = CommonSpace::new(args.into_policy_args(
             false,
             false,
-            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]),
+            metadata::extract_side_metadata(&[*VM::LOCAL_LOS_MARK_NURSERY_SPEC]),
         ));
         let mut pr = if is_discontiguous {
             FreeListPageResource::new_discontiguous(vm_map)
@@ -209,8 +205,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 self.treadmill.copy(object, nursery_object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+                    VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
                 queue.enqueue(object);
             } else {
@@ -257,7 +252,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             } else {
                 MARK_BIT
             };
-            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
+            let old_value = VM::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
                 Ordering::SeqCst,
@@ -267,7 +262,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 return false;
             }
             // using LOS_BIT_MASK have side effects of clearing nursery bit
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+            if VM::LOCAL_LOS_MARK_NURSERY_SPEC
                 .compare_exchange_metadata::<VM, u8>(
                     object,
                     old_value,
@@ -285,21 +280,15 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::SeqCst,
-        ) & MARK_BIT
+        VM::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(object, None, Ordering::SeqCst)
+            & MARK_BIT
             == value
     }
 
     /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
-            object,
-            None,
-            Ordering::Relaxed,
-        ) & NURSERY_BIT
+        VM::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(object, None, Ordering::Relaxed)
+            & NURSERY_BIT
             == NURSERY_BIT
     }
 }

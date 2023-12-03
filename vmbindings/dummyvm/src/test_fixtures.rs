@@ -10,8 +10,8 @@ use mmtk::AllocationSemantics;
 use mmtk::MMTK;
 
 use crate::api::*;
-use crate::object_model::OBJECT_REF_OFFSET;
 use crate::DummyVM;
+use crate::OBJECT_REF_OFFSET;
 
 pub trait FixtureContent {
     fn create() -> Self;

@@ -25,7 +25,6 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::util::VMThread;
-use crate::vm::ObjectModel;
 use std::sync::Mutex;
 
 /// The result for `MarkSweepSpace.acquire_block()`. `MarkSweepSpace` will attempt
@@ -96,7 +95,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst)
+        VM::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst)
     }
 
     #[cfg(feature = "object_pinning")]
@@ -215,7 +214,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 MetadataSpec::OnSide(Block::TLS_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
-                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::LOCAL_MARK_BIT_SPEC,
             ])
         };
         let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
@@ -249,8 +248,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             object,
         );
-        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
+        if !VM::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
+            VM::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
             let block = Block::containing::<VM>(object);
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
@@ -268,7 +267,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn prepare(&mut self) {
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        if let MetadataSpec::OnSide(side) = *VM::LOCAL_MARK_BIT_SPEC {
             for chunk in self.chunk_map.all_chunks() {
                 side.bzero_metadata(chunk.start(), Chunk::BYTES);
             }

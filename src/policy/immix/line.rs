@@ -65,7 +65,7 @@ impl Line {
     pub fn mark_lines_for_object<VM: VMBinding>(object: ObjectReference, state: u8) -> usize {
         debug_assert!(!super::BLOCK_ONLY);
         let start = object.to_object_start::<VM>();
-        let end = start + VM::VMObjectModel::get_current_size(object);
+        let end = start + VM::get_object_size(object);
         let start_line = Line::from_unaligned_address(start);
         let mut end_line = Line::from_unaligned_address(end);
         if !Line::is_aligned(end) {

@@ -11,7 +11,7 @@ use crate::util::heap::PageResource;
 use crate::util::metadata::mark_bit::MarkState;
 use crate::util::opaque_pointer::*;
 use crate::util::ObjectReference;
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 
 use std::sync::atomic::Ordering;
 
@@ -58,7 +58,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
         self.mark_state
             .on_object_metadata_initialization::<VM>(object);
         if self.common.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
@@ -173,9 +173,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             common: CommonSpace::new(args.into_policy_args(
                 false,
                 true,
-                crate::util::metadata::extract_side_metadata(&[
-                    *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                ]),
+                crate::util::metadata::extract_side_metadata(&[*VM::LOCAL_MARK_BIT_SPEC]),
             )),
         };
 

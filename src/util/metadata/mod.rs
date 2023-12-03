@@ -4,7 +4,7 @@
 //!
 //! The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. VO bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.
 //!
-//! MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the ['ObjectModel'](crate::vm::ObjectModel).
+//! MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the [`crate::vm::VMBinding`].
 //!
 //!
 //! # Side Metadata
@@ -121,7 +121,7 @@
 //! For each global metadata bit-set, a constant instance of the `MetadataSpec` struct should be created.
 //!
 //! If the metadata is per-object and may possibly reside in objects, the constant instance should be created in the VM's ObjectModel.
-//! For instance, the forwarding-bits metadata spec should be assigned to `LOCAL_FORWARDING_BITS_SPEC` in [`ObjectModel`](crate::vm::ObjectModel).
+//! For instance, the forwarding-bits metadata spec should be assigned to `LOCAL_FORWARDING_BITS_SPEC` in [`crate::vm::VMBinding`].
 //! The VM binding decides whether to put these metadata bit-sets in-objects or on-side.
 //!
 //! For other metadata bit-sets, constant `MetadataSpec` instances, created inside MMTk by plans/policies, are used in conjunction with the access functions from the current module.

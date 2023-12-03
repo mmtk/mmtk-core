@@ -1,7 +1,6 @@
 use crate::util::address::Address;
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
-use crate::vm::ActivePlan;
 use std::sync::Mutex;
 
 use super::layout::VMMap;
@@ -73,7 +72,7 @@ pub trait PageResource<VM: VMBinding>: 'static {
         let delta = actual_pages - reserved_pages;
         self.common().accounting.reserve(delta);
         self.common().accounting.commit(actual_pages);
-        if VM::VMActivePlan::is_mutator(tls) {
+        if VM::is_mutator(tls) {
             self.vm_map()
                 .add_to_cumulative_committed_pages(actual_pages);
         }

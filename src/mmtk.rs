@@ -21,7 +21,6 @@ use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::util::statistics::stats::Stats;
-use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
 use std::default::Default;
@@ -109,8 +108,7 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) state: Arc<GlobalState>,
     pub(crate) plan: UnsafeCell<Box<dyn Plan<VM = VM>>>,
     pub(crate) reference_processors: ReferenceProcessors,
-    pub(crate) finalizable_processor:
-        Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
+    pub(crate) finalizable_processor: Mutex<FinalizableProcessor<VM::FinalizableType>>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMEdge>>,
@@ -201,9 +199,7 @@ impl<VM: VMBinding> MMTK<VM> {
             state,
             plan: UnsafeCell::new(plan),
             reference_processors: ReferenceProcessors::new(),
-            finalizable_processor: Mutex::new(FinalizableProcessor::<
-                <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
-            >::new()),
+            finalizable_processor: Mutex::new(FinalizableProcessor::<VM::FinalizableType>::new()),
             scheduler,
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),
@@ -312,7 +308,6 @@ impl<VM: VMBinding> MMTK<VM> {
         force: bool,
         exhaustive: bool,
     ) {
-        use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
             warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
             return;
@@ -330,7 +325,7 @@ impl<VM: VMBinding> MMTK<VM> {
                 .user_triggered_collection
                 .store(true, Ordering::Relaxed);
             self.gc_requester.request();
-            VM::VMCollection::block_for_gc(tls);
+            VM::block_for_gc(tls);
         }
     }
 

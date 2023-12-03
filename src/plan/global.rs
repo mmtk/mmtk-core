@@ -25,7 +25,6 @@ use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
 use crate::util::{conversions, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::Ordering;
@@ -225,7 +224,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     fn get_reserved_pages(&self) -> usize {
         let used_pages = self.get_used_pages();
         let collection_reserve = self.get_collection_reserved_pages();
-        let vm_live_bytes = <Self::VM as VMBinding>::VMCollection::vm_live_bytes();
+        let vm_live_bytes = <Self::VM as VMBinding>::vm_live_bytes();
         // Note that `vm_live_bytes` may not be the exact number of bytes in whole pages.  The VM
         // binding is allowed to return an approximate value if it is expensive or impossible to
         // compute the exact number of pages occupied.
@@ -495,7 +494,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             return self.vm_space.trace_object(queue, object);
         }
 
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
+        VM::vm_trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {

@@ -20,7 +20,6 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout::BYTES_IN_CHUNK};
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
@@ -264,7 +263,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
                     MetadataSpec::OnSide(OFFSET_MALLOC_METADATA_SPEC),
-                    *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                    *VM::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
             scheduler: args.scheduler.clone(),
@@ -330,8 +329,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: usize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if self.get_gc_trigger().poll(false, Some(self)) {
-            assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls));
+            assert!(VM::is_mutator(tls), "Polling in GC worker");
+            VM::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };
         }
 
@@ -496,7 +495,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits
-        match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        match *VM::LOCAL_MARK_BIT_SPEC {
             MetadataSpec::OnSide(local_mark_bit_side_spec) => {
                 self.sweep_chunk_mark_on_side(chunk_start, local_mark_bit_side_spec);
             }
