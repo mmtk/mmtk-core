@@ -309,7 +309,7 @@ impl<B: Region> BlockPool<B> {
     /// Push a block to the thread-local queue
     pub fn push(&self, block: B) {
         self.count.fetch_add(1, Ordering::SeqCst);
-        let id = crate::scheduler::current_worker_ordinal().unwrap();
+        let id = crate::scheduler::current_worker_ordinal();
         let failed = unsafe {
             self.worker_local_freed_blocks[id]
                 .push_relaxed(block)
