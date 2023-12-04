@@ -10,7 +10,7 @@ fast-path on their side rather than just calling this function.</p>
 <ul>
 <li>Use subsuming barrier <code>object_reference_write</code></li>
 <li>Use both <code>object_reference_write_pre</code> and <code>object_reference_write_post</code>, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.</li>
-<li>Implement fast-path on the VM side, and call the generic api <code>object_reference_slow</code> as barrier slow-path call.</li>
+<li>Implement fast-path on the VM side, and call the generic api <code>object_reference_write_slow</code> as barrier slow-path call.</li>
 <li>Implement fast-path on the VM side, and do a specialized slow-path call.</li>
 </ul>
 <p>Arguments:</p>
