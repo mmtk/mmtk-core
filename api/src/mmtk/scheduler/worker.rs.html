@@ -450,6 +450,12 @@
 <a href="#450" id="450">450</a>
 <a href="#451" id="451">451</a>
 <a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -471,12 +477,18 @@
 
 <span class="macro">thread_local! </span>{
     <span class="doccomment">/// Current worker&#39;s ordinal
-    </span><span class="kw">static </span>WORKER_ORDINAL: Atomic&lt;<span class="prelude-ty">Option</span>&lt;ThreadId&gt;&gt; = Atomic::new(<span class="prelude-val">None</span>);
+    </span><span class="kw">static </span>WORKER_ORDINAL: Atomic&lt;ThreadId&gt; = Atomic::new(ThreadId::MAX);
 }
 
 <span class="doccomment">/// Get current worker ordinal. Return `None` if the current thread is not a worker.
-</span><span class="kw">pub fn </span>current_worker_ordinal() -&gt; <span class="prelude-ty">Option</span>&lt;ThreadId&gt; {
-    WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed))
+</span><span class="kw">pub fn </span>current_worker_ordinal() -&gt; ThreadId {
+    <span class="kw">let </span>ordinal = WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed));
+    <span class="macro">debug_assert_ne!</span>(
+        ordinal,
+        ThreadId::MAX,
+        <span class="string">&quot;Thread-local variable WORKER_ORDINAL not set yet.&quot;
+    </span>);
+    ordinal
 }
 
 <span class="doccomment">/// The part shared between a GCWorker and the scheduler.
@@ -812,7 +824,7 @@
     /// Each worker will keep polling and executing work packets in a loop.
     </span><span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="macro">probe!</span>(mmtk, gcworker_run);
-        WORKER_ORDINAL.with(|x| x.store(<span class="prelude-val">Some</span>(<span class="self">self</span>.ordinal), Ordering::SeqCst));
+        WORKER_ORDINAL.with(|x| x.store(<span class="self">self</span>.ordinal, Ordering::SeqCst));
         <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
         <span class="self">self</span>.tls = tls;
         <span class="self">self</span>.copy = <span class="kw">crate</span>::plan::create_gc_worker_context(tls, mmtk);

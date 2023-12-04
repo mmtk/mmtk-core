@@ -412,10 +412,13 @@
 <a href="#412" id="412">412</a>
 <a href="#413" id="413">413</a>
 <a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{Collection, VMBinding};
+<span class="kw">use </span>bytemuck::NoUninit;
 <span class="kw">use </span>libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 <span class="kw">use </span>std::io::{Error, <span class="prelude-ty">Result</span>};
 <span class="kw">use </span>sysinfo::{RefreshKind, System, SystemExt};
@@ -475,7 +478,8 @@
 /// This currently supports switching between different huge page allocation
 /// methods. However, this can later be refactored to reduce other code
 /// repetition.
-</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="attr">#[repr(u8)]
+#[derive(Debug, Copy, Clone, NoUninit)]
 </span><span class="kw">pub enum </span>MmapStrategy {
     <span class="doccomment">/// The default mmap strategy.
     </span>Normal,

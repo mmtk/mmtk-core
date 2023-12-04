@@ -216,11 +216,13 @@
 <a href="#216" id="216">216</a>
 <a href="#217" id="217">217</a>
 <a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::rev_group::RevisitableGroupByForIterator;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>atomic::{Atomic, Ordering};
+<span class="kw">use </span>bytemuck::NoUninit;
 <span class="kw">use </span>std::io::Result;
 
 <span class="doccomment">/// Generic mmap and protection functionality
@@ -283,7 +285,7 @@
 
 <span class="doccomment">/// The mmap state of a mmap chunk.
 </span><span class="attr">#[repr(u8)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, NoUninit)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">enum </span>MapState {
     <span class="doccomment">/// The chunk is unmapped and not managed by MMTk.
     </span>Unmapped,

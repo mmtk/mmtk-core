@@ -706,7 +706,7 @@
     <span class="doccomment">/// Push a block to the thread-local queue
     </span><span class="kw">pub fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, block: B) {
         <span class="self">self</span>.count.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
-        <span class="kw">let </span>id = <span class="kw">crate</span>::scheduler::current_worker_ordinal().unwrap();
+        <span class="kw">let </span>id = <span class="kw">crate</span>::scheduler::current_worker_ordinal();
         <span class="kw">let </span>failed = <span class="kw">unsafe </span>{
             <span class="self">self</span>.worker_local_freed_blocks[id]
                 .push_relaxed(block)

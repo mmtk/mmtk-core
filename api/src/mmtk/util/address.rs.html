@@ -618,7 +618,9 @@
 <a href="#618" id="618">618</a>
 <a href="#619" id="619">619</a>
 <a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
+<span class="kw">use </span>bytemuck::NoUninit;
 
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::mem;
@@ -638,7 +640,7 @@
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 </span><span class="attr">#[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
 </span><span class="kw">pub struct </span>Address(usize);
 
 <span class="doccomment">/// Address + ByteSize (positive)
@@ -1097,7 +1099,7 @@
 /// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven&#39;t seen a use case for now.
 </span><span class="attr">#[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
 </span><span class="kw">pub struct </span>ObjectReference(usize);
 
 <span class="kw">impl </span>ObjectReference {
