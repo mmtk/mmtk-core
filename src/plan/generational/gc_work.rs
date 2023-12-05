@@ -36,19 +36,21 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         Self { plan, base }
     }
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
+        debug_assert!(!object.is_null());
+
         // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
         self.plan
             .trace_object_nursery(&mut self.base.nodes, object, worker)
     }
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        let new_object = self.trace_object(object);
-        debug_assert!(!self.plan.is_object_in_nursery(new_object));
-        slot.store(new_object);
+        slot.update_for_forwarding(|object| {
+            debug_assert!(!object.is_null());
+            let new_object = self.trace_object(object);
+            debug_assert!(!new_object.is_null());
+            debug_assert!(!self.plan.is_object_in_nursery(new_object));
+            new_object
+        });
     }
 
     fn create_scan_work(

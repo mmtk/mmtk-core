@@ -41,10 +41,71 @@ use crate::util::{Address, ObjectReference};
 /// in a word as a pointer, it can also use `SimpleEdge` for weak reference fields.
 pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// Load object reference from the edge.
+    ///
+    /// If the slot is not holding an object reference, it should return `ObjectReference::NULL`.
+    /// Specifically,
+    ///
+    /// -   If the langauge has the concept of "null pointer" which does not point to any object in
+    ///     the heap, this method should return `ObjectReference::NULL` regardless how a null
+    ///     pointer is encoded in the VM.  However, if the VM uses a special object in the heap to
+    ///     represent a null value, such as the `None` object of `NoneType` in Python, this method
+    ///     should still return the object reference to such `None` objects so that they are
+    ///     properly traced, kept alive, and they have their references forwarded.
+    /// -   If, in a VM, the data type a slot can hold is a union of references and non-reference
+    ///     values, and the slot is currently holding a non-reference value, such as a small
+    ///     integer, a floating-point number, or any special value such as `true`, `false` or `nil`
+    ///     that do not point to any object, the slot is considered not holding an reference.  This
+    ///     method should return `ObjectReference::NULL` in such cases.
+    ///
+    /// If the slot holds an object reference with tag bits, the returned value shall be the object
+    /// reference with the tag bits removed.
     fn load(&self) -> ObjectReference;
 
     /// Store the object reference `object` into the edge.
+    ///
+    /// FIXME: Currently the subsuming write barrier (`Barrier::object_reference_write`) calls this
+    /// method to perform the actual store to the field.  It only works if the VM does not store
+    /// tag bits in the slot.
+    ///
+    /// FIXME: If the slot contains tag bits, consider overriding the `update_for_forwarding`
+    /// method. See: https://github.com/mmtk/mmtk-core/issues/1033
     fn store(&self, object: ObjectReference);
+
+    /// Update the slot for forwarding.
+    ///
+    /// If the slot is holding an object reference, this method shall call `updater` with that
+    /// reference; if the slot is not holding an object reference, including when holding a NULL
+    /// pointer or holding small integers or special non-reference values such as `true`, `false`
+    /// or `nil`, this method does not need to take further action.  In no circumstance should this
+    /// method pass `ObjectReference::NULL` to `updater`.
+    ///
+    /// If the returned value of the `updater` closure is not `ObjectReference::NULL`, it will be
+    /// the forwarded object reference of the original object, and this method shall update the
+    /// slot to point to the new location; if the returned value is `ObjectReference::NULL`, this
+    /// method does not need to take further action.
+    ///
+    /// This method is called to trace the object pointed by this slot, and forward the reference
+    /// in the slot.  To implement this semantics, the VM should usually preserve the tag bits if
+    /// it uses tagged pointers to indicate whether the slot holds an object reference or
+    /// non-reference values.
+    ///
+    /// The default implementation calls `self.load()` to load the object reference, and calls
+    /// `self.store` to store the updated reference.  VMs that use tagged pointers should override
+    /// this method to preserve the tag bits between the load and store.
+    fn update_for_forwarding<F>(&self, updater: F)
+    where
+        F: FnOnce(ObjectReference) -> ObjectReference,
+    {
+        let object = self.load();
+        if object.is_null() {
+            return;
+        }
+        let new_object = updater(object);
+        if new_object.is_null() {
+            return;
+        }
+        self.store(new_object);
+    }
 
     /// Prefetch the edge so that a subsequent `load` will be faster.
     fn prefetch_load(&self) {
