@@ -44,13 +44,13 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
             .trace_object_nursery(&mut self.base.nodes, object, worker)
     }
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        if object.is_null() {
-            return;
-        }
-        let new_object = self.trace_object(object);
-        debug_assert!(!self.plan.is_object_in_nursery(new_object));
-        slot.store(new_object);
+        slot.update_for_forwarding(|object| {
+            debug_assert!(!object.is_null());
+            let new_object = self.trace_object(object);
+            debug_assert!(!new_object.is_null());
+            debug_assert!(!self.plan.is_object_in_nursery(new_object));
+            new_object
+        });
     }
 
     fn create_scan_work(

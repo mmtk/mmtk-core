@@ -662,14 +662,16 @@ pub trait ProcessEdgesWork:
     /// Process an edge, including loading the object reference from the memory slot,
     /// trace the object and store back the new object reference if necessary.
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        if object.is_null() {
-            return;
-        }
-        let new_object = self.trace_object(object);
-        if Self::OVERWRITE_REFERENCE {
-            slot.store(new_object);
-        }
+        slot.update_for_forwarding(|object| {
+            debug_assert!(!object.is_null());
+            let new_object = self.trace_object(object);
+            debug_assert!(!new_object.is_null());
+            if Self::OVERWRITE_REFERENCE {
+                new_object
+            } else {
+                ObjectReference::NULL
+            }
+        });
     }
 
     /// Process all the edges in the work packet.
@@ -1006,14 +1008,16 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        if object.is_null() {
-            return;
-        }
-        let new_object = self.trace_object(object);
-        if P::may_move_objects::<KIND>() {
-            slot.store(new_object);
-        }
+        slot.update_for_forwarding(|object| {
+            debug_assert!(!object.is_null());
+            let new_object = self.trace_object(object);
+            debug_assert!(!new_object.is_null());
+            if P::may_move_objects::<KIND>() {
+                new_object
+            } else {
+                ObjectReference::NULL
+            }
+        });
     }
 }
 

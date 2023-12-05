@@ -63,14 +63,49 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
 
     /// Store the object reference `object` into the edge.
     ///
-    /// If the slot holds an object reference with tag bits, this method must preserve the tag
-    /// bits while updating the object reference so that it points to the forwarded object given by
-    /// the parameter `object`.
+    /// FIXME: Currently the subsuming write barrier (`Barrier::object_reference_write`) calls this
+    /// method to perform the actual store to the field.  It only works if the VM does not store
+    /// tag bits in the slot.
     ///
-    /// FIXME: This design is inefficient for handling object references with tag bits.  Consider
-    /// introducing a new updating function to do the load, trace and store in one function.
-    /// See: https://github.com/mmtk/mmtk-core/issues/1033
+    /// FIXME: If the slot contains tag bits, consider overriding the `update_for_forwarding`
+    /// method. See: https://github.com/mmtk/mmtk-core/issues/1033
     fn store(&self, object: ObjectReference);
+
+    /// Update the slot for forwarding.
+    ///
+    /// If the slot is holding an object reference, this method shall call `updater` with that
+    /// reference; if the slot is not holding an object reference, including when holding a NULL
+    /// pointer or holding small integers or special non-reference values such as `true`, `false`
+    /// or `nil`, this method does not need to take further action.  In no circumstance should this
+    /// method pass `ObjectReference::NULL` to `updater`.
+    ///
+    /// If the returned value of the `updater` closure is not `ObjectReference::NULL`, it will be
+    /// the forwarded object reference of the original object, and this method shall update the
+    /// slot to point to the new location; if the returned value is `ObjectReference::NULL`, this
+    /// method does not need to take further action.
+    ///
+    /// This method is called to trace the object pointed by this slot, and forward the reference
+    /// in the slot.  To implement this semantics, the VM should usually preserve the tag bits if
+    /// it uses tagged pointers to indicate whether the slot holds an object reference or
+    /// non-reference values.
+    ///
+    /// The default implementation calls `self.load()` to load the object reference, and calls
+    /// `self.store` to store the updated reference.  VMs that use tagged pointers should override
+    /// this method to preserve the tag bits between the load and store.
+    fn update_for_forwarding<F>(&self, updater: F)
+    where
+        F: FnOnce(ObjectReference) -> ObjectReference,
+    {
+        let object = self.load();
+        if object.is_null() {
+            return;
+        }
+        let new_object = updater(object);
+        if new_object.is_null() {
+            return;
+        }
+        self.store(new_object);
+    }
 
     /// Prefetch the edge so that a subsequent `load` will be faster.
     fn prefetch_load(&self) {
