@@ -2,6 +2,7 @@ use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
+use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
 use sysinfo::{RefreshKind, System, SystemExt};
@@ -61,7 +62,8 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 /// This currently supports switching between different huge page allocation
 /// methods. However, this can later be refactored to reduce other code
 /// repetition.
-#[derive(Debug, Copy, Clone)]
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, NoUninit)]
 pub enum MmapStrategy {
     /// The default mmap strategy.
     Normal,
