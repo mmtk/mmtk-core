@@ -667,7 +667,8 @@ pub trait ProcessEdgesWork:
             return;
         }
         let new_object = self.trace_object(object);
-        if Self::OVERWRITE_REFERENCE {
+        debug_assert!(!new_object.is_null());
+        if Self::OVERWRITE_REFERENCE && new_object != object {
             slot.store(new_object);
         }
     }
@@ -1011,7 +1012,8 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
             return;
         }
         let new_object = self.trace_object(object);
-        if P::may_move_objects::<KIND>() {
+        debug_assert!(!new_object.is_null());
+        if P::may_move_objects::<KIND>() && new_object != object  {
             slot.store(new_object);
         }
     }

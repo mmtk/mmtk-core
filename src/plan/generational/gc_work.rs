@@ -50,7 +50,11 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         }
         let new_object = self.trace_object(object);
         debug_assert!(!self.plan.is_object_in_nursery(new_object));
-        slot.store(new_object);
+        // Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,
+        // but will still return `object`.  In that case, we don't need to write it back.
+        if new_object != object {
+            slot.store(new_object);
+        }
     }
 
     fn create_scan_work(
