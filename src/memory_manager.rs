@@ -122,7 +122,7 @@ pub fn bind_mutator<VM: VMBinding>(
 }
 
 /// Report to MMTk that a mutator is no longer needed. All mutator state is flushed before it is
-/// destroyed, A binding should not attempt to use the mutator after this call. MMTk will not
+/// destroyed. A binding should not attempt to use the mutator after this call. MMTk will not
 /// attempt to reclaim the memory for the mutator, so a binding should properly reclaim the memory
 /// for the mutator after this call.
 ///
