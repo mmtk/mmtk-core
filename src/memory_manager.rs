@@ -121,13 +121,15 @@ pub fn bind_mutator<VM: VMBinding>(
     mutator
 }
 
-/// Report to MMTk that a mutator is no longer needed. A binding should not attempt
-/// to use the mutator after this call. MMTk will not attempt to reclaim the memory for the
-/// mutator, so a binding should properly reclaim the memory for the mutator after this call.
+/// Report to MMTk that a mutator is no longer needed. All mutator state is flushed before it is
+/// destroyed, A binding should not attempt to use the mutator after this call. MMTk will not
+/// attempt to reclaim the memory for the mutator, so a binding should properly reclaim the memory
+/// for the mutator after this call.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
 pub fn destroy_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
+    mutator.flush();
     mutator.on_destroy();
 }
 
