@@ -26,7 +26,9 @@ use std::sync::Mutex;
 pub const OBJECT_REF_OFFSET: usize = 4;
 
 lazy_static! {
-    pub static ref MOCK_VM_INSTANCE: Mutex<MockVM> = Mutex::new(MockVM::default());
+    // The mutex may get poisoned any time. Accessing this mutex needs to deal with the poisoned case.
+    // One can use read/write_mockvm to access mock vm.
+    static ref MOCK_VM_INSTANCE: Mutex<MockVM> = Mutex::new(MockVM::default());
 }
 
 macro_rules! lifetime {
@@ -37,61 +39,87 @@ macro_rules! lifetime {
 
 macro_rules! mock {
     ($fn: ident($($arg:expr),*)) => {
-        MOCK_VM_INSTANCE.lock().unwrap().$fn.call(($($arg),*))
+        write_mockvm(|mock| mock.$fn.call(($($arg),*)))
     };
 }
 macro_rules! mock_any {
     ($fn: ident($($arg:expr),*)) => {
-        *MOCK_VM_INSTANCE.lock().unwrap().$fn.call_any(Box::new(($($arg),*))).downcast().unwrap()
+        *write_mockvm(|mock| mock.$fn.call_any(Box::new(($($arg),*)))).downcast().unwrap()
     };
 }
 
+pub fn read_mockvm<F, R>(func: F) -> R where F: FnOnce(&MockVM) -> R {
+    let lock = MOCK_VM_INSTANCE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    func(&lock)
+}
+pub fn write_mockvm<F, R>(func: F) -> R where F: FnOnce(&mut MockVM) -> R {
+    let mut lock = MOCK_VM_INSTANCE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    func(&mut lock)
+}
+
+#[cfg(feature = "mock_test")]
+pub fn with_mockvm<S, T, C>(setup: S, test: T, cleanup: C) where S: FnOnce() -> MockVM, T: FnOnce() + std::panic::UnwindSafe, C: FnOnce() {
+    super::serial_test(|| {
+        // Setup
+        {
+            write_mockvm(|mock| *mock = setup());
+        }
+        super::with_cleanup(test, cleanup);
+    })
+}
+
+pub fn default_setup() -> MockVM {
+    MockVM::default()
+}
+
+pub fn no_cleanup() {}
+
 pub struct MockVM {
     // active plan
-    number_of_mutators: MockMethod<(), usize>,
-    is_mutator: MockMethod<VMThread, bool>,
-    mutator: MockMethod<VMMutatorThread, &'static mut Mutator<MockVM>>,
-    mutators: MockMethod<(), Box<dyn Iterator<Item = &'static mut Mutator<MockVM>> + 'static>>,
-    vm_trace_object: MockMethod<(&'static dyn ObjectQueue, ObjectReference, &'static mut GCWorker<MockVM>), ObjectReference>,
+    pub number_of_mutators: MockMethod<(), usize>,
+    pub is_mutator: MockMethod<VMThread, bool>,
+    pub mutator: MockMethod<VMMutatorThread, &'static mut Mutator<MockVM>>,
+    pub mutators: MockMethod<(), Box<dyn Iterator<Item = &'static mut Mutator<MockVM>> + 'static>>,
+    pub vm_trace_object: MockMethod<(&'static dyn ObjectQueue, ObjectReference, &'static mut GCWorker<MockVM>), ObjectReference>,
     // collection
-    stop_all_mutators: MockMethod<(VMWorkerThread, Box<dyn FnMut(&'static mut Mutator<MockVM>)>), ()>,
-    resume_mutators: MockMethod<VMWorkerThread, ()>,
-    block_for_gc: MockMethod<VMMutatorThread, ()>,
-    spawn_gc_thread: MockMethod<(VMThread, GCThreadContext<MockVM>), ()>,
-    out_of_memory: MockMethod<(VMThread, AllocationError), ()>,
-    schedule_finalization: MockMethod<VMWorkerThread, ()>,
-    post_forwarding: MockMethod<VMWorkerThread, ()>,
-    vm_live_bytes: MockMethod<(), usize>,
+    pub stop_all_mutators: MockMethod<(VMWorkerThread, Box<dyn FnMut(&'static mut Mutator<MockVM>)>), ()>,
+    pub resume_mutators: MockMethod<VMWorkerThread, ()>,
+    pub block_for_gc: MockMethod<VMMutatorThread, ()>,
+    pub spawn_gc_thread: MockMethod<(VMThread, GCThreadContext<MockVM>), ()>,
+    pub out_of_memory: MockMethod<(VMThread, AllocationError), ()>,
+    pub schedule_finalization: MockMethod<VMWorkerThread, ()>,
+    pub post_forwarding: MockMethod<VMWorkerThread, ()>,
+    pub vm_live_bytes: MockMethod<(), usize>,
     // object model
-    copy_object: MockMethod<(ObjectReference, CopySemantics, &'static GCWorkerCopyContext<MockVM>), ObjectReference>,
-    copy_object_to: MockMethod<(ObjectReference, ObjectReference, Address), Address>,
-    get_object_size: MockMethod<ObjectReference, usize>,
-    get_object_size_when_copied: MockMethod<ObjectReference, usize>,
-    get_object_align_when_copied: MockMethod<ObjectReference, usize>,
-    get_object_align_offset_when_copied: MockMethod<ObjectReference, usize>,
-    get_object_reference_when_copied_to: MockMethod<(ObjectReference, Address), ObjectReference>,
-    ref_to_object_start: MockMethod<ObjectReference, Address>,
-    ref_to_header: MockMethod<ObjectReference, Address>,
-    ref_to_address: MockMethod<ObjectReference, Address>,
-    address_to_ref: MockMethod<Address, ObjectReference>,
-    dump_object: MockMethod<ObjectReference, ()>,
+    pub copy_object: MockMethod<(ObjectReference, CopySemantics, &'static GCWorkerCopyContext<MockVM>), ObjectReference>,
+    pub copy_object_to: MockMethod<(ObjectReference, ObjectReference, Address), Address>,
+    pub get_object_size: MockMethod<ObjectReference, usize>,
+    pub get_object_size_when_copied: MockMethod<ObjectReference, usize>,
+    pub get_object_align_when_copied: MockMethod<ObjectReference, usize>,
+    pub get_object_align_offset_when_copied: MockMethod<ObjectReference, usize>,
+    pub get_object_reference_when_copied_to: MockMethod<(ObjectReference, Address), ObjectReference>,
+    pub ref_to_object_start: MockMethod<ObjectReference, Address>,
+    pub ref_to_header: MockMethod<ObjectReference, Address>,
+    pub ref_to_address: MockMethod<ObjectReference, Address>,
+    pub address_to_ref: MockMethod<Address, ObjectReference>,
+    pub dump_object: MockMethod<ObjectReference, ()>,
     // reference glue
-    weakref_clear_referent: MockMethod<ObjectReference, ()>,
-    weakref_set_referent: MockMethod<(ObjectReference, ObjectReference), ()>,
-    weakref_get_referent: MockMethod<ObjectReference, ObjectReference>,
-    weakref_is_referent_cleared: MockMethod<ObjectReference, bool>,
-    weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
+    pub weakref_clear_referent: MockMethod<ObjectReference, ()>,
+    pub weakref_set_referent: MockMethod<(ObjectReference, ObjectReference), ()>,
+    pub weakref_get_referent: MockMethod<ObjectReference, ObjectReference>,
+    pub weakref_is_referent_cleared: MockMethod<ObjectReference, bool>,
+    pub weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
     // scanning
-    support_edge_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
-    scan_object: MockMethod<(VMWorkerThread, ObjectReference, &'static mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>), ()>,
-    scan_object_and_trace_edges: MockMethod<(VMWorkerThread, ObjectReference, &'static mut dyn ObjectTracer), ()>,
-    scan_roots_in_mutator_thread: Box<dyn MockAny>,
-    scan_vm_specific_roots: Box<dyn MockAny>,
-    notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
-    supports_return_barrier: MockMethod<(), bool>,
-    prepare_for_roots_re_scanning: MockMethod<(), ()>,
-    process_weak_refs: Box<dyn MockAny>,
-    forward_weak_refs: Box<dyn MockAny>,
+    pub support_edge_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
+    pub scan_object: MockMethod<(VMWorkerThread, ObjectReference, &'static mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>), ()>,
+    pub scan_object_and_trace_edges: MockMethod<(VMWorkerThread, ObjectReference, &'static mut dyn ObjectTracer), ()>,
+    pub scan_roots_in_mutator_thread: Box<dyn MockAny>,
+    pub scan_vm_specific_roots: Box<dyn MockAny>,
+    pub notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
+    pub supports_return_barrier: MockMethod<(), bool>,
+    pub prepare_for_roots_re_scanning: MockMethod<(), ()>,
+    pub process_weak_refs: Box<dyn MockAny>,
+    pub forward_weak_refs: Box<dyn MockAny>,
 }
 
 impl Default for MockVM {
@@ -105,7 +133,7 @@ impl Default for MockVM {
 
             stop_all_mutators: MockMethod::new_unimplemented(),
             resume_mutators: MockMethod::new_unimplemented(),
-            block_for_gc: MockMethod::new_fixed(Box::new(|_| panic!("block_for_gc is not implemented"))),
+            block_for_gc: MockMethod::new_unimplemented(),
             spawn_gc_thread: MockMethod::new_default(),
             out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| panic!("Out of memory with {:?}!", err))),
             schedule_finalization: MockMethod::new_default(),

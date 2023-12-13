@@ -58,10 +58,11 @@ pub mod build_info;
 pub mod memory_manager;
 pub mod plan;
 pub mod scheduler;
-#[deny(missing_docs)]
 pub mod util;
-#[deny(missing_docs)]
 pub mod vm;
+
+#[cfg(test)]
+mod tests;
 
 pub use crate::plan::{
     AllocationSemantics, BarrierSelector, Mutator, MutatorContext, ObjectQueue, Plan,

@@ -65,6 +65,9 @@ default = []
 # It's manually added to CI scripts
 perf_counter = ["pfm"]
 
+# This feature is only used for mock tests.
+mock_test = []
+
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
 
