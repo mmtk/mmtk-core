@@ -937,6 +937,8 @@
 <a href="#937" id="937">937</a>
 <a href="#938" id="938">938</a>
 <a href="#939" id="939">939</a>
+<a href="#940" id="940">940</a>
+<a href="#941" id="941">941</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1060,13 +1062,15 @@
     mutator
 }
 
-<span class="doccomment">/// Report to MMTk that a mutator is no longer needed. A binding should not attempt
-/// to use the mutator after this call. MMTk will not attempt to reclaim the memory for the
-/// mutator, so a binding should properly reclaim the memory for the mutator after this call.
+<span class="doccomment">/// Report to MMTk that a mutator is no longer needed. All mutator state is flushed before it is
+/// destroyed. A binding should not attempt to use the mutator after this call. MMTk will not
+/// attempt to reclaim the memory for the mutator, so a binding should properly reclaim the memory
+/// for the mutator after this call.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
 </span><span class="kw">pub fn </span>destroy_mutator&lt;VM: VMBinding&gt;(mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;) {
+    mutator.flush();
     mutator.on_destroy();
 }
 
