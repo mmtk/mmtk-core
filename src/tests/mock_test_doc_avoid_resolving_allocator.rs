@@ -22,10 +22,8 @@ pub fn acquire_typed_allocator() {
 
             // ANCHOR: avoid_resolving_allocator
             // At boot time
-            let selector = memory_manager::get_allocator_mapping(
-                &fixture.mmtk,
-                AllocationSemantics::Default,
-            );
+            let selector =
+                memory_manager::get_allocator_mapping(&fixture.mmtk, AllocationSemantics::Default);
             unsafe {
                 DEFAULT_ALLOCATOR_OFFSET =
                     crate::plan::Mutator::<MockVM>::get_allocator_base_offset(selector);
@@ -44,6 +42,6 @@ pub fn acquire_typed_allocator() {
 
             assert!(!addr.is_zero());
         },
-        no_cleanup
+        no_cleanup,
     )
 }

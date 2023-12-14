@@ -18,7 +18,13 @@ pub fn nogc_lock_free_allocate() {
             let mut align = min;
             while align <= max {
                 info!("Test allocation with alignment {}", align);
-                let addr = memory_manager::alloc(&mut fixture.mutator, 8, align, 0, AllocationSemantics::Default);
+                let addr = memory_manager::alloc(
+                    &mut fixture.mutator,
+                    8,
+                    align,
+                    0,
+                    AllocationSemantics::Default,
+                );
                 info!("addr = {}", addr);
                 assert!(
                     addr.is_aligned_to(align),
@@ -29,6 +35,6 @@ pub fn nogc_lock_free_allocate() {
                 align *= 2;
             }
         },
-        no_cleanup
+        no_cleanup,
     )
 }

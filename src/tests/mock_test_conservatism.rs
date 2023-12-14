@@ -60,7 +60,7 @@ pub fn null() {
                 assert_invalid_objref(addr, fixture.objref.to_raw_address());
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -79,7 +79,7 @@ pub fn too_small() {
                 }
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -93,7 +93,7 @@ pub fn max() {
                 assert_invalid_objref(addr, fixture.objref.to_raw_address());
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -109,7 +109,7 @@ pub fn too_big() {
                 }
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -124,7 +124,7 @@ pub fn direct_hit() {
                 assert_valid_objref(addr);
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -144,7 +144,7 @@ pub fn small_offsets() {
                 }
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -182,7 +182,7 @@ pub fn large_offsets_aligned() {
                 }
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -209,6 +209,6 @@ pub fn negative_offsets() {
                 }
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }

@@ -1,10 +1,8 @@
 // GITHUB-CI: MMTK_PLAN=all
 
 use super::mock_test_prelude::*;
-use crate::util::conversions::*;
-use crate::util::heap::vm_layout::VMLayout;
-use crate::util::Address;
 use super::mock_test_vm_layout_default::test_with_vm_layout;
+use crate::util::heap::vm_layout::VMLayout;
 
 #[test]
 fn test_vm_layout_log_address_space() {
@@ -21,6 +19,6 @@ fn test_vm_layout_log_address_space() {
             };
             test_with_vm_layout(Some(layout));
         },
-        no_cleanup
+        no_cleanup,
     )
 }

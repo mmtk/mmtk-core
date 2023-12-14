@@ -1,11 +1,13 @@
 // GITHUB-CI: MMTK_PLAN=NoGC
 
+#![allow(unused)]
+
 use super::mock_test_prelude::*;
-use atomic::{Atomic, Ordering};
 use crate::{
     util::{Address, ObjectReference},
     vm::edge_shape::{Edge, SimpleEdge},
 };
+use atomic::{Atomic, Ordering};
 
 lazy_static! {
     static ref FIXTURE: Fixture<TwoObjects> = Fixture::new();
@@ -28,7 +30,7 @@ mod simple_edges {
                     assert_eq!(objref, fixture.objref1);
                 });
             },
-            no_cleanup
+            no_cleanup,
         )
     }
 
@@ -48,7 +50,7 @@ mod simple_edges {
                     assert_eq!(objref, fixture.objref2);
                 });
             },
-            no_cleanup
+            no_cleanup,
         )
     }
 }
@@ -201,7 +203,7 @@ mod offset_edge {
                     assert_eq!(objref, fixture.objref1);
                 });
             },
-            no_cleanup
+            no_cleanup,
         )
     }
 
@@ -223,7 +225,7 @@ mod offset_edge {
                     assert_eq!(objref, fixture.objref2);
                 });
             },
-            no_cleanup
+            no_cleanup,
         )
     }
 }
@@ -290,7 +292,7 @@ mod tagged_edge {
                     assert_eq!(objref2, fixture.objref1);
                 });
             },
-            no_cleanup
+            no_cleanup,
         )
     }
 
@@ -328,19 +330,19 @@ mod tagged_edge {
                     assert_eq!(objref2, fixture.objref2);
                 });
             },
-            no_cleanup
+            no_cleanup,
         )
     }
 }
 
 mod mixed {
-    use super::*;
     #[cfg(target_pointer_width = "64")]
     use super::compressed_oop::CompressedOopEdge;
     use super::offset_edge::OffsetEdge;
     use super::offset_edge::OFFSET;
     use super::tagged_edge::TaggedEdge;
     use super::tagged_edge::TAG1;
+    use super::*;
     use crate::vm::edge_shape::SimpleEdge;
 
     /// If a VM supports multiple kinds of edges, we can use tagged union to represent all of them.

@@ -1,5 +1,5 @@
-use criterion::criterion_main;
 use criterion::criterion_group;
+use criterion::criterion_main;
 use criterion::Criterion;
 
 // As we can only initialize one MMTk instance, we have to run each benchmark in a separate process.
@@ -20,12 +20,10 @@ mod sft;
 
 fn bench_main(c: &mut Criterion) {
     match std::env::var("MMTK_BENCH") {
-        Ok(bench) => {
-            match bench.as_str() {
-                "alloc" => alloc::bench(c),
-                "sft" => sft::bench(c),
-                _ => panic!("Unknown benchmark {:?}", bench)
-            }
+        Ok(bench) => match bench.as_str() {
+            "alloc" => alloc::bench(c),
+            "sft" => sft::bench(c),
+            _ => panic!("Unknown benchmark {:?}", bench),
         },
         Err(_) => panic!("Need to name a benchmark by the env var MMTK_BENCH"),
     }

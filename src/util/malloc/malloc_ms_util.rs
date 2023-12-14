@@ -4,7 +4,7 @@ use crate::util::Address;
 use crate::vm::VMBinding;
 
 /// Allocate with alignment. This also guarantees the memory is zero initialized.
-pub fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
+pub fn align_alloc(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
@@ -76,7 +76,7 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
         address = Address::from_mut_ptr(raw);
         debug_assert!(address.is_aligned_to(align));
     } else if align > 16 && offset == 0 {
-        address = align_alloc::<VM>(size, align);
+        address = align_alloc(size, align);
         #[cfg(feature = "malloc_hoard")]
         {
             is_offset_malloc = true;

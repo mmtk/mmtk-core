@@ -1,9 +1,7 @@
-use crate::memory_manager;
+use super::mock_test_prelude::*;
+
 use crate::util::opaque_pointer::*;
 use crate::AllocationSemantics;
-use crate::util::test_util::fixtures::*;
-use crate::util::test_util::mock_vm::*;
-use crate::util::test_util::mock_method::*;
 
 /// This test allocates without calling initialize_collection(). When we exceed the heap limit, a GC should be triggered by MMTk.
 /// But as we haven't enabled collection, GC is not initialized, so MMTk will panic.
@@ -15,19 +13,30 @@ pub fn allocate_without_initialize_collection() {
         default_setup,
         || {
             const MB: usize = 1024 * 1024;
-            let fixture = MMTKFixture::create_with_builder(|builder| {
-                builder.options.gc_trigger.set(crate::util::options::GCTriggerSelector::FixedHeapSize(MB));
-            }, false); // Do not initialize collection
+            let fixture = MMTKFixture::create_with_builder(
+                |builder| {
+                    builder
+                        .options
+                        .gc_trigger
+                        .set(crate::util::options::GCTriggerSelector::FixedHeapSize(MB));
+                },
+                false,
+            ); // Do not initialize collection
 
             // Build mutator
-            let mut mutator = memory_manager::bind_mutator(fixture.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
+            let mut mutator = memory_manager::bind_mutator(
+                fixture.mmtk,
+                VMMutatorThread(VMThread::UNINITIALIZED),
+            );
 
             // Allocate half MB. It should be fine.
-            let addr = memory_manager::alloc(&mut mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
+            let addr =
+                memory_manager::alloc(&mut mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
 
             // Fill up the heap
-            let _ = memory_manager::alloc(&mut mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
+            let _ =
+                memory_manager::alloc(&mut mutator, MB >> 1, 8, 0, AllocationSemantics::Default);
 
             // Attempt another allocation.
             let addr = memory_manager::alloc(&mut mutator, MB, 8, 0, AllocationSemantics::Default);
@@ -38,6 +47,6 @@ pub fn allocate_without_initialize_collection() {
             read_mockvm(|mock| {
                 assert!(!mock.block_for_gc.is_called());
             });
-        }
+        },
     )
 }

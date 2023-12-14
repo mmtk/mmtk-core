@@ -24,7 +24,7 @@ pub fn malloc_free() {
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -46,7 +46,7 @@ pub fn calloc_free() {
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -74,7 +74,7 @@ pub fn realloc_grow() {
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -102,6 +102,6 @@ pub fn realloc_shrink() {
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }

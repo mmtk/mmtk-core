@@ -12,8 +12,18 @@ lazy_static! {
 }
 
 // Checks if the allocation should be an LOS allocation.
-fn alloc_default_or_large(mmtk:&MMTK<MockVM>, mutator: &mut Mutator<MockVM>, size: usize, align: usize, offset: usize, semantic: AllocationSemantics) -> Address {
-    let max_non_los_size = mmtk.get_plan().constraints().max_non_los_default_alloc_bytes;
+fn alloc_default_or_large(
+    mmtk: &MMTK<MockVM>,
+    mutator: &mut Mutator<MockVM>,
+    size: usize,
+    align: usize,
+    offset: usize,
+    semantic: AllocationSemantics,
+) -> Address {
+    let max_non_los_size = mmtk
+        .get_plan()
+        .constraints()
+        .max_non_los_default_alloc_bytes;
     if size >= max_non_los_size {
         memory_manager::alloc(mutator, size, align, offset, AllocationSemantics::Los)
     } else {
@@ -40,7 +50,7 @@ pub fn allocate_max_size_object() {
                 );
             })
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -56,7 +66,14 @@ pub fn allocate_max_size_object_after_succeed() {
         || {
             MUTATOR.with_fixture_mut(|fixture| {
                 // Allocate something so we have a thread local allocation buffer
-                alloc_default_or_large(fixture.mmtk(), &mut fixture.mutator, 8, 8, 0, AllocationSemantics::Default);
+                alloc_default_or_large(
+                    fixture.mmtk(),
+                    &mut fixture.mutator,
+                    8,
+                    8,
+                    0,
+                    AllocationSemantics::Default,
+                );
                 // Allocate an unrealistically large object
                 alloc_default_or_large(
                     fixture.mmtk(),
@@ -68,7 +85,7 @@ pub fn allocate_max_size_object_after_succeed() {
                 );
             })
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 

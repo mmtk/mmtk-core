@@ -21,7 +21,13 @@ pub fn allocate_alignment() {
                 let mut align = min;
                 while align <= max {
                     info!("Test allocation with alignment {}", align);
-                    let addr = memory_manager::alloc(&mut fixture.mutator, 8, align, 0, AllocationSemantics::Default);
+                    let addr = memory_manager::alloc(
+                        &mut fixture.mutator,
+                        8,
+                        align,
+                        0,
+                        AllocationSemantics::Default,
+                    );
                     assert!(
                         addr.is_aligned_to(align),
                         "Expected allocation alignment {}, returned address is {:?}",

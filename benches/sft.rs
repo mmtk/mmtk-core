@@ -1,13 +1,13 @@
-use criterion::Criterion;
 use criterion::black_box;
 use criterion::criterion_group;
+use criterion::Criterion;
 
+use mmtk::memory_manager;
 use mmtk::util::test_util::fixtures::*;
 use mmtk::util::test_util::mock_vm::*;
-use mmtk::AllocationSemantics;
-use mmtk::vm::VMBinding;
 use mmtk::vm::ObjectModel;
-use mmtk::memory_manager;
+use mmtk::vm::VMBinding;
+use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     let mut fixture = MutatorFixture::create();

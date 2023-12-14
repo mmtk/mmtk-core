@@ -1,7 +1,18 @@
+// NOTE: MMTk will panic if MMTK is initialized more than once per process (this is a bug and we should fix it).
+// To work around the problem, we run each of the following modules in a separate test process
+// if the test initializes an MMTk intance.
+
+// All the tests with prefix 'mock_test_' and with the feature 'mock_test' will use MockVM, and will initialize MMTk.
+// To avoid re-initialization, one can have only one #[test] per module,
+// or use fixtures in `crate::util::test_util::fixtures` to create one MMTk instance
+// per module and reuse the instance in multiple tests.
+
+#[cfg(feature = "mock_test")]
 mod mock_test_prelude {
-    pub use crate::util::test_util::fixtures::*;
-    pub use crate::util::test_util::mock_vm::*;
     pub use crate::memory_manager;
+    pub use crate::util::test_util::fixtures::*;
+    pub use crate::util::test_util::mock_method::*;
+    pub use crate::util::test_util::mock_vm::*;
     pub use crate::vm::*;
 }
 

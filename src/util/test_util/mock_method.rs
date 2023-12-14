@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-use std::collections::HashMap;
 use std::any::Any;
 
 pub trait MockAny {
@@ -33,7 +31,10 @@ pub struct MockClosure<I, R> {
 
 impl<I, R> MockClosure<I, R> {
     fn new(closure: MockClosureSignature<I, R>) -> Self {
-        Self { closure, call_count: 0 }
+        Self {
+            closure,
+            call_count: 0,
+        }
     }
     fn call(&mut self, args: I) -> R {
         self.call_count += 1;
@@ -47,28 +48,31 @@ impl<I, R> std::default::Default for MockMethod<I, R> {
     }
 }
 
-impl<I, R> MockMethod<I, R>{
+impl<I, R> MockMethod<I, R> {
     pub fn new_unimplemented() -> Self {
         Self {
-            imp: MockImpl::Fixed(MockClosure::new(Box::new(|_| {unimplemented!()})))
+            imp: MockImpl::Fixed(MockClosure::new(Box::new(|_| unimplemented!()))),
         }
     }
 
-    pub fn new_default() -> Self where R: Default {
+    pub fn new_default() -> Self
+    where
+        R: Default,
+    {
         Self {
-            imp: MockImpl::Fixed(MockClosure::new(Box::new(|_| R::default())))
+            imp: MockImpl::Fixed(MockClosure::new(Box::new(|_| R::default()))),
         }
     }
 
     pub fn new_fixed(closure: MockClosureSignature<I, R>) -> Self {
         Self {
-            imp: MockImpl::Fixed(MockClosure::new(closure))
+            imp: MockImpl::Fixed(MockClosure::new(closure)),
         }
     }
 
     pub fn new_sequence(closures: Vec<MockClosureSignature<I, R>>) -> Self {
         Self {
-            imp: MockImpl::Sequence(closures.into_iter().map(|c| MockClosure::new(c)).collect())
+            imp: MockImpl::Sequence(closures.into_iter().map(|c| MockClosure::new(c)).collect()),
         }
     }
 
@@ -79,7 +83,7 @@ impl<I, R> MockMethod<I, R>{
             MockImpl::Sequence(closures) => {
                 let len = closures.len();
                 closures[cur_call % len].call(args)
-            },
+            }
             MockImpl::Fixed(closure) => closure.call(args),
         }
     }
@@ -91,7 +95,7 @@ impl<I, R> MockMethod<I, R>{
     pub fn call_count(&self) -> usize {
         match &self.imp {
             MockImpl::Fixed(c) => c.call_count,
-            MockImpl::Sequence(vec) => vec.iter().map(|c| c.call_count).sum()
+            MockImpl::Sequence(vec) => vec.iter().map(|c| c.call_count).sum(),
         }
     }
 }

@@ -3,11 +3,8 @@
 
 use super::mock_test_prelude::*;
 
-use atomic::Atomic;
 use crate::util::{Address, ObjectReference};
-use crate::util::{VMMutatorThread, VMThread};
-use crate::vm::edge_shape::SimpleEdge;
-use crate::AllocationSemantics;
+use atomic::Atomic;
 
 lazy_static! {
     static ref FIXTURE: Fixture<SingleObject> = Fixture::new();
@@ -28,7 +25,8 @@ fn test_assertion_barrier_invalid_ref() {
 
                 // Create an invalid object reference (offset 8 bytes on the original object ref), and invoke barrier slowpath with it
                 // The invalid object ref has no VO bit, and the assertion should fail.
-                let invalid_objref = ObjectReference::from_raw_address(objref.to_raw_address() + 8usize);
+                let invalid_objref =
+                    ObjectReference::from_raw_address(objref.to_raw_address() + 8usize);
                 fixture.mutator_mut().barrier.object_reference_write_slow(
                     invalid_objref,
                     edge,
@@ -36,7 +34,7 @@ fn test_assertion_barrier_invalid_ref() {
                 );
             });
         },
-        no_cleanup
+        no_cleanup,
     );
 }
 
@@ -53,13 +51,12 @@ fn test_assertion_barrier_valid_ref() {
                 let edge = Address::from_ref(&mut slot);
 
                 // Invoke barrier slowpath with the valid object ref
-                fixture.mutator_mut().barrier.object_reference_write_slow(
-                    objref,
-                    edge,
-                    objref,
-                );
+                fixture
+                    .mutator_mut()
+                    .barrier
+                    .object_reference_write_slow(objref, edge, objref);
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }

@@ -5,11 +5,15 @@ use crate::util::heap::vm_layout::VMLayout;
 
 pub fn test_with_vm_layout(layout: Option<VMLayout>) {
     use crate::plan::AllocationSemantics;
-    use crate::vm::ObjectModel;
 
     let mut fixture = MutatorFixture::create_with_builder(|builder| {
         // 1MB
-        builder.options.gc_trigger.set(crate::util::options::GCTriggerSelector::FixedHeapSize(1024 * 1024));
+        builder
+            .options
+            .gc_trigger
+            .set(crate::util::options::GCTriggerSelector::FixedHeapSize(
+                1024 * 1024,
+            ));
         // Set layout
         if let Some(layout) = layout {
             builder.set_vm_layout(layout);
@@ -32,6 +36,6 @@ fn test_vm_layout_default() {
         || {
             test_with_vm_layout(None);
         },
-        no_cleanup
+        no_cleanup,
     )
 }

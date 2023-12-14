@@ -5,12 +5,12 @@ use atomic_refcell::AtomicRefCell;
 use std::sync::Mutex;
 use std::sync::Once;
 
-use crate::MMTKBuilder;
-use crate::util::{ObjectReference, VMMutatorThread, VMThread};
-use crate::AllocationSemantics;
-use crate::MMTK;
 use crate::memory_manager;
 use crate::util::test_util::mock_vm::MockVM;
+use crate::util::{ObjectReference, VMMutatorThread, VMThread};
+use crate::AllocationSemantics;
+use crate::MMTKBuilder;
+use crate::MMTK;
 
 pub trait FixtureContent {
     fn create() -> Self;
@@ -120,15 +120,24 @@ pub struct MMTKFixture {
 
 impl FixtureContent for MMTKFixture {
     fn create() -> Self {
-        Self::create_with_builder(|builder| {
-            const MB: usize = 1024 * 1024;
-            builder.options.gc_trigger.set(crate::util::options::GCTriggerSelector::FixedHeapSize(MB));
-        }, true)
+        Self::create_with_builder(
+            |builder| {
+                const MB: usize = 1024 * 1024;
+                builder
+                    .options
+                    .gc_trigger
+                    .set(crate::util::options::GCTriggerSelector::FixedHeapSize(MB));
+            },
+            true,
+        )
     }
 }
 
 impl MMTKFixture {
-    pub fn create_with_builder<F>(with_builder: F, initialize_collection: bool) -> Self where F: FnOnce(&mut MMTKBuilder) {
+    pub fn create_with_builder<F>(with_builder: F, initialize_collection: bool) -> Self
+    where
+        F: FnOnce(&mut MMTKBuilder),
+    {
         let mut builder = MMTKBuilder::new();
         with_builder(&mut builder);
 
@@ -140,9 +149,7 @@ impl MMTKFixture {
             memory_manager::initialize_collection(mmtk_static, VMThread::UNINITIALIZED);
         }
 
-        MMTKFixture {
-            mmtk: mmtk_static,
-        }
+        MMTKFixture { mmtk: mmtk_static }
     }
 }
 
@@ -152,7 +159,6 @@ impl Drop for MMTKFixture {
         let _ = unsafe { Box::from_raw(mmtk_ptr as *mut MMTK<MockVM>) };
     }
 }
-
 
 use crate::plan::Mutator;
 
@@ -170,23 +176,28 @@ impl FixtureContent for MutatorFixture {
 
 impl MutatorFixture {
     pub fn create_with_heapsize(size: usize) -> Self {
-        let mmtk = MMTKFixture::create_with_builder(|builder| {
-            builder.options.gc_trigger.set(crate::util::options::GCTriggerSelector::FixedHeapSize(size));
-        }, true);
-        let mutator = memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
-        Self {
-            mmtk,
-            mutator,
-        }
+        let mmtk = MMTKFixture::create_with_builder(
+            |builder| {
+                builder
+                    .options
+                    .gc_trigger
+                    .set(crate::util::options::GCTriggerSelector::FixedHeapSize(size));
+            },
+            true,
+        );
+        let mutator =
+            memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
+        Self { mmtk, mutator }
     }
 
-    pub fn create_with_builder<F>(with_builder: F) -> Self where F: FnOnce(&mut MMTKBuilder) {
+    pub fn create_with_builder<F>(with_builder: F) -> Self
+    where
+        F: FnOnce(&mut MMTKBuilder),
+    {
         let mmtk = MMTKFixture::create_with_builder(with_builder, true);
-        let mutator = memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
-        Self {
-            mmtk,
-            mutator,
-        }
+        let mutator =
+            memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
+        Self { mmtk, mutator }
     }
 
     pub fn mmtk(&self) -> &'static MMTK<MockVM> {
@@ -216,10 +227,7 @@ impl FixtureContent for SingleObject {
         let objref = MockVM::address_to_ref(addr);
         memory_manager::post_alloc(&mut mutator.mutator, objref, size, semantics);
 
-        SingleObject {
-            objref,
-            mutator,
-        }
+        SingleObject { objref, mutator }
     }
 }
 

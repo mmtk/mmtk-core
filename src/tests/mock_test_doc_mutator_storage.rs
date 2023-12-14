@@ -40,7 +40,7 @@ pub fn boxed_pointer() {
                 assert!(!addr.is_zero());
             });
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -62,14 +62,19 @@ pub fn embed_mutator_struct() {
                 // Store the struct (or use memcpy for non-Rust code)
                 let mut storage = MutatorInTLS { embed: *mutator };
                 // Allocate
-                let addr =
-                    memory_manager::alloc(&mut storage.embed, 8, 8, 0, AllocationSemantics::Default);
+                let addr = memory_manager::alloc(
+                    &mut storage.embed,
+                    8,
+                    8,
+                    0,
+                    AllocationSemantics::Default,
+                );
                 // ANCHOR_END: mutator_storage_embed_mutator_struct
 
                 assert!(!addr.is_zero());
             })
         },
-        no_cleanup
+        no_cleanup,
     )
 }
 
@@ -117,7 +122,9 @@ pub fn embed_fastpath_struct() {
                         let default_allocator = unsafe {
                             storage
                                 .mutator
-                                .allocator_impl_mut::<crate::util::alloc::BumpAllocator<MockVM>>(selector)
+                                .allocator_impl_mut::<crate::util::alloc::BumpAllocator<MockVM>>(
+                                    selector,
+                                )
                         };
                         // Copy bump pointer values to the allocator in the mutator
                         default_allocator.bump_pointer = storage.default_bump_pointer;
@@ -139,6 +146,6 @@ pub fn embed_fastpath_struct() {
                 assert!(!addr2.is_zero());
             })
         },
-        no_cleanup
+        no_cleanup,
     )
 }

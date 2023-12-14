@@ -1,26 +1,25 @@
+use crate::plan::ObjectQueue;
+use crate::scheduler::gc_work::ProcessEdgesWorkRootsWorkFactory;
+use crate::scheduler::gc_work::ProcessEdgesWorkTracerContext;
 use crate::scheduler::gc_work::SFTProcessEdges;
+use crate::scheduler::*;
+use crate::util::alloc::AllocationError;
+use crate::util::copy::*;
+use crate::util::opaque_pointer::*;
+use crate::util::{Address, ObjectReference};
+use crate::vm::object_model::specs::*;
 use crate::vm::EdgeVisitor;
+use crate::vm::GCThreadContext;
 use crate::vm::ObjectTracer;
 use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
 use crate::vm::VMBinding;
-use crate::vm::edge_shape::*;
-use crate::util::opaque_pointer::*;
 use crate::Mutator;
-use crate::plan::ObjectQueue;
-use crate::util::{Address, ObjectReference};
-use crate::vm::GCThreadContext;
-use crate::scheduler::gc_work::ProcessEdgesWorkTracerContext;
-use crate::scheduler::gc_work::ProcessEdgesWorkRootsWorkFactory;
-use crate::scheduler::*;
-use crate::util::alloc::AllocationError;
-use crate::util::copy::*;
-use crate::vm::object_model::specs::*;
 
 use super::mock_method::*;
 
-use std::ops::Range;
 use std::default::Default;
+use std::ops::Range;
 use std::sync::Mutex;
 
 pub const OBJECT_REF_OFFSET: usize = 4;
@@ -34,7 +33,7 @@ lazy_static! {
 macro_rules! lifetime {
     ($e: expr) => {
         unsafe { std::mem::transmute($e) }
-    }
+    };
 }
 
 macro_rules! mock {
@@ -48,17 +47,32 @@ macro_rules! mock_any {
     };
 }
 
-pub fn read_mockvm<F, R>(func: F) -> R where F: FnOnce(&MockVM) -> R {
-    let lock = MOCK_VM_INSTANCE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+pub fn read_mockvm<F, R>(func: F) -> R
+where
+    F: FnOnce(&MockVM) -> R,
+{
+    let lock = MOCK_VM_INSTANCE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     func(&lock)
 }
-pub fn write_mockvm<F, R>(func: F) -> R where F: FnOnce(&mut MockVM) -> R {
-    let mut lock = MOCK_VM_INSTANCE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+pub fn write_mockvm<F, R>(func: F) -> R
+where
+    F: FnOnce(&mut MockVM) -> R,
+{
+    let mut lock = MOCK_VM_INSTANCE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     func(&mut lock)
 }
 
 #[cfg(feature = "mock_test")]
-pub fn with_mockvm<S, T, C>(setup: S, test: T, cleanup: C) where S: FnOnce() -> MockVM, T: FnOnce() + std::panic::UnwindSafe, C: FnOnce() {
+pub fn with_mockvm<S, T, C>(setup: S, test: T, cleanup: C)
+where
+    S: FnOnce() -> MockVM,
+    T: FnOnce() + std::panic::UnwindSafe,
+    C: FnOnce(),
+{
     super::serial_test(|| {
         // Setup
         {
@@ -80,9 +94,17 @@ pub struct MockVM {
     pub is_mutator: MockMethod<VMThread, bool>,
     pub mutator: MockMethod<VMMutatorThread, &'static mut Mutator<MockVM>>,
     pub mutators: MockMethod<(), Box<dyn Iterator<Item = &'static mut Mutator<MockVM>> + 'static>>,
-    pub vm_trace_object: MockMethod<(&'static dyn ObjectQueue, ObjectReference, &'static mut GCWorker<MockVM>), ObjectReference>,
+    pub vm_trace_object: MockMethod<
+        (
+            &'static dyn ObjectQueue,
+            ObjectReference,
+            &'static mut GCWorker<MockVM>,
+        ),
+        ObjectReference,
+    >,
     // collection
-    pub stop_all_mutators: MockMethod<(VMWorkerThread, Box<dyn FnMut(&'static mut Mutator<MockVM>)>), ()>,
+    pub stop_all_mutators:
+        MockMethod<(VMWorkerThread, Box<dyn FnMut(&'static mut Mutator<MockVM>)>), ()>,
     pub resume_mutators: MockMethod<VMWorkerThread, ()>,
     pub block_for_gc: MockMethod<VMMutatorThread, ()>,
     pub spawn_gc_thread: MockMethod<(VMThread, GCThreadContext<MockVM>), ()>,
@@ -91,13 +113,21 @@ pub struct MockVM {
     pub post_forwarding: MockMethod<VMWorkerThread, ()>,
     pub vm_live_bytes: MockMethod<(), usize>,
     // object model
-    pub copy_object: MockMethod<(ObjectReference, CopySemantics, &'static GCWorkerCopyContext<MockVM>), ObjectReference>,
+    pub copy_object: MockMethod<
+        (
+            ObjectReference,
+            CopySemantics,
+            &'static GCWorkerCopyContext<MockVM>,
+        ),
+        ObjectReference,
+    >,
     pub copy_object_to: MockMethod<(ObjectReference, ObjectReference, Address), Address>,
     pub get_object_size: MockMethod<ObjectReference, usize>,
     pub get_object_size_when_copied: MockMethod<ObjectReference, usize>,
     pub get_object_align_when_copied: MockMethod<ObjectReference, usize>,
     pub get_object_align_offset_when_copied: MockMethod<ObjectReference, usize>,
-    pub get_object_reference_when_copied_to: MockMethod<(ObjectReference, Address), ObjectReference>,
+    pub get_object_reference_when_copied_to:
+        MockMethod<(ObjectReference, Address), ObjectReference>,
     pub ref_to_object_start: MockMethod<ObjectReference, Address>,
     pub ref_to_header: MockMethod<ObjectReference, Address>,
     pub ref_to_address: MockMethod<ObjectReference, Address>,
@@ -111,8 +141,22 @@ pub struct MockVM {
     pub weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
     // scanning
     pub support_edge_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
-    pub scan_object: MockMethod<(VMWorkerThread, ObjectReference, &'static mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>), ()>,
-    pub scan_object_and_trace_edges: MockMethod<(VMWorkerThread, ObjectReference, &'static mut dyn ObjectTracer), ()>,
+    pub scan_object: MockMethod<
+        (
+            VMWorkerThread,
+            ObjectReference,
+            &'static mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>,
+        ),
+        (),
+    >,
+    pub scan_object_and_trace_edges: MockMethod<
+        (
+            VMWorkerThread,
+            ObjectReference,
+            &'static mut dyn ObjectTracer,
+        ),
+        (),
+    >,
     pub scan_roots_in_mutator_thread: Box<dyn MockAny>,
     pub scan_vm_specific_roots: Box<dyn MockAny>,
     pub notify_initial_thread_scan_complete: MockMethod<(bool, VMWorkerThread), ()>,
@@ -129,13 +173,17 @@ impl Default for MockVM {
             is_mutator: MockMethod::new_fixed(Box::new(|_| true)),
             mutator: MockMethod::new_unimplemented(),
             mutators: MockMethod::new_unimplemented(),
-            vm_trace_object: MockMethod::new_fixed(Box::new(|(_, object, _)| panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object))),
+            vm_trace_object: MockMethod::new_fixed(Box::new(|(_, object, _)| {
+                panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
+            })),
 
             stop_all_mutators: MockMethod::new_unimplemented(),
             resume_mutators: MockMethod::new_unimplemented(),
             block_for_gc: MockMethod::new_unimplemented(),
             spawn_gc_thread: MockMethod::new_default(),
-            out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| panic!("Out of memory with {:?}!", err))),
+            out_of_memory: MockMethod::new_fixed(Box::new(|(_, err)| {
+                panic!("Out of memory with {:?}!", err)
+            })),
             schedule_finalization: MockMethod::new_default(),
             post_forwarding: MockMethod::new_default(),
             vm_live_bytes: MockMethod::new_default(),
@@ -144,13 +192,21 @@ impl Default for MockVM {
             copy_object_to: MockMethod::new_unimplemented(),
             get_object_size: MockMethod::new_unimplemented(),
             get_object_size_when_copied: MockMethod::new_unimplemented(),
-            get_object_align_when_copied: MockMethod::new_fixed(Box::new(|_| std::mem::size_of::<usize>())),
+            get_object_align_when_copied: MockMethod::new_fixed(Box::new(|_| {
+                std::mem::size_of::<usize>()
+            })),
             get_object_align_offset_when_copied: MockMethod::new_fixed(Box::new(|_| 0)),
             get_object_reference_when_copied_to: MockMethod::new_unimplemented(),
-            ref_to_object_start: MockMethod::new_fixed(Box::new(|object| object.to_raw_address().sub(OBJECT_REF_OFFSET))),
+            ref_to_object_start: MockMethod::new_fixed(Box::new(|object| {
+                object.to_raw_address().sub(OBJECT_REF_OFFSET)
+            })),
             ref_to_header: MockMethod::new_fixed(Box::new(|object| object.to_raw_address())),
-            ref_to_address: MockMethod::new_fixed(Box::new(|object| object.to_raw_address().sub(OBJECT_REF_OFFSET))),
-            address_to_ref: MockMethod::new_fixed(Box::new(|addr| ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET)))),
+            ref_to_address: MockMethod::new_fixed(Box::new(|object| {
+                object.to_raw_address().sub(OBJECT_REF_OFFSET)
+            })),
+            address_to_ref: MockMethod::new_fixed(Box::new(|addr| {
+                ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET))
+            })),
             dump_object: MockMethod::new_unimplemented(),
 
             weakref_clear_referent: MockMethod::new_unimplemented(),
@@ -162,13 +218,46 @@ impl Default for MockVM {
             support_edge_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
             scan_object: MockMethod::new_unimplemented(),
             scan_object_and_trace_edges: MockMethod::new_unimplemented(),
-            scan_roots_in_mutator_thread: Box::new(MockMethod::<(VMWorkerThread, &'static mut Mutator<MockVM>, ProcessEdgesWorkRootsWorkFactory<MockVM, SFTProcessEdges<MockVM>, SFTProcessEdges<MockVM>>), ()>::new_unimplemented()),
-            scan_vm_specific_roots: Box::new(MockMethod::<(VMWorkerThread, ProcessEdgesWorkRootsWorkFactory<MockVM, SFTProcessEdges<MockVM>, SFTProcessEdges<MockVM>>), ()>::new_unimplemented()),
+            scan_roots_in_mutator_thread: Box::new(MockMethod::<
+                (
+                    VMWorkerThread,
+                    &'static mut Mutator<MockVM>,
+                    ProcessEdgesWorkRootsWorkFactory<
+                        MockVM,
+                        SFTProcessEdges<MockVM>,
+                        SFTProcessEdges<MockVM>,
+                    >,
+                ),
+                (),
+            >::new_unimplemented()),
+            scan_vm_specific_roots: Box::new(MockMethod::<
+                (
+                    VMWorkerThread,
+                    ProcessEdgesWorkRootsWorkFactory<
+                        MockVM,
+                        SFTProcessEdges<MockVM>,
+                        SFTProcessEdges<MockVM>,
+                    >,
+                ),
+                (),
+            >::new_unimplemented()),
             notify_initial_thread_scan_complete: MockMethod::new_unimplemented(),
             supports_return_barrier: MockMethod::new_unimplemented(),
             prepare_for_roots_re_scanning: MockMethod::new_unimplemented(),
-            process_weak_refs: Box::new(MockMethod::<(&'static mut GCWorker<Self>, ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>), bool>::new_unimplemented()),
-            forward_weak_refs: Box::new(MockMethod::<(&'static mut GCWorker<Self>, ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>), ()>::new_default()),
+            process_weak_refs: Box::new(MockMethod::<
+                (
+                    &'static mut GCWorker<Self>,
+                    ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>,
+                ),
+                bool,
+            >::new_unimplemented()),
+            forward_weak_refs: Box::new(MockMethod::<
+                (
+                    &'static mut GCWorker<Self>,
+                    ProcessEdgesWorkTracerContext<SFTProcessEdges<MockVM>>,
+                ),
+                (),
+            >::new_default()),
         }
     }
 }
@@ -209,8 +298,16 @@ impl crate::vm::ActivePlan<MockVM> for MockVM {
         unsafe { std::mem::transmute(ret) }
     }
 
-    fn vm_trace_object<Q: ObjectQueue>(queue: &mut Q, object: ObjectReference, worker: &mut GCWorker<MockVM>) -> ObjectReference {
-        mock!(vm_trace_object(unsafe { std::mem::transmute(queue as &mut dyn ObjectQueue) }, object, unsafe { std::mem::transmute(worker) }))
+    fn vm_trace_object<Q: ObjectQueue>(
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<MockVM>,
+    ) -> ObjectReference {
+        mock!(vm_trace_object(
+            unsafe { std::mem::transmute(queue as &mut dyn ObjectQueue) },
+            object,
+            unsafe { std::mem::transmute(worker) }
+        ))
     }
 }
 
@@ -219,7 +316,11 @@ impl crate::vm::Collection<MockVM> for MockVM {
     where
         F: FnMut(&'static mut Mutator<MockVM>),
     {
-        mock!(stop_all_mutators(tls, unsafe { std::mem::transmute(Box::new(mutator_visitor) as Box<dyn FnMut(&'static mut Mutator<MockVM>)>) }))
+        mock!(stop_all_mutators(tls, unsafe {
+            std::mem::transmute(
+                Box::new(mutator_visitor) as Box<dyn FnMut(&'static mut Mutator<MockVM>)>
+            )
+        }))
     }
 
     fn resume_mutators(tls: VMWorkerThread) {
@@ -268,7 +369,9 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<MockVM>,
     ) -> ObjectReference {
-        mock!(copy_object(from, semantics, unsafe { std::mem::transmute(copy_context) }))
+        mock!(copy_object(from, semantics, unsafe {
+            std::mem::transmute(copy_context)
+        }))
     }
 
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {
@@ -291,10 +394,7 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         mock!(get_object_align_offset_when_copied(object))
     }
 
-    fn get_reference_when_copied_to(
-        from: ObjectReference,
-        to: Address,
-    ) -> ObjectReference {
+    fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
         mock!(get_object_reference_when_copied_to(from, to))
     }
 
@@ -349,23 +449,38 @@ impl crate::vm::Scanning<MockVM> for MockVM {
         object: ObjectReference,
         edge_visitor: &mut EV,
     ) {
-        mock!(scan_object(tls, object, lifetime!(edge_visitor as &mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>)))
+        mock!(scan_object(
+            tls,
+            object,
+            lifetime!(edge_visitor as &mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>)
+        ))
     }
     fn scan_object_and_trace_edges<OT: ObjectTracer>(
         tls: VMWorkerThread,
         object: ObjectReference,
         object_tracer: &mut OT,
     ) {
-        mock!(scan_object_and_trace_edges(tls, object, lifetime!(object_tracer as &mut dyn ObjectTracer)))
+        mock!(scan_object_and_trace_edges(
+            tls,
+            object,
+            lifetime!(object_tracer as &mut dyn ObjectTracer)
+        ))
     }
     fn scan_roots_in_mutator_thread(
         tls: VMWorkerThread,
         mutator: &'static mut Mutator<Self>,
         factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>,
     ) {
-        mock_any!(scan_roots_in_mutator_thread(tls, mutator, Box::new(factory)))
+        mock_any!(scan_roots_in_mutator_thread(
+            tls,
+            mutator,
+            Box::new(factory)
+        ))
     }
-    fn scan_vm_specific_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>) {
+    fn scan_vm_specific_roots(
+        tls: VMWorkerThread,
+        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>,
+    ) {
         mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
     }
     fn notify_initial_thread_scan_complete(partial_scan: bool, tls: VMWorkerThread) {
@@ -377,11 +492,17 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     fn prepare_for_roots_re_scanning() {
         mock!(prepare_for_roots_re_scanning())
     }
-    fn process_weak_refs(worker: &mut GCWorker<Self>, tracer_context: impl ObjectTracerContext<Self>) -> bool {
+    fn process_weak_refs(
+        worker: &mut GCWorker<Self>,
+        tracer_context: impl ObjectTracerContext<Self>,
+    ) -> bool {
         let worker: &'static mut GCWorker<Self> = lifetime!(worker);
         mock_any!(process_weak_refs(worker, tracer_context))
     }
-    fn forward_weak_refs(worker: &mut GCWorker<Self>, tracer_context: impl ObjectTracerContext<Self>) {
+    fn forward_weak_refs(
+        worker: &mut GCWorker<Self>,
+        tracer_context: impl ObjectTracerContext<Self>,
+    ) {
         let worker: &'static mut GCWorker<Self> = lifetime!(worker);
         mock_any!(forward_weak_refs(worker, tracer_context))
     }
