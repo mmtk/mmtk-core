@@ -22,31 +22,42 @@ use std::default::Default;
 use std::ops::Range;
 use std::sync::Mutex;
 
-pub const OBJECT_REF_OFFSET: usize = 4;
+/// The offset between object reference and the allocation address if we use
+/// the default mock VM.
+pub const DEFAULT_OBJECT_REF_OFFSET: usize = 4;
 
+// To mock static methods, we have to create a static instance of `MockVM`.
 lazy_static! {
     // The mutex may get poisoned any time. Accessing this mutex needs to deal with the poisoned case.
     // One can use read/write_mockvm to access mock vm.
     static ref MOCK_VM_INSTANCE: Mutex<MockVM> = Mutex::new(MockVM::default());
 }
 
+// MockVM only allows mock methods with references of no lifetime or static lifetime.
+// If `VMBinding` methods has references of a specific lifetime,
+// the references need to be turned into static lifetime before we can call mock methods.
+// This is correct as long as we only use the references within the mock methods, and
+// we do not store them for access after the mock method returns.
 macro_rules! lifetime {
     ($e: expr) => {
         unsafe { std::mem::transmute($e) }
     };
 }
 
+/// Call `MockMethod`.
 macro_rules! mock {
     ($fn: ident($($arg:expr),*)) => {
         write_mockvm(|mock| mock.$fn.call(($($arg),*)))
     };
 }
+/// Call `MockAny`.
 macro_rules! mock_any {
     ($fn: ident($($arg:expr),*)) => {
         *write_mockvm(|mock| mock.$fn.call_any(Box::new(($($arg),*)))).downcast().unwrap()
     };
 }
 
+/// Read from the static MockVM instance. It deals with the case of a poisoned lock.
 pub fn read_mockvm<F, R>(func: F) -> R
 where
     F: FnOnce(&MockVM) -> R,
@@ -56,6 +67,7 @@ where
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     func(&lock)
 }
+/// Write to the staitc MockVM instance. It deals with the case of a poisoned lock.
 pub fn write_mockvm<F, R>(func: F) -> R
 where
     F: FnOnce(&mut MockVM) -> R,
@@ -66,7 +78,15 @@ where
     func(&mut lock)
 }
 
-#[cfg(feature = "mock_test")]
+/// A test that uses `MockVM`` should use this method to wrap the entire test
+/// that may use `MockVM`.
+///
+/// # Arguents
+/// * `setup`: Create a `MockVM`. Most tests can just use the default `MockVM::default()`.
+///   A test may also overwrite some methods for its own testing purpose.
+/// * `test`: The actual test. All the code that may access `MockVM`/`VMBinding` should be
+///   wrapped in the test closure.
+/// * `cleanup`: Any clean up or post check when the test finishes or aborts.
 pub fn with_mockvm<S, T, C>(setup: S, test: T, cleanup: C)
 where
     S: FnOnce() -> MockVM,
@@ -82,12 +102,77 @@ where
     })
 }
 
+/// Set up a default `MockVM`
 pub fn default_setup() -> MockVM {
     MockVM::default()
 }
 
+/// No extra clean up after the test.
 pub fn no_cleanup() {}
 
+/// A struct that allows us to mock the behavior of a `VMBinding` and the VM traits for testing.
+/// For simplicity, we implement `VMBinding` as well as `ActivePlan`, `Collection`,
+/// `ObjectModel`, `ReferenceGlue`, `Scanning` on the `MockVM` type, and forward each
+/// method to the mock methods in the static `MockVM` instance.
+/// By changing the mock closures in the struct, we can control the behavior of the `VMBinding`.
+/// Use [`with_mockvm`] in the tests that need `MockVM`.
+///
+/// # Mocking methods
+///
+/// The struct includes one mock method for each methods in the VM traits.
+///
+/// ## Methods with only value types
+///
+/// It is straighforward to mock methods with only value types. Just group the argument types,
+/// and the return types into two tuples (e.g. `I` and `R`), and create a `MockMethod<I, R>`.
+/// For example, [`crate::vm::ActivePlan::is_mutator`] has a signature of `fn(VMThread) -> bool`,
+/// we can just create `MockMethod<VMThread, bool>` for it.
+///
+/// ## Methods with reference types
+///
+/// As we cannot have extra type parameters (including generic lifetime paraeters) on `MockVM`, `MockVM` can only
+/// have `MockMethod` with types of `'static` lifetime. To create a mock method for methods with
+/// reference types, just replace the lifetime specifier in the reference with `'static` lifetime.
+/// For example, [`crate::vm::ActivePlan::mutators`] has a signature of `fn<'a>() -> Box<dyn Iterator<Item = &'a mut Mutator<VM>> + 'a>`,
+/// we just replace all the lifetime specifiers with `'static.`, and create
+/// `MockMethod<(), Box<dyn Iterator<Item = &'static mut Mutator<MockVM>> + 'static>>`.
+/// When we invoke the `MockMethod`, we can use the `lifetime!` macro to hack the lifetime.
+/// Though this is unsafe, it is correct as long as we only use the reference within the mock implementation.
+///
+/// ## Methods with generic type parameters
+///
+/// As we cannot have extra type parameters on `MockVM`, there are two ways
+/// to mock methods with generic type parameters.
+///
+/// ### Use trait objects
+///
+/// We can use trait objects if the trait is object safe. For example,
+/// [`crate::vm::ActivePlan::vm_trace_object`] has a signature of
+/// `fn<Q: ObjectQueue>(&mut Q, ObjectReference, &mut GCWorker<VM>) -> ObjectReference`,
+/// we can mock `&mut Q` as `&mut dyn ObjectQueue`, and use
+/// `MockMethod<(&'static mut dyn ObjectQueue, ObjectReference, &'static mut GCWorker<MockVM>), ObjectReference>`
+/// for the method.
+///
+/// ### Use `MockAny`
+///
+/// For cases where we cannot use trait objects, we can use `MockAny`.
+/// We simply use `Box<MockAny>` and initiate it with a `MockMethod` of
+/// concrete types. For example, [`crate::vm::Scanning::process_weak_refs`]
+/// has a signature of `fn(&mut GCWorker<VM>, impl ObjectTracerContext<VM>`.
+/// `ObjectTracerContext` is not object safe. So we just use `Box<MockAny>`
+/// in `MockVM`, and initiate it with a concrete type of `ObjectTracerContext`, such as
+/// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,ProcessEdgesWorkTracerContext<SFTProcessEdges<Self>>,),bool>::new_unimplemented())`.
+///
+/// # Mock constants and associated types
+///
+/// These are not supported at the moment. As those will change the `MockVM` type, we will have
+/// to use macros to generate a new `MockVM` type when we custimize constants or associated types.
+
+// The current implementation is not perfect, but at least it works, and it is easy enough to debug with.
+// I have tried different third-party libraries for mocking, and each has its own limitation. And
+// none of the libraries I tried can mock `VMBinding` and the associated traits out of box. Even after I attempted
+// to remove all those VM traits and had all the methods in `VMBinding`, the libraries still did not
+// work out.
 pub struct MockVM {
     // active plan
     pub number_of_mutators: MockMethod<(), usize>,
@@ -96,7 +181,7 @@ pub struct MockVM {
     pub mutators: MockMethod<(), Box<dyn Iterator<Item = &'static mut Mutator<MockVM>> + 'static>>,
     pub vm_trace_object: MockMethod<
         (
-            &'static dyn ObjectQueue,
+            &'static mut dyn ObjectQueue,
             ObjectReference,
             &'static mut GCWorker<MockVM>,
         ),
@@ -198,14 +283,14 @@ impl Default for MockVM {
             get_object_align_offset_when_copied: MockMethod::new_fixed(Box::new(|_| 0)),
             get_object_reference_when_copied_to: MockMethod::new_unimplemented(),
             ref_to_object_start: MockMethod::new_fixed(Box::new(|object| {
-                object.to_raw_address().sub(OBJECT_REF_OFFSET)
+                object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
             })),
             ref_to_header: MockMethod::new_fixed(Box::new(|object| object.to_raw_address())),
             ref_to_address: MockMethod::new_fixed(Box::new(|object| {
-                object.to_raw_address().sub(OBJECT_REF_OFFSET)
+                object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
             })),
             address_to_ref: MockMethod::new_fixed(Box::new(|addr| {
-                ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET))
+                ObjectReference::from_raw_address(addr.add(DEFAULT_OBJECT_REF_OFFSET))
             })),
             dump_object: MockMethod::new_unimplemented(),
 
@@ -294,8 +379,7 @@ impl crate::vm::ActivePlan<MockVM> for MockVM {
 
     fn mutators<'a>() -> Box<dyn Iterator<Item = &'a mut Mutator<MockVM>> + 'a> {
         let ret = mock!(mutators());
-        // Work around the lifetime
-        unsafe { std::mem::transmute(ret) }
+        lifetime!(ret)
     }
 
     fn vm_trace_object<Q: ObjectQueue>(
@@ -304,9 +388,9 @@ impl crate::vm::ActivePlan<MockVM> for MockVM {
         worker: &mut GCWorker<MockVM>,
     ) -> ObjectReference {
         mock!(vm_trace_object(
-            unsafe { std::mem::transmute(queue as &mut dyn ObjectQueue) },
+            lifetime!(queue as &mut dyn ObjectQueue),
             object,
-            unsafe { std::mem::transmute(worker) }
+            lifetime!(worker)
         ))
     }
 }
@@ -316,11 +400,7 @@ impl crate::vm::Collection<MockVM> for MockVM {
     where
         F: FnMut(&'static mut Mutator<MockVM>),
     {
-        mock!(stop_all_mutators(tls, unsafe {
-            std::mem::transmute(
-                Box::new(mutator_visitor) as Box<dyn FnMut(&'static mut Mutator<MockVM>)>
-            )
-        }))
+        mock!(stop_all_mutators(tls, lifetime!(Box::new(mutator_visitor) as Box<dyn FnMut(&'static mut Mutator<MockVM>)>)))
     }
 
     fn resume_mutators(tls: VMWorkerThread) {
@@ -362,16 +442,14 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec =
         VMLocalLOSMarkNurserySpec::in_header(0);
 
-    const OBJECT_REF_OFFSET_LOWER_BOUND: isize = OBJECT_REF_OFFSET as isize;
+    const OBJECT_REF_OFFSET_LOWER_BOUND: isize = DEFAULT_OBJECT_REF_OFFSET as isize;
 
     fn copy(
         from: ObjectReference,
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<MockVM>,
     ) -> ObjectReference {
-        mock!(copy_object(from, semantics, unsafe {
-            std::mem::transmute(copy_context)
-        }))
+        mock!(copy_object(from, semantics, lifetime!(copy_context)))
     }
 
     fn copy_to(from: ObjectReference, to: ObjectReference, region: Address) -> Address {

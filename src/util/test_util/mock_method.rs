@@ -1,5 +1,7 @@
 use std::any::Any;
 
+/// MockAny hides any type information. It is useful when we want to create
+/// a mock method for methods with generic type parameters.
 pub trait MockAny {
     fn call_any(&mut self, args: Box<dyn Any>) -> Box<dyn Any>;
 }
@@ -13,17 +15,24 @@ impl<I: 'static, R: 'static> MockAny for MockMethod<I, R> {
     }
 }
 
+/// Mocking a method. The type parameters are the types of arguments
+/// and the return values of the method as tuples.
 pub struct MockMethod<I, R> {
     imp: MockImpl<I, R>,
 }
 
+/// The actual implementation of the mock method.
 pub enum MockImpl<I, R> {
+    /// Invocation to the method will call the closures one by one, and wrap around when we call the last one.
     Sequence(Vec<MockClosure<I, R>>),
+    /// Every invocation to the method will call the closure.
     Fixed(MockClosure<I, R>),
 }
 
+/// The function pointer for the mock closure.
 pub type MockClosureSignature<I, R> = Box<dyn Fn(I) -> R + Send + Sync>;
 
+/// The function pointer for the closure, and some metadata.
 pub struct MockClosure<I, R> {
     closure: MockClosureSignature<I, R>,
     call_count: usize,
@@ -49,12 +58,14 @@ impl<I, R> std::default::Default for MockMethod<I, R> {
 }
 
 impl<I, R> MockMethod<I, R> {
+    /// The method will panic with `unimplemented!()` when called.
     pub fn new_unimplemented() -> Self {
         Self {
             imp: MockImpl::Fixed(MockClosure::new(Box::new(|_| unimplemented!()))),
         }
     }
 
+    /// The method will return the default value for the return type.
     pub fn new_default() -> Self
     where
         R: Default,
@@ -64,18 +75,21 @@ impl<I, R> MockMethod<I, R> {
         }
     }
 
+    /// The method will execute the given closure when called.
     pub fn new_fixed(closure: MockClosureSignature<I, R>) -> Self {
         Self {
             imp: MockImpl::Fixed(MockClosure::new(closure)),
         }
     }
 
+    /// The method will execute the next closure in the sequence when called.
     pub fn new_sequence(closures: Vec<MockClosureSignature<I, R>>) -> Self {
         Self {
             imp: MockImpl::Sequence(closures.into_iter().map(|c| MockClosure::new(c)).collect()),
         }
     }
 
+    /// Call the mock method.
     pub fn call(&mut self, args: I) -> R {
         let cur_call = self.call_count();
 
@@ -88,10 +102,12 @@ impl<I, R> MockMethod<I, R> {
         }
     }
 
+    /// Is the method called?
     pub fn is_called(&self) -> bool {
         self.call_count() > 0
     }
 
+    /// How many times has the method been called?
     pub fn call_count(&self) -> usize {
         match &self.imp {
             MockImpl::Fixed(c) => c.call_count,

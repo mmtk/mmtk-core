@@ -61,9 +61,6 @@ pub mod scheduler;
 pub mod util;
 pub mod vm;
 
-#[cfg(test)]
-mod tests;
-
 pub use crate::plan::{
     AllocationSemantics, BarrierSelector, Mutator, MutatorContext, ObjectQueue, Plan,
 };

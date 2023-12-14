@@ -10,10 +10,14 @@ use criterion::Criterion;
 // MMTK_BENCH=alloc cargo bench --features mock_test
 // MMTK_BENCH=sft   cargo bench --features mock_test
 
-// [Yi] I am not sure if these benchmarks are helpful any more after the MockVM refactoring. MockVM is really slow, as it dispatches
-// every call to function pointers in a struct. These tests may use MockVM, so they become slower as well. And the slowdown
-// from MockVM may hide the actual performance difference caused by related code changes.
-// We may want to improve the MockVM implementation so we can skip dispatching for benchmarking.
+// [Yi] I am not sure if these benchmarks are helpful any more after the MockVM refactoring. MockVM is really slow, as it
+// is accessed with a lock, and it dispatches every call to function pointers in a struct. These tests may use MockVM,
+// so they become slower as well. And the slowdown
+// from MockVM may hide the actual performance difference when we change the functions that are benchmarked.
+// We may want to improve the MockVM implementation so we can skip dispatching for benchmarking, or introduce another MockVM
+// implementation for benchmarking.
+// However, I will just keep these benchmarks here. If we find it not useful, and we do not plan to improve MockVM, we can delete
+// them.
 
 mod alloc;
 mod sft;
