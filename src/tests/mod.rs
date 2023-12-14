@@ -5,6 +5,9 @@ mod mock_test_prelude {
     pub use crate::vm::*;
 }
 
+#[cfg(not(feature = "malloc_counted_size"))]
+mod malloc_api;
+
 #[cfg(feature = "mock_test")]
 mod mock_test_allocate_align_offset;
 #[cfg(feature = "mock_test")]
@@ -33,6 +36,20 @@ mod mock_test_is_in_mmtk_spaces;
 mod mock_test_issue139_allocate_non_multiple_of_min_alignment;
 #[cfg(feature = "mock_test")]
 mod mock_test_issue867_allocate_unrealistically_large_object;
+#[cfg(all(feature = "mock_test", feature = "malloc_counted_size"))]
+mod mock_test_malloc_counted;
+#[cfg(feature = "mock_test")]
+mod mock_test_malloc_ms;
+#[cfg(all(feature = "mock_test", feature = "nogc_lock_free"))]
+mod mock_test_nogc_lock_free;
+#[cfg(all(feature = "mock_test", target_pointer_width = "64"))]
+mod mock_test_vm_layout_compressed_pointer;
+#[cfg(feature = "mock_test")]
+mod mock_test_vm_layout_default;
+#[cfg(feature = "mock_test")]
+mod mock_test_vm_layout_heap_start;
+#[cfg(feature = "mock_test")]
+mod mock_test_vm_layout_log_address_space;
 
 #[cfg(feature = "mock_test")]
 mod mock_test_doc_avoid_resolving_allocator;

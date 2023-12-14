@@ -3,9 +3,22 @@
 use super::mock_test_prelude::*;
 
 use crate::plan::AllocationSemantics;
+use crate::util::Address;
+use crate::Mutator;
+use crate::MMTK;
 
 lazy_static! {
     static ref MUTATOR: Fixture<MutatorFixture> = Fixture::new();
+}
+
+// Checks if the allocation should be an LOS allocation.
+fn alloc_default_or_large(mmtk:&MMTK<MockVM>, mutator: &mut Mutator<MockVM>, size: usize, align: usize, offset: usize, semantic: AllocationSemantics) -> Address {
+    let max_non_los_size = mmtk.get_plan().constraints().max_non_los_default_alloc_bytes;
+    if size >= max_non_los_size {
+        memory_manager::alloc(mutator, size, align, offset, AllocationSemantics::Los)
+    } else {
+        memory_manager::alloc(mutator, size, align, offset, semantic)
+    }
 }
 
 #[test]
@@ -17,7 +30,8 @@ pub fn allocate_max_size_object() {
             let (size, align) = (usize::MAX, 8);
 
             MUTATOR.with_fixture_mut(|fixture| {
-                memory_manager::alloc(
+                alloc_default_or_large(
+                    fixture.mmtk(),
                     &mut fixture.mutator,
                     size,
                     align,
@@ -42,9 +56,10 @@ pub fn allocate_max_size_object_after_succeed() {
         || {
             MUTATOR.with_fixture_mut(|fixture| {
                 // Allocate something so we have a thread local allocation buffer
-                memory_manager::alloc(&mut fixture.mutator, 8, 8, 0, AllocationSemantics::Default);
+                alloc_default_or_large(fixture.mmtk(), &mut fixture.mutator, 8, 8, 0, AllocationSemantics::Default);
                 // Allocate an unrealistically large object
-                memory_manager::alloc(
+                alloc_default_or_large(
+                    fixture.mmtk(),
                     &mut fixture.mutator,
                     usize::MAX,
                     8,
@@ -71,7 +86,8 @@ pub fn allocate_unrealistically_large_object() {
             );
 
             MUTATOR.with_fixture_mut(|fixture| {
-                memory_manager::alloc(
+                alloc_default_or_large(
+                    fixture.mmtk(),
                     &mut fixture.mutator,
                     size,
                     align,
@@ -92,7 +108,8 @@ pub fn allocate_more_than_heap_size() {
         || {
             // The heap has 1 MB. Allocating with 2MB will cause OOM.
             MUTATOR.with_fixture_mut(|fixture| {
-                memory_manager::alloc(
+                alloc_default_or_large(
+                    fixture.mmtk(),
                     &mut fixture.mutator,
                     2 * 1024 * 1024,
                     8,

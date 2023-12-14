@@ -180,6 +180,15 @@ impl MutatorFixture {
         }
     }
 
+    pub fn create_with_builder<F>(with_builder: F) -> Self where F: FnOnce(&mut MMTKBuilder) {
+        let mmtk = MMTKFixture::create_with_builder(with_builder, true);
+        let mutator = memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
+        Self {
+            mmtk,
+            mutator,
+        }
+    }
+
     pub fn mmtk(&self) -> &'static MMTK<MockVM> {
         self.mmtk.mmtk
     }
