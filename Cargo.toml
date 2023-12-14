@@ -70,7 +70,8 @@ default = []
 # It's manually added to CI scripts
 perf_counter = ["pfm"]
 
-# This feature is only used for mock tests.
+# This feature is only used for tests with MockVM.
+# CI scripts run those tests with this feature.
 mock_test = []
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
