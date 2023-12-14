@@ -192,12 +192,21 @@ jobs:
           path: mmtk-ruby
           ref: ${{ needs.binding-refs.outputs.ruby_binding_ref }}
 
+      - name: Setup script dependencies
+        run: ./.github/scripts/ci-setup-script-deps.sh
+        working-directory: mmtk-ruby
+
+      - name: Determine Ruby repository and revision
+        id: extract-ruby-revision
+        run: python ./.github/scripts/extract-ruby-revision.py ./mmtk/Cargo.toml --github-output=$GITHUB_OUTPUT
+        working-directory: mmtk-ruby
+
       - name: Checkout Ruby
         uses: actions/checkout@v3
         with:
-          repository: mmtk/ruby
+          repository: ${{ steps.extract-ruby-revision.outputs.ruby_repo }}
+          ref: ${{ steps.extract-ruby-revision.outputs.ruby_rev }}
           path: ruby
-          ref: mmtk
 
       - name: Override mmtk-core dependency for binding
         run: ./.github/scripts/ci-replace-mmtk-dep.sh ../mmtk-ruby/mmtk/Cargo.toml --mmtk-core-path .
