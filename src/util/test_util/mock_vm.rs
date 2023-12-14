@@ -211,6 +211,7 @@ pub struct MockVM {
     pub get_object_size_when_copied: MockMethod<ObjectReference, usize>,
     pub get_object_align_when_copied: MockMethod<ObjectReference, usize>,
     pub get_object_align_offset_when_copied: MockMethod<ObjectReference, usize>,
+    pub get_type_descriptor: MockMethod<(), &'static [i8]>,
     pub get_object_reference_when_copied_to:
         MockMethod<(ObjectReference, Address), ObjectReference>,
     pub ref_to_object_start: MockMethod<ObjectReference, Address>,
@@ -281,6 +282,7 @@ impl Default for MockVM {
                 std::mem::size_of::<usize>()
             })),
             get_object_align_offset_when_copied: MockMethod::new_fixed(Box::new(|_| 0)),
+            get_type_descriptor: MockMethod::new_unimplemented(),
             get_object_reference_when_copied_to: MockMethod::new_unimplemented(),
             ref_to_object_start: MockMethod::new_fixed(Box::new(|object| {
                 object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
@@ -470,6 +472,11 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
 
     fn get_align_offset_when_copied(object: ObjectReference) -> usize {
         mock!(get_object_align_offset_when_copied(object))
+    }
+
+    fn get_type_descriptor(reference: ObjectReference) -> &'static [i8] {
+        // We do not use this method, and it will be removed.
+        unreachable!()
     }
 
     fn get_reference_when_copied_to(from: ObjectReference, to: Address) -> ObjectReference {
