@@ -402,7 +402,10 @@ impl crate::vm::Collection<MockVM> for MockVM {
     where
         F: FnMut(&'static mut Mutator<MockVM>),
     {
-        mock!(stop_all_mutators(tls, lifetime!(Box::new(mutator_visitor) as Box<dyn FnMut(&'static mut Mutator<MockVM>)>)))
+        mock!(stop_all_mutators(
+            tls,
+            lifetime!(Box::new(mutator_visitor) as Box<dyn FnMut(&'static mut Mutator<MockVM>)>)
+        ))
     }
 
     fn resume_mutators(tls: VMWorkerThread) {
