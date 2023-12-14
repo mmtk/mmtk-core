@@ -54,9 +54,14 @@ sysinfo = "0.29"
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.8.5"
+criterion = "0.4"
 
 [build-dependencies]
 built = { version = "0.7.1", features = ["git2"] }
+
+[[bench]]
+name = "main"
+harness = false
 
 [features]
 default = []
