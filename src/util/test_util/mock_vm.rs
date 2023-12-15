@@ -1,3 +1,6 @@
+// Some mock methods may get really complex
+#![allow(clippy::type_complexity)]
+
 use crate::plan::ObjectQueue;
 use crate::scheduler::gc_work::ProcessEdgesWorkRootsWorkFactory;
 use crate::scheduler::gc_work::ProcessEdgesWorkTracerContext;
@@ -67,7 +70,7 @@ where
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     func(&lock)
 }
-/// Write to the staitc MockVM instance. It deals with the case of a poisoned lock.
+/// Write to the static MockVM instance. It deals with the case of a poisoned lock.
 pub fn write_mockvm<F, R>(func: F) -> R
 where
     F: FnOnce(&mut MockVM) -> R,
@@ -162,6 +165,10 @@ pub fn no_cleanup() {}
 /// `ObjectTracerContext` is not object safe. So we just use `Box<MockAny>`
 /// in `MockVM`, and initiate it with a concrete type of `ObjectTracerContext`, such as
 /// `Box::new((MockMethod::<(&'static mut GCWorker<Self>,ProcessEdgesWorkTracerContext<SFTProcessEdges<Self>>,),bool>::new_unimplemented())`.
+///
+/// Note that when `MockAny` is used, one needs to make sure that the types of the actual arguments match the argument types used for creating the `MockMethod`.
+/// We provide a default implementation for those `MockAny` methods, and it is very possible that the types in the default implementation do not
+/// match the arguments you would like to test with. You should overwrite the default `MockMethod` during the MockVM setup.
 ///
 /// # Mock constants and associated types
 ///
@@ -477,7 +484,7 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         mock!(get_object_align_offset_when_copied(object))
     }
 
-    fn get_type_descriptor(reference: ObjectReference) -> &'static [i8] {
+    fn get_type_descriptor(_reference: ObjectReference) -> &'static [i8] {
         // We do not use this method, and it will be removed.
         unreachable!()
     }

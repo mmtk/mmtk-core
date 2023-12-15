@@ -1,7 +1,12 @@
 use std::any::Any;
 
-/// MockAny hides any type information. It is useful when we want to create
+/// `MockAny` hides any type information. It is useful when we want to create
 /// a mock method for methods with generic type parameters.
+/// When `MockAny` is used for a method, the user needs to make sure that the types in the
+/// actual [`MockMethod`] behind the MockAny match the arguments that will be passed to the method,
+/// otherwise, the downcast from `Any` will fail. We use `MockAny` for some methods in [`super::mockvm::MockVM`].
+/// The user should check if their intended arguments match the default `MockMethod` type, and if not,
+/// they should create their own `MockMethod`s for those methods.
 pub trait MockAny {
     fn call_any(&mut self, args: Box<dyn Any>) -> Box<dyn Any>;
 }

@@ -27,6 +27,9 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo clippy --tests --features perf_counter
 fi
 
+# mock tests
+cargo clippy --features mock_test
+
 # --- Check auxiliary crate ---
 
 style_check_auxiliary_crate() {
