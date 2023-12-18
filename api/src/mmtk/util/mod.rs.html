@@ -105,6 +105,9 @@
 </span><span class="kw">pub mod </span>opaque_pointer;
 <span class="doccomment">/// MMTk command line options.
 </span><span class="kw">pub mod </span>options;
+<span class="doccomment">/// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
+</span><span class="attr">#[cfg(any(test, feature = <span class="string">&quot;mock_test&quot;</span>))]
+</span><span class="kw">pub mod </span>test_util;
 
 <span class="comment">// The following modules are only public in the mmtk crate. They should only be used in MMTk core.
 </span><span class="doccomment">/// An analysis framework for collecting data and profiling in GC.
@@ -139,9 +142,6 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>sanity;
 <span class="doccomment">/// Utils for collecting statistics.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>statistics;
-<span class="doccomment">/// Test utilities.
-</span><span class="attr">#[cfg(test)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>test_util;
 <span class="doccomment">/// A treadmill implementation.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>treadmill;
 

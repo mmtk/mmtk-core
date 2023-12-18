@@ -208,20 +208,20 @@ This approach could be a simple start in early development, but we do not recomm
 the binding needs to turn the boxed pointer into a raw pointer before storing it.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>        struct MutatorInTLS {
-            // Store the mutator as a boxed pointer.
-            // Accessing any value in the mutator will need a dereferencing of the boxed pointer.
-            ptr: Box&lt;Mutator&lt;DummyVM&gt;&gt;,
-        }
+</span>                struct MutatorInTLS {
+                    // Store the mutator as a boxed pointer.
+                    // Accessing any value in the mutator will need a dereferencing of the boxed pointer.
+                    ptr: Box&lt;Mutator&lt;MockVM&gt;&gt;,
+                }
 
-        // Bind an MMTk mutator
-        let mutator = mmtk::memory_manager::bind_mutator(&amp;fixture.mmtk, tls_opaque_pointer);
-        // Store the pointer in TLS
-        let mut storage = MutatorInTLS { ptr: mutator };
+                // Bind an MMTk mutator
+                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+                // Store the pointer in TLS
+                let mut storage = MutatorInTLS { ptr: mutator };
 
-        // Allocate
-        let addr =
-            mmtk::memory_manager::alloc(&amp;mut storage.ptr, 8, 8, 0, AllocationSemantics::Default);
+                // Allocate
+                let addr =
+                    memory_manager::alloc(&amp;mut storage.ptr, 8, 8, 0, AllocationSemantics::Default);
 <span class="boring">}</span></code></pre></pre>
 <h3 id="option-2-embed-the-mutator-struct"><a class="header" href="#option-2-embed-the-mutator-struct">Option 2: Embed the <code>Mutator</code> struct</a></h3>
 <p>To remove the extra pointer dereference, the binding can embed the <code>Mutator</code> type into their TLS type. This saves the extra dereference.</p>
@@ -229,17 +229,22 @@ the binding needs to turn the boxed pointer into a raw pointer before storing it
 have an assertion to ensure that the native type has the exact same layout as the Rust type <code>Mutator</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>        struct MutatorInTLS {
-            embed: Mutator&lt;DummyVM&gt;,
-        }
+</span>                struct MutatorInTLS {
+                    embed: Mutator&lt;MockVM&gt;,
+                }
 
-        // Bind an MMTk mutator
-        let mutator = mmtk::memory_manager::bind_mutator(&amp;fixture.mmtk, tls_opaque_pointer);
-        // Store the struct (or use memcpy for non-Rust code)
-        let mut storage = MutatorInTLS { embed: *mutator };
-        // Allocate
-        let addr =
-            mmtk::memory_manager::alloc(&amp;mut storage.embed, 8, 8, 0, AllocationSemantics::Default);
+                // Bind an MMTk mutator
+                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+                // Store the struct (or use memcpy for non-Rust code)
+                let mut storage = MutatorInTLS { embed: *mutator };
+                // Allocate
+                let addr = memory_manager::alloc(
+                    &amp;mut storage.embed,
+                    8,
+                    8,
+                    0,
+                    AllocationSemantics::Default,
+                );
 <span class="boring">}</span></code></pre></pre>
 <h3 id="option-3-embed-the-fast-path-struct"><a class="header" href="#option-3-embed-the-fast-path-struct">Option 3: Embed the fast-path struct</a></h3>
 <p>The size of <code>Mutator</code> is a few hundreds of bytes, which could be considered too large to store in the TLS in some language implementations.
@@ -265,9 +270,61 @@ Many plans in MMTk use bump pointer allocator for their default allocation seman
 which includes (but not limited to) <code>NoGC</code>, <code>SemiSpace</code>, <code>Immix</code>, generational plans, etc.
 If a plan does not do bump-pointer allocation, we may still implement fast-paths, but we need to embed different data structures instead of <code>BumpPointer</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
-</span>
-<span class="boring">fn main() {
-</span><span class="boring">}</span></code></pre></pre>
+</span><span class="boring">fn main() {
+</span>                use crate::util::alloc::BumpPointer;
+                struct MutatorInTLS {
+                    default_bump_pointer: BumpPointer,
+                    mutator: Box&lt;Mutator&lt;MockVM&gt;&gt;,
+                }
+
+                // Bind an MMTk mutator
+                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+                // Create a fastpath BumpPointer with default(). The BumpPointer from default() will guarantee to fail on the first allocation
+                // so the allocation goes to the slowpath and we will get an allocation buffer from MMTk.
+                let default_bump_pointer = BumpPointer::default();
+                // Store the fastpath BumpPointer along with the mutator
+                let mut storage = MutatorInTLS {
+                    default_bump_pointer,
+                    mutator,
+                };
+
+                // Allocate
+                let mut allocate_default = |size: usize| -&gt; Address {
+                    // Alignment code is omitted here to make the code simpler to read.
+                    // In an actual implementation, alignment and offset need to be considered by the bindings.
+                    let new_cursor = storage.default_bump_pointer.cursor + size;
+                    if new_cursor &lt; storage.default_bump_pointer.limit {
+                        let addr = storage.default_bump_pointer.cursor;
+                        storage.default_bump_pointer.cursor = new_cursor;
+                        addr
+                    } else {
+                        use crate::util::alloc::Allocator;
+                        let selector = memory_manager::get_allocator_mapping(
+                            fixture.mmtk,
+                            AllocationSemantics::Default,
+                        );
+                        let default_allocator = unsafe {
+                            storage
+                                .mutator
+                                .allocator_impl_mut::&lt;crate::util::alloc::BumpAllocator&lt;MockVM&gt;&gt;(
+                                    selector,
+                                )
+                        };
+                        // Copy bump pointer values to the allocator in the mutator
+                        default_allocator.bump_pointer = storage.default_bump_pointer;
+                        // Do slow path allocation with MMTk
+                        let addr = default_allocator.alloc_slow(size, 8, 0);
+                        // Copy bump pointer values to the fastpath BumpPointer so we will have an allocation buffer.
+                        storage.default_bump_pointer = default_allocator.bump_pointer;
+                        addr
+                    }
+                };
+
+                // Allocate: this will fail in the fastpath, and will get an allocation buffer from the slowpath
+                let addr1 = allocate_default(8);
+                // Allocate: this will allocate from the fastpath
+                let addr2 = allocate_default(8);
+<span class="boring">}</span></code></pre></pre>
 <p>And pseudo-code for how you would reset the <code>BumpPointer</code>s for all mutators in <code>resume_mutators</code>. Note that these mutators are the runtime's actual mutator threads (i.e. where the cached bump pointers are stored) and are different from MMTk's <code>Mutator</code> struct.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -307,25 +364,23 @@ that naturally avoids this problem. If you do not want to implement the fast-pat
 with the default allocation semantics, we can use the offset to get a reference to the actual allocator (with unsafe code), and allocate with the allocator.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>        // At boot time
-        let selector = mmtk::memory_manager::get_allocator_mapping(
-            &amp;fixture.mmtk,
-            AllocationSemantics::Default,
-        );
-        unsafe {
-            DEFAULT_ALLOCATOR_OFFSET =
-                mmtk::plan::Mutator::&lt;DummyVM&gt;::get_allocator_base_offset(selector);
-        }
-        let mutator = mmtk::memory_manager::bind_mutator(&amp;fixture.mmtk, tls_opaque_pointer);
-
-        // At run time: allocate with the default semantics without resolving allocator
-        let default_allocator: &amp;mut BumpAllocator&lt;DummyVM&gt; = {
-            let mutator_addr = Address::from_ref(&amp;*mutator);
+</span>            // At boot time
+            let selector =
+                memory_manager::get_allocator_mapping(fixture.mmtk, AllocationSemantics::Default);
             unsafe {
-                (mutator_addr + DEFAULT_ALLOCATOR_OFFSET).as_mut_ref::&lt;BumpAllocator&lt;DummyVM&gt;&gt;()
+                DEFAULT_ALLOCATOR_OFFSET =
+                    crate::plan::Mutator::&lt;MockVM&gt;::get_allocator_base_offset(selector);
             }
-        };
-        let addr = default_allocator.alloc(8, 8, 0);
+            let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+
+            // At run time: allocate with the default semantics without resolving allocator
+            let default_allocator: &amp;mut BumpAllocator&lt;MockVM&gt; = {
+                let mutator_addr = Address::from_ref(&amp;*mutator);
+                unsafe {
+                    (mutator_addr + DEFAULT_ALLOCATOR_OFFSET).as_mut_ref::&lt;BumpAllocator&lt;MockVM&gt;&gt;()
+                }
+            };
+            let addr = default_allocator.alloc(8, 8, 0);
 <span class="boring">}</span></code></pre></pre>
 <h2 id="emitting-allocation-sequence-in-a-jit-compiler"><a class="header" href="#emitting-allocation-sequence-in-a-jit-compiler">Emitting Allocation Sequence in a JIT Compiler</a></h2>
 <p>If the language has a JIT compiler, it is generally desirable to generate the code sequence for the allocation fast-path, rather

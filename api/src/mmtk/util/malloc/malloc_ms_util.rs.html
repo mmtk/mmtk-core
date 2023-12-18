@@ -106,7 +106,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
 <span class="doccomment">/// Allocate with alignment. This also guarantees the memory is zero initialized.
-</span><span class="kw">pub fn </span>align_alloc&lt;VM: VMBinding&gt;(size: usize, align: usize) -&gt; Address {
+</span><span class="kw">pub fn </span>align_alloc(size: usize, align: usize) -&gt; Address {
     <span class="kw">let </span><span class="kw-2">mut </span>ptr = std::ptr::null_mut::&lt;libc::c_void&gt;();
     <span class="kw">let </span>ptr_ptr = <span class="macro">std::ptr::addr_of_mut!</span>(ptr);
     <span class="kw">let </span>result = <span class="kw">unsafe </span>{ posix_memalign(ptr_ptr, align, size) };
@@ -178,7 +178,7 @@
         address = Address::from_mut_ptr(raw);
         <span class="macro">debug_assert!</span>(address.is_aligned_to(align));
     } <span class="kw">else if </span>align &gt; <span class="number">16 </span>&amp;&amp; offset == <span class="number">0 </span>{
-        address = align_alloc::&lt;VM&gt;(size, align);
+        address = align_alloc(size, align);
         <span class="attr">#[cfg(feature = <span class="string">&quot;malloc_hoard&quot;</span>)]
         </span>{
             is_offset_malloc = <span class="bool-val">true</span>;

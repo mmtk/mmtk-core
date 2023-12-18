@@ -1484,7 +1484,7 @@
 
 <span class="doccomment">/// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
-</span><span class="kw">struct </span>ProcessEdgesWorkTracer&lt;E: ProcessEdgesWork&gt; {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessEdgesWorkTracer&lt;E: ProcessEdgesWork&gt; {
     process_edges_work: E,
     stage: WorkBucketStage,
 }
@@ -1529,7 +1529,7 @@
 /// the call to `with_tracer`, making use of its `trace_object` method.  It then creates work
 /// packets using the methods of the `ProcessEdgesWork` and add the work packet into the given
 /// `stage`.
-</span><span class="kw">struct </span>ProcessEdgesWorkTracerContext&lt;E: ProcessEdgesWork&gt; {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessEdgesWorkTracerContext&lt;E: ProcessEdgesWork&gt; {
     stage: WorkBucketStage,
     phantom_data: PhantomData&lt;E&gt;,
 }
@@ -1956,7 +1956,7 @@
         ScanObjects::&lt;<span class="self">Self</span>&gt;::new(nodes, <span class="bool-val">false</span>, roots, <span class="self">self</span>.bucket)
     }
 }
-<span class="kw">struct </span>ProcessEdgesWorkRootsWorkFactory&lt;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessEdgesWorkRootsWorkFactory&lt;
     VM: VMBinding,
     E: ProcessEdgesWork&lt;VM = VM&gt;,
     I: ProcessEdgesWork&lt;VM = VM&gt;,

@@ -819,7 +819,7 @@
 <a href="#819" id="819">819</a>
 <a href="#820" id="820">820</a>
 <a href="#821" id="821">821</a>
-</pre></div><pre class="rust"><code><span class="attr">#[cfg(test)]
+</pre></div><pre class="rust"><code><span class="attr">#[cfg(all(test, debug_assertions))]
 </span><span class="kw">mod </span>tests {
     <span class="kw">use </span>atomic::Ordering;
 

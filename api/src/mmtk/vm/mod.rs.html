@@ -78,6 +78,9 @@
 <a href="#78" id="78">78</a>
 <a href="#79" id="79">79</a>
 <a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.
 //!
 //! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.
@@ -114,6 +117,9 @@
 <span class="kw">pub use </span><span class="self">self</span>::scanning::ObjectTracerContext;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::RootsWorkFactory;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::Scanning;
+
+<span class="attr">#[cfg(test)]
+</span><span class="kw">mod </span>tests;
 
 <span class="doccomment">/// Default min alignment 4 bytes
 </span><span class="kw">const </span>DEFAULT_LOG_MIN_ALIGNMENT: usize = <span class="number">2</span>;
