@@ -312,6 +312,14 @@ impl Default for MockVM {
             support_edge_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
             scan_object: MockMethod::new_unimplemented(),
             scan_object_and_trace_edges: MockMethod::new_unimplemented(),
+            // We instantiate a `MockMethod` with the arguments as ProcessEdgesWorkRootsWorkFactory<..., SFTProcessEdges<MockVM>, ...>,
+            // thus the mock method expects the actual call arguments to match the type.
+            // In most cases, this won't work and this `MockMethod` is just a place holder. It is
+            // fine as long as the method is not actually called.
+            // If the user will need this method, and would like to mock the method in their particular test,
+            // they are expected to provide their own
+            // `MockMethod` that matches the argument types they will pass for the test case.
+            // See the documents on the section about `MockAny` on the `MockVM` type.
             scan_roots_in_mutator_thread: Box::new(MockMethod::<
                 (
                     VMWorkerThread,
@@ -324,6 +332,7 @@ impl Default for MockVM {
                 ),
                 (),
             >::new_unimplemented()),
+            // Same here: the `MockMethod` is just a place holder. See the above comments.
             scan_vm_specific_roots: Box::new(MockMethod::<
                 (
                     VMWorkerThread,
@@ -338,6 +347,7 @@ impl Default for MockVM {
             notify_initial_thread_scan_complete: MockMethod::new_unimplemented(),
             supports_return_barrier: MockMethod::new_unimplemented(),
             prepare_for_roots_re_scanning: MockMethod::new_unimplemented(),
+            // Same here: the `MockMethod` is just a place holder. See the above comments.
             process_weak_refs: Box::new(MockMethod::<
                 (
                     &'static mut GCWorker<Self>,
@@ -345,6 +355,7 @@ impl Default for MockVM {
                 ),
                 bool,
             >::new_unimplemented()),
+            // Same here: the `MockMethod` is just a place holder. See the above comments.
             forward_weak_refs: Box::new(MockMethod::<
                 (
                     &'static mut GCWorker<Self>,
