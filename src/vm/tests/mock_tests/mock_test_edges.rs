@@ -402,13 +402,13 @@ mod mixed {
                     let de3 = DummyVMEdge::Offset(edge3);
                     let de4 = DummyVMEdge::Tagged(edge4);
 
-                    let edges = vec![de1, de3, de4];
+                    let edges = [de1, de3, de4];
                     for (i, edge) in edges.iter().enumerate() {
                         let objref = edge.load();
                         assert_eq!(objref, fixture.objref1, "Edge {} is not properly loaded", i);
                     }
 
-                    let mutable_edges = vec![de1, de3, de4];
+                    let mutable_edges = [de1, de3, de4];
                     for (i, edge) in mutable_edges.iter().enumerate() {
                         edge.store(fixture.objref2);
                         let objref = edge.load();
