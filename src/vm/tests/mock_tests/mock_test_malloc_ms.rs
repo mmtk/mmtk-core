@@ -14,8 +14,8 @@ fn test_malloc() {
 
             assert!(address1.is_aligned_to(8));
             assert!(address2.is_aligned_to(32));
-            assert!((address3 + 4 as isize).is_aligned_to(8));
-            assert!((address4 + 4 as isize).is_aligned_to(64));
+            assert!((address3 + 4_isize).is_aligned_to(8));
+            assert!((address4 + 4_isize).is_aligned_to(64));
 
             assert!(!bool1);
             #[cfg(feature = "malloc_hoard")]

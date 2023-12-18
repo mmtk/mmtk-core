@@ -28,7 +28,7 @@ pub fn boxed_pointer() {
                 }
 
                 // Bind an MMTk mutator
-                let mutator = memory_manager::bind_mutator(&fixture.mmtk, tls_opaque_pointer);
+                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
                 // Store the pointer in TLS
                 let mut storage = MutatorInTLS { ptr: mutator };
 
@@ -58,7 +58,7 @@ pub fn embed_mutator_struct() {
                 }
 
                 // Bind an MMTk mutator
-                let mutator = memory_manager::bind_mutator(&fixture.mmtk, tls_opaque_pointer);
+                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
                 // Store the struct (or use memcpy for non-Rust code)
                 let mut storage = MutatorInTLS { embed: *mutator };
                 // Allocate
@@ -94,7 +94,7 @@ pub fn embed_fastpath_struct() {
                 }
 
                 // Bind an MMTk mutator
-                let mutator = memory_manager::bind_mutator(&fixture.mmtk, tls_opaque_pointer);
+                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
                 // Create a fastpath BumpPointer with default(). The BumpPointer from default() will guarantee to fail on the first allocation
                 // so the allocation goes to the slowpath and we will get an allocation buffer from MMTk.
                 let default_bump_pointer = BumpPointer::default();
@@ -116,7 +116,7 @@ pub fn embed_fastpath_struct() {
                     } else {
                         use crate::util::alloc::Allocator;
                         let selector = memory_manager::get_allocator_mapping(
-                            &fixture.mmtk,
+                            fixture.mmtk,
                             AllocationSemantics::Default,
                         );
                         let default_allocator = unsafe {

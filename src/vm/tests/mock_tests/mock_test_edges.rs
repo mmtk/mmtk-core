@@ -24,7 +24,7 @@ mod simple_edges {
                 FIXTURE.with_fixture(|fixture| {
                     let mut slot: Atomic<ObjectReference> = Atomic::new(fixture.objref1);
 
-                    let edge = SimpleEdge::from_address(Address::from_ref(&mut slot));
+                    let edge = SimpleEdge::from_address(Address::from_ref(&slot));
                     let objref = edge.load();
 
                     assert_eq!(objref, fixture.objref1);
@@ -42,7 +42,7 @@ mod simple_edges {
                 FIXTURE.with_fixture(|fixture| {
                     let mut slot: Atomic<ObjectReference> = Atomic::new(fixture.objref1);
 
-                    let edge = SimpleEdge::from_address(Address::from_ref(&mut slot));
+                    let edge = SimpleEdge::from_address(Address::from_ref(&slot));
                     edge.store(fixture.objref2);
                     assert_eq!(slot.load(Ordering::SeqCst), fixture.objref2);
 
@@ -108,7 +108,7 @@ mod compressed_oop {
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
-        let edge = CompressedOopEdge::from_address(Address::from_ref(&mut slot));
+        let edge = CompressedOopEdge::from_address(Address::from_ref(&slot));
         let objref = edge.load();
 
         assert_eq!(objref, objref1);
@@ -125,7 +125,7 @@ mod compressed_oop {
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
-        let edge = CompressedOopEdge::from_address(Address::from_ref(&mut slot));
+        let edge = CompressedOopEdge::from_address(Address::from_ref(&slot));
         edge.store(objref2);
         assert_eq!(slot.load(Ordering::SeqCst), compressed2);
 
@@ -197,7 +197,7 @@ mod offset_edge {
                     let addr1 = fixture.objref1.to_raw_address();
                     let mut slot: Atomic<Address> = Atomic::new(addr1 + OFFSET);
 
-                    let edge = OffsetEdge::new_with_offset(Address::from_ref(&mut slot), OFFSET);
+                    let edge = OffsetEdge::new_with_offset(Address::from_ref(&slot), OFFSET);
                     let objref = edge.load();
 
                     assert_eq!(objref, fixture.objref1);
@@ -217,7 +217,7 @@ mod offset_edge {
                     let addr2 = fixture.objref2.to_raw_address();
                     let mut slot: Atomic<Address> = Atomic::new(addr1 + OFFSET);
 
-                    let edge = OffsetEdge::new_with_offset(Address::from_ref(&mut slot), OFFSET);
+                    let edge = OffsetEdge::new_with_offset(Address::from_ref(&slot), OFFSET);
                     edge.store(fixture.objref2);
                     assert_eq!(slot.load(Ordering::SeqCst), addr2 + OFFSET);
 
@@ -282,8 +282,8 @@ mod tagged_edge {
                     let mut slot2: Atomic<usize> =
                         Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
 
-                    let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
-                    let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
+                    let edge1 = TaggedEdge::new(Address::from_ref(&slot1));
+                    let edge2 = TaggedEdge::new(Address::from_ref(&slot2));
                     let objref1 = edge1.load();
                     let objref2 = edge2.load();
 
@@ -307,8 +307,8 @@ mod tagged_edge {
                     let mut slot2: Atomic<usize> =
                         Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
 
-                    let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
-                    let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
+                    let edge1 = TaggedEdge::new(Address::from_ref(&slot1));
+                    let edge2 = TaggedEdge::new(Address::from_ref(&slot2));
                     edge1.store(fixture.objref2);
                     edge2.store(fixture.objref2);
 
@@ -394,9 +394,9 @@ mod mixed {
                     let mut slot3: Atomic<Address> = Atomic::new(addr1 + OFFSET);
                     let mut slot4: Atomic<usize> = Atomic::new(addr1.as_usize() | TAG1);
 
-                    let edge1 = SimpleEdge::from_address(Address::from_ref(&mut slot1));
-                    let edge3 = OffsetEdge::new_with_offset(Address::from_ref(&mut slot3), OFFSET);
-                    let edge4 = TaggedEdge::new(Address::from_ref(&mut slot4));
+                    let edge1 = SimpleEdge::from_address(Address::from_ref(&slot1));
+                    let edge3 = OffsetEdge::new_with_offset(Address::from_ref(&slot3), OFFSET);
+                    let edge4 = TaggedEdge::new(Address::from_ref(&slot4));
 
                     let de1 = DummyVMEdge::Simple(edge1);
                     let de3 = DummyVMEdge::Offset(edge3);

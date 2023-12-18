@@ -20,8 +20,8 @@ fn test_assertion_barrier_invalid_ref() {
                 let objref = fixture.objref;
 
                 // Create an edge
-                let mut slot = Atomic::new(objref);
-                let edge = Address::from_ref(&mut slot);
+                let slot = Atomic::new(objref);
+                let edge = Address::from_ref(&slot);
 
                 // Create an invalid object reference (offset 8 bytes on the original object ref), and invoke barrier slowpath with it
                 // The invalid object ref has no VO bit, and the assertion should fail.
@@ -47,8 +47,8 @@ fn test_assertion_barrier_valid_ref() {
                 let objref = fixture.objref;
 
                 // Create an edge
-                let mut slot = Atomic::new(objref);
-                let edge = Address::from_ref(&mut slot);
+                let slot = Atomic::new(objref);
+                let edge = Address::from_ref(&slot);
 
                 // Invoke barrier slowpath with the valid object ref
                 fixture

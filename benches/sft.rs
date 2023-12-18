@@ -1,5 +1,4 @@
 use criterion::black_box;
-use criterion::criterion_group;
 use criterion::Criterion;
 
 use mmtk::memory_manager;

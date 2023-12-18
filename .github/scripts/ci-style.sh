@@ -29,6 +29,8 @@ fi
 
 # mock tests
 cargo clippy --features mock_test
+cargo clippy --features mock_test --tests
+cargo clippy --features mock_test --benches
 
 # --- Check auxiliary crate ---
 

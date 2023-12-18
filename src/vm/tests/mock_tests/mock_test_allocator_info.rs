@@ -15,7 +15,7 @@ pub fn test_allocator_info() {
             let fixture = MMTKFixture::create();
 
             let selector =
-                memory_manager::get_allocator_mapping(&fixture.mmtk, AllocationSemantics::Default);
+                memory_manager::get_allocator_mapping(fixture.mmtk, AllocationSemantics::Default);
             let base_offset = crate::plan::Mutator::<MockVM>::get_allocator_base_offset(selector);
             let allocator_info = AllocatorInfo::new::<MockVM>(selector);
 
