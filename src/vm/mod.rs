@@ -35,6 +35,9 @@ pub use self::scanning::ObjectTracerContext;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 
+#[cfg(test)]
+mod tests;
+
 /// Default min alignment 4 bytes
 const DEFAULT_LOG_MIN_ALIGNMENT: usize = 2;
 /// Default max alignment 8 bytes

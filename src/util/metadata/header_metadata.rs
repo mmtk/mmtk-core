@@ -454,7 +454,7 @@ impl fmt::Debug for HeaderMetadataSpec {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod tests {
     use super::*;
     use crate::util::address::Address;

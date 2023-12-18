@@ -54,9 +54,14 @@ sysinfo = "0.29"
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.8.5"
+criterion = "0.4"
 
 [build-dependencies]
 built = { version = "0.7.1", features = ["git2"] }
+
+[[bench]]
+name = "main"
+harness = false
 
 [features]
 default = []
@@ -64,6 +69,10 @@ default = []
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["pfm"]
+
+# This feature is only used for tests with MockVM.
+# CI scripts run those tests with this feature.
+mock_test = []
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.

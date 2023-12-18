@@ -27,6 +27,11 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo clippy --tests --features perf_counter
 fi
 
+# mock tests
+cargo clippy --features mock_test
+cargo clippy --features mock_test --tests
+cargo clippy --features mock_test --benches
+
 # --- Check auxiliary crate ---
 
 style_check_auxiliary_crate() {
@@ -37,4 +42,3 @@ style_check_auxiliary_crate() {
 }
 
 style_check_auxiliary_crate macros
-style_check_auxiliary_crate vmbindings/dummyvm

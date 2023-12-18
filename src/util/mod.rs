@@ -25,6 +25,9 @@ pub mod memory;
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
+/// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
+#[cfg(any(test, feature = "mock_test"))]
+pub mod test_util;
 
 // The following modules are only public in the mmtk crate. They should only be used in MMTk core.
 /// An analysis framework for collecting data and profiling in GC.
@@ -59,9 +62,6 @@ pub(crate) mod rust_util;
 pub(crate) mod sanity;
 /// Utils for collecting statistics.
 pub(crate) mod statistics;
-/// Test utilities.
-#[cfg(test)]
-pub(crate) mod test_util;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
 

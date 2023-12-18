@@ -33,7 +33,7 @@ If the VM is not implemented in Rust,
 the binding needs to turn the boxed pointer into a raw pointer before storing it.
 
 ```rust
-{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_boxed_pointer}}
+{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_mutator_storage.rs:mutator_storage_boxed_pointer}}
 ```
 
 ### Option 2: Embed the `Mutator` struct
@@ -44,7 +44,7 @@ If the implementation language is not Rust, the developer needs to create a type
 have an assertion to ensure that the native type has the exact same layout as the Rust type `Mutator`.
 
 ```rust
-{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_embed_mutator_struct}}
+{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_mutator_storage.rs:mutator_storage_embed_mutator_struct}}
 ```
 
 ### Option 3: Embed the fast-path struct
@@ -78,7 +78,7 @@ which includes (but not limited to) `NoGC`, `SemiSpace`, `Immix`, generational p
 If a plan does not do bump-pointer allocation, we may still implement fast-paths, but we need to embed different data structures instead of `BumpPointer`.
 
 ```rust
-{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_mutator_storage.rs:mutator_storage_embed_fast-path_struct}}
+{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_mutator_storage.rs:mutator_storage_embed_fastpath_struct}}
 ```
 
 And pseudo-code for how you would reset the `BumpPointer`s for all mutators in `resume_mutators`. Note that these mutators are the runtime's actual mutator threads (i.e. where the cached bump pointers are stored) and are different from MMTk's `Mutator` struct.
@@ -120,7 +120,7 @@ Once MMTk is initialized, a binding can get the memory offset for the default al
 with the default allocation semantics, we can use the offset to get a reference to the actual allocator (with unsafe code), and allocate with the allocator.
 
 ```rust
-{{#include ../../../../../vmbindings/dummyvm/src/tests/doc_avoid_resolving_allocator.rs:avoid_resolving_allocator}}
+{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_avoid_resolving_allocator.rs:avoid_resolving_allocator}}
 ```
 
 ## Emitting Allocation Sequence in a JIT Compiler

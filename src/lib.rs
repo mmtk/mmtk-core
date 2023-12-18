@@ -58,9 +58,7 @@ pub mod build_info;
 pub mod memory_manager;
 pub mod plan;
 pub mod scheduler;
-#[deny(missing_docs)]
 pub mod util;
-#[deny(missing_docs)]
 pub mod vm;
 
 pub use crate::plan::{

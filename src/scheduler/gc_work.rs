@@ -265,7 +265,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 /// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
-struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
+pub(crate) struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
     process_edges_work: E,
     stage: WorkBucketStage,
 }
@@ -310,7 +310,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
 /// the call to `with_tracer`, making use of its `trace_object` method.  It then creates work
 /// packets using the methods of the `ProcessEdgesWork` and add the work packet into the given
 /// `stage`.
-struct ProcessEdgesWorkTracerContext<E: ProcessEdgesWork> {
+pub(crate) struct ProcessEdgesWorkTracerContext<E: ProcessEdgesWork> {
     stage: WorkBucketStage,
     phantom_data: PhantomData<E>,
 }
@@ -739,7 +739,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         ScanObjects::<Self>::new(nodes, false, roots, self.bucket)
     }
 }
-struct ProcessEdgesWorkRootsWorkFactory<
+pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
     VM: VMBinding,
     E: ProcessEdgesWork<VM = VM>,
     I: ProcessEdgesWork<VM = VM>,
