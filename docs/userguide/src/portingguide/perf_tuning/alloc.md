@@ -78,7 +78,7 @@ which includes (but not limited to) `NoGC`, `SemiSpace`, `Immix`, generational p
 If a plan does not do bump-pointer allocation, we may still implement fast-paths, but we need to embed different data structures instead of `BumpPointer`.
 
 ```rust
-{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_mutator_storage.rs:mutator_storage_embed_fast-path_struct}}
+{{#include ../../../../../src/vm/tests/mock_tests/mock_test_doc_mutator_storage.rs:mutator_storage_embed_fastpath_struct}}
 ```
 
 And pseudo-code for how you would reset the `BumpPointer`s for all mutators in `resume_mutators`. Note that these mutators are the runtime's actual mutator threads (i.e. where the cached bump pointers are stored) and are different from MMTk's `Mutator` struct.
