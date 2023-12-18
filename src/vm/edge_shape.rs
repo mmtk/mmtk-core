@@ -63,13 +63,13 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
     ///
     /// FIXME: This design is inefficient for handling object references with tag bits.  Consider
     /// introducing a new updating function to do the load, trace and store in one function.
-    /// See: https://github.com/mmtk/mmtk-core/issues/1033
+    /// See: <https://github.com/mmtk/mmtk-core/issues/1033>
     ///
     /// FIXME: This method is currently used by both moving GC algorithms and the subsuming write
     /// barrier ([`crate::memory_manager::object_reference_write`]).  The two reference writing
     /// operations have different semantics, and need to be implemented differently if the VM
     /// supports offsetted or tagged references.
-    /// See: https://github.com/mmtk/mmtk-core/issues/1038
+    /// See: <https://github.com/mmtk/mmtk-core/issues/1038>
     fn store(&self, object: ObjectReference);
 
     /// Prefetch the edge so that a subsequent `load` will be faster.
