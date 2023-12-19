@@ -26,11 +26,14 @@ impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
 
 /// Callback trait of scanning functions that directly trace through edges.
 pub trait ObjectTracer {
-    /// Call this function for the content of each edge,
-    /// and assign the returned value back to the edge.
+    /// Call this function to trace through an object graph edge which points to `object`.
+    /// `object` must point to a valid object, and cannot be `ObjectReference::NULL`.
     ///
-    /// Note: This function is performance-critical.
-    /// Implementations should consider inlining if necessary.
+    /// The return value is the new object reference for `object` if it is moved, or `object` if
+    /// not moved.  If moved, the caller should update the slot that holds the reference to
+    /// `object` so that it points to the new location.
+    ///
+    /// Note: This function is performance-critical, therefore must be implemented efficiently.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 }
 
