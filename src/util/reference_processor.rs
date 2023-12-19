@@ -216,6 +216,7 @@ impl ReferenceProcessor {
         e: &mut E,
         referent: ObjectReference,
     ) -> ObjectReference {
+        debug_assert!(!referent.is_null());
         e.trace_object(referent)
     }
 
@@ -223,6 +224,7 @@ impl ReferenceProcessor {
         e: &mut E,
         object: ObjectReference,
     ) -> ObjectReference {
+        debug_assert!(!object.is_null());
         e.trace_object(object)
     }
 
@@ -230,6 +232,7 @@ impl ReferenceProcessor {
         e: &mut E,
         referent: ObjectReference,
     ) -> ObjectReference {
+        debug_assert!(!referent.is_null());
         e.trace_object(referent)
     }
 
@@ -285,9 +288,6 @@ impl ReferenceProcessor {
             reference: ObjectReference,
         ) -> ObjectReference {
             let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
-            let new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
-            <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
-            let new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
             {
                 use crate::vm::ObjectModel;
                 trace!(
@@ -295,13 +295,22 @@ impl ReferenceProcessor {
                     reference,
                     <E::VM as VMBinding>::VMObjectModel::get_current_size(reference)
                 );
+            }
+
+            if !<E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(old_referent) {
+                let new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
+                <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
+
                 trace!(
                     " referent: {} (forwarded to {})",
                     old_referent,
                     new_referent
                 );
-                trace!(" reference: forwarded to {}", new_reference);
             }
+
+            let new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
+            trace!(" reference: forwarded to {}", new_reference);
+
             debug_assert!(
                 !new_reference.is_null(),
                 "reference {:?}'s forwarding pointer is NULL",
