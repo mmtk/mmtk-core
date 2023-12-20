@@ -130,6 +130,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        debug_assert!(!object.is_null());
         debug_assert!(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
             "MarkCompact does not support transitive pin trace."

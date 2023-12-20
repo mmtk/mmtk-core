@@ -400,9 +400,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
+        debug_assert!(!object.is_null());
 
         assert!(
             self.in_space(object),
