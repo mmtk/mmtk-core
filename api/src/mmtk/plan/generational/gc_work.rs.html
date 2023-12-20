@@ -167,6 +167,12 @@
 <a href="#167" id="167">167</a>
 <a href="#168" id="168">168</a>
 <a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
@@ -205,9 +211,8 @@
         <span class="self">Self </span>{ plan, base }
     }
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
-        <span class="kw">if </span>object.is_null() {
-            <span class="kw">return </span>object;
-        }
+        <span class="macro">debug_assert!</span>(!object.is_null());
+
         <span class="comment">// We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         </span><span class="kw">let </span>worker = <span class="self">self</span>.worker();
         <span class="self">self</span>.plan
@@ -215,9 +220,16 @@
     }
     <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span>object = slot.load();
+        <span class="kw">if </span>object.is_null() {
+            <span class="kw">return</span>;
+        }
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
         <span class="macro">debug_assert!</span>(!<span class="self">self</span>.plan.is_object_in_nursery(new_object));
-        slot.store(new_object);
+        <span class="comment">// Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,
+        // but will still return `object`.  In that case, we don&#39;t need to write it back.
+        </span><span class="kw">if </span>new_object != object {
+            slot.store(new_object);
+        }
     }
 
     <span class="kw">fn </span>create_scan_work(

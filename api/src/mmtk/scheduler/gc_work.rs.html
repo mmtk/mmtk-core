@@ -1217,6 +1217,7 @@
 <a href="#1217" id="1217">1217</a>
 <a href="#1218" id="1218">1218</a>
 <a href="#1219" id="1219">1219</a>
+<a href="#1220" id="1220">1220</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
@@ -1492,11 +1493,8 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; ObjectTracer <span class="kw">for </span>ProcessEdgesWorkTracer&lt;E&gt; {
     <span class="doccomment">/// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
-    ///
-    /// This function is inlined because `trace_object` is probably the hottest function in MMTk.
-    /// If this function is called in small closures, please profile the program and make sure the
-    /// closure is inlined, too.
     </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(!object.is_null());
         <span class="kw">let </span>result = <span class="self">self</span>.process_edges_work.trace_object(object);
         <span class="self">self</span>.flush_if_full();
         result
@@ -1882,8 +1880,12 @@
     /// trace the object and store back the new object reference if necessary.
     </span><span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span>object = slot.load();
+        <span class="kw">if </span>object.is_null() {
+            <span class="kw">return</span>;
+        }
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
-        <span class="kw">if </span><span class="self">Self</span>::OVERWRITE_REFERENCE {
+        <span class="macro">debug_assert!</span>(!new_object.is_null());
+        <span class="kw">if </span><span class="self">Self</span>::OVERWRITE_REFERENCE &amp;&amp; new_object != object {
             slot.store(new_object);
         }
     }
@@ -1940,9 +1942,7 @@
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
         <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
 
-        <span class="kw">if </span>object.is_null() {
-            <span class="kw">return </span>object;
-        }
+        <span class="macro">debug_assert!</span>(!object.is_null());
 
         <span class="comment">// Erase &lt;VM&gt; type parameter
         </span><span class="kw">let </span>worker = GCWorkerMutRef::new(<span class="self">self</span>.worker());
@@ -2216,9 +2216,7 @@
     }
 
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
-        <span class="kw">if </span>object.is_null() {
-            <span class="kw">return </span>object;
-        }
+        <span class="macro">debug_assert!</span>(!object.is_null());
         <span class="comment">// We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         </span><span class="kw">let </span>worker = <span class="self">self</span>.worker();
         <span class="self">self</span>.plan
@@ -2227,8 +2225,12 @@
 
     <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span>object = slot.load();
+        <span class="kw">if </span>object.is_null() {
+            <span class="kw">return</span>;
+        }
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
-        <span class="kw">if </span>P::may_move_objects::&lt;KIND&gt;() {
+        <span class="macro">debug_assert!</span>(!new_object.is_null());
+        <span class="kw">if </span>P::may_move_objects::&lt;KIND&gt;() &amp;&amp; new_object != object {
             slot.store(new_object);
         }
     }

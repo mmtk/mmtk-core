@@ -815,8 +815,6 @@
 <a href="#815" id="815">815</a>
 <a href="#816" id="816">816</a>
 <a href="#817" id="817">817</a>
-<a href="#818" id="818">818</a>
-<a href="#819" id="819">819</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
@@ -1219,9 +1217,7 @@
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
     ) -&gt; ObjectReference {
-        <span class="kw">if </span>object.is_null() {
-            <span class="kw">return </span>object;
-        }
+        <span class="macro">debug_assert!</span>(!object.is_null());
 
         <span class="macro">assert!</span>(
             <span class="self">self</span>.in_space(object),

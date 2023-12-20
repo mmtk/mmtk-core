@@ -342,6 +342,7 @@
 <a href="#342" id="342">342</a>
 <a href="#343" id="343">343</a>
 <a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -561,6 +562,7 @@
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
         <span class="macro">trace!</span>(<span class="string">&quot;copyspace.trace_object(, {:?}, {:?})&quot;</span>, object, semantics,);
+        <span class="macro">debug_assert!</span>(!object.is_null());
 
         <span class="comment">// If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
         </span><span class="kw">if </span>!<span class="self">self</span>.is_from_space() {

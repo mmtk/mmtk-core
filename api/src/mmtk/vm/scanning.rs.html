@@ -335,6 +335,9 @@
 <a href="#335" id="335">335</a>
 <a href="#336" id="336">336</a>
 <a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Mutator;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -363,11 +366,14 @@
 
 <span class="doccomment">/// Callback trait of scanning functions that directly trace through edges.
 </span><span class="kw">pub trait </span>ObjectTracer {
-    <span class="doccomment">/// Call this function for the content of each edge,
-    /// and assign the returned value back to the edge.
+    <span class="doccomment">/// Call this function to trace through an object graph edge which points to `object`.
+    /// `object` must point to a valid object, and cannot be `ObjectReference::NULL`.
     ///
-    /// Note: This function is performance-critical.
-    /// Implementations should consider inlining if necessary.
+    /// The return value is the new object reference for `object` if it is moved, or `object` if
+    /// not moved.  If moved, the caller should update the slot that holds the reference to
+    /// `object` so that it points to the new location.
+    ///
+    /// Note: This function is performance-critical, therefore must be implemented efficiently.
     </span><span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference;
 }
 

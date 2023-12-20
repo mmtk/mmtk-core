@@ -555,6 +555,15 @@
 <a href="#555" id="555">555</a>
 <a href="#556" id="556">556</a>
 <a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -773,6 +782,7 @@
         e: <span class="kw-2">&amp;mut </span>E,
         referent: ObjectReference,
     ) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(!referent.is_null());
         e.trace_object(referent)
     }
 
@@ -780,6 +790,7 @@
         e: <span class="kw-2">&amp;mut </span>E,
         object: ObjectReference,
     ) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(!object.is_null());
         e.trace_object(object)
     }
 
@@ -787,6 +798,7 @@
         e: <span class="kw-2">&amp;mut </span>E,
         referent: ObjectReference,
     ) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(!referent.is_null());
         e.trace_object(referent)
     }
 
@@ -842,9 +854,6 @@
             reference: ObjectReference,
         ) -&gt; ObjectReference {
             <span class="kw">let </span>old_referent = &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::get_referent(reference);
-            <span class="kw">let </span>new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
-            &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::set_referent(reference, new_referent);
-            <span class="kw">let </span>new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
             {
                 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
                 <span class="macro">trace!</span>(
@@ -852,13 +861,22 @@
                     reference,
                     &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMObjectModel::get_current_size(reference)
                 );
+            }
+
+            <span class="kw">if </span>!&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::is_referent_cleared(old_referent) {
+                <span class="kw">let </span>new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
+                &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::set_referent(reference, new_referent);
+
                 <span class="macro">trace!</span>(
                     <span class="string">&quot; referent: {} (forwarded to {})&quot;</span>,
                     old_referent,
                     new_referent
                 );
-                <span class="macro">trace!</span>(<span class="string">&quot; reference: forwarded to {}&quot;</span>, new_reference);
             }
+
+            <span class="kw">let </span>new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
+            <span class="macro">trace!</span>(<span class="string">&quot; reference: forwarded to {}&quot;</span>, new_reference);
+
             <span class="macro">debug_assert!</span>(
                 !new_reference.is_null(),
                 <span class="string">&quot;reference {:?}&#39;s forwarding pointer is NULL&quot;</span>,

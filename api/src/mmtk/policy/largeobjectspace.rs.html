@@ -307,6 +307,7 @@
 <a href="#307" id="307">307</a>
 <a href="#308" id="308">308</a>
 <a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -498,6 +499,7 @@
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
     ) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(!object.is_null());
         <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
         </span><span class="macro">debug_assert!</span>(
             <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set::&lt;VM&gt;(object),
