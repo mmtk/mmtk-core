@@ -32,7 +32,7 @@ If the current version is `0.X.x`, the new version should be `0.X+1.0`.
 The PR should include these changes:
 
 1. Bump version in `Cargo.toml`.
-2. Bump version in `macros/Cargo.toml`. Use the new version for the `mmtk-macros` dependency in `Cargo.toml`
+2. Bump version in `macros/Cargo.toml`.
 3. Update `CHANGELOG.md`:
    1. Add a section for the new version number and the cut-off date (when the PR is created)
    2. Add change logs for the release. The following shows one convenient way to do it. If there is a better way, we should adopt.
@@ -40,7 +40,7 @@ The PR should include these changes:
          then click [`Draft a new release`](https://github.com/mmtk/mmtk-core/releases/new). Enter the new version tag,
          and the `Generate release notes` button should be avaialble. Copy the notes as the change logs to `CHANGELOG.md`.
          Close the release page without tagging a release.
-      2. Categorize the changes in `CHANGELOG.md`. We use these categories: Plan, Policy, Allocator, Scheduler, API, Misc.
+      2. Categorize the changes in `CHANGELOG.md`. We use these categories: Plan, Policy, Allocator, Scheduler, API, Documentation, CI, Misc.
 4. Update the pinned Rust version in `rust-toolchain` if necessary.
    1. Talk with system admin for our CI machines, and check if there is a newer Rust version that we should be using.
    2. If we update to a new Rust version, make necessary changes to the code base.
