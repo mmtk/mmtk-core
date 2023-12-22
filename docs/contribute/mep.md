@@ -1,12 +1,12 @@
 MMTk Enhancement Proposal (MEP)
 ===============================
 
-An MMTk Enhancement Proposal (MEP) is a more formal variant of issue.  It has a special format, and
-will undergo a more thorough review process.  Its goal is helping the MMTk developers making more
-informed decisions.
+An MMTk Enhancement Proposal (MEP) is a formal process for the MMTk team and its developers to
+propose significant design changes, review the impact of the changes and make informed decisions.
+It has a special format, and will undergo a more thorough review process.  Its goal is helping the
+MMTk developers making more informed decisions.
 
-MEP is inspired by the Java Enhancement Proposal, described in https://openjdk.org/jeps/1  However,
-unlike JEP which is more open-ended, MEP is more focused on making design decisions.
+MEP is inspired by the Java Enhancement Proposal, described in https://openjdk.org/jeps/1
 
 # When is MEP required?
 
@@ -18,39 +18,23 @@ applicable to any kind of significant changes, including but not limited to:
 -   Changes to the MMTk core to implement a feature demanded by bindings.
 -   Major refactoring to the MMTk core.
 
-One purpose of MEP is reducing the risks to the future development of MMTk.  Large-scale changes and
-public API changes usually indicate such risks, but these are only indicators, not criteria.  The
-assessment of risks is subjective, and we need to discuss in order to reach consensus.
+**The core purpose of the MEP process is to avoid the unintentional introduction of changes that
+bring long-term negative impacts to MMTk.**  Large-scale changes and public API changes usually
+indicate such risks, but these are only indicators, not criteria.  The assessment of risks is mostly
+subjective, and the MMTk team need to discuss in order to reach consensus.
 
-Note: JEP is also required for things that "require two or more weeks of engineering effort" and/or
-"are in high demand by developers or customers".  We don't judge whether we need MEP based on
-engineering effort or public demand.  Many PRs for MMTk require multiple weeks of work and rigorous
-testing, but most of them can be settled with regular issues and PRs.  We label priorities using
-GitHub issue tags, such as `P-normal`, `P-high`, etc.  If a feature is requested often, and we have
-man power for that, we can raise the priority.
+If a contributor is uncertain if they should submit an MEP for their proposed changes, we encourage
+them to talk with the MMTk team first, or to simply submit a normal PR/issue to get it started. An
+MEP would be requested by the MMTk team if necessary (See the details about this in the section of
+MEP review process).
 
 # Format
 
-A MEP will be posted as a GitHub issue in the `mmtk-core` repository.  It should contain certain
-tags:
-
--   **The `MEP` tag**
-    -   It is used to identify MEPs.
--   **Area (`A-*`)**
-    -   For example, `A-gc-algorithm`.
--   **Category (`C-*`)**
-    -   For example, `C-refactoring`.
-    -   Note that not all MEP are "enhancement" in the sense of `C-enhancement`.  Some MEPs may
-        simply be intended for fixing long-standing hard-to-fix bugs by making non-trivial changes.
--   **Goal (`G-*`)**
-    -   For example, `G-safety`.
-
-We use the format of JEP (https://openjdk.org/jeps/2) as a frame of reference, but deviate from it
-when needed.
+A MEP will be posted as a GitHub issue in the `mmtk-core` repository.  It should contain `MEP` tag.
 
 A MEP should have the following sections:
 
--   TL;DR (summary)
+-   TL;DR
 -   Goal
 -   Non-goal (optional)
 -   Success Metric
@@ -67,18 +51,13 @@ A MEP should have the following sections:
 -   Risks and Assumptions (optional)
 -   Related Issues (optional)
 
-Note: Sections in JEP but not in MEP:
-
--   Dependencies: We have the *Related Issues* section, instead.
-
 # Sections
 
 ## TL;DR
 
-This section should use about one to three sentences to summarize the MEP.  JEP calls it "Summary",
-but we call it "TL;DR" (too long, didn't read) to emphasize that it should be short enough so that
-readers (including those in a hurry) can get the main idea very quickly without reading through the
-MEP.
+This section should use about one to three sentences to summarize the MEP.  As the name "TL;DR" (too
+long, didn't read) suggests, this section should be short enough so that readers (including those in
+a hurry) can get the main idea very quickly without reading through the MEP.
 
 ## Goals
 
