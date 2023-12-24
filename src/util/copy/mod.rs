@@ -8,6 +8,7 @@ use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::{ImmixCopyContext, ImmixHybridCopyContext};
 use crate::policy::space::Space;
+#[cfg(not(feature = "vm_forwarding"))]
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
@@ -111,6 +112,9 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
     /// * `semantics`: The copy semantic used for the copying.
     pub fn post_copy(&mut self, object: ObjectReference, bytes: usize, semantics: CopySemantics) {
         // Clear forwarding bits.
+        // Not used when using VM-side forwarding implementation because the VM binding is supposed
+        // to ensure the copied object is not in the "being forwarded" or "forwarded" state.
+        #[cfg(not(feature = "vm_forwarding"))]
         object_forwarding::clear_forwarding_bits::<VM>(object);
         // If we are copying objects in mature space, we would need to mark the object as mature.
         if semantics.is_mature() && self.config.constraints.needs_log_bit {

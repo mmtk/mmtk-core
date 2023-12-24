@@ -584,75 +584,78 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::on_trace_object::<VM>(object);
 
-        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
-        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            // We lost the forwarding race as some other thread has set the forwarding word; wait
-            // until the object has been forwarded by the winner. Note that the object may not
-            // necessarily get forwarded since Immix opportunistically moves objects.
-            #[allow(clippy::let_and_return)]
-            let new_object =
-                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-            #[cfg(debug_assertions)]
-            {
-                if new_object == object {
-                    debug_assert!(
+        match object_forwarding::ForwardingAttempt::<VM>::attempt(object) {
+            object_forwarding::ForwardingAttempt::Lost(lost) => {
+                // We lost the forwarding race as some other thread has set the forwarding word; wait
+                // until the object has been forwarded by the winner. Note that the object may not
+                // necessarily get forwarded since Immix opportunistically moves objects.
+                #[allow(clippy::let_and_return)]
+                let new_object = lost.spin_and_get_forwarded_object();
+
+                #[cfg(debug_assertions)]
+                {
+                    if new_object == object {
+                        debug_assert!(
                         self.is_marked(object) || self.defrag.space_exhausted() || self.is_pinned(object),
                         "Forwarded object is the same as original object {} even though it should have been copied",
                         object,
                     );
-                } else {
-                    // new_object != object
-                    debug_assert!(
+                    } else {
+                        // new_object != object
+                        debug_assert!(
                         !Block::containing::<VM>(new_object).is_defrag_source(),
                         "Block {:?} containing forwarded object {} should not be a defragmentation source",
                         Block::containing::<VM>(new_object),
                         new_object,
                     );
+                    }
+                }
+                new_object
+            }
+            object_forwarding::ForwardingAttempt::Won(won) => {
+                if self.is_marked(object) {
+                    // We won the forwarding race but the object is already marked so we clear the
+                    // forwarding status and return the unmoved object
+                    won.revert();
+                    object
+                } else {
+                    // We won the forwarding race; actually forward and copy the object if it is not pinned
+                    // and we have sufficient space in our copy allocator
+                    let new_object = if self.is_pinned(object)
+                        || (!nursery_collection && self.defrag.space_exhausted())
+                    {
+                        self.attempt_mark(object, self.mark_state);
+                        won.revert();
+                        Block::containing::<VM>(object).set_state(BlockState::Marked);
+
+                        #[cfg(feature = "vo_bit")]
+                        vo_bit::helper::on_object_marked::<VM>(object);
+
+                        object
+                    } else {
+                        // We are forwarding objects. When the copy allocator allocates the block, it should
+                        // mark the block. So we do not need to explicitly mark it here.
+
+                        // Clippy complains if the "vo_bit" feature is not enabled.
+                        #[allow(clippy::let_and_return)]
+                        let new_object = won.forward_object(semantics, copy_context);
+
+                        #[cfg(feature = "vo_bit")]
+                        vo_bit::helper::on_object_forwarded::<VM>(new_object);
+
+                        new_object
+                    };
+                    debug_assert_eq!(
+                        Block::containing::<VM>(new_object).get_state(),
+                        BlockState::Marked
+                    );
+
+                    queue.enqueue(new_object);
+                    debug_assert!(new_object.is_live());
+                    self.unlog_object_if_needed(new_object);
+                    new_object
                 }
             }
-            new_object
-        } else if self.is_marked(object) {
-            // We won the forwarding race but the object is already marked so we clear the
-            // forwarding status and return the unmoved object
-            object_forwarding::clear_forwarding_bits::<VM>(object);
-            object
-        } else {
-            // We won the forwarding race; actually forward and copy the object if it is not pinned
-            // and we have sufficient space in our copy allocator
-            let new_object = if self.is_pinned(object)
-                || (!nursery_collection && self.defrag.space_exhausted())
-            {
-                self.attempt_mark(object, self.mark_state);
-                object_forwarding::clear_forwarding_bits::<VM>(object);
-                Block::containing::<VM>(object).set_state(BlockState::Marked);
-
-                #[cfg(feature = "vo_bit")]
-                vo_bit::helper::on_object_marked::<VM>(object);
-
-                object
-            } else {
-                // We are forwarding objects. When the copy allocator allocates the block, it should
-                // mark the block. So we do not need to explicitly mark it here.
-
-                // Clippy complains if the "vo_bit" feature is not enabled.
-                #[allow(clippy::let_and_return)]
-                let new_object =
-                    object_forwarding::forward_object::<VM>(object, semantics, copy_context);
-
-                #[cfg(feature = "vo_bit")]
-                vo_bit::helper::on_object_forwarded::<VM>(new_object);
-
-                new_object
-            };
-            debug_assert_eq!(
-                Block::containing::<VM>(new_object).get_state(),
-                BlockState::Marked
-            );
-
-            queue.enqueue(new_object);
-            debug_assert!(new_object.is_live());
-            self.unlog_object_if_needed(new_object);
-            new_object
         }
     }
 

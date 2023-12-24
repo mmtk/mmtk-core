@@ -1,4 +1,18 @@
-use crate::util::copy::*;
+//! This module contains the traditional implementation of object forwarding from JikesRVM.
+//!
+//! In this implementaion,
+//!
+//! -   The forwarding states are encoded by the two-bit-per-object
+//!     `ObjectModel::LOCAL_FORWARDING_BITS_SPEC` metadata.
+//! -   The forwarding pointer is encoded by the one-word-per-object
+//!     `ObjectModel::LOCAL_FORWARDING_POINTER_SPEC` metadata.
+//!
+//! It also supports putting the forwarding bits and forwarding pointers into one single word to
+//! conserve space.  Simply specify both `ObjectModel::LOCAL_FORWARDING_BITS_SPEC` and
+//! `ObjectModel::LOCAL_FORWARDING_POINTER_SPEC` as in-header, and let them overlap in the same
+//! word, and the `write_forwarding_bits_and_forwarding_pointer` will handle this use case with
+//! proper bit operations.
+
 use crate::util::metadata::MetadataSpec;
 use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
@@ -47,8 +61,9 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
 /// * `object`: the forwarded/being_forwarded object.
 /// * `forwarding_bits`: the last state of the forwarding bits before calling this function.
 ///
-/// Returns a reference to the new object.
-///
+/// Returns a reference to the new object.  But if the GC algorithm decides that the object should
+/// be pinned and should not move, it will revert the forwarding bits to
+/// `FORWARDING_NOT_TRIGGERED_YET`.  In that case, this function will simply return `object`.
 pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     object: ObjectReference,
     forwarding_bits: u8,
@@ -74,12 +89,10 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
-pub fn forward_object<VM: VMBinding>(
+pub fn write_forwarding_bits_and_forwarding_pointer<VM: VMBinding>(
     object: ObjectReference,
-    semantics: CopySemantics,
-    copy_context: &mut GCWorkerCopyContext<VM>,
-) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
+    new_object: ObjectReference,
+) {
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
@@ -96,11 +109,10 @@ pub fn forward_object<VM: VMBinding>(
             Ordering::SeqCst,
         );
     }
-    new_object
 }
 
 /// Return the forwarding bits for a given `ObjectReference`.
-pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
+fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
     VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(
         object,
         None,
@@ -116,7 +128,7 @@ fn is_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     get_forwarding_status::<VM>(object) == BEING_FORWARDED
 }
 
-pub fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
+fn is_forwarded_or_being_forwarded<VM: VMBinding>(object: ObjectReference) -> bool {
     get_forwarding_status::<VM>(object) != FORWARDING_NOT_TRIGGERED_YET
 }
 
@@ -124,7 +136,7 @@ pub fn state_is_forwarded_or_being_forwarded(forwarding_bits: u8) -> bool {
     forwarding_bits != FORWARDING_NOT_TRIGGERED_YET
 }
 
-pub fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
+fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
     forwarding_bits == BEING_FORWARDED
 }
 
@@ -162,10 +174,7 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
 /// Write the forwarding pointer of an object.
 /// This function is called on being_forwarded objects.
-pub fn write_forwarding_pointer<VM: VMBinding>(
-    object: ObjectReference,
-    new_object: ObjectReference,
-) {
+fn write_forwarding_pointer<VM: VMBinding>(object: ObjectReference, new_object: ObjectReference) {
     debug_assert!(
         is_being_forwarded::<VM>(object),
         "write_forwarding_pointer called for object {:?} that is not being forwarded! Forwarding state = 0x{:x}",
@@ -190,7 +199,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
 /// Otherwise, returns `Some(shift)`, where `shift` is the left shift needed on forwarding bits.
 ///
 #[cfg(target_endian = "little")]
-pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
+fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
     use std::ops::Deref;
     // if both forwarding bits and forwarding pointer are in-header
     match (
@@ -210,6 +219,6 @@ pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> O
 }
 
 #[cfg(target_endian = "big")]
-pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
+fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> Option<isize> {
     unimplemented!()
 }
