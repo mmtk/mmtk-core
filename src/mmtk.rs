@@ -148,7 +148,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let state = Arc::new(GlobalState::default());
 
-        let gc_requester = Arc::new(GCRequester::new());
+        let gc_requester = Arc::new(GCRequester::new(scheduler.clone()));
 
         let gc_trigger = Arc::new(GCTrigger::new(
             options.clone(),

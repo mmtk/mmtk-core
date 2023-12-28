@@ -27,20 +27,6 @@ pub struct GCController<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCController<VM> {
-    pub(crate) fn new(
-        mmtk: &'static MMTK<VM>,
-        requester: Arc<GCRequester<VM>>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-        coordinator_worker: GCWorker<VM>,
-    ) -> Box<GCController<VM>> {
-        Box::new(Self {
-            mmtk,
-            requester,
-            scheduler,
-            coordinator_worker,
-        })
-    }
-
     /// The main loop for the GC controller.
     pub fn run(&mut self, tls: VMWorkerThread) -> ! {
         probe!(mmtk, gccontroller_run);
@@ -50,7 +36,7 @@ impl<VM: VMBinding> GCController<VM> {
 
         loop {
             debug!("[STWController: Waiting for request...]");
-            self.requester.wait_for_request();
+            //self.requester.wait_for_request();
             debug!("[STWController: Request recieved.]");
 
             self.do_gc_until_completion_traced();

@@ -6,9 +6,8 @@ use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
-use crate::vm::Collection;
-use crate::vm::{GCThreadContext, VMBinding};
-use crossbeam::deque::{self, Steal};
+use crate::vm::VMBinding;
+use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,8 +17,6 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Workers
     pub(crate) worker_group: Arc<WorkerGroup<VM>>,
-    /// The shared part of the GC worker object of the controller thread
-    coordinator_worker_shared: Arc<GCWorkerShared<VM>>,
     /// Condition Variable for worker synchronization
     pub(crate) worker_monitor: Arc<WorkerMonitor>,
     /// How to assign the affinity of each GC thread. Specified by the user.
@@ -70,7 +67,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         Arc::new(Self {
             work_buckets,
             worker_group,
-            coordinator_worker_shared,
             worker_monitor,
             affinity,
         })
@@ -82,23 +78,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Create GC threads, including the controller thread and all workers.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        // Spawn the controller thread.
-        let coordinator_worker = GCWorker::new(
-            mmtk,
-            usize::MAX,
-            self.clone(),
-            true,
-            self.coordinator_worker_shared.clone(),
-            deque::Worker::new_fifo(),
-        );
-        let gc_controller = GCController::new(
-            mmtk,
-            mmtk.gc_requester.clone(),
-            self.clone(),
-            coordinator_worker,
-        );
-        VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
-
         self.worker_group.spawn(mmtk, tls)
     }
 
@@ -379,8 +358,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             worker_stat.enable();
         }
-        let coordinator_worker_stat = self.coordinator_worker_shared.borrow_stat();
-        coordinator_worker_stat.enable();
     }
 
     pub fn statistics(&self) -> HashMap<String, String> {
@@ -389,8 +366,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             summary.merge(&worker_stat);
         }
-        let coordinator_worker_stat = self.coordinator_worker_shared.borrow_stat();
-        summary.merge(&coordinator_worker_stat);
         summary.harness_stat()
     }
 
