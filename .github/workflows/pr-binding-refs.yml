@@ -89,13 +89,13 @@ jobs:
             default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master,JULIA_BINDING_REPO=mmtk/mmtk-julia,JULIA_BINDING_REF=master,RUBY_BINDING_REPO=mmtk/mmtk-ruby,RUBY_BINDING_REF=master'
         - id: print
           run: |
-            echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
-            echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
-            echo "::set-output name=jikesrvm_binding_repo::${{ env.JIKESRVM_BINDING_REPO }}"
-            echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
-            echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
-            echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
-            echo "::set-output name=julia_binding_repo::${{ env.JULIA_BINDING_REPO }}"
-            echo "::set-output name=julia_binding_ref::${{ env.JULIA_BINDING_REF }}"
-            echo "::set-output name=ruby_binding_repo::${{ env.RUBY_BINDING_REPO }}"
-            echo "::set-output name=ruby_binding_ref::${{ env.RUBY_BINDING_REF }}"
+            echo "openjdk_binding_repo=${{ env.OPENJDK_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "openjdk_binding_ref=${{ env.OPENJDK_BINDING_REF }}" >> $GITHUB_OUTPUT
+            echo "jikesrvm_binding_repo=${{ env.JIKESRVM_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "jikesrvm_binding_ref=${{ env.JIKESRVM_BINDING_REF }}" >> $GITHUB_OUTPUT
+            echo "v8_binding_repo=${{ env.V8_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "v8_binding_ref=${{ env.V8_BINDING_REF }}" >> $GITHUB_OUTPUT
+            echo "julia_binding_repo=${{ env.JULIA_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "julia_binding_ref=${{ env.JULIA_BINDING_REF }}" >> $GITHUB_OUTPUT
+            echo "ruby_binding_repo=${{ env.RUBY_BINDING_REPO }}" >> $GITHUB_OUTPUT
+            echo "ruby_binding_ref=${{ env.RUBY_BINDING_REF }}" >> $GITHUB_OUTPUT

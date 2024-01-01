@@ -26,7 +26,7 @@ jobs:
         run: |
           export MSRV=`cargo read-manifest | python -c 'import json,sys; print(json.load(sys.stdin)["rust_version"])'`
           export TEST=`cat rust-toolchain`
-          echo "::set-output name=array::[\"$MSRV\", \"$TEST\", \"stable\"]"
+          echo "array=[\"$MSRV\", \"$TEST\", \"stable\"]" >> $GITHUB_OUTPUT
 
   pre-code-review-checks:
     needs: setup-test-matrix
