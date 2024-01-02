@@ -1,5 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
+
+use atomic_refcell::AtomicRefCell;
 
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -40,6 +43,9 @@ pub struct GlobalState {
     pub(crate) stacks_prepared: AtomicBool,
     /// A counter that keeps tracks of the number of bytes allocated since last stress test
     pub(crate) allocation_bytes: AtomicUsize,
+    /// The time when the current GC started.  Only accessible in `ScheduleCollection` and
+    /// `GCWorkScheduler::on_gc_finished` which never happen at the same time.
+    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) malloc_bytes: AtomicUsize,
@@ -214,6 +220,7 @@ impl Default for GlobalState {
             cur_collection_attempts: AtomicUsize::new(0),
             scanned_stacks: AtomicUsize::new(0),
             allocation_bytes: AtomicUsize::new(0),
+            gc_start_time: AtomicRefCell::new(None),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "count_live_bytes_in_gc")]

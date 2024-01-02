@@ -12,7 +12,7 @@ use crossbeam::queue::ArrayQueue;
 #[cfg(feature = "count_live_bytes_in_gc")]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 /// Represents the ID of a GC worker thread.
 pub type ThreadId = usize;
@@ -75,40 +75,14 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     }
 }
 
-/// Used to synchronize mutually exclusive operations between workers and controller,
-/// and also waking up workers when more work packets are available.
+/// A data structure for parking and waking up workers.
+/// It keeps track of the number of workers parked, and allow the last parked worker to perform
+/// operations that require all other workers to be parked.
 pub(crate) struct WorkerMonitor {
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
     /// This is notified when new work is made available for the workers.
-    /// Particularly, it is notified when
-    /// -   `sync.worker_group_state` is transitioned to `Working` because
-    ///     -   some workers still have designated work, or
-    ///     -   some sentinel work packets are added to their drained buckets, or
-    ///     -   some work buckets are opened, or
-    /// -   any work packet is added to any open bucket.
-    /// Workers wait on this condvar.
     work_available: Condvar,
-    /// This is notified when all workers parked.
-    /// The coordinator waits on this condvar.
-    all_workers_parked: Condvar,
-}
-
-/// The state of the worker group.
-///
-/// The worker group alternates between the `Sleeping` and the `Working` state.  Workers are
-/// allowed to execute work packets in the `Working` state.  However, once workers entered the
-/// `Sleeping` state, they will not be allowed to packets from buckets until the coordinator
-/// explicitly transitions the state back to `Working` after it found more work for workers to do.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum WorkerGroupState {
-    /// In this state, the coordinator can open new buckets and close buckets,
-    /// but workers cannot execute any packets or get any work packets from any buckets.
-    /// Workers cannot unpark in this state.
-    Sleeping,
-    /// In this state, workers can get work packets from open buckets,
-    /// but no buckets can be opened or closed.
-    Working,
 }
 
 /// The synchronized part of `WorkerMonitor`.
@@ -117,8 +91,6 @@ pub(crate) struct WorkerMonitorSync {
     worker_count: usize,
     /// Number of parked workers.
     parked_workers: usize,
-    /// The worker group state.
-    worker_group_state: WorkerGroupState,
 }
 
 impl WorkerMonitor {
@@ -127,26 +99,19 @@ impl WorkerMonitor {
             sync: Mutex::new(WorkerMonitorSync {
                 worker_count,
                 parked_workers: 0,
-                worker_group_state: WorkerGroupState::Sleeping,
             }),
             work_available: Default::default(),
-            all_workers_parked: Default::default(),
         }
     }
 
     /// Wake up workers when more work packets are made available for workers.
     /// This function is called when adding work packets to buckets.
-    /// This function doesn't change the `work_group_state` variable.
-    /// If workers are in the `Sleeping` state, use `resume_and_wait` to resume workers.
     pub fn notify_work_available(&self, all: bool) {
-        let sync = self.sync.lock().unwrap();
+        let mut guard = self.sync.lock().unwrap();
+        self.notify_work_available_inner(all, &mut guard);
+    }
 
-        // Don't notify workers if we are adding packets when workers are sleeping.
-        // This could happen when we add `ScheduleCollection` or schedule sentinels.
-        if sync.worker_group_state == WorkerGroupState::Sleeping {
-            return;
-        }
-
+    fn notify_work_available_inner(&self, all: bool, _guard: &mut MutexGuard<WorkerMonitorSync>) {
         if all {
             self.work_available.notify_all();
         } else {
@@ -154,34 +119,17 @@ impl WorkerMonitor {
         }
     }
 
-    /// Wake up workers and wait until they transition to `Sleeping` state again.
-    /// This is called by the coordinator.
-    /// If `all` is true, notify all workers; otherwise only notify one worker.
-    pub fn resume_and_wait(&self, all: bool) {
-        let mut sync = self.sync.lock().unwrap();
-        sync.worker_group_state = WorkerGroupState::Working;
-        if all {
-            self.work_available.notify_all();
-        } else {
-            self.work_available.notify_one();
-        }
-        let _sync = self
-            .all_workers_parked
-            .wait_while(sync, |sync| {
-                sync.worker_group_state == WorkerGroupState::Working
-            })
-            .unwrap();
-    }
-
-    /// Test if the worker group is in the `Sleeping` state.
-    pub fn debug_is_sleeping(&self) -> bool {
-        let sync = self.sync.lock().unwrap();
-        sync.worker_group_state == WorkerGroupState::Sleeping
-    }
-
-    /// Park until more work is available.
-    /// The argument `worker` indicates this function can only be called by workers.
-    pub fn park_and_wait<VM: VMBinding>(&self, worker: &GCWorker<VM>) {
+    /// Park a worker until more work is available.
+    /// If it is the last worker parked, `on_last_parked` will be called.
+    /// If `on_last_parked` returns `true`, this function will notify other workers about available
+    /// work before unparking the current worker;
+    /// if `on_last_parked` returns `false`, the current worker will also wait for work packets to
+    /// be added.
+    pub fn park_and_wait<VM, F>(&self, worker: &GCWorker<VM>, on_last_parked: F)
+    where
+        VM: VMBinding,
+        F: FnOnce() -> bool,
+    {
         let mut sync = self.sync.lock().unwrap();
 
         // Park this worker
@@ -189,13 +137,17 @@ impl WorkerMonitor {
         trace!("Worker {} parked.", worker.ordinal);
 
         if all_parked {
-            // If all workers are parked, enter "Sleeping" state and notify controller.
-            sync.worker_group_state = WorkerGroupState::Sleeping;
-            debug!(
-                "Worker {} notifies the coordinator that all workerer parked.",
-                worker.ordinal
-            );
-            self.all_workers_parked.notify_one();
+            debug!("Worker {} is the last worker parked.", worker.ordinal);
+            let more_work_available = on_last_parked();
+            if more_work_available {
+                self.notify_work_available_inner(true, &mut sync);
+            } else {
+                // It didn't make more work available.  Keep waiting.
+                // This should happen when
+                // 1.   Worker threads have just been created, but GC has not started, yet, or
+                // 2.   A GC has just finished.
+                sync = self.work_available.wait(sync).unwrap();
+            }
         } else {
             // Otherwise wait until notified.
             // Note: The condition for this `cond.wait` is "more work is available".
@@ -204,14 +156,6 @@ impl WorkerMonitor {
             // here and wait again.
             sync = self.work_available.wait(sync).unwrap();
         }
-
-        // If we are in the `Sleeping` state, wait until leaving that state.
-        sync = self
-            .work_available
-            .wait_while(sync, |sync| {
-                sync.worker_group_state == WorkerGroupState::Sleeping
-            })
-            .unwrap();
 
         // Unpark this worker.
         sync.dec_parked_workers();

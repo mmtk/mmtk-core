@@ -1,12 +1,16 @@
+use super::gc_work::ScheduleCollection;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
+use super::worker::{GCWorker, ThreadId, WorkerGroup, WorkerMonitor};
 use super::*;
+use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
+use crate::vm::Collection;
 use crate::vm::VMBinding;
+use crate::Plan;
 use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
@@ -62,8 +66,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
 
-        let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new(None));
-
         Arc::new(Self {
             work_buckets,
             worker_group,
@@ -86,9 +88,17 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.affinity.resolve_affinity(thread);
     }
 
+    /// Schedule collection.  Called via `GCRequester`.
+    /// Because this function may be called by a mutator thread, we only add a `ScheduleCollection`
+    /// work packet here so that a GC worker can wake up later and actually schedule the work for a
+    /// collection.
+    pub(crate) fn schedule_collection(&self) {
+        // Add a ScheduleCollection work packet.  It is the seed of other work packets.
+        self.work_buckets[WorkBucketStage::Unconstrained].add(ScheduleCollection);
+    }
+
     /// Schedule all the common work packets
     pub fn schedule_common_work<C: GCWorkContext<VM = VM>>(&self, plan: &'static C::PlanType) {
-        use crate::plan::Plan;
         use crate::scheduler::gc_work::*;
         // Stop & scan mutators (mutator scanning can happen before STW)
         self.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<C>::new());
@@ -349,8 +359,125 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 return work;
             }
 
-            self.worker_monitor.park_and_wait(worker);
+            self.worker_monitor.park_and_wait(worker, || {
+                // This is the last worker parked.
+
+                // Test whether we are doing GC.
+                if worker.mmtk.gc_requester.is_gc_scheduled() {
+                    trace!("GC is scheduled.  Try to find more work to do...");
+                    // We are in the middle of GC, and the last GC worker parked.
+                    // Find more work for workers to do.
+                    let found_more_work = self.find_more_work_for_workers();
+
+                    if !found_more_work {
+                        // GC finished.
+                        self.on_gc_finished(worker);
+                    }
+
+                    found_more_work
+                } else {
+                    trace!("GC is not scheduled.  Wait for the first GC.");
+                    // GC is not scheduled.  Do nothing.
+                    // Note that when GC worker threads has just been created, they will try to get
+                    // work packets to execute.  But since the first GC has not started, yet, there
+                    // is not any work packets to execute, yet.  Therefore, all workers will park,
+                    // and the last parked worker will reach here.  In that case, we should simply
+                    // let workers wait until the first GC starts, instead of trying to open more
+                    // buckets.
+                    // If a GC worker spuriously wakes up when GC is not scheduled, it should not
+                    // do anything, either.
+                    false
+                }
+            });
         }
+    }
+
+    /// Find more work for workers to do.  Return true if more work is available.
+    fn find_more_work_for_workers(&self) -> bool {
+        if self.worker_group.has_designated_work() {
+            return true;
+        }
+
+        // See if any bucket has a sentinel.
+        if self.schedule_sentinels() {
+            return true;
+        }
+
+        // Try to open new buckets.
+        if self.update_buckets() {
+            return true;
+        }
+
+        // If all of the above failed, it means GC has finished.
+        false
+    }
+
+    /// Called when GC has finished, i.e. when all work packets have been executed.
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+        // All GC workers (except this one) must have parked by now.
+        debug_assert!(!self.worker_group.has_designated_work());
+        debug_assert!(self.all_buckets_empty());
+
+        // Deactivate all work buckets to prepare for the next GC.
+        self.deactivate_all();
+        self.debug_assert_all_buckets_deactivated();
+
+        let mmtk = worker.mmtk;
+
+        // Tell GC trigger that GC ended - this happens before we resume mutators.
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
+
+        // Compute the elapsed time of the GC.
+        let gc_start = {
+            let mut guard = mmtk.state.gc_start_time.borrow_mut();
+            guard.take().expect("gc_start_time was not set")
+        };
+        let elapsed = gc_start.elapsed();
+
+        info!(
+            "End of GC ({}/{} pages, took {} ms)",
+            mmtk.get_plan().get_reserved_pages(),
+            mmtk.get_plan().get_total_pages(),
+            elapsed.as_millis()
+        );
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk.state.get_live_bytes_in_last_gc();
+            let used_bytes =
+                mmtk.get_plan().get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+            debug_assert!(
+                live_bytes <= used_bytes,
+                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                live_bytes, used_bytes
+            );
+            info!(
+                "Live objects = {} bytes ({:04.1}% of {} used pages)",
+                live_bytes,
+                live_bytes as f64 * 100.0 / used_bytes as f64,
+                mmtk.get_plan().get_used_pages()
+            );
+        }
+
+        // All other workers are parked, so it is safe to access the Plan instance mutably.
+        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
+        plan_mut.end_of_gc(worker.tls);
+
+        #[cfg(feature = "extreme_assertions")]
+        if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
+            // reset the logging info at the end of each GC
+            mmtk.edge_logger.reset();
+        }
+
+        // Reset the triggering information.
+        mmtk.state.reset_collection_trigger();
+
+        // Set to NotInGC after everything, and right before resuming mutators.
+        mmtk.set_gc_status(GcStatus::NotInGC);
+        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+
+        // Notify the `GCRequester` that GC has finished.
+        mmtk.gc_requester.on_gc_finished();
     }
 
     pub fn enable_stat(&self) {

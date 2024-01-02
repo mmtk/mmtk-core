@@ -75,17 +75,17 @@ impl<VM: VMBinding> GCController<VM> {
     fn do_gc_until_completion(&mut self) {
         let gc_start = std::time::Instant::now();
 
-        debug_assert!(
-            self.scheduler.worker_monitor.debug_is_sleeping(),
-            "Workers are still doing work when GC started."
-        );
+        // debug_assert!(
+        //     self.scheduler.worker_monitor.debug_is_sleeping(),
+        //     "Workers are still doing work when GC started."
+        // );
 
         // Add a ScheduleCollection work packet.  It is the seed of other work packets.
         self.scheduler.work_buckets[WorkBucketStage::Unconstrained].add(ScheduleCollection);
 
         // Notify only one worker at this time because there is only one work packet,
         // namely `ScheduleCollection`.
-        self.scheduler.worker_monitor.resume_and_wait(false);
+        // self.scheduler.worker_monitor.resume_and_wait(false);
 
         // Gradually open more buckets as workers stop each time they drain all open bucket.
         loop {
@@ -102,11 +102,11 @@ impl<VM: VMBinding> GCController<VM> {
 
             // Notify all workers because there should be many work packets available in the newly
             // opened bucket(s).
-            self.scheduler.worker_monitor.resume_and_wait(true);
+            // self.scheduler.worker_monitor.resume_and_wait(true);
         }
 
         // All GC workers must have parked by now.
-        debug_assert!(self.scheduler.worker_monitor.debug_is_sleeping());
+        // debug_assert!(self.scheduler.worker_monitor.debug_is_sleeping());
         debug_assert!(!self.scheduler.worker_group.has_designated_work());
         debug_assert!(self.scheduler.all_buckets_empty());
 
