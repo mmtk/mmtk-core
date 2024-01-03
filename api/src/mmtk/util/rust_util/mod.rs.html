@@ -265,6 +265,29 @@
 
 <span class="kw">unsafe impl</span>&lt;T&gt; Sync <span class="kw">for </span>InitializeOnce&lt;T&gt; {}
 
+<span class="doccomment">/// This implements `std::array::from_fn` introduced in Rust 1.63.
+/// We should replace this with the standard counterpart after bumping MSRV,
+/// but we also need to evaluate whether it would use too much stack space (see code comments).
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>array_from_fn&lt;T, <span class="kw">const </span>N: usize, F&gt;(<span class="kw-2">mut </span>cb: F) -&gt; [T; N]
+<span class="kw">where
+    </span>F: FnMut(usize) -&gt; T,
+{
+    <span class="comment">// Note on unsafety: An alternative to the unsafe implementation below is creating a fixed
+    // array of `[0, 1, 2, ..., N-1]` and using the `.map(cb)` method to create the result.
+    // However, the `array::map` method implemented in the standard library consumes a surprisingly
+    // large amount of stack space.  For VMs that run on confined stacks, such as JikesRVM, that
+    // would cause stack overflow.  Therefore we implement it manually using unsafe primitives.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>result_array: MaybeUninit&lt;[T; N]&gt; = MaybeUninit::zeroed();
+    <span class="kw">let </span>array_ptr = result_array.as_mut_ptr();
+    <span class="kw">for </span>index <span class="kw">in </span><span class="number">0</span>..N {
+        <span class="kw">let </span>item = cb(index);
+        <span class="kw">unsafe </span>{
+            <span class="macro">std::ptr::addr_of_mut!</span>((<span class="kw-2">*</span>array_ptr)[index]).write(item);
+        }
+    }
+    <span class="kw">unsafe </span>{ result_array.assume_init() }
+}
+
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>initialize_once_tests {
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -300,28 +323,5 @@
         <span class="comment">// The initialize_usize should only be called once
         </span><span class="macro">assert_eq!</span>(INITIALIZE_COUNT.load(Ordering::SeqCst), <span class="number">1</span>);
     }
-}
-
-<span class="doccomment">/// This implements `std::array::from_fn` introduced in Rust 1.63.
-/// We should replace this with the standard counterpart after bumping MSRV,
-/// but we also need to evaluate whether it would use too much stack space (see code comments).
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>array_from_fn&lt;T, <span class="kw">const </span>N: usize, F&gt;(<span class="kw-2">mut </span>cb: F) -&gt; [T; N]
-<span class="kw">where
-    </span>F: FnMut(usize) -&gt; T,
-{
-    <span class="comment">// Note on unsafety: An alternative to the unsafe implementation below is creating a fixed
-    // array of `[0, 1, 2, ..., N-1]` and using the `.map(cb)` method to create the result.
-    // However, the `array::map` method implemented in the standard library consumes a surprisingly
-    // large amount of stack space.  For VMs that run on confined stacks, such as JikesRVM, that
-    // would cause stack overflow.  Therefore we implement it manually using unsafe primitives.
-    </span><span class="kw">let </span><span class="kw-2">mut </span>result_array: MaybeUninit&lt;[T; N]&gt; = MaybeUninit::zeroed();
-    <span class="kw">let </span>array_ptr = result_array.as_mut_ptr();
-    <span class="kw">for </span>index <span class="kw">in </span><span class="number">0</span>..N {
-        <span class="kw">let </span>item = cb(index);
-        <span class="kw">unsafe </span>{
-            <span class="macro">std::ptr::addr_of_mut!</span>((<span class="kw-2">*</span>array_ptr)[index]).write(item);
-        }
-    }
-    <span class="kw">unsafe </span>{ result_array.assume_init() }
 }
 </code></pre></div></section></main></body></html>
