@@ -134,7 +134,13 @@ impl WorkerMonitor {
 
         // Park this worker
         let all_parked = sync.inc_parked_workers();
-        trace!("Worker {} parked.", worker.ordinal);
+        trace!(
+            "Worker {} parked.  parked/total: {}/{}.  All parked: {}",
+            worker.ordinal,
+            sync.parked_workers,
+            sync.worker_count,
+            all_parked
+        );
 
         if all_parked {
             debug!("Worker {} is the last worker parked.", worker.ordinal);

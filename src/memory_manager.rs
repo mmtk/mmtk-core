@@ -16,7 +16,7 @@ use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
-use crate::scheduler::{GCController, GCWork, GCWorker};
+use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout::vm_layout;
@@ -459,21 +459,6 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
         assert!(mmtk.state.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
         VM::VMCollection::block_for_gc(tls);
     }
-}
-
-/// Run the main loop for the GC controller thread. This method does not return.
-///
-/// Arguments:
-/// * `tls`: The thread that will be used as the GC controller.
-/// * `gc_controller`: The execution context of the GC controller threa.
-///   It is the `GCController` passed to `Collection::spawn_gc_thread`.
-/// * `mmtk`: A reference to an MMTk instance.
-pub fn start_control_collector<VM: VMBinding>(
-    _mmtk: &'static MMTK<VM>,
-    tls: VMWorkerThread,
-    gc_controller: &mut GCController<VM>,
-) {
-    gc_controller.run(tls);
 }
 
 /// Run the main loop of a GC worker. This method does not return.

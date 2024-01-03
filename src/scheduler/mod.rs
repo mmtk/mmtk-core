@@ -20,8 +20,5 @@ mod worker;
 pub(crate) use worker::current_worker_ordinal;
 pub use worker::GCWorker;
 
-mod controller;
-pub use controller::GCController;
-
 pub(crate) mod gc_work;
 pub use gc_work::ProcessEdgesWork;

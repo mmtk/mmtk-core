@@ -276,7 +276,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    pub(crate) fn assert_all_activated_buckets_are_empty(&self) {
+    pub(crate) fn assert_all_activated_buckets_are_empty(&self, worker: &GCWorker<VM>) {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
             if bucket.is_activated() && !bucket.is_empty() {
@@ -286,6 +286,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // we should show at least one abnormal bucket in the panic message
                 // so that we still have some information for debugging.
                 error_example = Some(id);
+
+                while !bucket.is_empty() {
+                    match bucket.poll(&worker.local_work_buffer) {
+                        Steal::Success(w) => {
+                            error!("  Bucket {:?} has {:?}", id, w.get_type_name());
+                        },
+                        Steal::Retry => continue,
+                        _ => {}
+                    }
+                }
             }
         }
         if let Some(id) = error_example {
@@ -364,8 +374,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
                 // Test whether we are doing GC.
                 if worker.mmtk.gc_requester.is_gc_scheduled() {
-                    trace!("GC is scheduled.  Try to find more work to do...");
                     // We are in the middle of GC, and the last GC worker parked.
+                    trace!("GC is scheduled.  Try to find more work to do...");
+
+                    // During GC, if all workers parked, all open buckets must have been drained.
+                    self.assert_all_activated_buckets_are_empty(worker);
+
                     // Find more work for workers to do.
                     let found_more_work = self.find_more_work_for_workers();
 
@@ -395,16 +409,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Find more work for workers to do.  Return true if more work is available.
     fn find_more_work_for_workers(&self) -> bool {
         if self.worker_group.has_designated_work() {
+            trace!("Some workers have designated work.");
             return true;
         }
 
         // See if any bucket has a sentinel.
         if self.schedule_sentinels() {
+            trace!("Some sentinels are scheduled.");
             return true;
         }
 
         // Try to open new buckets.
         if self.update_buckets() {
+            trace!("Some buckets are opened.");
             return true;
         }
 

@@ -4,9 +4,8 @@ use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
 
 /// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
+/// Currently, `GCWorker` is the only kind of thread that mmtk-core will create.
 pub enum GCThreadContext<VM: VMBinding> {
-    /// The GC thread to spawn is a controller thread. There is only one controller thread.
-    Controller(Box<GCController<VM>>),
     /// The GC thread to spawn is a worker thread. There can be multiple worker threads.
     Worker(Box<GCWorker<VM>>),
 }
@@ -53,10 +52,9 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
     ///   calls `initialize_collection()` and passes as an argument.
     /// * `ctx`: The context for the GC thread.
-    ///   * If `Controller` is passed, it means spawning a thread to run as the GC controller.
-    ///     The spawned thread shall call `memory_manager::start_control_collector`.
     ///   * If `Worker` is passed, it means spawning a thread to run as a GC worker.
     ///     The spawned thread shall call `memory_manager::start_worker`.
+    ///     Currently `Worker` is the only kind of thread which mmtk-core will create.
     ///   In either case, the `Box` inside should be passed back to the called function.
     fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
 
