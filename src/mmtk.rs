@@ -255,15 +255,15 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_sanity.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn set_gc_status(&self, s: GcStatus) {
-        let mut gc_status = self.state.gc_status.lock().unwrap();
-        if *gc_status == GcStatus::NotInGC {
+    pub(crate) fn set_gc_status(&self, new_status: GcStatus) {
+        let old_status = self.state.gc_status.swap(new_status, Ordering::SeqCst);
+        debug_assert_ne!(old_status, new_status);
+        if old_status == GcStatus::NotInGC {
             self.state.stacks_prepared.store(false, Ordering::SeqCst);
             // FIXME stats
             self.stats.start_gc();
         }
-        *gc_status = s;
-        if *gc_status == GcStatus::NotInGC {
+        if new_status == GcStatus::NotInGC {
             // FIXME stats
             if self.stats.get_gathering_stats() {
                 self.stats.end_gc();
@@ -273,12 +273,12 @@ impl<VM: VMBinding> MMTK<VM> {
 
     /// Return true if a collection is in progress.
     pub fn gc_in_progress(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() != GcStatus::NotInGC
+        self.state.gc_status.load(Ordering::SeqCst) != GcStatus::NotInGC
     }
 
     /// Return true if a collection is in progress and past the preparatory stage.
     pub fn gc_in_progress_proper(&self) -> bool {
-        *self.state.gc_status.lock().unwrap() == GcStatus::GcProper
+        self.state.gc_status.load(Ordering::SeqCst) == GcStatus::GcProper
     }
 
     /// Return true if the current GC is an emergency GC.

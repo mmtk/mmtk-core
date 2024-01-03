@@ -1,8 +1,9 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Mutex;
 use std::time::Instant;
 
+use atomic::Atomic;
 use atomic_refcell::AtomicRefCell;
+use bytemuck::NoUninit;
 
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -20,7 +21,7 @@ pub struct GlobalState {
     /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
     pub(crate) trigger_gc_when_heap_is_full: AtomicBool,
     /// The current GC status.
-    pub(crate) gc_status: Mutex<GcStatus>,
+    pub(crate) gc_status: Atomic<GcStatus>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     pub(crate) emergency_collection: AtomicBool,
@@ -209,7 +210,7 @@ impl Default for GlobalState {
         Self {
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),
-            gc_status: Mutex::new(GcStatus::NotInGC),
+            gc_status: Atomic::new(GcStatus::NotInGC),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
@@ -229,9 +230,20 @@ impl Default for GlobalState {
     }
 }
 
-#[derive(PartialEq)]
+/// GC status, an indicator of whether MMTk is in the progress of a GC or not.
+///
+/// This type was only used for assertions in JikesRVM.  After we removed the coordinator (a.k.a.
+/// controller) thread, we use the GC status to decide whether GC workers should open new work
+/// buckets when the last worker parked.
+// FIXME: `GcProper` is inherited from JikesRVM, but it is not used in MMTk core.  Consider
+// removing it.
+#[derive(PartialEq, Clone, Copy, NoUninit, Debug)]
+#[repr(u8)]
 pub enum GcStatus {
+    /// Not in GC
     NotInGC,
+    /// GC has started, but not all stacks have been scanned, yet.
     GcPrepare,
+    /// GC has started, and all stacks have been scanned.
     GcProper,
 }

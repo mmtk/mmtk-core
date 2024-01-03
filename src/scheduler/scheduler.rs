@@ -5,6 +5,7 @@ use super::worker::{GCWorker, ThreadId, WorkerGroup, WorkerMonitor};
 use super::*;
 use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
+use crate::scheduler::worker::LastParkedResult;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
@@ -89,10 +90,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Schedule collection.  Called via `GCRequester`.
-    /// Because this function may be called by a mutator thread, we only add a `ScheduleCollection`
+    /// Because this function is called by a mutator thread, we only add a `ScheduleCollection`
     /// work packet here so that a GC worker can wake up later and actually schedule the work for a
     /// collection.
-    pub(crate) fn schedule_collection(&self) {
+    pub(crate) fn mutator_schedule_collection(&self) {
+        debug!("Adding ScheduleCollection work packet upon mutator request.");
         // Add a ScheduleCollection work packet.  It is the seed of other work packets.
         self.work_buckets[WorkBucketStage::Unconstrained].add(ScheduleCollection);
     }
@@ -373,7 +375,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // This is the last worker parked.
 
                 // Test whether we are doing GC.
-                if worker.mmtk.gc_requester.is_gc_scheduled() {
+                if worker.mmtk.gc_in_progress() {
                     // We are in the middle of GC, and the last GC worker parked.
                     trace!("GC is scheduled.  Try to find more work to do...");
 
@@ -383,12 +385,17 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     // Find more work for workers to do.
                     let found_more_work = self.find_more_work_for_workers();
 
-                    if !found_more_work {
+                    if found_more_work {
+                        LastParkedResult::WakeAll
+                    } else {
                         // GC finished.
-                        self.on_gc_finished(worker);
+                        let scheduled_next_gc = self.on_gc_finished(worker);
+                        if scheduled_next_gc {
+                            LastParkedResult::WakeSelf
+                        } else {
+                            LastParkedResult::ParkSelf
+                        }
                     }
-
-                    found_more_work
                 } else {
                     trace!("GC is not scheduled.  Wait for the first GC.");
                     // GC is not scheduled.  Do nothing.
@@ -400,7 +407,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     // buckets.
                     // If a GC worker spuriously wakes up when GC is not scheduled, it should not
                     // do anything, either.
-                    false
+                    LastParkedResult::ParkSelf
                 }
             });
         }
@@ -430,7 +437,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+    /// Return `true` if it scheduled the next GC immediately.
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
         // All GC workers (except this one) must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         debug_assert!(self.all_buckets_empty());
@@ -494,7 +502,24 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
 
         // Notify the `GCRequester` that GC has finished.
-        mmtk.gc_requester.on_gc_finished();
+        let should_schedule_gc_now = mmtk.gc_requester.on_gc_finished();
+        if should_schedule_gc_now {
+            // We should schedule the next GC immediately.  This means GC was triggered between
+            // `clear_request` (when stacks were scanned) and `on_gc_finished` (right above).  This
+            // can happen if
+            // 1.  It is concurrent GC, and a mutator triggered another GC while the current GC was
+            //     still running, or
+            // 2.  It is STW GC, but after the invocation of `resume_mutators` above, one mutator
+            //     ran so fast that it triggered a GC before we called `on_gc_finished`.
+            // Note that we are holding the `WorkerMonitor` mutex, and cannot notify workers now.
+            // When this function returns, the current worker should continue to execute the newly
+            // added `ScheduleCollection` work packet.
+            debug!("GC already requested before `on_gc_finished`.  Add ScheduleCollection now.");
+            self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn enable_stat(&self) {

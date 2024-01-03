@@ -75,6 +75,17 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     }
 }
 
+/// The result type of the `on_last_parked` call-back in `WorkMonitor::park_and_wait`.
+/// It decides how many workers should wake up after `on_last_parked`.
+pub(crate) enum LastParkedResult {
+    /// The last parked worker should wait, too, until more work packets are added.
+    ParkSelf,
+    /// The last parked worker should unpark and find work packet to do.
+    WakeSelf,
+    /// Wake up all parked GC workers.
+    WakeAll,
+}
+
 /// A data structure for parking and waking up workers.
 /// It keeps track of the number of workers parked, and allow the last parked worker to perform
 /// operations that require all other workers to be parked.
@@ -128,7 +139,7 @@ impl WorkerMonitor {
     pub fn park_and_wait<VM, F>(&self, worker: &GCWorker<VM>, on_last_parked: F)
     where
         VM: VMBinding,
-        F: FnOnce() -> bool,
+        F: FnOnce() -> LastParkedResult,
     {
         let mut sync = self.sync.lock().unwrap();
 
@@ -144,15 +155,23 @@ impl WorkerMonitor {
 
         if all_parked {
             debug!("Worker {} is the last worker parked.", worker.ordinal);
-            let more_work_available = on_last_parked();
-            if more_work_available {
-                self.notify_work_available_inner(true, &mut sync);
-            } else {
-                // It didn't make more work available.  Keep waiting.
-                // This should happen when
-                // 1.   Worker threads have just been created, but GC has not started, yet, or
-                // 2.   A GC has just finished.
-                sync = self.work_available.wait(sync).unwrap();
+            let result = on_last_parked();
+            match result {
+                LastParkedResult::ParkSelf => {
+                    // It didn't make more work available.  Keep waiting.
+                    // This should happen when
+                    // 1.  Worker threads have just been created, but GC has not started, yet, or
+                    // 2.  A GC has just finished.
+                    sync = self.work_available.wait(sync).unwrap();
+                }
+                LastParkedResult::WakeSelf => {
+                    // Continue without waiting.
+                    // This should happen when only one work packet is made available.
+                }
+                LastParkedResult::WakeAll => {
+                    // Notify all GC workers.
+                    self.notify_work_available_inner(true, &mut sync);
+                }
             }
         } else {
             // Otherwise wait until notified.
@@ -165,7 +184,12 @@ impl WorkerMonitor {
 
         // Unpark this worker.
         sync.dec_parked_workers();
-        trace!("Worker {} unparked.", worker.ordinal);
+        trace!(
+            "Worker {} unparked.  parked/total: {}/{}.",
+            worker.ordinal,
+            sync.parked_workers,
+            sync.worker_count,
+        );
     }
 }
 
