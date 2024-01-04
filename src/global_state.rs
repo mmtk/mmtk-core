@@ -44,8 +44,11 @@ pub struct GlobalState {
     pub(crate) stacks_prepared: AtomicBool,
     /// A counter that keeps tracks of the number of bytes allocated since last stress test
     pub(crate) allocation_bytes: AtomicUsize,
-    /// The time when the current GC started.  Only accessible in `ScheduleCollection` and
-    /// `GCWorkScheduler::on_gc_finished` which never happen at the same time.
+    /// The time when the current GC started.  Currently only used for logging.
+    /// Note that some (but not all) `GCTriggerPolicy` implementations do their own time tracking
+    /// independently for their own need.
+    /// This field only accessible in `ScheduleCollection` and `GCWorkScheduler::on_gc_finished`
+    /// which never happen at the same time, so `AtomicRefCell` is enough.
     pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// A counteer that keeps tracks of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]

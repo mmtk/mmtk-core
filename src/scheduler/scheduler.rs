@@ -22,7 +22,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Workers
     pub(crate) worker_group: Arc<WorkerGroup<VM>>,
-    /// Condition Variable for worker synchronization
+    /// Monitor for worker synchronization, including a mutex and conditional variables.
     pub(crate) worker_monitor: Arc<WorkerMonitor>,
     /// How to assign the affinity of each GC thread. Specified by the user.
     affinity: AffinityKind,
@@ -48,14 +48,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Set the open condition of each bucket.
         {
-            // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
-            // This vec will grow for each stage we call with open_next()
             let first_stw_stage = WorkBucketStage::first_stw_stage();
             let mut open_stages: Vec<WorkBucketStage> = vec![first_stw_stage];
-            // The rest will open after the previous stage is done.
             let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             for stage in stages {
+                // Unconstrained is always open.
+                // The first STW stage (Prepare) will be opened when the world stopped
+                // (i.e. when all mutators are suspended).
                 if stage != WorkBucketStage::Unconstrained && stage != first_stw_stage {
+                    // Other work packets will be opened after previous stages are done
+                    // (i.e their buckets are drained and all workers parked).
                     let cur_stages = open_stages.clone();
                     work_buckets[stage].set_open_condition(
                         move |scheduler: &GCWorkScheduler<VM>| {
@@ -278,7 +280,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Check if all the work buckets are empty
-    pub(crate) fn assert_all_activated_buckets_are_empty(&self, worker: &GCWorker<VM>) {
+    pub(crate) fn assert_all_activated_buckets_are_empty(&self) {
         let mut error_example = None;
         for (id, bucket) in self.work_buckets.iter() {
             if bucket.is_activated() && !bucket.is_empty() {
@@ -288,16 +290,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // we should show at least one abnormal bucket in the panic message
                 // so that we still have some information for debugging.
                 error_example = Some(id);
-
-                while !bucket.is_empty() {
-                    match bucket.poll(&worker.local_work_buffer) {
-                        Steal::Success(w) => {
-                            error!("  Bucket {:?} has {:?}", id, w.get_type_name());
-                        },
-                        Steal::Retry => continue,
-                        _ => {}
-                    }
-                }
             }
         }
         if let Some(id) = error_example {
@@ -377,10 +369,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // Test whether we are doing GC.
                 if worker.mmtk.gc_in_progress() {
                     // We are in the middle of GC, and the last GC worker parked.
-                    trace!("GC is scheduled.  Try to find more work to do...");
+                    trace!("The last worker parked during GC.  Try to find more work to do...");
 
                     // During GC, if all workers parked, all open buckets must have been drained.
-                    self.assert_all_activated_buckets_are_empty(worker);
+                    self.assert_all_activated_buckets_are_empty();
 
                     // Find more work for workers to do.
                     let found_more_work = self.find_more_work_for_workers();
@@ -397,16 +389,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                         }
                     }
                 } else {
-                    trace!("GC is not scheduled.  Wait for the first GC.");
-                    // GC is not scheduled.  Do nothing.
-                    // Note that when GC worker threads has just been created, they will try to get
-                    // work packets to execute.  But since the first GC has not started, yet, there
-                    // is not any work packets to execute, yet.  Therefore, all workers will park,
-                    // and the last parked worker will reach here.  In that case, we should simply
-                    // let workers wait until the first GC starts, instead of trying to open more
-                    // buckets.
-                    // If a GC worker spuriously wakes up when GC is not scheduled, it should not
-                    // do anything, either.
+                    trace!("The last worker parked while not in GC.  Wait for GC to start.");
+                    // GC has not started, yet.  Do not try to open work buckets.
+                    //
+                    // This branch is usually reached when `initialize_colection` has just been
+                    // called and GC worker threads have just been created.  In that case, there is
+                    // no work packets to execute, and workers should park and wait for the first
+                    // GC.
+                    //
+                    // This branch can also be reached if a GC worker spuriously wakes up while not
+                    // in GC.
                     LastParkedResult::ParkSelf
                 }
             });
@@ -439,7 +431,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Called when GC has finished, i.e. when all work packets have been executed.
     /// Return `true` if it scheduled the next GC immediately.
     fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
-        // All GC workers (except this one) must have parked by now.
+        // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         debug_assert!(self.all_buckets_empty());
 
@@ -465,6 +457,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             mmtk.get_plan().get_total_pages(),
             elapsed.as_millis()
         );
+
+        // USDT tracepoint for the end of GC.
+        probe!(mmtk, gc_end);
 
         #[cfg(feature = "count_live_bytes_in_gc")]
         {
@@ -500,9 +495,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Set to NotInGC after everything, and right before resuming mutators.
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
-
-        // GC offically ends here.
-        probe!(mmtk, gc_end);
 
         // Notify the `GCRequester` that GC has finished.
         let should_schedule_gc_now = mmtk.gc_requester.on_gc_finished();
