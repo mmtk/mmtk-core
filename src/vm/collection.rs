@@ -30,8 +30,7 @@ pub trait Collection<VM: VMBinding> {
     /// This method may not be called by the same GC thread that called `stop_all_mutators`.
     ///
     /// Arguments:
-    /// * `tls`: The thread pointer for the GC worker.  Currently it is the tls of the embedded `GCWorker` instance
-    /// of the coordinator thread, but it is subject to change, and should not be depended on.
+    /// * `tls`: The thread pointer for the GC worker.
     fn resume_mutators(tls: VMWorkerThread);
 
     /// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC

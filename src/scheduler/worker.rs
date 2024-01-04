@@ -44,10 +44,6 @@ pub struct GCWorkerShared<VM: VMBinding> {
     #[cfg(feature = "count_live_bytes_in_gc")]
     live_bytes: AtomicUsize,
     /// A queue of GCWork that can only be processed by the owned thread.
-    ///
-    /// Note: Currently, designated work cannot be added from the GC controller thread, or
-    /// there will be synchronization problems.  If it is necessary to do so, we need to
-    /// update the code in `GCWorkScheduler::poll_slow` for proper synchornization.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
     pub stealer: Option<Stealer<Box<dyn GCWork<VM>>>>,
@@ -218,12 +214,10 @@ impl WorkerMonitorSync {
 }
 
 /// A GC worker.  This part is privately owned by a worker thread.
-/// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
 pub struct GCWorker<VM: VMBinding> {
     /// The VM-specific thread-local state of the GC thread.
     pub tls: VMWorkerThread,
-    /// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal
-    /// is usize::MAX if it is the embedded worker of the GC controller thread.
+    /// The ordinal of the worker, numbered from 0 to the number of workers minus one.
     pub ordinal: ThreadId,
     /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
@@ -231,9 +225,6 @@ pub struct GCWorker<VM: VMBinding> {
     copy: GCWorkerCopyContext<VM>,
     /// The reference to the MMTk instance.
     pub mmtk: &'static MMTK<VM>,
-    /// True if this struct is the embedded GCWorker of the controller thread.
-    /// False if this struct belongs to a standalone GCWorker thread.
-    is_coordinator: bool,
     /// Reference to the shared part of the GC worker.  It is used for synchronization.
     pub shared: Arc<GCWorkerShared<VM>>,
     /// Local work packet queue.
@@ -262,7 +253,6 @@ impl<VM: VMBinding> GCWorker<VM> {
         mmtk: &'static MMTK<VM>,
         ordinal: ThreadId,
         scheduler: Arc<GCWorkScheduler<VM>>,
-        is_coordinator: bool,
         shared: Arc<GCWorkerShared<VM>>,
         local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
     ) -> Self {
@@ -273,7 +263,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             copy: GCWorkerCopyContext::new_non_copy(),
             scheduler,
             mmtk,
-            is_coordinator,
             shared,
             local_work_buffer,
         }
@@ -305,11 +294,6 @@ impl<VM: VMBinding> GCWorker<VM> {
             return;
         }
         self.local_work_buffer.push(Box::new(work));
-    }
-
-    /// Is this worker a coordinator or a normal GC worker?
-    pub fn is_coordinator(&self) -> bool {
-        self.is_coordinator
     }
 
     /// Get the scheduler. There is only one scheduler per MMTk instance.
@@ -364,7 +348,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 }
 
-/// A worker group to manage all the GC workers (except the coordinator worker).
+/// A worker group to manage all the GC workers.
 pub(crate) struct WorkerGroup<VM: VMBinding> {
     /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
@@ -401,7 +385,6 @@ impl<VM: VMBinding> WorkerGroup<VM> {
                 mmtk,
                 ordinal,
                 mmtk.scheduler.clone(),
-                false,
                 shared.clone(),
                 unspawned_local_work_queues.pop().unwrap(),
             ));

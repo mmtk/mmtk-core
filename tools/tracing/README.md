@@ -15,7 +15,6 @@ Currently, the core provides the following tracepoints.
 - `mmtk:collection_initialized()`: GC is enabled
 - `mmtk:harness_begin()`: the timing iteration of a benchmark begins
 - `mmtk:harness_end()`: the timing iteration of a benchmark ends
-- `mmtk:gccontroller_run()`: the GC controller thread enters its work loop
 - `mmtk:gcworker_run()`: a GC worker thread enters its work loop
 - `mmtk:gc_start()`: a collection epoch starts
 - `mmtk:gc_end()`: a collection epoch ends

@@ -14,6 +14,9 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        // This is officially when a GC starts.
+        probe!(mmtk, gc_start);
+
         // Record the time when GC starts.
         {
             let mut guard = mmtk.state.gc_start_time.borrow_mut();

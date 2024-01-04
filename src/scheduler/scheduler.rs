@@ -79,7 +79,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.as_ref().worker_count()
     }
 
-    /// Create GC threads, including the controller thread and all workers.
+    /// Create GC threads, including all workers.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
         self.worker_group.spawn(mmtk, tls)
     }
@@ -501,6 +501,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
 
+        // GC offically ends here.
+        probe!(mmtk, gc_end);
+
         // Notify the `GCRequester` that GC has finished.
         let should_schedule_gc_now = mmtk.gc_requester.on_gc_finished();
         if should_schedule_gc_now {
@@ -542,14 +545,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.gc_requester.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
-        // Note: This is the only place where a non-coordinator thread opens a bucket.
-        // If the `StopMutators` is executed by the coordinator thread, it will open
-        // the `Prepare` bucket and let workers start executing packets while the coordinator
-        // can still add more work packets to `Prepare`.  However, since `Prepare` is the first STW
-        // bucket and only the coordinator can open any subsequent buckets, workers cannot execute
-        // work packets out of order.  This is not generally true if we are not opening the first
-        // STW bucket.  In the future, we should redesign the opening condition of work buckets to
-        // make the synchronization more robust,
+        // Note: This is the only place where a bucket is opened without having all workers parked.
+        // We usually require all workers to park before opening new buckets because otherwise
+        // packets will be executed out of order.  However, since `Prepare` is the first STW
+        // bucket, and all subsequent buckets require all workers to park before opening, workers
+        // cannot execute work packets out of order.  This is not generally true if we are not
+        // opening the first STW bucket.  In the future, we should redesign the opening condition
+        // of work buckets to make the synchronization more robust,
         first_stw_bucket.activate();
         self.worker_monitor.notify_work_available(true);
     }
