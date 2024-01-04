@@ -49,7 +49,7 @@ impl<VM: VMBinding> GCRequester<VM> {
 
             let should_schedule_gc = self.try_schedule_collection(&mut guard);
             if should_schedule_gc {
-                self.scheduler.mutator_schedule_collection();
+                self.scheduler.request_schedule_collection();
                 // Note: We do not clear `request_flag` now.  It will be cleared by `clear_request`
                 // after all mutators have stopped.
             }

@@ -98,6 +98,8 @@ pub(crate) struct WorkerMonitorSync {
     worker_count: usize,
     /// Number of parked workers.
     parked_workers: usize,
+    /// True if a mutator has requested the workers to schedule a GC.
+    should_schedule_gc: bool,
 }
 
 impl WorkerMonitor {
@@ -106,12 +108,26 @@ impl WorkerMonitor {
             sync: Mutex::new(WorkerMonitorSync {
                 worker_count,
                 parked_workers: 0,
+                should_schedule_gc: false,
             }),
             work_available: Default::default(),
         }
     }
 
-    /// Wake up workers when more work packets are made available for workers.
+    /// Request a GC worker to schedule the next GC.
+    /// Callable from mutator threads.
+    pub fn request_schedule_collection(&self) {
+        let mut guard = self.sync.lock().unwrap();
+        assert!(
+            !guard.should_schedule_gc,
+            "should_schedule_gc is already set"
+        );
+        guard.should_schedule_gc = true;
+        self.notify_work_available_inner(false, &mut guard);
+    }
+
+    /// Wake up workers when more work packets are made available for workers,
+    /// or a mutator has requested the GC workers to schedule a GC.
     /// This function is called when adding work packets to buckets.
     pub fn notify_work_available(&self, all: bool) {
         let mut guard = self.sync.lock().unwrap();
@@ -130,17 +146,15 @@ impl WorkerMonitor {
 
     /// Park a worker until work packets are available.
     /// If it is the last worker parked, `on_last_parked` will be called.
-    /// The return value of `on_last_parked` will determine whether this worker will block wait,
-    /// too, and whether other worker will be waken up.
+    /// The argument is true if `sync.gc_requested` is `true`,
+    /// and `sync.gc_requested` will be cleared to `false` regardless of its value.
+    /// The return value of `on_last_parked` will determine whether this worker will block and
+    /// wait, too, and whether other worker will be waken up.
     pub fn park_and_wait<VM, F>(&self, worker: &GCWorker<VM>, on_last_parked: F)
     where
         VM: VMBinding,
-        F: FnOnce() -> LastParkedResult,
+        F: FnOnce(bool) -> LastParkedResult,
     {
-        warn!("Sleep before acquiring self.sync...");
-        std::thread::sleep(std::time::Duration::from_millis(30));
-        warn!("Slept.  Now acquire self.sync...");
-
         let mut sync = self.sync.lock().unwrap();
 
         // Park this worker
@@ -157,7 +171,8 @@ impl WorkerMonitor {
 
         if all_parked {
             debug!("Worker {} is the last worker parked.", worker.ordinal);
-            let result = on_last_parked();
+            let should_schedule_gc = std::mem::replace(&mut sync.should_schedule_gc, false);
+            let result = on_last_parked(should_schedule_gc);
             match result {
                 LastParkedResult::ParkSelf => {
                     should_wait = true;
@@ -174,33 +189,61 @@ impl WorkerMonitor {
         }
 
         if should_wait {
-            // Note:
+            // Notes on CondVar usage:
+            //
+            // Conditional variables may spurious wake up.  Therefore, they are usually tested in a
+            // loop while holding a mutex
+            //
+            //      lock();
+            //      while condition() {
+            //          condvar.wait();
+            //      }
+            //      unlock();
+            //
+            // The actual condition for this `self.work_available.wait(sync)` is:
+            //
+            // 1.  any work packet is available, or
+            // 2.  a request for scheduling GC is submitted.
+            //
+            // But it is not used like the typical use pattern shown above, mainly because work
+            // packets can be added without holding the mutex `self.sync`.  This means one worker
+            // can add a new work packet (no mutex needed) right after another worker finds no work
+            // packets are available and then park.  In other words, condition (1) can suddenly
+            // become true after a worker sees it is false but before the worker blocks waiting on
+            // the CondVar.  If this happens, the last parked worker will block forever and never
+            // get notified.  This may happen if mutators or the previously existing "coordinator
+            // thread" can add work packets.
+            //
+            // However, after the "coordinator thread" was removed, only GC worker threads can add
+            // work packets during GC.  Parked workers (except the last parked worker) cannot make
+            // more work packets availble (by adding new packets or opening buckets).  For this
+            // reason, the **last** parked worker can be sure that after it finds no packets
+            // available, no other workers can add another work packet (because they all parked).
+            // So the **last** parked worker can open more buckets or declare GC finished.
+            //
+            // Condition (2), i.e. `sync.should_schedule_gc` is guarded by the mutator `sync`.
+            // When set (by a mutator via `request_schedule_collection`), it will notify a
+            // worker; and the last parked worker always checks it before waiting.  So this
+            // condition will not be set without any worker noticing.
+            //
+            // Note that generational barriers may add `ProcessModBuf` work packets when not in GC.
+            // This is benign because those work packets are not executed immediately, and are
+            // guaranteed to be executed in the next GC.
+            //
+            // Notes on spurious wake-up:
+            //
             // 1.  The condition variable `work_available` is guarded by `self.sync`.  Because the
             //     last parked worker is holding the mutex `self.sync` when executing
             //     `on_last_parked`, no workers can unpark (even if they spuriously wake up) during
             //     `on_last_parked` because they cannot re-acquire the mutex `self.sync`.
+            //
             // 2.  Workers may spuriously wake up and unpark when `on_last_parked` is not being
             //     executed (including the case when the last parked worker is waiting here, too).
-            //     Spurious wake-up is safe because the actual condition for this `cond.wait` is
-            //     "more work is available".  If a worker spuriously wakes up, then in the next
-            //     loop iteration, it will call `poll_schedulable_work`, and find no work packets
-            //     to execute.  Then the worker will reach here again and wait.
-            // 3.  Mutators may add a `ScheduleCollection` work packet via `GCRequester` to trigger
-            //     GC.  It is the only case where a work packet is added by a thread that is not a
-            //     GC worker.  Because the mutator must hold the mutex `self.sync` to notify GC
-            //     workers when adding a work packet to a bucket, either of the two can happen:
-            //     1.  The mutator called `work_available.notify_one` after the worker has called
-            //         `wait`, in which case one worker (not necessarily the last parked worker)
-            //         will be waken up.
-            //     2.  The mutator notified when the last worker has just entered this function.
-            //         In that case, ... Oh no!  All workers sleep forever!
-            warn!("Now wait...");
-            if rand::random::<bool>() {
-                sync = self.work_available.wait(sync).unwrap();
-                warn!("Out from wait.");
-            } else {
-                warn!("Emulated spurious wakeup.");
-            }
+            //     If one or more GC workers spuriously wake up, they will check for work packets,
+            //     and park again if not available.  The last parked worker will ensure the two
+            //     conditions listed above are both false before blocking.  If either condition is
+            //     true, the last parked worker will take action.
+            sync = self.work_available.wait(sync).unwrap();
         }
 
         // Unpark this worker.
