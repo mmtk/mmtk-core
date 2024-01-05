@@ -1,24 +1,33 @@
 use crate::scheduler::GCWorkScheduler;
 use crate::vm::VMBinding;
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 struct RequestSync {
-    /// Has the GCRequester called `GCWorkScheduler::schedule_collection` for the current request?
-    /// This flag exists so that once `GCRequester` called `GCWorkScheduler::schedule_collection`,
-    /// it cannot call it again until the GC it initiated finished.
+    /// Are the GC workers already aware that we requested a GC?
+    ///
+    /// Mutators call `GCRequester::request()` to trigger GC.  It communicates with workers by
+    /// calling `GCWorkScheduler::request_schedule_collection`.  Under the hood, it sets a
+    /// synchronized variable and notifies one worker.  Conceptually, it is sending a message to GC
+    /// workers.
+    ///
+    /// The purpose of this variable is preventing the message above from being sent while GC
+    /// workers are still doing GC.  This is mainly significant for concurrent GC.  In the current
+    /// design (inherited from JikesRVM), `request_flag` is cleared when all mutators are
+    /// suspended, at which time GC is still in progress.  If `GCRequester::request()` is called
+    /// after `request_flag` is cleared but before `on_gc_finished` is called, the mutator will not
+    /// send the message.  But GC workers will check `request_flag` when GC finishes, and schedule
+    /// the next GC.
     gc_scheduled: bool,
 }
 
-/// This data structure lets mutators trigger GC, and may schedule collection when appropriate.
+/// This data structure lets mutators trigger GC.
 pub struct GCRequester<VM: VMBinding> {
     request_sync: Mutex<RequestSync>,
     /// An atomic flag outside `RequestSync` so that mutators can check if GC has already been
     /// requested in `poll` without acquiring the mutex.
     request_flag: AtomicBool,
     scheduler: Arc<GCWorkScheduler<VM>>,
-    phantom: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> GCRequester<VM> {
@@ -29,12 +38,11 @@ impl<VM: VMBinding> GCRequester<VM> {
             }),
             request_flag: AtomicBool::new(false),
             scheduler,
-            phantom: PhantomData,
         }
     }
 
     /// Request a GC.  Called by mutators when polling (during allocation) and when handling user
-    /// GC requests (e.g. `System.gc();` in Java);
+    /// GC requests (e.g. `System.gc();` in Java).
     pub fn request(&self) {
         // Note: This is the double-checked locking algorithm.
         // The load has the `Relaxed` order instead of `Acquire` because we are not doing lazy
@@ -54,12 +62,6 @@ impl<VM: VMBinding> GCRequester<VM> {
                 // after all mutators have stopped.
             }
         }
-    }
-
-    /// Returns true if GC has been scheduled.
-    pub fn is_gc_scheduled(&self) -> bool {
-        let guard = self.request_sync.lock().unwrap();
-        guard.gc_scheduled
     }
 
     /// Clear the "GC requested" flag so that mutators can trigger the next GC.
@@ -82,16 +84,12 @@ impl<VM: VMBinding> GCRequester<VM> {
 
     /// Decide whether we should schedule a new collection.  Will transition the state of
     /// `gc_scheduled` from `false` to `true` if we should schedule a new collection.
+    ///
     /// Return `true` if the state transition happens.
     fn try_schedule_collection(&self, sync: &mut RequestSync) -> bool {
-        // The time to schedule a collection is when `request_flag` is `true` but `gc_scheduled`
-        // is `false`.  `gc_scheduled` is `true` if either
-        //
-        // 1.  another mutator called `request()` concurrently and scheduled a collection, or
-        // 2.  a new GC is requested while the current GC is still in progress.
-        //
-        // If `gc_scheduled` is `true` when GC is requested, we do nothing now.  But when the
-        // currrent GC finishes, a GC worker will call `on_gc_finished` which clears the
+        // The time to schedule a collection is when `request_flag` is `true` but `gc_scheduled` is
+        // `false`.  If `gc_scheduled` is `true` when GC is requested, we do nothing now.  But when
+        // the currrent GC finishes, a GC worker will call `on_gc_finished` which clears the
         // `gc_scheduled` flag, and checks the `request_flag` again to trigger the next GC.
         if self.request_flag.load(Ordering::Relaxed) && !sync.gc_scheduled {
             sync.gc_scheduled = true;

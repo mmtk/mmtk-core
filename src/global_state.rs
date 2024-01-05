@@ -233,13 +233,20 @@ impl Default for GlobalState {
     }
 }
 
-/// GC status, an indicator of whether MMTk is in the progress of a GC or not.
+/// GC status.
 ///
-/// This type was only used for assertions in JikesRVM.  After we removed the coordinator (a.k.a.
-/// controller) thread, we use the GC status to decide whether GC workers should open new work
-/// buckets when the last worker parked.
-// FIXME: `GcProper` is inherited from JikesRVM, but it is not used in MMTk core.  Consider
-// removing it.
+/// -   It starts in the `NotInGC` state.
+/// -   It enters `GcPrepare` when GC starts (i.e. when `ScheduleCollection` is executed).
+/// -   It enters `GcProper` when all mutators have stopped.
+/// -   It returns to `NotInGC` when GC finishes.
+///
+/// All states except `NotInGC` are considered "in GC".
+///
+/// The status is checked by GC workers.  The last parked worker only tries to open new buckets
+/// during GC.
+///
+/// The distinction between `GcPrepare` and `GcProper` is inherited from JikesRVM.  Several
+/// assertions in JikesRVM involve those two states.
 #[derive(PartialEq, Clone, Copy, NoUninit, Debug)]
 #[repr(u8)]
 pub enum GcStatus {

@@ -82,13 +82,16 @@ pub(crate) enum LastParkedResult {
     WakeAll,
 }
 
-/// A data structure for parking and waking up workers.
-/// It keeps track of the number of workers parked, and allow the last parked worker to perform
-/// operations that can only be performed when all workers have parked.
+/// A data structure for synchronizing workers.
+///
+/// -   It allows workers to park and unpark.  It keeps track of the number of workers parked, and
+///     allows the last parked worker to perform operations that can only be performed when all
+///     workers have parked.
+/// -   It allows mutators to notify workers to schedule a GC.
 pub(crate) struct WorkerMonitor {
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
-    /// This is notified when new work is made available for the workers.
+    /// This is notified when new work packets are available, or a mutator has requested GC.
     work_available: Condvar,
 }
 
@@ -99,6 +102,10 @@ pub(crate) struct WorkerMonitorSync {
     /// Number of parked workers.
     parked_workers: usize,
     /// True if a mutator has requested the workers to schedule a GC.
+    ///
+    /// Consider this as a one-element message queue.  The last parked worker will poll this
+    /// "queue" by reading this field and setting it to `false`.  The last parked worker will
+    /// schedule a GC whenever seeing `true` in this field.
     should_schedule_gc: bool,
 }
 
@@ -128,7 +135,6 @@ impl WorkerMonitor {
 
     /// Wake up workers when more work packets are made available for workers,
     /// or a mutator has requested the GC workers to schedule a GC.
-    /// This function is called when adding work packets to buckets.
     pub fn notify_work_available(&self, all: bool) {
         let mut guard = self.sync.lock().unwrap();
         self.notify_work_available_inner(all, &mut guard);
@@ -144,12 +150,12 @@ impl WorkerMonitor {
         }
     }
 
-    /// Park a worker until work packets are available.
+    /// Park a worker and wait on the CondVar `work_available`.
+    ///
     /// If it is the last worker parked, `on_last_parked` will be called.
-    /// The argument is true if `sync.gc_requested` is `true`,
-    /// and `sync.gc_requested` will be cleared to `false` regardless of its value.
-    /// The return value of `on_last_parked` will determine whether this worker will block and
-    /// wait, too, and whether other worker will be waken up.
+    /// The argument of `on_last_parked` is true if `sync.gc_requested` is `true`.
+    /// The return value of `on_last_parked` will determine whether this worker and other workers
+    /// will wake up or block waiting.
     pub fn park_and_wait<VM, F>(&self, worker: &GCWorker<VM>, on_last_parked: F)
     where
         VM: VMBinding,
@@ -191,8 +197,7 @@ impl WorkerMonitor {
         if should_wait {
             // Notes on CondVar usage:
             //
-            // Conditional variables may spurious wake up.  Therefore, they are usually tested in a
-            // loop while holding a mutex
+            // Conditional variables are usually tested in a loop while holding a mutex
             //
             //      lock();
             //      while condition() {
@@ -229,7 +234,7 @@ impl WorkerMonitor {
             // Note that generational barriers may add `ProcessModBuf` work packets when not in GC.
             // This is benign because those work packets are not executed immediately, and are
             // guaranteed to be executed in the next GC.
-            //
+
             // Notes on spurious wake-up:
             //
             // 1.  The condition variable `work_available` is guarded by `self.sync`.  Because the

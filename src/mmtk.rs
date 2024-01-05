@@ -344,6 +344,8 @@ impl<VM: VMBinding> MMTK<VM> {
         self.state
             .internal_triggered_collection
             .store(true, Ordering::Relaxed);
+        // TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
+        // Consider removing functions related to "internal triggered collection".
         self.gc_requester.request();
     }
 
