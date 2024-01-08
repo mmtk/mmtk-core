@@ -23,15 +23,14 @@ pub trait ReferenceGlue<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `new_reference`: The reference whose referent is to be cleared.
-    fn clear_referent(new_reference: ObjectReference) {
-        Self::set_referent(new_reference, ObjectReference::NULL);
-    }
+    fn clear_referent(new_reference: ObjectReference);
 
     /// Get the referent from a weak reference object.
     ///
     /// Arguments:
-    /// * `object`: The object reference.
-    fn get_referent(object: ObjectReference) -> ObjectReference;
+    /// * `object`: Reference to the referent.  `None`` if the object currently does not point to a
+    ///   referent.  This may happen if the reference has been cleared.
+    fn get_referent(object: ObjectReference) -> Option<ObjectReference>;
 
     /// Set the referent in a weak reference object.
     ///
@@ -39,14 +38,6 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// * `reff`: The object reference for the reference.
     /// * `referent`: The referent object reference.
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
-
-    /// Check if the referent has been cleared.
-    ///
-    /// Arguments:
-    /// * `referent`: The referent object reference.
-    fn is_referent_cleared(referent: ObjectReference) -> bool {
-        referent.is_null()
-    }
 
     /// For weak reference types, if the referent is cleared during GC, the reference
     /// will be added to a queue, and MMTk will call this method to inform

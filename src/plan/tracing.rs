@@ -117,7 +117,7 @@ impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
         {
             use crate::vm::edge_shape::Edge;
             trace!(
-                "(ObjectsClosure) Visit edge {:?} (pointing to {})",
+                "(ObjectsClosure) Visit edge {:?} (pointing to {:?})",
                 slot,
                 slot.load()
             );
