@@ -61,7 +61,7 @@ jobs:
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       # run
       - name: Performance Run
         run: |
@@ -137,7 +137,7 @@ jobs:
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       # run
       - name: Performance Run
         run: |
@@ -207,7 +207,7 @@ jobs:
           rm -rf mmtk-openjdk/repos/openjdk/build
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
