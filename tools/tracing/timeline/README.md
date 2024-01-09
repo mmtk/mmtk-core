@@ -21,7 +21,14 @@ Run the following command with a **normal** user (*not* as `root` or using `sudo
 ./capture.py -e 50 -m /path/to/libmmtk_openjdk.so
 ```
 
-`-e 50` means we only capture one GC in every 50 GCs because otherwise it will record too much log.
+`-e 50` means we only capture one GC in every 50 GCs because otherwise it will have to print too
+much log.  (Note: Printing in bpftrace is done via a fixed-size user/kernel space buffer, therefore
+excessive printing will overrun the buffer and cause events to be dropped.  The `-e` option helps
+reducing the volume of log, thereby reducing the likelihood of buffer overrun and the time for
+post-processing.  If one single GC still produces too much log and overruns the buffer, the user
+should consider setting the `BPFTRACE_PERF_RB_PAGES` environment variable.  See the man page of
+`bpftrace`.)
+
 Replace `/path/to/libmmtk_openjdk.so` with the actual path to the `.so` that contains MMTk and its
 binding.
 

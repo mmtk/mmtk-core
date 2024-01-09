@@ -37,7 +37,7 @@ class LogProcessor:
         type_name = right.strip()
         if type_name == "":
             # bpftrace sometimes sees empty strings when using the `str` function
-            # See https://github.com/mmtk/mmtk-core/issues/1020
+            # See the "Known issues" section in README.md
             type_name = UNKNOWN_TYPE
         self.type_id_name[type_id] = type_name
 
