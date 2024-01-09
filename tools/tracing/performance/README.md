@@ -51,7 +51,7 @@ If you use `-H`, the tracing tools will automatically end with `harness_end` is
 called.
 Otherwise, you will need to terminate the tools manually with `Ctrl-C`.
 These tools also have a timeout of 1200 seconds so not to stall unattended
-benchmark execution. 
+benchmark execution.
 
 ## Tracing tools
 ### Measuring the time spend in allocation slow path (`alloc_slow`)
@@ -61,7 +61,7 @@ fidelity better.
 
 Sample output:
 ```
-@alloc_slow_hist: 
+@alloc_slow_hist:
 [4, 8)               304 |@                                                   |
 [8, 16)            12603 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
 [16, 32)            8040 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                   |
@@ -160,7 +160,7 @@ count root edges separately.
 
 Sample output:
 ```
-@process_edges_packet_size: 
+@process_edges_packet_size:
 [1]                  238 |@@@@@                                               |
 [2, 4)               806 |@@@@@@@@@@@@@@@@@                                   |
 [4, 8)              1453 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                     |
@@ -177,7 +177,7 @@ Sample output:
 [8K, 16K)             58 |@                                                   |
 [16K, 32K)             5 |                                                    |
 
-@process_edges_root_packet_size: 
+@process_edges_root_packet_size:
 [1]                   71 |@@@@@@@                                             |
 [2, 4)                 4 |                                                    |
 [4, 8)               276 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@                        |

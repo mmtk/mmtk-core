@@ -59,7 +59,7 @@ def main():
         # the command line, Ctrl-C will be captured by bpftrace instead of the
         # outer Python script. The temporary file can then be cleaned up by
         # the END probe in bpftrace.
-        # 
+        #
         # In theory, you can implement this via pty, but it is very finicky
         # and doesn't work reliably.
         # See also https://github.com/anupli/running-ng/commit/b74e3a13f56dd97f73432d8a391e1d6cd9db8663
