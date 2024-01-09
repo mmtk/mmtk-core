@@ -128,6 +128,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             )
         }
     }
+
+    fn debug_get_size(&self) -> Option<usize> {
+        Some(self.modbuf.len())
+    }
 }
 
 /// The array-copy modbuf contains a list of array slices in mature space(s) that
@@ -171,5 +175,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
                 mmtk,
             )
         }
+    }
+
+    fn debug_get_size(&self) -> Option<usize> {
+        Some(self.modbuf.len())
     }
 }

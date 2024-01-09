@@ -692,6 +692,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
         }
         trace!("ProcessEdgesWork End");
     }
+
+    fn debug_get_size(&self) -> Option<usize> {
+        Some(self.edges.len())
+    }
 }
 
 /// A general process edges implementation using SFT. A plan can always implement their own process edges. However,
@@ -952,6 +956,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
         self.do_work_common(&self.buffer, worker, mmtk);
         trace!("ScanObjects End");
     }
+
+    fn debug_get_size(&self) -> Option<usize> {
+        Some(self.buffer.len())
+    }
 }
 
 use crate::mmtk::MMTK;
@@ -1094,6 +1102,10 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
         trace!("PlanScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
         trace!("PlanScanObjects End");
+    }
+
+    fn debug_get_size(&self) -> Option<usize> {
+        Some(self.buffer.len())
     }
 }
 
