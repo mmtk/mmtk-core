@@ -384,6 +384,13 @@ impl<VM: VMBinding> GCWorker<VM> {
             // probe! expands to an empty block on unsupported platforms
             #[allow(unused_variables)]
             let typename = work.get_type_name();
+
+            #[cfg(feature = "bpftrace_workaround")]
+            // Workaround a problem where bpftrace script cannot see the work packet names,
+            // by force loading from the packet name.
+            // See the "Known issues" section in `tools/tracing/timeline/README.md`
+            std::hint::black_box(unsafe { *(typename.as_ptr()) });
+
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(self, mmtk);
         }

@@ -122,3 +122,24 @@ like this:
 
 ![Perfetto UI timeline](./perfetto-example.png)
 
+## Known issues
+
+### "(unknonwn:xxxx)" work packet names
+
+When `bpftrace` reads the work packet names at the `work` USDT trace points, it sometimes sees the
+string contents are all '\0'.  It is likely a result of lazy mmap.  The packet name is obtained by
+`std::any::type_name` which is currently implemented using debug information.  It is likely that the
+string contents are not mmapped at the time when `bpftrace` reads it from outside the process.
+
+The `visualize.py` script uses the place-holder `(unknown:xxxx)` for such strings, where `xxxx` is
+the addresses of the strings.
+
+**Enable the `bpftrace_workaround` feature** of `mmtk-core` to work around this problem.  It forces
+a load from the packet name before the trace point to ensure the string is mapped.  It adds a tiny
+overhead, so it is not enabled by default.
+
+See: https://github.com/mmtk/mmtk-core/issues/1020
+
+<!--
+vim: ts=4 sw=4 sts=4 et tw=100
+-->

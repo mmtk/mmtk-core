@@ -60,7 +60,10 @@ usdt:$MMTK:mmtk:work_poll {
 
 usdt:$MMTK:mmtk:work {
     @thread_in_work[tid] = 1;
-    if (!(@decoded[arg0]) && @gc_count >= 2) {
+    if (!@decoded[arg0]) {
+        // Note: The address of the work packet name is correct, but sometimes bpftrace sees the
+        // characters in the packet name string to be all '\0'.
+        // See the "Known issues" section of README.md
         @type_name[arg0] = str(arg0, arg1);
         @decoded[arg0] = 1;
     }
