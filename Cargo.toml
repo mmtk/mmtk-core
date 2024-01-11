@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.22.0"
+version = "0.22.1"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -38,7 +38,7 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"]
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
 # MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
-mmtk-macros = { version="0.22.0", path = "macros/" }
+mmtk-macros = { version="0.22.1", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
