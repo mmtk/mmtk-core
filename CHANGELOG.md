@@ -1,3 +1,12 @@
+0.22.1 (2024-01-11)
+===
+
+## What's Changed
+
+* Revert a mistake in v0.22 that prevents cargo publish by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1065
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.22.0...v0.22.1
+
 0.22.0 (2023-12-21)
 ===
 
