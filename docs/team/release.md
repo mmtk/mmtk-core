@@ -81,7 +81,13 @@ Once the PRs are merged, we can tag releases on Github.
 2. Keep an eye on the CI status for the latest commit in MMTk core.
 3. Do point release for fixing severe issues. Currently we normally do not need point releases. Normal bug fixes or any other issues can be fixed in the next release.
    But in rare cases, such as the current tagged release cannot build, cannot run, or it somehow fails in publishing, we may need to do a point release.
-   * If there is no other commit in `master` yet, doing a point release follows exactly the same process above. Depending on the changes, we may or may not need a point release
-     for the bindings.
-   * If there are commits in `master` that we do not want to include in the point release, the point release should be in a separate branch in the upstream repository.
-     The changes for the point release should be merged back to `master`.
+
+### Point release
+
+   1. Create a pull request to fix the issue.
+   2. Create a pull request to bump the version number, following the same process [above](#create-prs-to-bump-the-version-number).
+   3. Once the PRs are merged,
+      * Create a branch in the main repository based on the last release `v0.x.y` (from `master` or from the last point release branch), named with the new point release version, such as `v0.x.y+1`.
+      * Cherry pick commits from `master` that should be included in the new point release.
+      * Tag a release from the branch, following the same process [above](#tag-releases).
+      * If there is no other commit in `master` yet, there is no need to create a different branch for the release, and we can tag a release from `master`.

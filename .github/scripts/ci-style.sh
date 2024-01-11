@@ -42,3 +42,9 @@ style_check_auxiliary_crate() {
 }
 
 style_check_auxiliary_crate macros
+
+# --- cargo publish dry run ---
+# Main crate
+cargo publish --dry-run
+# Macros
+cargo publish --dry-run --manifest-path=macros/Cargo.toml
