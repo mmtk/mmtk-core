@@ -37,7 +37,7 @@ jobs:
 
           for n in {1..5}; do
               echo "Attempt #"$n
-              false && { success=true; break; }
+              cargo publish && { success=true; break; }
               echo "Wait for Retry #"$n
               sleep 60
           done
