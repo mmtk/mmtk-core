@@ -32,7 +32,7 @@ If the current version is `0.X.x`, the new version should be `0.X+1.0`.
 The PR should include these changes:
 
 1. Bump version in `Cargo.toml`.
-2. Bump version in `macros/Cargo.toml`.
+2. Bump version in `macros/Cargo.toml`. Use the new version for the `mmtk-macros` dependency in `Cargo.toml`.
 3. Update `CHANGELOG.md`:
    1. Add a section for the new version number and the cut-off date (when the PR is created)
    2. Add change logs for the release. The following shows one convenient way to do it. If there is a better way, we should adopt.
