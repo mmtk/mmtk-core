@@ -99,6 +99,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     fn add_schedule_collection_packet(&self) {
+        // We set the eBPF trace point here so that bpftrace scripts can start recording work
+        // packet events before the `ScheduleCollection` work packet starts.
+        probe!(mmtk, gc_start);
+
         // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
