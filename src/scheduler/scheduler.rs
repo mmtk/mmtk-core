@@ -443,7 +443,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
 
         // No reqeusts.  Park this worker, too.
-        return LastParkedResult::ParkSelf;
+        LastParkedResult::ParkSelf
     }
 
     /// Find more work for workers to do.  Return true if more work is available.

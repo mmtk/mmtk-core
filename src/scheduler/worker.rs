@@ -117,7 +117,10 @@ pub(crate) struct WorkerGoals {
 /// The thing workers are currently doing.  This affects several things, such as what the last
 /// parked worker will do, and whether workers will stop themselves.
 pub(crate) enum WorkerGoal {
-    Gc { start_time: std::time::Instant },
+    Gc {
+        start_time: std::time::Instant,
+    },
+    #[allow(unused)] // TODO: Implement forking support later.
     StopForFork,
 }
 
@@ -150,7 +153,7 @@ impl WorkerMonitor {
     /// Callable from mutator threads.
     pub fn request_schedule_collection(&self) {
         let mut guard = self.sync.lock().unwrap();
-        if guard.goals.requests.gc == false {
+        if !guard.goals.requests.gc {
             guard.goals.requests.gc = true;
             self.notify_work_available_inner(false, &mut guard);
         }
