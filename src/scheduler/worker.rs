@@ -91,8 +91,9 @@ pub(crate) enum LastParkedResult {
 pub(crate) struct WorkerMonitor {
     /// The synchronized part.
     sync: Mutex<WorkerMonitorSync>,
-    /// This is notified when new work packets are available, or a mutator has requested GC.
-    work_available: Condvar,
+    /// Notified if workers have anything to do.  That include any work packets available, and any
+    /// field in `sync.goals.requests` set to true.
+    have_anything_to_do: Condvar,
 }
 
 /// The synchronized part of `WorkerMonitor`.
@@ -101,12 +102,36 @@ pub(crate) struct WorkerMonitorSync {
     worker_count: usize,
     /// Number of parked workers.
     parked_workers: usize,
-    /// True if a mutator has requested the workers to schedule a GC.
-    ///
-    /// Consider this as a one-element message queue.  The last parked worker will poll this
-    /// "queue" by reading this field and setting it to `false`.  The last parked worker will
-    /// schedule a GC whenever seeing `true` in this field.
-    should_schedule_gc: bool,
+    /// Current and requested goals.
+    goals: WorkerGoals,
+}
+
+#[derive(Default)]
+pub(crate) struct WorkerGoals {
+    /// What are the workers doing now?
+    pub(crate) current: Option<WorkerGoal>,
+    /// Requests received from mutators.
+    pub(crate) requests: WorkerRequests,
+}
+
+/// The thing workers are currently doing.  This affects several things, such as what the last
+/// parked worker will do, and whether workers will stop themselves.
+pub(crate) enum WorkerGoal {
+    Gc { start_time: std::time::Instant },
+    StopForFork,
+}
+
+/// Reqeusts received from mutators.  Workers respond to those requests when they do not have a
+/// current goal.  Multiple things can be requested at the same time, and workers respond to the
+/// thing with the highest priority.
+///
+/// The fields of this structs are ordered with decreasing priority.
+#[derive(Default)] // All fields should be false by default.
+pub(crate) struct WorkerRequests {
+    /// The VM needs to fork.  Workers should save their contexts and exit.
+    pub(crate) stop_for_fork: bool,
+    /// GC is requested.  Workers should schedule a GC.
+    pub(crate) gc: bool,
 }
 
 impl WorkerMonitor {
@@ -115,9 +140,9 @@ impl WorkerMonitor {
             sync: Mutex::new(WorkerMonitorSync {
                 worker_count,
                 parked_workers: 0,
-                should_schedule_gc: false,
+                goals: Default::default(),
             }),
-            work_available: Default::default(),
+            have_anything_to_do: Default::default(),
         }
     }
 
@@ -125,12 +150,10 @@ impl WorkerMonitor {
     /// Callable from mutator threads.
     pub fn request_schedule_collection(&self) {
         let mut guard = self.sync.lock().unwrap();
-        assert!(
-            !guard.should_schedule_gc,
-            "should_schedule_gc is already set"
-        );
-        guard.should_schedule_gc = true;
-        self.notify_work_available_inner(false, &mut guard);
+        if guard.goals.requests.gc == false {
+            guard.goals.requests.gc = true;
+            self.notify_work_available_inner(false, &mut guard);
+        }
     }
 
     /// Wake up workers when more work packets are made available for workers,
@@ -144,9 +167,9 @@ impl WorkerMonitor {
     /// mutex of `WorkerMonitorSync`.
     fn notify_work_available_inner(&self, all: bool, _guard: &mut MutexGuard<WorkerMonitorSync>) {
         if all {
-            self.work_available.notify_all();
+            self.have_anything_to_do.notify_all();
         } else {
-            self.work_available.notify_one();
+            self.have_anything_to_do.notify_one();
         }
     }
 
@@ -159,7 +182,7 @@ impl WorkerMonitor {
     pub fn park_and_wait<VM, F>(&self, worker: &GCWorker<VM>, on_last_parked: F)
     where
         VM: VMBinding,
-        F: FnOnce(bool) -> LastParkedResult,
+        F: FnOnce(&mut WorkerGoals) -> LastParkedResult,
     {
         let mut sync = self.sync.lock().unwrap();
 
@@ -177,8 +200,7 @@ impl WorkerMonitor {
 
         if all_parked {
             debug!("Worker {} is the last worker parked.", worker.ordinal);
-            let should_schedule_gc = std::mem::replace(&mut sync.should_schedule_gc, false);
-            let result = on_last_parked(should_schedule_gc);
+            let result = on_last_parked(&mut sync.goals);
             match result {
                 LastParkedResult::ParkSelf => {
                     should_wait = true;
@@ -248,7 +270,7 @@ impl WorkerMonitor {
             //     and park again if not available.  The last parked worker will ensure the two
             //     conditions listed above are both false before blocking.  If either condition is
             //     true, the last parked worker will take action.
-            sync = self.work_available.wait(sync).unwrap();
+            sync = self.have_anything_to_do.wait(sync).unwrap();
         }
 
         // Unpark this worker.

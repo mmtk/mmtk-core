@@ -1,11 +1,11 @@
 use super::gc_work::ScheduleCollection;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, ThreadId, WorkerGroup, WorkerMonitor};
+use super::worker::{GCWorker, ThreadId, WorkerGoals, WorkerGroup, WorkerMonitor};
 use super::*;
 use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
-use crate::scheduler::worker::LastParkedResult;
+use crate::scheduler::worker::{LastParkedResult, WorkerGoal};
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
@@ -16,6 +16,7 @@ use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
@@ -99,10 +100,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
     fn add_schedule_collection_packet(&self) {
-        // We set the eBPF trace point here so that bpftrace scripts can start recording work
-        // packet events before the `ScheduleCollection` work packet starts.
-        probe!(mmtk, gc_start);
-
         // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
         self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
     }
@@ -370,57 +367,83 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
 
             self.worker_monitor
-                .park_and_wait(worker, |should_schedule_gc| {
-                    self.on_last_parked(worker, should_schedule_gc)
-                });
+                .park_and_wait(worker, |goals| self.on_last_parked(worker, goals));
         }
     }
 
     /// Called when the last worker parked.
     /// `should_schedule_gc` is true if a mutator requested a GC.
-    fn on_last_parked(&self, worker: &GCWorker<VM>, should_schedule_gc: bool) -> LastParkedResult {
-        // Test whether this is happening during GC.
-        if worker.mmtk.gc_in_progress() {
-            assert!(
-                !should_schedule_gc,
-                "GC request sent to WorkerMonitor while GC is still in progress."
-            );
+    fn on_last_parked(&self, worker: &GCWorker<VM>, goals: &mut WorkerGoals) -> LastParkedResult {
+        let Some(ref current_goal) = goals.current else {
+            // There is no goal.  Find a request to respond to.
+            return self.respond_to_requests(goals);
+        };
 
-            // We are in the middle of GC, and the last GC worker parked.
-            trace!("The last worker parked during GC.  Try to find more work to do...");
+        match current_goal {
+            worker::WorkerGoal::Gc { start_time } => {
+                // We are in the progress of GC.
 
-            // During GC, if all workers parked, all open buckets must have been drained.
-            self.assert_all_activated_buckets_are_empty();
+                // In stop-the-world GC, mutators cannot request for GC while GC is in progress.
+                // When we support concurrent GC, we should remove this assertion.
+                assert!(
+                    !goals.requests.gc,
+                    "GC request sent to WorkerMonitor while GC is still in progress."
+                );
 
-            // Find more work for workers to do.
-            let found_more_work = self.find_more_work_for_workers();
+                // We are in the middle of GC, and the last GC worker parked.
+                trace!("The last worker parked during GC.  Try to find more work to do...");
 
-            if found_more_work {
-                LastParkedResult::WakeAll
-            } else {
-                // GC finished.
-                let scheduled_next_gc = self.on_gc_finished(worker);
-                if scheduled_next_gc {
-                    LastParkedResult::WakeSelf
+                // During GC, if all workers parked, all open buckets must have been drained.
+                self.assert_all_activated_buckets_are_empty();
+
+                // Find more work for workers to do.
+                let found_more_work = self.find_more_work_for_workers();
+
+                if found_more_work {
+                    LastParkedResult::WakeAll
                 } else {
-                    LastParkedResult::ParkSelf
+                    // GC finished.
+                    self.on_gc_finished(worker, start_time);
+
+                    // Clear the current goal
+                    goals.current = None;
+                    self.respond_to_requests(goals)
                 }
             }
-        } else {
-            trace!(
-                "The last worker parked while not in GC.  should_schedule_gc: {}",
-                should_schedule_gc
-            );
-
-            if should_schedule_gc {
-                // A mutator requested a GC to be scheduled.
-                self.add_schedule_collection_packet();
-                LastParkedResult::WakeSelf
-            } else {
-                // Wait until GC is requested.
-                LastParkedResult::ParkSelf
+            worker::WorkerGoal::StopForFork => {
+                // A worker parked again when it is asked to exit.
+                unimplemented!()
             }
         }
+    }
+
+    /// Respond to a worker reqeust.
+    fn respond_to_requests(&self, goals: &mut WorkerGoals) -> LastParkedResult {
+        assert!(goals.current.is_none());
+
+        if goals.requests.gc {
+            // A mutator requested a GC to be scheduled.
+            goals.requests.gc = false;
+
+            // We set the eBPF trace point here so that bpftrace scripts can start recording work
+            // packet events before the `ScheduleCollection` work packet starts.
+            probe!(mmtk, gc_start);
+
+            goals.current = Some(WorkerGoal::Gc {
+                start_time: Instant::now(),
+            });
+
+            self.add_schedule_collection_packet();
+            return LastParkedResult::WakeSelf;
+        }
+
+        if goals.requests.stop_for_fork {
+            // The VM wants to fork.  GC threads should exit.
+            unimplemented!()
+        }
+
+        // No reqeusts.  Park this worker, too.
+        return LastParkedResult::ParkSelf;
     }
 
     /// Find more work for workers to do.  Return true if more work is available.
@@ -448,7 +471,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
     /// Return `true` if it scheduled the next GC immediately.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>) -> bool {
+    fn on_gc_finished(&self, worker: &GCWorker<VM>, start_time: &Instant) {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         debug_assert!(self.all_buckets_empty());
@@ -463,11 +486,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
 
         // Compute the elapsed time of the GC.
-        let gc_start = {
-            let mut guard = mmtk.state.gc_start_time.borrow_mut();
-            guard.take().expect("gc_start_time was not set")
-        };
-        let elapsed = gc_start.elapsed();
+        let elapsed = start_time.elapsed();
 
         info!(
             "End of GC ({}/{} pages, took {} ms)",
@@ -513,28 +532,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Set to NotInGC after everything, and right before resuming mutators.
         mmtk.set_gc_status(GcStatus::NotInGC);
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
-
-        // Notify the `GCRequester` that GC has finished.
-        let should_schedule_gc_now = mmtk.gc_requester.on_gc_finished();
-        if should_schedule_gc_now {
-            // We should schedule the next GC immediately.  This means GC was triggered between
-            // `clear_request` (when stacks were scanned) and `on_gc_finished` (right above).  This
-            // can happen if
-            // 1.  It is concurrent GC, and a mutator triggered another GC while the current GC was
-            //     still running, or
-            // 2.  It is STW GC, but after the invocation of `resume_mutators` above, one mutator
-            //     ran so fast that it triggered a GC before we called `on_gc_finished`.
-            debug!("GC already requested before `on_gc_finished`.  Schedule GC now.");
-            self.add_schedule_collection_packet();
-            true
-        } else {
-            // Note that if a mutator attempts to request GC after `on_gc_finished`, it will call
-            // `request_schedule_collection`, but will block on the mutex `WorkerMonitor::sync`
-            // because the current GC worker is holding it.  After the current worker calls
-            // `work_available.wait()`, the mutator will continue and wake up a GC worker (not
-            // necessarily this one) to schedule the GC.
-            false
-        }
     }
 
     pub fn enable_stat(&self) {

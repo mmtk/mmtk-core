@@ -14,16 +14,6 @@ pub struct ScheduleCollection;
 
 impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        // Record the time when GC starts.
-        {
-            let mut guard = mmtk.state.gc_start_time.borrow_mut();
-            let old_time = guard.replace(std::time::Instant::now());
-            debug_assert!(
-                old_time.is_none(),
-                "gc_start_time is still set when GC started: {old_time:?}",
-            );
-        }
-
         // Tell GC trigger that GC started.
         mmtk.gc_trigger.policy.on_gc_start(mmtk);
 
