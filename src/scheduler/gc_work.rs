@@ -222,57 +222,6 @@ impl<C: GCWorkContext> GCWork<C::VM> for StopMutators<C> {
     }
 }
 
-#[derive(Default)]
-pub struct EndOfGC {
-    pub elapsed: std::time::Duration,
-}
-
-impl<VM: VMBinding> GCWork<VM> for EndOfGC {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        info!(
-            "End of GC ({}/{} pages, took {} ms)",
-            mmtk.get_plan().get_reserved_pages(),
-            mmtk.get_plan().get_total_pages(),
-            self.elapsed.as_millis()
-        );
-
-        #[cfg(feature = "count_live_bytes_in_gc")]
-        {
-            let live_bytes = mmtk.state.get_live_bytes_in_last_gc();
-            let used_bytes =
-                mmtk.get_plan().get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
-            debug_assert!(
-                live_bytes <= used_bytes,
-                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
-                live_bytes, used_bytes
-            );
-            info!(
-                "Live objects = {} bytes ({:04.1}% of {} used pages)",
-                live_bytes,
-                live_bytes as f64 * 100.0 / used_bytes as f64,
-                mmtk.get_plan().get_used_pages()
-            );
-        }
-
-        // We assume this is the only running work packet that accesses plan at the point of execution
-        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        plan_mut.end_of_gc(worker.tls);
-
-        #[cfg(feature = "extreme_assertions")]
-        if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
-            // reset the logging info at the end of each GC
-            mmtk.edge_logger.reset();
-        }
-
-        // Reset the triggering information.
-        mmtk.state.reset_collection_trigger();
-
-        // Set to NotInGC after everything, and right before resuming mutators.
-        mmtk.set_gc_status(GcStatus::NotInGC);
-        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
-    }
-}
-
 /// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
 pub(crate) struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
