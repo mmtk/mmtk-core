@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 /// This data structure lets mutators trigger GC.
 pub struct GCRequester<VM: VMBinding> {
-    /// An atomic flag outside `RequestSync` so that mutators can check if GC has already been
-    /// requested in `poll` without acquiring the mutex.
+    /// Set by mutators to trigger GC.  It is atomic so that mutators can check if GC has already
+    /// been requested efficiently in `poll` without acquiring any mutex.
     request_flag: AtomicBool,
     scheduler: Arc<GCWorkScheduler<VM>>,
 }
@@ -27,6 +27,9 @@ impl<VM: VMBinding> GCRequester<VM> {
         }
 
         if !self.request_flag.swap(true, Ordering::Relaxed) {
+            // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
+            // with GC workers, so only the first mutator that changed the `request_flag` to `true`
+            // shall do it.
             self.scheduler.request_schedule_collection();
         }
     }

@@ -1,11 +1,12 @@
 use super::gc_work::ScheduleCollection;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, ThreadId, WorkerGoals, WorkerGroup, WorkerMonitor};
+use super::worker::{GCWorker, ThreadId, WorkerGroup};
+use super::worker_goals::{WorkerGoal, WorkerGoals};
+use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
 use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
-use crate::scheduler::worker::{LastParkedResult, WorkerGoal};
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
@@ -95,7 +96,14 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
     pub(crate) fn request_schedule_collection(&self) {
         debug!("A mutator is sending GC-scheduling request to workers...");
-        self.worker_monitor.request_schedule_collection();
+        self.worker_monitor.make_request(|requests| {
+            if !requests.gc {
+                requests.gc = true;
+                true
+            } else {
+                false
+            }
+        });
     }
 
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
@@ -380,7 +388,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         };
 
         match current_goal {
-            worker::WorkerGoal::Gc { start_time } => {
+            WorkerGoal::Gc { start_time } => {
                 // We are in the progress of GC.
 
                 // In stop-the-world GC, mutators cannot request for GC while GC is in progress.
@@ -410,7 +418,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     self.respond_to_requests(goals)
                 }
             }
-            worker::WorkerGoal::StopForFork => {
+            WorkerGoal::StopForFork => {
                 // A worker parked again when it is asked to exit.
                 unimplemented!()
             }

@@ -1,4 +1,4 @@
-use super::worker::WorkerMonitor;
+use super::worker_monitor::WorkerMonitor;
 use super::*;
 use crate::vm::VMBinding;
 use crossbeam::deque::{Injector, Steal, Worker};
