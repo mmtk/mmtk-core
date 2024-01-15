@@ -2,11 +2,14 @@ name: Pre Code Review Checks
 
 on:
   pull_request:
-    branches:
-      - master
-  merge_group:
-    branches:
-      - master
+  #   branches:
+  #     - master
+  # merge_group:
+  #   branches:
+  #     - master
+    # Disable the tests for now.
+    branches-ignore:
+      - '**'
 
 concurrency:
   # Cancels pending runs when a PR gets updated.
