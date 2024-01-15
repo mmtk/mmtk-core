@@ -1,0 +1,36 @@
+name: Extended Binding Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - master
+
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  binding-refs:
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    uses: ./.github/workflows/pr-binding-refs.yml
+    with:
+      pull_request: ${{ github.event.pull_request.number }}
+
+  openjdk:
+    runs-on: ubuntu-22.04
+    needs: binding-refs
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    steps:
+      - name: Invoke binding workflows
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+          ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: test-core-extended.yml
+          inputs: '{ "mmtk-core-repo": "${{ github.repository }}", "mmtk-core-ref": "${{ github.sha }}" }'
+          wait-for-completion: true
+          wait-for-completion-timeout: 6h
+          wait-for-completion-interval: 5m
