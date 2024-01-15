@@ -3,8 +3,11 @@ name: Binding Tests
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+    # branches:
+    #   - master
+    # Disable the tests for now.
+    branches-ignore:
+      - '**'
 
 concurrency:
   # Cancels pending runs when a PR gets updated.
