@@ -547,8 +547,6 @@
 <a href="#547" id="547">547</a>
 <a href="#548" id="548">548</a>
 <a href="#549" id="549">549</a>
-<a href="#550" id="550">550</a>
-<a href="#551" id="551">551</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
@@ -759,7 +757,7 @@
     </span>allocation_pages: f64,
     <span class="doccomment">/// Allocation duration in secs
     </span>allocation_time: f64,
-    <span class="doccomment">/// Collected memory in pages
+    <span class="doccomment">/// Collected memory in pages (memory traversed during collection)
     </span>collection_pages: f64,
     <span class="doccomment">/// Collection duration in secs
     </span>collection_time: f64,
@@ -840,9 +838,8 @@
     ) -&gt; bool {
         <span class="kw">if </span>!plan.is_current_gc_nursery() {
             <span class="self">self</span>.gc_end_live_pages = plan.get_mature_reserved_pages();
-            <span class="self">self</span>.collection_pages = <span class="self">self
-                </span>.gc_release_live_pages
-                .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
+            <span class="comment">// Use live pages as an estimate for pages traversed during GC
+            </span><span class="self">self</span>.collection_pages = <span class="self">self</span>.gc_end_live_pages <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
                 <span class="string">&quot;collected pages = mature live at gc end {} - mature live at gc release {} = {}&quot;</span>,
                 <span class="self">self</span>.gc_release_live_pages,
@@ -878,9 +875,8 @@
     <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         <span class="macro">trace!</span>(<span class="string">&quot;live pages = {}&quot;</span>, <span class="self">self</span>.gc_end_live_pages);
-        <span class="self">self</span>.collection_pages = <span class="self">self
-            </span>.gc_release_live_pages
-            .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
+        <span class="comment">// Use live pages as an estimate for pages traversed during GC
+        </span><span class="self">self</span>.collection_pages = <span class="self">self</span>.gc_end_live_pages <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
             <span class="string">&quot;collected pages = live at gc end {} - live at gc release {} = {}&quot;</span>,
             <span class="self">self</span>.gc_release_live_pages,
