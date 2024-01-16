@@ -208,7 +208,7 @@ struct MemBalancerStats {
     allocation_pages: f64,
     /// Allocation duration in secs
     allocation_time: f64,
-    /// Collected memory in pages
+    /// Collected memory in pages (memory traversed during collection)
     collection_pages: f64,
     /// Collection duration in secs
     collection_time: f64,
@@ -289,9 +289,8 @@ impl MemBalancerStats {
     ) -> bool {
         if !plan.is_current_gc_nursery() {
             self.gc_end_live_pages = plan.get_mature_reserved_pages();
-            self.collection_pages = self
-                .gc_release_live_pages
-                .saturating_sub(self.gc_end_live_pages) as f64;
+            // Use live pages as an estimate for pages traversed during GC
+            self.collection_pages = self.gc_end_live_pages as f64;
             trace!(
                 "collected pages = mature live at gc end {} - mature live at gc release {} = {}",
                 self.gc_release_live_pages,
@@ -327,9 +326,8 @@ impl MemBalancerStats {
     fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live pages = {}", self.gc_end_live_pages);
-        self.collection_pages = self
-            .gc_release_live_pages
-            .saturating_sub(self.gc_end_live_pages) as f64;
+        // Use live pages as an estimate for pages traversed during GC
+        self.collection_pages = self.gc_end_live_pages as f64;
         trace!(
             "collected pages = live at gc end {} - live at gc release {} = {}",
             self.gc_release_live_pages,
