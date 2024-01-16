@@ -392,6 +392,13 @@
 <a href="#392" id="392">392</a>
 <a href="#393" id="393">393</a>
 <a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -534,6 +541,12 @@
 
             <span class="comment">/* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
             </span><span class="kw">if </span><span class="self">self</span>.common().contiguous &amp;&amp; chunk_align_down(sync.cursor) != sync.current_chunk {
+                <span class="macro">debug_assert!</span>(
+                    chunk_align_down(sync.cursor) &gt; sync.current_chunk,
+                    <span class="string">&quot;Not monotonic.  chunk_align_down(sync.cursor): {}, sync.current_chunk: {}&quot;</span>,
+                    chunk_align_down(sync.cursor),
+                    sync.current_chunk,
+                );
                 sync.current_chunk = chunk_align_down(sync.cursor);
             }
             <span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
@@ -704,6 +717,7 @@
                 MonotonePageResourceConditional::Contiguous { start: _start, .. } =&gt; _start,
                 <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
             };
+            guard.current_chunk = guard.cursor;
         } <span class="kw">else if </span>!guard.cursor.is_zero() {
             <span class="kw">let </span>bytes = guard.cursor - guard.current_chunk;
             <span class="self">self</span>.release_pages_extent(guard.current_chunk, bytes);
