@@ -495,6 +495,18 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     probe!(mmtk, collection_initialized);
 }
 
+pub fn uninitialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
+    assert!(
+        mmtk.state.is_initialized(),
+        "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+    );
+    //mmtk.scheduler.stop_gc_threads_for_forking(mmtk, tls);
+    mmtk.state.initialized.store(false, Ordering::SeqCst);
+    //probe!(mmtk, collection_initialized);
+    unimplemented!()
+}
+
+
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
 /// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
 /// Note this call is not thread safe, only one VM thread should call this.

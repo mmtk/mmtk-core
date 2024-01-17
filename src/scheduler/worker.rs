@@ -214,12 +214,36 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 }
 
+enum WorkerCreationState<VM: VMBinding> {
+    NotCreated {
+        /// The local work queues for to-be-created workers.
+        unspawned_local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
+    },
+    Created {
+        /// `Worker` instances for worker threads that have not been created yet, or worker thread that
+        /// are suspended (e.g. for forking).
+        suspended_workers: Vec<Box<GCWorker<VM>>>,
+    },
+}
+
+impl<VM: VMBinding> WorkerCreationState<VM> {
+    pub fn is_created(&self) -> bool {
+        matches!(self, WorkerCreationState::Created { .. })
+    }
+}
+
 /// A worker group to manage all the GC workers.
 pub(crate) struct WorkerGroup<VM: VMBinding> {
     /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
-    unspawned_local_work_queues: Mutex<Vec<deque::Worker<Box<dyn GCWork<VM>>>>>,
+    /// The stateful part
+    state: Mutex<WorkerCreationState<VM>>,
 }
+
+/// We have to persuade Rust that `WorkerGroup` is safe to share because it thinks one worker can
+/// refer to another worker via the path "worker -> scheduler -> worker_group -> suspended_workers
+/// -> worker" which it thinks is cyclic reference and unsafe.
+unsafe impl<VM: VMBinding> Sync for WorkerGroup<VM> {}
 
 impl<VM: VMBinding> WorkerGroup<VM> {
     /// Create a WorkerGroup
@@ -238,13 +262,21 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
         Arc::new(Self {
             workers_shared,
-            unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
+            state: Mutex::new(WorkerCreationState::NotCreated {
+                unspawned_local_work_queues,
+            }),
         })
     }
 
-    /// Spawn all the worker threads
-    pub fn spawn(&self, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        let mut unspawned_local_work_queues = self.unspawned_local_work_queues.lock().unwrap();
+    /// Create `GCWorker` instances, but do not create threads, yet.
+    fn create_worker_structs(&self, state: &mut WorkerCreationState<VM>, mmtk: &'static MMTK<VM>) {
+        let WorkerCreationState::NotCreated { unspawned_local_work_queues } = state else {
+            panic!("GCWorker structs have already been created");
+        };
+
+        assert_eq!(self.workers_shared.len(), unspawned_local_work_queues.len());
+        let mut suspended_workers = Vec::with_capacity(self.workers_shared.len());
+
         // Spawn each worker thread.
         for (ordinal, shared) in self.workers_shared.iter().enumerate() {
             let worker = Box::new(GCWorker::new(
@@ -254,9 +286,30 @@ impl<VM: VMBinding> WorkerGroup<VM> {
                 shared.clone(),
                 unspawned_local_work_queues.pop().unwrap(),
             ));
+            suspended_workers.push(worker);
+        }
+
+        *state = WorkerCreationState::Created { suspended_workers };
+    }
+
+    /// Spawn all the worker threads
+    pub fn spawn(&self, mmtk: &'static MMTK<VM>, tls: VMThread) {
+        let mut guard = self.state.lock().unwrap();
+
+        // Create worker structs lazily.  If we are spawning workers after fork, worker structs
+        // will have been created already, so we can skip the creation.
+        if !guard.is_created() {
+            self.create_worker_structs(&mut *guard, mmtk);
+        }
+
+        let WorkerCreationState::Created { ref mut suspended_workers } = *guard else {
+            panic!("GCWorker structs have not been created, yet.");
+        };
+
+        // Drain the queue.  We transfer the ownership of each `GCWorker` instance to a GC thread.
+        for worker in suspended_workers.drain(..) {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
-        debug_assert!(unspawned_local_work_queues.is_empty());
     }
 
     /// Get the number of workers in the group
