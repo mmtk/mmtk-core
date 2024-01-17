@@ -11,7 +11,7 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::{plan::global::BasePlan, vm::VMBinding};
@@ -135,17 +135,29 @@ impl<VM: VMBinding> SemiSpace<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
+        let copyspace0_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+        let copyspace1_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+
+        // Spaces will eventually be placed by `BasePlan`.
+        let common = CommonPlan::new(&mut plan_args);
+
         let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
-                plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("copyspace0", true, copyspace0_resp.unwrap()),
                 false,
             ),
             copyspace1: CopySpace::new(
-                plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("copyspace1", true, copyspace1_resp.unwrap()),
                 true,
             ),
-            common: CommonPlan::new(plan_args),
+            common,
         };
 
         res.verify_side_metadata_sanity();

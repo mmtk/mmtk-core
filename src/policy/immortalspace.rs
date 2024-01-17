@@ -121,7 +121,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSp
 impl<VM: VMBinding> ImmortalSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let vm_map = args.vm_map;
-        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let is_discontiguous = !args.space_meta.contiguous;
         let common = CommonSpace::new(args.into_policy_args(
             false,
             true,
@@ -145,7 +145,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         start: Address,
         size: usize,
     ) -> Self {
-        assert!(!args.vmrequest.is_discontiguous());
+        assert!(args.space_meta.contiguous);
         ImmortalSpace {
             mark_state: MarkState::new(),
             pr: MonotonePageResource::new_contiguous(start, size, args.vm_map),

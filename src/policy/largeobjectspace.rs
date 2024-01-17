@@ -143,7 +143,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         protect_memory_on_release: bool,
     ) -> Self {
-        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let is_discontiguous = !args.space_meta.contiguous;
         let vm_map = args.vm_map;
         let common = CommonSpace::new(args.into_policy_args(
             false,
@@ -151,7 +151,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]),
         ));
         let mut pr = if is_discontiguous {
-            FreeListPageResource::new_discontiguous(vm_map)
+            FreeListPageResource::new_discontiguous(common.start, vm_map)
         } else {
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };

@@ -200,7 +200,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> MarkSweepSpace<VM> {
         let scheduler = args.scheduler.clone();
         let vm_map = args.vm_map;
-        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let is_discontiguous = !args.space_meta.contiguous;
         let local_specs = {
             metadata::extract_side_metadata(&vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
@@ -221,7 +221,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
         MarkSweepSpace {
             pr: if is_discontiguous {
-                FreeListPageResource::new_discontiguous(vm_map)
+                FreeListPageResource::new_discontiguous(common.start, vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
             },

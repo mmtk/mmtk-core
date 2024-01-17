@@ -289,9 +289,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let common =
             CommonSpace::new(args.into_policy_args(true, false, Self::side_metadata_specs()));
         ImmixSpace {
-            pr: if common.vmrequest.is_discontiguous() {
+            pr: if !common.space_meta.contiguous {
                 BlockPageResource::new_discontiguous(
                     Block::LOG_PAGES,
+                    common.start,
                     vm_map,
                     scheduler.num_workers(),
                 )

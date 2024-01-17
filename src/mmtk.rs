@@ -12,15 +12,15 @@ use crate::util::analysis::AnalysisManager;
 use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::heap_meta::HeapMeta;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
-use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
 use crate::util::statistics::stats::Stats;
+use crate::util::{opaque_pointer::*, Address};
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
@@ -189,8 +189,14 @@ impl<VM: VMBinding> MMTK<VM> {
 
         // TODO: This probably does not work if we have multiple MMTk instances.
         VM_MAP.boot();
-        // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
+
+        // `Map32` uses `finalize_static_space_map` this to initialize the global freelists, which is reasonable.
+        // `Map64` uses `finalize_static_space_map` this to fix the starting addresses of `RawMemoryFreeList` instances, which is a bug and should be fixed.
+        // Since `Map64` doesn't read the start and end of the discontiguous range in the function at all, we can leave them as zeroes.
+        let discontig_range = heap
+            .get_discontiguous_range()
+            .unwrap_or(Address::ZERO..Address::ZERO);
+        VM_MAP.finalize_static_space_map(discontig_range.start, discontig_range.end);
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);

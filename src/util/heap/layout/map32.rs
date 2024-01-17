@@ -9,7 +9,6 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
 use crate::util::Address;
 use std::cell::UnsafeCell;
-use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
@@ -25,7 +24,6 @@ pub struct Map32Inner {
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    shared_fl_map: Vec<Option<NonNull<CommonFreeListPageResource>>>,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec<SpaceDescriptor>,
@@ -50,7 +48,6 @@ impl Map32 {
                 region_map: IntArrayFreeList::new(max_chunks, max_chunks as _, 1),
                 global_page_map: IntArrayFreeList::new(1, 1, MAX_SPACES),
                 shared_discontig_fl_count: 0,
-                shared_fl_map: vec![None; MAX_SPACES],
                 total_available_discontiguous_chunks: 0,
                 finalized: false,
                 descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; max_chunks],
@@ -107,15 +104,7 @@ impl VMMap for Map32 {
         Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
-    unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource) {
-        let ordinal: usize = (*pr)
-            .free_list
-            .downcast_ref::<IntArrayFreeList>()
-            .unwrap()
-            .get_ordinal() as usize;
-        let self_mut: &mut Map32Inner = self.mut_self();
-        self_mut.shared_fl_map[ordinal] = Some(NonNull::new_unchecked(pr as *mut _));
-    }
+    unsafe fn bind_freelist(&self, _pr: *const CommonFreeListPageResource) {}
 
     unsafe fn allocate_contiguous_chunks(
         &self,
@@ -204,24 +193,15 @@ impl VMMap for Map32 {
         /* establish bounds of discontiguous space */
         let start_address = from;
         let first_chunk = start_address.chunk_index();
-        let last_chunk = to.chunk_index();
+        let last_byte = to - 1;
+        let last_chunk = last_byte.chunk_index();
         let unavail_start_chunk = last_chunk + 1;
         let trailing_chunks = vm_layout().max_chunks() - unavail_start_chunk;
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;
         // start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
         self_mut.global_page_map.resize_freelist(pages, pages as _);
-        // TODO: Clippy favors using iter().flatten() rather than iter() with if-let.
-        // https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
-        // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
-        // there is no test to ensure the refactoring will be correct.
-        #[allow(clippy::manual_flatten)]
-        for fl in self_mut.shared_fl_map.iter().copied() {
-            if let Some(mut fl) = fl {
-                let fl_mut = unsafe { fl.as_mut() };
-                fl_mut.resize_freelist(start_address);
-            }
-        }
+
         // [
         //  2: -1073741825
         //  3: -1073741825

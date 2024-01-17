@@ -16,7 +16,7 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -201,17 +201,29 @@ impl<VM: VMBinding> GenCopy<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
+        let copyspace0_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+        let copyspace1_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+
+        // Spaces will eventually be placed by `BasePlan`.
+        let gen = CommonGenPlan::new(&mut plan_args);
+
         let copyspace0 = CopySpace::new(
-            plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+            plan_args.get_space_args("copyspace0", true, copyspace0_resp.unwrap()),
             false,
         );
         let copyspace1 = CopySpace::new(
-            plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+            plan_args.get_space_args("copyspace1", true, copyspace1_resp.unwrap()),
             true,
         );
 
         let res = GenCopy {
-            gen: CommonGenPlan::new(plan_args),
+            gen,
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,

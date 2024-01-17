@@ -13,7 +13,7 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
@@ -138,12 +138,20 @@ impl<VM: VMBinding> Immix<VM> {
         mut plan_args: CreateSpecificPlanArgs<VM>,
         space_args: ImmixSpaceArgs,
     ) -> Self {
+        let immix_space_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+
+        // Spaces will eventually be placed by `BasePlan`.
+        let common = CommonPlan::new(&mut plan_args);
+
         let immix = Immix {
             immix_space: ImmixSpace::new(
-                plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("immix", true, immix_space_resp.unwrap()),
                 space_args,
             ),
-            common: CommonPlan::new(plan_args),
+            common,
             last_gc_was_defrag: AtomicBool::new(false),
         };
 

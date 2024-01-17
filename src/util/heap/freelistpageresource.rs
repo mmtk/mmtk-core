@@ -179,6 +179,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 }
 
 impl<VM: VMBinding> FreeListPageResource<VM> {
+    /// Create a contiguous free list page resource.
+    ///
+    /// The page resource will span over the address range from `start` to `start + bytes`.
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         let pages = conversions::bytes_to_pages_up(bytes);
         let common_flpr = {
@@ -209,9 +212,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
-    pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
+    /// Create a discontiguous free list page resource.
+    ///
+    /// `start` will be used as the base address for computing chunk addresses from free list
+    /// indices.  We don't need to compute the extent here.
+    pub fn new_discontiguous(start: Address, vm_map: &'static dyn VMMap) -> Self {
         let common_flpr = {
-            let start = vm_layout().available_start();
             let common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: vm_map.create_freelist(start),
                 start,

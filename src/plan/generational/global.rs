@@ -6,7 +6,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -37,20 +37,24 @@ pub struct CommonGenPlan<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> CommonGenPlan<VM> {
-    pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
+    pub fn new(args: &mut CreateSpecificPlanArgs<VM>) -> Self {
+        let nursery_resp = args.global_args.heap.specify_space(VMRequest::Extent {
+            extent: args.global_args.options.get_max_nursery_bytes(),
+            top: false,
+        });
+
+        // Spaces will eventually be placed by `BasePlan`.
+        let common = CommonPlan::new(args);
+
         let nursery = CopySpace::new(
-            args.get_space_args(
-                "nursery",
-                true,
-                VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), false),
-            ),
+            args.get_space_args("nursery", true, nursery_resp.unwrap()),
             true,
         );
+
         let full_heap_gc_count = args
             .global_args
             .stats
             .new_event_counter("majorGC", true, true);
-        let common = CommonPlan::new(args);
 
         CommonGenPlan {
             nursery,

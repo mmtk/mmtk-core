@@ -2,8 +2,8 @@
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
-use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
+use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -12,13 +12,13 @@ use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
-// ANCHOR_END: imports_no_gc_work
+                                               // ANCHOR_END: imports_no_gc_work
 
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
@@ -63,7 +63,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
             },
             space_mapping: vec![
                 // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), &self.copyspace0)
+                (CopySelector::CopySpace(0), &self.copyspace0),
             ],
             constraints: &MYGC_CONSTRAINTS,
         }
@@ -164,13 +164,35 @@ impl<VM: VMBinding> MyGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
+        // ANCHOR: specify_spaces
+        let copyspace0_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+        let copyspace1_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+        // ANCHOR_END: specify_spaces
+
+        // ANCHOR: create_common_plan
+        // Spaces will eventually be placed by `BasePlan`.
+        let common = CommonPlan::new(&mut plan_args);
+        // ANCHOR_END: create_common_plan
+
         let res = MyGC {
             hi: AtomicBool::new(false),
-            // ANCHOR: copyspace_new
-            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
-            // ANCHOR_END: copyspace_new
-            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
-            common: CommonPlan::new(plan_args),
+            // ANCHOR: copyspaces_new
+            copyspace0: CopySpace::new(
+                plan_args.get_space_args("copyspace0", true, copyspace0_resp.unwrap()),
+                false,
+            ),
+            copyspace1: CopySpace::new(
+                plan_args.get_space_args("copyspace1", true, copyspace1_resp.unwrap()),
+                true,
+            ),
+            // ANCHOR_END: copyspaces_new
+            common,
         };
 
         res.verify_side_metadata_sanity();

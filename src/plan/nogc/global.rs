@@ -9,8 +9,7 @@ use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[allow(unused_imports)]
-use crate::util::heap::VMRequest;
+use crate::util::heap::heap_meta::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -89,23 +88,35 @@ impl<VM: VMBinding> NoGC<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
+        let nogc_space_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+        let immortal_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+        let los_resp = plan_args
+            .global_args
+            .heap
+            .specify_space(VMRequest::Unrestricted);
+
+        // Spaces will eventually be placed by `BasePlan`.
+        let base = BasePlan::new(&mut plan_args);
+
         let res = NoGC {
             nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
-                VMRequest::discontiguous(),
+                nogc_space_resp.unwrap(),
             )),
             immortal: ImmortalSpace::new(plan_args.get_space_args(
                 "immortal",
                 true,
-                VMRequest::discontiguous(),
+                immortal_resp.unwrap(),
             )),
-            los: ImmortalSpace::new(plan_args.get_space_args(
-                "los",
-                true,
-                VMRequest::discontiguous(),
-            )),
-            base: BasePlan::new(plan_args),
+            los: ImmortalSpace::new(plan_args.get_space_args("los", true, los_resp.unwrap())),
+            base,
         };
 
         res.verify_side_metadata_sanity();

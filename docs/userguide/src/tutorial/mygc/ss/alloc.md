@@ -81,23 +81,48 @@ use mmtk_macros::{HasSpaces, PlanTraceObject};
 
 #### Constructor
 
-Change `fn new()`. This section initialises and prepares the objects in MyGC 
+Change `fn new()`. This section initialises and prepares the objects in MyGC
 that you just defined.
 
-   1. Delete the definition of `mygc_space`. 
-   Instead, we will define the two copyspaces here.
-   2. Define one of the copyspaces by adding the following code: 
-```rust
-{{#include ../../code/mygc_semispace/global.rs:copyspace_new}}
-```
-
-   3. Create another copyspace, called `copyspace1`, defining it as a fromspace 
-   instead of a tospace. (Hint: the definitions for 
-   copyspaces are in `src/policy/copyspace.rs`.) 
-   4. Finally, replace the old MyGC initializer.
 ```rust
 {{#include ../../code/mygc_semispace/global.rs:plan_new}}
 ```
+
+We now look into the steps.
+
+First, we use the `HeapMeta` object provided from the argument to specify all
+spaces that will be created in the current plan.
+
+```rust
+{{#include ../../code/mygc_semispace/global.rs:specify_spaces}}
+```
+
+We do not have special requirements for either of the copy-spaces, so we just
+specify `VMRequest::Unrestricted` here.  At this step, the return values
+`copyspace0_resp` and `copyspace1_resp` has not become usable, yet.
+
+Then, we construct the parent structure `CommonPlan::new()`.
+
+```rust
+{{#include ../../code/mygc_semispace/global.rs:create_common_plan}}
+```
+
+`CommonPlan::new()` will call `BasePlan::new()` which, in turn, will call
+`HeapMeta::place_spaces()`.  That will determine the address range of all
+spaces we specified.
+
+After this, we can call `copyspace0_resp.unwrap()` to retrieve the computed
+placement information for creating `copyspace0`.  `copyspace1` is similar.  We
+can now create the two `CopySpace` instances.
+
+```rust
+{{#include ../../code/mygc_semispace/global.rs:copyspaces_new}}
+```
+
+Note that `CommonSpace` and `BaseSpace` also define other spaces, such as the
+large object space.  Their constructors specify their spaces before
+determining their address ranges and instantiating them, just like we
+discribed here.
 
 ### Access MyGC spaces
 
