@@ -7,8 +7,6 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::copy::*;
-#[cfg(feature = "vo_bit")]
-use crate::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
@@ -189,19 +187,8 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     #[cfg(feature = "vo_bit")]
     unsafe fn reset_vo_bit(&self) {
-        let current_chunk = self.pr.get_current_chunk();
-        if self.common.contiguous {
-            // If we have allocated something into this space, we need to clear its VO bit.
-            if current_chunk != self.common.start {
-                crate::util::metadata::vo_bit::bzero_vo_bit(
-                    self.common.start,
-                    current_chunk + BYTES_IN_CHUNK - self.common.start,
-                );
-            }
-        } else {
-            for (start, size) in self.pr.iterate_allocated_regions() {
-                crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
-            }
+        for (start, size) in self.pr.iterate_allocated_regions() {
+            crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
         }
     }
 
@@ -217,6 +204,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
+        debug_assert!(!object.is_null());
 
         // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
         if !self.is_from_space() {

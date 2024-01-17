@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.21.0"
+version = "0.22.1"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -37,8 +37,8 @@ libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
-# MMTk macros
-mmtk-macros = { version = "0.21.0", path = "macros/" }
+# MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
+mmtk-macros = { version="0.22.1", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
 pfm = { version = "0.1.1", optional = true }
@@ -54,9 +54,14 @@ sysinfo = "0.29"
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.8.5"
+criterion = "0.4"
 
 [build-dependencies]
 built = { version = "0.7.1", features = ["git2"] }
+
+[[bench]]
+name = "main"
+harness = false
 
 [features]
 default = []
@@ -64,6 +69,10 @@ default = []
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["pfm"]
+
+# This feature is only used for tests with MockVM.
+# CI scripts run those tests with this feature.
+mock_test = []
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
@@ -142,6 +151,10 @@ malloc_counted_size = []
 
 # Count the size of all live objects in GC
 count_live_bytes_in_gc = []
+
+# Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
+# capture the type names of work packets.
+bpftrace_workaround = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

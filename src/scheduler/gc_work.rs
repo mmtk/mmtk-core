@@ -265,7 +265,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 /// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
 /// `ProcessEdgesWork` instance.
-struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
+pub(crate) struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
     process_edges_work: E,
     stage: WorkBucketStage,
 }
@@ -273,11 +273,8 @@ struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
 impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
     /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
-    ///
-    /// This function is inlined because `trace_object` is probably the hottest function in MMTk.
-    /// If this function is called in small closures, please profile the program and make sure the
-    /// closure is inlined, too.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        debug_assert!(!object.is_null());
         let result = self.process_edges_work.trace_object(object);
         self.flush_if_full();
         result
@@ -310,7 +307,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
 /// the call to `with_tracer`, making use of its `trace_object` method.  It then creates work
 /// packets using the methods of the `ProcessEdgesWork` and add the work packet into the given
 /// `stage`.
-struct ProcessEdgesWorkTracerContext<E: ProcessEdgesWork> {
+pub(crate) struct ProcessEdgesWorkTracerContext<E: ProcessEdgesWork> {
     stage: WorkBucketStage,
     phantom_data: PhantomData<E>,
 }
@@ -663,8 +660,12 @@ pub trait ProcessEdgesWork:
     /// trace the object and store back the new object reference if necessary.
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
+        if object.is_null() {
+            return;
+        }
         let new_object = self.trace_object(object);
-        if Self::OVERWRITE_REFERENCE {
+        debug_assert!(!new_object.is_null());
+        if Self::OVERWRITE_REFERENCE && new_object != object {
             slot.store(new_object);
         }
     }
@@ -721,9 +722,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::sft::GCWorkerMutRef;
 
-        if object.is_null() {
-            return object;
-        }
+        debug_assert!(!object.is_null());
 
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
@@ -737,7 +736,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         ScanObjects::<Self>::new(nodes, false, roots, self.bucket)
     }
 }
-struct ProcessEdgesWorkRootsWorkFactory<
+pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
     VM: VMBinding,
     E: ProcessEdgesWork<VM = VM>,
     I: ProcessEdgesWork<VM = VM>,
@@ -997,9 +996,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
+        debug_assert!(!object.is_null());
         // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
         self.plan
@@ -1008,8 +1005,12 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
 
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
+        if object.is_null() {
+            return;
+        }
         let new_object = self.trace_object(object);
-        if P::may_move_objects::<KIND>() {
+        debug_assert!(!new_object.is_null());
+        if P::may_move_objects::<KIND>() && new_object != object {
             slot.store(new_object);
         }
     }

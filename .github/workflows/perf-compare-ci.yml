@@ -61,8 +61,8 @@ jobs:
               return res.data.head.sha
         - id: print
           run: |
-            echo "::set-output name=mmtk_repo::${{ steps.core-repo.outputs.result }}"
-            echo "::set-output name=mmtk_ref::${{ steps.core-ref.outputs.result }}"
+            echo "mmtk_repo=${{ steps.core-repo.outputs.result }}" >> $GITHUB_OUTPUT
+            echo "mmtk_ref=${{ steps.core-ref.outputs.result }}" >> $GITHUB_OUTPUT
 
     # Run perf compare for JikesRVM
     jikesrvm-perf-compare:

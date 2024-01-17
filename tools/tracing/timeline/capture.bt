@@ -1,0 +1,82 @@
+BEGIN {
+    @every = $EVERY;
+    @harness = $HARNESS;
+
+    @gc_count = 0;
+
+    if (!@harness) {
+        //always collect data
+        @stats_enabled = 1;
+    }
+}
+
+END {
+    system("rm $TMP_FILE");
+}
+
+usdt:$MMTK:mmtk:harness_begin {
+    if (@harness) {
+        //begin collecting data at harness_begin (start of final iteration)
+        @stats_enabled = 1;
+    }
+}
+
+usdt:$MMTK:mmtk:harness_end {
+    if (@harness) {
+        //end data at harness_end (end of final iteration)
+        @stats_enabled = 0;
+        exit();
+    }
+}
+
+usdt:$MMTK:mmtk:gc_start {
+    printf("GC,B,%d,%lu\n", tid, nsecs);
+    @gc_count += 1;
+    // bpftrace warns that signed `%` operator may have undefiend behavior.
+    if ((uint64)@gc_count % (uint64)@every == 0 && @stats_enabled) {
+        @enable_print = 1;
+    } else {
+        @enable_print = 0;
+    }
+}
+
+usdt:$MMTK:mmtk:gc_end {
+    printf("GC,E,%d,%lu\n", tid, nsecs);
+}
+
+usdt:$MMTK:mmtk:bucket_opened {
+    if (@enable_print) {
+        printf("BUCKET_OPEN,i,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
+}
+
+usdt:$MMTK:mmtk:work_poll {
+    if (@thread_in_work[tid]) {
+        if (@enable_print) {
+            printf("WORK,E,%d,%lu,%lu\n", tid, nsecs, @thread_work_id[tid]);
+        }
+    }
+}
+
+usdt:$MMTK:mmtk:work {
+    @thread_in_work[tid] = 1;
+    if (!@decoded[arg0]) {
+        // Note: The address of the work packet name is correct, but sometimes bpftrace sees the
+        // characters in the packet name string to be all '\0'.
+        // See the "Known issues" section of README.md
+        @type_name[arg0] = str(arg0, arg1);
+        @decoded[arg0] = 1;
+    }
+    @thread_work_id[tid] = arg0;
+    if (@enable_print) {
+        printf("WORK,B,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+    }
+}
+
+usdt:$MMTK:mmtk:process_edges {
+    if (@enable_print) {
+        printf("process_edges,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+    }
+}
+
+// vim: ft=bpftrace ts=4 sw=4 sts=4 et

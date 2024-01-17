@@ -1,3 +1,47 @@
+0.22.1 (2024-01-11)
+===
+
+## What's Changed
+
+* Revert a mistake in v0.22 that prevents cargo publish by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1065
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.22.0...v0.22.1
+
+0.22.0 (2023-12-21)
+===
+
+## What's Changed
+
+### API
+
+* Flush mutator buffers in `destroy_mutator` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1045
+* NULL and movement check in process_edge by @wks in https://github.com/mmtk/mmtk-core/pull/1032
+
+### Documentation
+
+* Mention revoking TLABs of all mutators after a GC by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1018
+* Add missing docs for the vm module by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1021
+* Add missing docs for some util modules by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1024
+* Add missing docs for the rest of the util module by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1026
+* Add missing docs for the rest of the code base (merge after #1026) by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1028
+* Update some stale comments by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1036
+
+### CI
+
+* Use new running scripts in ci-perf-kit by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1005
+* Upload perf build and log as artifacts (merge after #1005) by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1011
+* Fix multiple issues in recent CI changes by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1014
+* Fix CI for OpenJDK nogc config by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1019
+* Use ci-perf-kit 0.7.4: ignore runs with unmatched key/value in the logs. by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1025
+* Fix Ruby binding test repo checkout by @wks in https://github.com/mmtk/mmtk-core/pull/1048
+
+### Misc
+
+* Post-release dependency version bump for v0.21.0 by @wks in https://github.com/mmtk/mmtk-core/pull/1013
+* Introduce MockVM by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1049
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.21.0...v0.22.0
+
 0.21.0 (2023-11-03)
 ===
 
