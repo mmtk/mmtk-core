@@ -90,6 +90,22 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.spawn(mmtk, tls)
     }
 
+    /// Ask all GC workers to exit for forking, and wait until all workers exited.
+    pub fn stop_gc_threads_for_forking(self: &Arc<Self>) {
+        self.worker_monitor.make_request(|requests| {
+            if !requests.stop_for_fork {
+                requests.stop_for_fork = true;
+                true
+            } else {
+                false
+            }
+        });
+
+        self.worker_group.wait_until_worker_exited();
+
+        self.worker_monitor.on_all_workers_exited();
+    }
+
     /// Resolve the affinity of a thread.
     pub fn resolve_affinity(&self, thread: ThreadId) {
         self.affinity.resolve_affinity(thread);
@@ -101,6 +117,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_monitor.make_request(|requests| {
             if !requests.gc {
                 requests.gc = true;
+                warn!("GC requested.");
+                dbg!(requests);
                 true
             } else {
                 false
@@ -449,13 +467,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 start_time: Instant::now(),
             });
 
+            warn!("Responded to GC request.");
+            dbg!(goals);
+
             self.add_schedule_collection_packet();
             return LastParkedResult::WakeSelf;
         }
 
         if goals.requests.stop_for_fork {
-            // The VM wants to fork.  GC threads should exit.
-            unimplemented!()
+            // A mutator wanted to fork.
+            goals.requests.stop_for_fork = false;
+
+            goals.current = Some(WorkerGoal::StopForFork);
+            return LastParkedResult::WakeAll;
         }
 
         // No reqeusts.  Park this worker, too.

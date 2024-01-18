@@ -474,15 +474,18 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
 pub fn start_worker<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: VMWorkerThread,
-    worker: &mut GCWorker<VM>,
+    mut worker: Box<GCWorker<VM>>,
 ) {
     worker.run(tls, mmtk);
+    mmtk.scheduler.worker_group.surrender_gc_worker(worker);
 }
 
 /// Initialize the scheduler and GC workers that are required for doing garbage collections.
 /// This is a mandatory call for a VM during its boot process once its thread system
-/// is ready. This should only be called once. This call will invoke Collection::spawn_gc_thread()
-/// to create GC threads.
+/// is ready.  This call will invoke Collection::spawn_gc_thread() to create GC threads.
+///
+/// This function can also be called after `uninitialize_collection` is called in order to re-spawn
+/// the GC thtreads.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -498,15 +501,18 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     probe!(mmtk, collection_initialized);
 }
 
-pub fn uninitialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
+/// Ask GC worker threads to exit.  Currently, this function is for the sole purpose of forking.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn uninitialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     assert!(
         mmtk.state.is_initialized(),
         "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
     );
-    //mmtk.scheduler.stop_gc_threads_for_forking(mmtk, tls);
+    mmtk.scheduler.stop_gc_threads_for_forking();
     mmtk.state.initialized.store(false, Ordering::SeqCst);
-    //probe!(mmtk, collection_initialized);
-    unimplemented!()
+    probe!(mmtk, collection_uninitialized);
 }
 
 

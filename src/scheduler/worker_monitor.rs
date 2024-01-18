@@ -153,6 +153,7 @@ impl WorkerMonitor {
 
         if all_parked {
             debug!("Worker {} is the last worker parked.", worker.ordinal);
+            dbg!(&sync.goals);
             let result = on_last_parked(&mut sync.goals);
             match result {
                 LastParkedResult::ParkSelf => {
@@ -237,5 +238,11 @@ impl WorkerMonitor {
 
         // If the current goal is `StopForFork`, return true so that the worker thread will exit.
         matches!(sync.goals.current, Some(WorkerGoal::StopForFork))
+    }
+
+    /// Called when all workers have exited.
+    pub fn on_all_workers_exited(&self) {
+        let mut sync = self.sync.try_lock().unwrap();
+        sync.goals.current = None;
     }
 }

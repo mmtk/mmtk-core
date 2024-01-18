@@ -12,7 +12,7 @@ use crossbeam::queue::ArrayQueue;
 #[cfg(feature = "count_live_bytes_in_gc")]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 /// Represents the ID of a GC worker thread.
 pub type ThreadId = usize;
@@ -197,6 +197,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
+        warn!("Worker {} started.", self.ordinal);
         WORKER_ORDINAL.with(|x| x.store(self.ordinal, Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
@@ -256,6 +257,9 @@ pub(crate) struct WorkerGroup<VM: VMBinding> {
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
     /// The stateful part
     state: Mutex<WorkerCreationState<VM>>,
+    /// The condition of "all workers exited", i.e. the number of suspended workers is equal to the
+    /// number of workers.
+    cond_all_workers_exited: Condvar,
 }
 
 /// We have to persuade Rust that `WorkerGroup` is safe to share because it thinks one worker can
@@ -283,6 +287,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             state: Mutex::new(WorkerCreationState::NotCreated {
                 unspawned_local_work_queues,
             }),
+            cond_all_workers_exited: Default::default(),
         })
     }
 
@@ -328,6 +333,37 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         for worker in suspended_workers.drain(..) {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
+    }
+
+    /// Surrender the `GCWorker` struct when a GC worker exits.
+    pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
+        let mut state = self.state.lock().unwrap();
+        let WorkerCreationState::Created { ref mut suspended_workers } = *state else {
+            panic!("GCWorker structs have not been created, yet.");
+        };
+        let ordinal = worker.ordinal;
+        suspended_workers.push(worker);
+        info!(
+            "Worker {} surrendered. ({}/{})",
+            ordinal,
+            suspended_workers.len(),
+            self.worker_count()
+        );
+        if suspended_workers.len() == self.worker_count() {
+            info!("All {} workers surrendered.", self.worker_count());
+            self.cond_all_workers_exited.notify_all();
+        }
+    }
+
+    /// Wait until all workers exited.
+    pub fn wait_until_worker_exited(&self) {
+        let guard = self.state.lock().unwrap();
+        let _guard = self.cond_all_workers_exited.wait_while(guard, |state| {
+            let WorkerCreationState::Created { ref suspended_workers } = *state else {
+                panic!("GCWorker structs have not been created, yet.");
+            };
+            suspended_workers.len() != self.worker_count()
+        });
     }
 
     /// Get the number of workers in the group

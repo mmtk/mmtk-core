@@ -15,7 +15,7 @@
 use std::time::Instant;
 
 /// This current and reqeusted goals.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct WorkerGoals {
     /// What are the workers doing now?
     pub(crate) current: Option<WorkerGoal>,
@@ -25,6 +25,7 @@ pub(crate) struct WorkerGoals {
 
 /// The thing workers are currently doing.  This affects several things, such as what the last
 /// parked worker will do, and whether workers will stop themselves.
+#[derive(Debug)]
 pub(crate) enum WorkerGoal {
     Gc {
         start_time: Instant,
@@ -38,7 +39,7 @@ pub(crate) enum WorkerGoal {
 /// thing with the highest priority.
 ///
 /// The fields of this structs are ordered with decreasing priority.
-#[derive(Default)] // All fields should be false by default.
+#[derive(Default, Debug)] // All fields should be false by default.
 pub(crate) struct WorkerRequests {
     /// The VM needs to fork.  Workers should save their contexts and exit.
     pub(crate) stop_for_fork: bool,
