@@ -461,7 +461,10 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     }
 }
 
-/// Run the main loop of a GC worker. This method does not return.
+/// Run the main loop of a GC worker.
+///
+/// This method runs until the worker exits.  Currently a worker may exit after
+/// `uninitialize_collection` is called.
 ///
 /// Arguments:
 /// * `tls`: The thread that will be used as the GC worker.

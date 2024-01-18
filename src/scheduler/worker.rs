@@ -107,6 +107,16 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
     }
 }
 
+/// A special error type that indicate a worker should exit.
+/// This may happen if the VM needs to fork and asks workers to exit.
+pub(crate) struct WorkerShouldExit;
+
+/// The result type of `GCWorker::pool`.
+/// Too many functions return `Option<Box<dyn GCWork<VM>>>`.  In most cases, when `None` is
+/// returned, the caller should try getting work packets from another place.  To avoid confusion,
+/// we use `Err(WorkerShouldExit)` to clearly indicate that the worker should exit immediately.
+pub(crate) type PollResult<VM> = Result<Box<dyn GCWork<VM>>, WorkerShouldExit>;
+
 impl<VM: VMBinding> GCWorker<VM> {
     pub(crate) fn new(
         mmtk: &'static MMTK<VM>,
@@ -171,12 +181,16 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// 2. Poll from the local work queue.
     /// 3. Poll from activated global work-buckets
     /// 4. Steal from other workers
-    fn poll(&self) -> Box<dyn GCWork<VM>> {
-        self.shared
-            .designated_work
-            .pop()
-            .or_else(|| self.local_work_buffer.pop())
-            .unwrap_or_else(|| self.scheduler().poll(self))
+    fn poll(&mut self) -> PollResult<VM> {
+        if let Some(work) = self.shared.designated_work.pop() {
+            return Ok(work);
+        }
+
+        if let Some(work) = self.local_work_buffer.pop() {
+            return Ok(work);
+        }
+
+        self.scheduler().poll(self)
     }
 
     /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
@@ -197,7 +211,10 @@ impl<VM: VMBinding> GCWorker<VM> {
             // If we have work_start and work_end, we cannot measure the first
             // poll.
             probe!(mmtk, work_poll);
-            let mut work = self.poll();
+            let Ok(mut work) = self.poll() else {
+                // The worker is asked to exit.  Break from the loop.
+                break;
+            };
             // probe! expands to an empty block on unsupported platforms
             #[allow(unused_variables)]
             let typename = work.get_type_name();
@@ -211,6 +228,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(self, mmtk);
         }
+        probe!(mmtk, gcworker_exit);
     }
 }
 

@@ -1,3 +1,5 @@
+use self::worker::{PollResult, WorkerShouldExit};
+
 use super::gc_work::ScheduleCollection;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
@@ -362,20 +364,26 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Called by workers to get a schedulable work packet.
     /// Park the worker if there're no available packets.
-    pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
-        self.poll_schedulable_work(worker)
-            .unwrap_or_else(|| self.poll_slow(worker))
+    pub(crate) fn poll(&self, worker: &GCWorker<VM>) -> PollResult<VM> {
+        if let Some(work) = self.poll_schedulable_work(worker) {
+            return Ok(work);
+        }
+        self.poll_slow(worker)
     }
 
-    fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
+    fn poll_slow(&self, worker: &GCWorker<VM>) -> PollResult<VM> {
         loop {
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
-                return work;
+                return Ok(work);
             }
 
-            self.worker_monitor
+            let should_exit = self.worker_monitor
                 .park_and_wait(worker, |goals| self.on_last_parked(worker, goals));
+
+            if should_exit {
+                return Err(WorkerShouldExit);
+            }
         }
     }
 
