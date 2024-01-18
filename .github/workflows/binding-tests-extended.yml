@@ -1,7 +1,7 @@
 name: Extended Binding Tests
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled]
     branches:
       - master
@@ -10,6 +10,8 @@ concurrency:
   # Cancels pending runs when a PR gets updated.
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
+permissions: write-all
 
 jobs:
   binding-refs:
@@ -23,14 +25,21 @@ jobs:
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
+      - name: Split owner/repo
+        id: split-repo
+        run: |
+          owner=$(echo "${{ needs.binding-refs.outputs.openjdk_binding_repo }}" | cut -d'/' -f1)
+          repo=$(echo "${{ needs.binding-refs.outputs.openjdk_binding_repo}}" | cut -d'/' -f2)
+          echo "owner=$owner" >> $GITHUB_OUTPUT
+          echo "repo=$repo" >> $GITHUB_OUTPUT
       - name: Invoke binding workflows
-        uses: aurelien-baudet/workflow-dispatch@v2
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
-          repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+          owner: ${{ steps.split-repo.outputs.owner }}
+          repo: ${{ steps.split-repo.outputs.repo }}
           ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: test-core-extended.yml
-          inputs: '{ "mmtk-core-repo": "${{ github.repository }}", "mmtk-core-ref": "${{ github.sha }}" }'
-          wait-for-completion: true
-          wait-for-completion-timeout: 6h
-          wait-for-completion-interval: 5m
+          github_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          workflow_file_name: test-core-extended.yml
+          client_payload: '{ "mmtk-core-repo": "${{ github.repository }}", "mmtk-core-ref": "${{ github.sha }}" }'
+          wait_workflow: true
+          wait_interval: 300
