@@ -14,7 +14,7 @@ concurrency:
 jobs:
   # Figure out binding PRs.
   binding-refs:
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     uses: ./.github/workflows/pr-binding-refs.yml
     with:
       pull_request: ${{ github.event.pull_request.number }}
@@ -22,7 +22,7 @@ jobs:
   extended-tests-v8:
     runs-on: ubuntu-20.04
     needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -58,7 +58,7 @@ jobs:
 
   extended-tests-openjdk:
     needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     uses: ./.github/workflows/binding-tests-openjdk.yml
     with:
       repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
@@ -68,7 +68,7 @@ jobs:
   extended-tests-jikesrvm:
     runs-on: ubuntu-22.04
     needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -103,7 +103,7 @@ jobs:
   extended-tests-julia:
     runs-on: ubuntu-22.04
     needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -145,7 +145,7 @@ jobs:
   extended-tests-ruby:
     runs-on: ubuntu-22.04
     needs: binding-refs
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     strategy:
       fail-fast: true
       matrix:
