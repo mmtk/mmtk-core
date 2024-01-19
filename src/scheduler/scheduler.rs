@@ -92,6 +92,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Ask all GC workers to exit for forking, and wait until all workers exited.
     pub fn stop_gc_threads_for_forking(self: &Arc<Self>) {
+        debug!("A mutator is requesting GC threads to stop for forking...");
         self.worker_monitor.make_request(|requests| {
             if !requests.stop_for_fork {
                 requests.stop_for_fork = true;
@@ -117,8 +118,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_monitor.make_request(|requests| {
             if !requests.gc {
                 requests.gc = true;
-                warn!("GC requested.");
-                dbg!(requests);
                 true
             } else {
                 false
@@ -456,7 +455,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         assert!(goals.current.is_none());
 
         if goals.requests.gc {
-            // A mutator requested a GC to be scheduled.
+            trace!("A mutator requested a GC to be scheduled.");
             goals.requests.gc = false;
 
             // We set the eBPF trace point here so that bpftrace scripts can start recording work
@@ -467,15 +466,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 start_time: Instant::now(),
             });
 
-            warn!("Responded to GC request.");
-            dbg!(goals);
-
             self.add_schedule_collection_packet();
             return LastParkedResult::WakeSelf;
         }
 
         if goals.requests.stop_for_fork {
-            // A mutator wanted to fork.
+            trace!("A mutator wanted to fork.");
             goals.requests.stop_for_fork = false;
 
             goals.current = Some(WorkerGoal::StopForFork);

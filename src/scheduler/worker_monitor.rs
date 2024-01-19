@@ -152,8 +152,7 @@ impl WorkerMonitor {
         let mut should_wait = false;
 
         if all_parked {
-            debug!("Worker {} is the last worker parked.", worker.ordinal);
-            dbg!(&sync.goals);
+            trace!("Worker {} is the last worker parked.", worker.ordinal);
             let result = on_last_parked(&mut sync.goals);
             match result {
                 LastParkedResult::ParkSelf => {

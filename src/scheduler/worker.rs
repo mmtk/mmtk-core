@@ -197,7 +197,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
-        warn!("Worker {} started.", self.ordinal);
+        trace!("Worker {} started.", self.ordinal);
         WORKER_ORDINAL.with(|x| x.store(self.ordinal, Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
@@ -229,6 +229,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(self, mmtk);
         }
+        trace!("Worker {} exiting...", self.ordinal);
         probe!(mmtk, gcworker_exit);
     }
 }
@@ -333,6 +334,8 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         for worker in suspended_workers.drain(..) {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
+
+        debug!("Spawned {} worker threads.", self.worker_count());
     }
 
     /// Surrender the `GCWorker` struct when a GC worker exits.
@@ -343,14 +346,14 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         };
         let ordinal = worker.ordinal;
         suspended_workers.push(worker);
-        info!(
+        trace!(
             "Worker {} surrendered. ({}/{})",
             ordinal,
             suspended_workers.len(),
             self.worker_count()
         );
         if suspended_workers.len() == self.worker_count() {
-            info!("All {} workers surrendered.", self.worker_count());
+            debug!("All {} workers surrendered.", self.worker_count());
             self.cond_all_workers_exited.notify_all();
         }
     }
@@ -364,6 +367,8 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             };
             suspended_workers.len() != self.worker_count()
         });
+
+        debug!("All workers have exited.");
     }
 
     /// Get the number of workers in the group
