@@ -16,10 +16,13 @@ shipped with the MMTk release you use.
 
 Currently, the core provides the following tracepoints.
 
--   `mmtk:collection_initialized()`: GC is enabled
+-   `mmtk:collection_initialized()`: All GC worker threads are spawn
+-   `mmtk:collection_uninitialized()`: All GC worker threads exited.  This may happend during
+    execution, for example, if the VM needs to fork and requests GC workers to exit.
 -   `mmtk:harness_begin()`: the timing iteration of a benchmark begins
 -   `mmtk:harness_end()`: the timing iteration of a benchmark ends
 -   `mmtk:gcworker_run()`: a GC worker thread enters its work loop
+-   `mmtk:gcworker_exit()`: a GC worker thread exits its work loop
 -   `mmtk:gc_start()`: a collection epoch starts
 -   `mmtk:gc_end()`: a collection epoch ends
 -   `mmtk:process_edges(num_edges: int, is_roots: bool)`: a invocation of the `process_edges`
