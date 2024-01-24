@@ -4,8 +4,9 @@ use crate::util::test_util::mock_method::*;
 use crate::util::test_util::mock_vm::*;
 use crate::AllocationSemantics;
 
-// This test allocates after calling initialize_collection(). When we exceed the heap limit, MMTk will trigger a GC. And block_for_gc will be called.
-// We havent implemented block_for_gc so it will panic. This test is similar to allocate_with_initialize_collection, except that we once disabled GC in the test.
+// This test allocates after calling initialize_collection(). When we exceed the heap limit for the first time, MMTk will not trigger GC since GC has been disabled
+// However, the second 1MB allocation will trigger a GC since GC is enabled again. And block_for_gc will be called.
+// We havent implemented block_for_gc so it will panic. This test is similar to allocate_with_initialize_collection, except that GC is disabled once in the test.
 #[test]
 #[should_panic(expected = "block_for_gc is called")]
 pub fn allocate_with_re_enable_collection() {
@@ -14,6 +15,11 @@ pub fn allocate_with_re_enable_collection() {
         || -> MockVM {
             MockVM {
                 block_for_gc: MockMethod::new_fixed(Box::new(|_| panic!("block_for_gc is called"))),
+                is_collection_disabled: MockMethod::new_sequence(vec![
+                    Box::new(|()| -> bool { false }), // gc is not disabled but it shouldn't matter here
+                    Box::new(|()| -> bool { true }),  // gc is disabled
+                    Box::new(|()| -> bool { false }), // gc is enabled again
+                ]),
                 ..MockVM::default()
             }
         },
@@ -31,29 +37,23 @@ pub fn allocate_with_re_enable_collection() {
             );
             assert!(!addr.is_zero());
 
-            // Disable GC. So we can keep allocate without triggering a GC.
-            memory_manager::disable_collection(fixture.mmtk());
+            // In the next allocation GC is disabled. So we can keep allocate without triggering a GC.
             // Fill up the heap
-            let _ = memory_manager::alloc(
-                &mut fixture.mutator,
-                MB >> 1,
-                8,
-                0,
-                AllocationSemantics::Default,
-            );
+            let _ =
+                memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
 
-            // Enable GC again.
-            memory_manager::enable_collection(fixture.mmtk());
-            // Attempt another allocation. This will trigger GC.
+            // Attempt another allocation. This will trigger GC since GC is enabled again.
             let addr =
                 memory_manager::alloc(&mut fixture.mutator, MB, 8, 0, AllocationSemantics::Default);
             assert!(!addr.is_zero());
         },
         || {
-            // This is actually redundant, as we defined block_for_gc for this test.
-            // This just demostrates that we can check if the method is called.
+            // This ensures that block_for_gc is called for this test, and that the second allocation
+            // does not trigger GC since we expect is_collection_disabled to be called three times.
             read_mockvm(|mock| {
-                assert!(mock.block_for_gc.is_called());
+                assert!(
+                    mock.block_for_gc.is_called() && mock.is_collection_disabled.call_count() == 3
+                );
             });
         },
     )
