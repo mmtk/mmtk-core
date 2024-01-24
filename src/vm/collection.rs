@@ -140,8 +140,12 @@ pub trait Collection<VM: VMBinding> {
         0
     }
 
-    /// FIXME: Document method
+    /// Callback function to ask if collection should be disabled, i.e., the heap can grow beyond its
+    /// limit. This method is checked during allocation and when the VM suggests a GC. The latter also
+    /// does not trigger GC if the collection has been disabled by the VM.
     fn is_collection_disabled() -> bool {
+        // By default, MMTk assumes that collections are always enabled, and the binding should define
+        // this method if the VM supports disabling GC
         false
     }
 }
