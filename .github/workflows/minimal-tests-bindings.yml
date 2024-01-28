@@ -19,6 +19,14 @@ jobs:
   grace-period:
     runs-on: ubuntu-latest
     steps:
+      # This workflow runs for both merge_group and pull_request
+      # We need a way to get the pull request number that works for both cases.
+      # The action can do that.
+      - id: get-pr-number
+        uses: mgaitan/gha-get-pr-number@main
+      # This job also outputs the PR number
+      - run: echo "pr-number=${{ steps.get-pr-number.outputs.number }}"
+      # Sleep for 2 mins
       - run: sleep 120
 
   # Figure out binding PRs.
@@ -26,7 +34,7 @@ jobs:
     needs: grace-period
     uses: ./.github/workflows/pr-binding-refs.yml
     with:
-      pull_request: ${{ github.event.pull_request.number }}
+      pull_request: ${{ needs.grace-period.outputs.pr-number }}
 
   minimal-tests-openjdk:
     needs: binding-refs
