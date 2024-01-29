@@ -1,0 +1,37 @@
+name: Minimal tests - bindings
+
+on:
+  pull_request:
+    branches:
+      - master
+  merge_group:
+    branches:
+      - master
+
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # The workflow will be triggered once a PR is opened, and at that point, we do not have chance to specify which binding repo to use.
+  # This step allows 2mins before we check comments for binding repos/refs.
+  grace-period:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 120
+
+  # Figure out binding PRs.
+  binding-refs:
+    needs: grace-period
+    uses: ./.github/workflows/pr-binding-refs.yml
+    with:
+      pull_request: ${{ github.event.pull_request.number }}
+
+  minimal-tests-openjdk:
+    needs: binding-refs
+    uses: ./.github/workflows/binding-tests-openjdk.yml
+    with:
+      repo: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+      ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+      test-script: ci-test-minimal.sh

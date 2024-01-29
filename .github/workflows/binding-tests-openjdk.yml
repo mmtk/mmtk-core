@@ -1,0 +1,47 @@
+name: Run OpenJDK tests
+
+on:
+  workflow_call:
+    inputs:
+      repo:
+        type: string
+        required: true
+      ref:
+        type: string
+        required: true
+      test-script:
+        type: string
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+        - name: Checkout MMTk Core
+          uses: actions/checkout@v2
+          with:
+            path: mmtk-core
+        - name: Checkout OpenJDK Binding
+          uses: actions/checkout@v2
+          with:
+            repository: ${{ inputs.repo }}
+            path: mmtk-openjdk
+            ref: ${{ inputs.ref }}
+        - name: Use mmtk-core Rust toolchain for bindings
+          run: |
+            cp mmtk-core/rust-toolchain mmtk-openjdk/mmtk
+        - name: Setup
+          run: |
+            cd mmtk-openjdk
+            ./.github/scripts/ci-checkout.sh
+            ./.github/scripts/ci-setup.sh
+            sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+            sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+        - name: Overwrite MMTk core in openjdk binding
+          run: |
+            cp -r mmtk-core mmtk-openjdk/repos/
+        - name: Test
+          run: |
+            cd mmtk-openjdk
+            export RUST_BACKTRACE=1
+            ./.github/scripts/${{ inputs.test-script }}
