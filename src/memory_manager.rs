@@ -35,9 +35,8 @@ use std::sync::atomic::Ordering;
 /// 2. Set command line options for MMTKBuilder by [`crate::memory_manager::process`] or [`crate::memory_manager::process_bulk`].
 /// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
-///    supported. Currently we assume a binding will only need one MMTk instance.
-/// 4. Enable garbage collection in MMTk by [`crate::memory_manager::enable_collection`]. A binding should only call this once its
-///    thread system is ready. MMTk will not trigger garbage collection before this call.
+///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
+///    implement `VMCollection::is_collection_disabled()` if it requires that the GC should be disabled at a particular time.
 ///
 /// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when

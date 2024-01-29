@@ -34,12 +34,6 @@ extern void mmtk_flush_mutator(MMTk_Mutator mutator);
 // Initialize MMTk scheduler and GC workers
 extern void mmtk_initialize_collection(void* tls);
 
-// Allow MMTk to perform a GC when the heap is full
-extern void mmtk_enable_collection();
-
-// Disallow MMTk to perform a GC when the heap is full
-extern void mmtk_disable_collection();
-
 // Allocate memory for an object
 extern void* mmtk_alloc(MMTk_Mutator mutator,
                         size_t size,
