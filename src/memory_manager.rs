@@ -510,42 +510,6 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     probe!(mmtk, collection_initialized);
 }
 
-/// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
-/// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
-/// Note this call is not thread safe, only one VM thread should call this.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
-    debug_assert!(
-        !mmtk.state.should_trigger_gc_when_heap_is_full(),
-        "enable_collection() is called when GC is already enabled."
-    );
-    mmtk.state
-        .trigger_gc_when_heap_is_full
-        .store(true, Ordering::SeqCst);
-}
-
-/// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will
-/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the MMTk's heap size (the soft heap limit).
-/// However, there is no guarantee that the physical allocation will succeed, and if it succeeds, there is no guarantee that further allocation
-/// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
-/// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
-/// behavior. This call does not disable explicit GCs (through handle_user_collection_request()).
-/// Note this call is not thread safe, only one VM thread should call this.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
-    debug_assert!(
-        mmtk.state.should_trigger_gc_when_heap_is_full(),
-        "disable_collection() is called when GC is not enabled."
-    );
-    mmtk.state
-        .trigger_gc_when_heap_is_full
-        .store(false, Ordering::SeqCst);
-}
-
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
 ///
 /// Arguments:

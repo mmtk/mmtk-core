@@ -54,11 +54,6 @@ impl GlobalState {
         self.initialized.load(Ordering::SeqCst)
     }
 
-    /// Should MMTK trigger GC when heap is full? If GC is disabled, we wont trigger GC even if the heap is full.
-    pub fn should_trigger_gc_when_heap_is_full(&self) -> bool {
-        self.trigger_gc_when_heap_is_full.load(Ordering::SeqCst)
-    }
-
     /// Set the collection kind for the current GC. This is called before
     /// scheduling collection to determin what kind of collection it will be.
     pub fn set_collection_kind(
