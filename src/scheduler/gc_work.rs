@@ -297,7 +297,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
     fn flush(&mut self) {
         let next_nodes = self.process_edges_work.pop_nodes();
         assert!(!next_nodes.is_empty());
-        let work_packet = self.process_edges_work.create_scan_work(next_nodes, false);
+        let work_packet = self.process_edges_work.create_scan_work(next_nodes);
         let worker = self.process_edges_work.worker();
         worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
@@ -641,18 +641,14 @@ pub trait ProcessEdgesWork:
     ///
     /// `roots` indicates if we are creating a packet for root scanning.  It is only true when this
     /// method is called to handle `RootsWorkFactory::create_process_pinning_roots_work`.
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        roots: bool,
-    ) -> Self::ScanObjectsWorkType;
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType;
 
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
     /// this method will simply return with no work packet created.
     fn flush(&mut self) {
         let nodes = self.pop_nodes();
         if !nodes.is_empty() {
-            self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
+            self.start_or_dispatch_scan_work(self.create_scan_work(nodes));
         }
     }
 
@@ -732,8 +728,8 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
-        ScanObjects::<Self>::new(nodes, false, roots, self.bucket)
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> ScanObjects<Self> {
+        ScanObjects::<Self>::new(nodes, false, self.bucket)
     }
 }
 pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
@@ -815,10 +811,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
     /// The associated ProcessEdgesWork for processing the edges of the objects in this packet.
     type E: ProcessEdgesWork<VM = VM>;
 
-    /// Return true if the objects in this packet are pointed by roots, in which case we need to
-    /// call trace_object on them.
-    fn roots(&self) -> bool;
-
     /// Called after each object is scanned.
     fn post_scan_object(&self, object: ObjectReference);
 
@@ -836,7 +828,6 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         _mmtk: &'static MMTK<<Self::E as ProcessEdgesWork>::VM>,
     ) {
         let tls = worker.tls;
-        debug_assert!(!self.roots());
 
         // Scan the nodes in the buffer.
         let objects_to_scan = buffer;
@@ -904,22 +895,15 @@ pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
     #[allow(unused)]
     concurrent: bool,
-    roots: bool,
     phantom: PhantomData<Edges>,
     bucket: WorkBucketStage,
 }
 
 impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
-    pub fn new(
-        buffer: Vec<ObjectReference>,
-        concurrent: bool,
-        roots: bool,
-        bucket: WorkBucketStage,
-    ) -> Self {
+    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, bucket: WorkBucketStage) -> Self {
         Self {
             buffer,
             concurrent,
-            roots,
             phantom: PhantomData,
             bucket,
         }
@@ -928,10 +912,6 @@ impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
 
 impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanObjects<E> {
     type E = E;
-
-    fn roots(&self) -> bool {
-        self.roots
-    }
 
     fn get_bucket(&self) -> WorkBucketStage {
         self.bucket
@@ -942,7 +922,7 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
     }
 
     fn make_another(&self, buffer: Vec<ObjectReference>) -> Self {
-        Self::new(buffer, self.concurrent, false, self.bucket)
+        Self::new(buffer, self.concurrent, self.bucket)
     }
 }
 
@@ -987,12 +967,8 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         Self { plan, base }
     }
 
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        roots: bool,
-    ) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, roots, self.bucket)
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
+        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, self.bucket)
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
@@ -1041,7 +1017,6 @@ pub struct PlanScanObjects<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceO
     buffer: Vec<ObjectReference>,
     #[allow(dead_code)]
     concurrent: bool,
-    roots: bool,
     phantom: PhantomData<E>,
     bucket: WorkBucketStage,
 }
@@ -1051,14 +1026,12 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
         plan: &'static P,
         buffer: Vec<ObjectReference>,
         concurrent: bool,
-        roots: bool,
         bucket: WorkBucketStage,
     ) -> Self {
         Self {
             plan,
             buffer,
             concurrent,
-            roots,
             phantom: PhantomData,
             bucket,
         }
@@ -1070,10 +1043,6 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
 {
     type E = E;
 
-    fn roots(&self) -> bool {
-        self.roots
-    }
-
     fn get_bucket(&self) -> WorkBucketStage {
         self.bucket
     }
@@ -1083,7 +1052,7 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
     }
 
     fn make_another(&self, buffer: Vec<ObjectReference>) -> Self {
-        Self::new(self.plan, buffer, self.concurrent, false, self.bucket)
+        Self::new(self.plan, buffer, self.concurrent, self.bucket)
     }
 }
 
@@ -1169,7 +1138,7 @@ impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> 
         };
 
         let process_edges_work = E::new(vec![], false, mmtk, self.bucket);
-        let work = process_edges_work.create_scan_work(scanned_root_objects, false);
+        let work = process_edges_work.create_scan_work(scanned_root_objects);
         crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
 
         trace!("ProcessRootNode End");
@@ -1214,11 +1183,7 @@ impl<VM: VMBinding> ProcessEdgesWork for UnsupportedProcessEdges<VM> {
         panic!("unsupported!")
     }
 
-    fn create_scan_work(
-        &self,
-        _nodes: Vec<ObjectReference>,
-        _roots: bool,
-    ) -> Self::ScanObjectsWorkType {
+    fn create_scan_work(&self, _nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
         panic!("unsupported!")
     }
 }
