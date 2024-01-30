@@ -6,7 +6,7 @@ use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap so we won't trigger GC, but we should disable GC if we can
-    let mut fixture = MutatorFixture::create_with_heapsize(1 << 60);
+    let mut fixture = MutatorFixture::create_with_heapsize(1 << 50);
     c.bench_function("alloc", |b| {
         b.iter(|| {
             let _addr =
