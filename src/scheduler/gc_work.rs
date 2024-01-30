@@ -1101,7 +1101,11 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
 /// but creates the work to scan these objects using E. This is necessary to guarantee that these objects do not move
 /// (`I` should trace them without moving) as we do not have the information about the edges pointing to them.
 
-struct ProcessRootNode<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> {
+pub(crate) struct ProcessRootNode<
+    VM: VMBinding,
+    I: ProcessEdgesWork<VM = VM>,
+    E: ProcessEdgesWork<VM = VM>,
+> {
     phantom: PhantomData<(VM, I, E)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
