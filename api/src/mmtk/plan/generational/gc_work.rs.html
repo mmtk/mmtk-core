@@ -169,10 +169,6 @@
 <a href="#169" id="169">169</a>
 <a href="#170" id="170">170</a>
 <a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
@@ -232,12 +228,8 @@
         }
     }
 
-    <span class="kw">fn </span>create_scan_work(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        nodes: Vec&lt;ObjectReference&gt;,
-        roots: bool,
-    ) -&gt; <span class="self">Self</span>::ScanObjectsWorkType {
-        PlanScanObjects::new(<span class="self">self</span>.plan, nodes, <span class="bool-val">false</span>, roots, <span class="self">self</span>.bucket)
+    <span class="kw">fn </span>create_scan_work(<span class="kw-2">&amp;</span><span class="self">self</span>, nodes: Vec&lt;ObjectReference&gt;) -&gt; <span class="self">Self</span>::ScanObjectsWorkType {
+        PlanScanObjects::new(<span class="self">self</span>.plan, nodes, <span class="bool-val">false</span>, <span class="self">self</span>.bucket)
     }
 }
 
@@ -297,7 +289,7 @@
             <span class="comment">// Scan objects in the modbuf and forward pointers
             </span><span class="kw">let </span>modbuf = std::mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.modbuf);
             GCWork::do_work(
-                <span class="kw-2">&amp;mut </span>ScanObjects::&lt;E&gt;::new(modbuf, <span class="bool-val">false</span>, <span class="bool-val">false</span>, WorkBucketStage::Closure),
+                <span class="kw-2">&amp;mut </span>ScanObjects::&lt;E&gt;::new(modbuf, <span class="bool-val">false</span>, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

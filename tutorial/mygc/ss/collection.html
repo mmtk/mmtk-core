@@ -488,8 +488,8 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         }
     }
 
-    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
-        ScanObjects::&lt;Self&gt;::new(nodes, false, roots, self.bucket)
+    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;) -&gt; ScanObjects&lt;Self&gt; {
+        ScanObjects::&lt;Self&gt;::new(nodes, false, self.bucket)
     }
 }
 <span class="boring">}</span></code></pre></pre>
