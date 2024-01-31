@@ -1,4 +1,4 @@
-name: Pre Code Review Checks
+name: Minimal tests - mmtk-core
 
 on:
   pull_request:
@@ -28,7 +28,7 @@ jobs:
           export TEST=`cat rust-toolchain`
           echo "array=[\"$MSRV\", \"$TEST\", \"stable\"]" >> $GITHUB_OUTPUT
 
-  pre-code-review-checks:
+  minimal-tests-core:
     needs: setup-test-matrix
     strategy:
       fail-fast: false
@@ -39,7 +39,7 @@ jobs:
           - { os: macos-12, triple: x86_64-apple-darwin }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
-    name: pre-code-review-checks/${{ matrix.target.triple }}/${{ matrix.rust }}
+    name: minimal-tests-core/${{ matrix.target.triple }}/${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
 
     steps:

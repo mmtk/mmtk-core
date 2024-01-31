@@ -140,6 +140,12 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
 
             /* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
             if self.common().contiguous && chunk_align_down(sync.cursor) != sync.current_chunk {
+                debug_assert!(
+                    chunk_align_down(sync.cursor) > sync.current_chunk,
+                    "Not monotonic.  chunk_align_down(sync.cursor): {}, sync.current_chunk: {}",
+                    chunk_align_down(sync.cursor),
+                    sync.current_chunk,
+                );
                 sync.current_chunk = chunk_align_down(sync.cursor);
             }
             self.commit_pages(reserved_pages, required_pages, tls);
@@ -310,6 +316,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 MonotonePageResourceConditional::Contiguous { start: _start, .. } => _start,
                 _ => unreachable!(),
             };
+            guard.current_chunk = guard.cursor;
         } else if !guard.cursor.is_zero() {
             let bytes = guard.cursor - guard.current_chunk;
             self.release_pages_extent(guard.current_chunk, bytes);
