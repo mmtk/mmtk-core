@@ -204,7 +204,7 @@ pub struct MockVM {
     pub schedule_finalization: MockMethod<VMWorkerThread, ()>,
     pub post_forwarding: MockMethod<VMWorkerThread, ()>,
     pub vm_live_bytes: MockMethod<(), usize>,
-    pub is_collection_disabled: MockMethod<(), bool>,
+    pub is_collection_enabled: MockMethod<(), bool>,
     // object model
     pub copy_object: MockMethod<
         (
@@ -281,7 +281,7 @@ impl Default for MockVM {
             schedule_finalization: MockMethod::new_default(),
             post_forwarding: MockMethod::new_default(),
             vm_live_bytes: MockMethod::new_default(),
-            is_collection_disabled: MockMethod::new_default(),
+            is_collection_enabled: MockMethod::new_fixed(Box::new(|_| true)),
 
             copy_object: MockMethod::new_unimplemented(),
             copy_object_to: MockMethod::new_unimplemented(),
@@ -452,8 +452,8 @@ impl crate::vm::Collection<MockVM> for MockVM {
         mock!(post_forwarding(tls))
     }
 
-    fn is_collection_disabled() -> bool {
-        mock!(is_collection_disabled())
+    fn is_collection_enabled() -> bool {
+        mock!(is_collection_enabled())
     }
 
     fn vm_live_bytes() -> usize {

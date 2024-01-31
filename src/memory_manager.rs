@@ -36,7 +36,7 @@ use std::sync::atomic::Ordering;
 /// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
 ///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
-///    implement `VMCollection::is_collection_disabled()` if it requires that the GC should be disabled at a particular time.
+///    implement `VMCollection::is_collection_enabled()` if it requires that the GC should be disabled at a particular time.
 ///
 /// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
@@ -453,7 +453,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
         "gc_poll() can only be called by a mutator thread."
     );
 
-    if !(VM::VMCollection::is_collection_disabled()) && mmtk.gc_trigger.poll(false, None) {
+    if VM::VMCollection::is_collection_enabled() && mmtk.gc_trigger.poll(false, None) {
         debug!("Collection required");
         assert!(mmtk.state.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
         VM::VMCollection::block_for_gc(tls);

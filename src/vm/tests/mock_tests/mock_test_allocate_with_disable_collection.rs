@@ -11,7 +11,7 @@ pub fn allocate_with_disable_collection() {
     with_mockvm(
         || -> MockVM {
             MockVM {
-                is_collection_disabled: MockMethod::new_fixed(Box::new(|_| true)),
+                is_collection_enabled: MockMethod::new_fixed(Box::new(|_| false)),
                 ..MockVM::default()
             }
         },

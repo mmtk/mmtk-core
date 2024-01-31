@@ -15,10 +15,10 @@ pub fn allocate_with_re_enable_collection() {
         || -> MockVM {
             MockVM {
                 block_for_gc: MockMethod::new_fixed(Box::new(|_| panic!("block_for_gc is called"))),
-                is_collection_disabled: MockMethod::new_sequence(vec![
-                    Box::new(|()| -> bool { false }), // gc is not disabled but it shouldn't matter here
-                    Box::new(|()| -> bool { true }),  // gc is disabled
-                    Box::new(|()| -> bool { false }), // gc is enabled again
+                is_collection_enabled: MockMethod::new_sequence(vec![
+                    Box::new(|()| -> bool { true }), // gc is enabled but it shouldn't matter here
+                    Box::new(|()| -> bool { false }), // gc is disabled
+                    Box::new(|()| -> bool { true }), // gc is enabled again
                 ]),
                 ..MockVM::default()
             }
@@ -49,10 +49,10 @@ pub fn allocate_with_re_enable_collection() {
         },
         || {
             // This ensures that block_for_gc is called for this test, and that the second allocation
-            // does not trigger GC since we expect is_collection_disabled to be called three times.
+            // does not trigger GC since we expect is_collection_enabled to be called three times.
             read_mockvm(|mock| {
                 assert!(
-                    mock.block_for_gc.is_called() && mock.is_collection_disabled.call_count() == 3
+                    mock.block_for_gc.is_called() && mock.is_collection_enabled.call_count() == 3
                 );
             });
         },
