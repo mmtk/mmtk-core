@@ -153,7 +153,8 @@ pub trait Collection<VM: VMBinding> {
     /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
     fn is_collection_enabled() -> bool {
         // By default, MMTk assumes that collections are always enabled, and the binding should define
-        // this method if the VM supports disabling GC
+        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
+        // initialization is done, such as initializing class metadata for scanning objects.
         true
     }
 }
