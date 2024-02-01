@@ -240,8 +240,12 @@ enum WorkerCreationState<VM: VMBinding> {
         unspawned_local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
     },
     Created {
-        /// `Worker` instances for worker threads that have not been created yet, or worker thread that
-        /// are suspended (e.g. for forking).
+        /// `Worker` instances for worker threads that have not been created yet, or worker thread
+        /// that are suspended (e.g. for forking).
+        // Note: Clippy warns about `Vec<Box<T>>` because `Vec<T>` is already in the heap.
+        // However, the purpose of this `Vec` is allowing GC worker threads to give their
+        // `Box<GCWorker<VM>>` instances back to this pool.  Therefore, the `Box` is necessary.
+        #[allow(clippy::vec_box)]
         suspended_workers: Vec<Box<GCWorker<VM>>>,
     },
 }
