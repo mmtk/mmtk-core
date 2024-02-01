@@ -25,3 +25,9 @@ jobs:
           checkInterval: 600
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Check result
+        if: ${{ steps.waitforstatuschecks.outputs.status != 'success' }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Status checks failed')
