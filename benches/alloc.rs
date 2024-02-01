@@ -8,7 +8,7 @@ use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap (1TB) so we won't trigger GC, but we should disable GC if we can
-    let mut fixture = MutatorFixture::create_with_heapsize(1 << 40);
+    let mut fixture = MutatorFixture::create_with_heapsize(1usize << 40);
     {
         write_mockvm(|mock| {
             *mock = {
