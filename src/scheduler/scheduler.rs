@@ -395,7 +395,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 return Ok(work);
             }
 
-            let should_exit = self.worker_monitor
+            let should_exit = self
+                .worker_monitor
                 .park_and_wait(worker, |goals| self.on_last_parked(worker, goals));
 
             if should_exit {

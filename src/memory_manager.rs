@@ -515,7 +515,6 @@ pub fn uninitialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     probe!(mmtk, collection_uninitialized);
 }
 
-
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
 /// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
 /// Note this call is not thread safe, only one VM thread should call this.
