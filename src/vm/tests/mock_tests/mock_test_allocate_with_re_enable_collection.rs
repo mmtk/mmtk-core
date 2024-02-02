@@ -4,9 +4,9 @@ use crate::util::test_util::mock_method::*;
 use crate::util::test_util::mock_vm::*;
 use crate::AllocationSemantics;
 
-// This test allocates after calling initialize_collection(). When we exceed the heap limit for the first time, MMTk will not trigger GC since GC has been disabled
-// However, the second 1MB allocation will trigger a GC since GC is enabled again. And block_for_gc will be called.
-// We havent implemented block_for_gc so it will panic. This test is similar to allocate_with_initialize_collection, except that GC is disabled once in the test.
+/// This test allocates after calling `initialize_collection()`. When we exceed the heap limit for the first time, MMTk will not trigger GC since GC has been disabled
+/// However, the second 1MB allocation will trigger a GC since GC is enabled again. And `block_for_gc` will be called.
+/// We haven't implemented `block_for_gc` so it will panic. This test is similar to `allocate_with_initialize_collection`, except that GC is disabled once in the test.
 #[test]
 #[should_panic(expected = "block_for_gc is called")]
 pub fn allocate_with_re_enable_collection() {
@@ -51,9 +51,8 @@ pub fn allocate_with_re_enable_collection() {
             // This ensures that block_for_gc is called for this test, and that the second allocation
             // does not trigger GC since we expect is_collection_enabled to be called three times.
             read_mockvm(|mock| {
-                assert!(
-                    mock.block_for_gc.is_called() && mock.is_collection_enabled.call_count() == 3
-                );
+                assert!(mock.block_for_gc.is_called());
+                assert!(mock.is_collection_enabled.call_count() == 3);
             });
         },
     )

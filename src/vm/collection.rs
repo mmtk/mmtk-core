@@ -147,9 +147,10 @@ pub trait Collection<VM: VMBinding> {
     /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
     /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
     /// to make sure that the physical memory allows the amount of allocation. We highly recommend
-    /// to have GC always enabled (i.e. that this method always returns false). However, we support
-    /// this to accomodate some VMs that require this behavior. Note that this call also disables
-    /// explicit GCs (through handle_user_collection_request()). Note also that any synchronization
+    /// to have GC always enabled (i.e. that this method always returns true). However, we support
+    /// this to accomodate some VMs that require this behavior. Note that
+    /// `handle_user_collection_request()` calls this function, too.  If this function returns
+    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
     /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
     fn is_collection_enabled() -> bool {
         // By default, MMTk assumes that collections are always enabled, and the binding should define
