@@ -197,7 +197,12 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
-        trace!("Worker {} started.", self.ordinal);
+        debug!(
+            "Worker started. PID: {}, tid: {}, ordinal: {}",
+            unsafe { libc::getpid() },
+            unsafe { libc::gettid() },
+            self.ordinal
+        );
         WORKER_ORDINAL.with(|x| x.store(self.ordinal, Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
@@ -229,17 +234,25 @@ impl<VM: VMBinding> GCWorker<VM> {
             probe!(mmtk, work, typename.as_ptr(), typename.len());
             work.do_work_with_stat(self, mmtk);
         }
-        trace!("Worker {} exiting...", self.ordinal);
+        debug!(
+            "Worker exiting. PID: {}, tid: {}, ordinal: {}",
+            unsafe { libc::getpid() },
+            unsafe { libc::gettid() },
+            self.ordinal
+        );
         probe!(mmtk, gcworker_exit);
     }
 }
 
 enum WorkerCreationState<VM: VMBinding> {
+    /// `GCWorker`` structs have not been created yet.
     NotCreated {
         /// The local work queues for to-be-created workers.
         unspawned_local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
     },
-    Created {
+    /// `GCWorker`` structs are created, but worker threads are either not been spawn, yet, or in
+    /// the progress of stopping for forking.
+    Resting {
         /// `Worker` instances for worker threads that have not been created yet, or worker thread
         /// that are suspended (e.g. for forking).
         // Note: Clippy warns about `Vec<Box<T>>` because `Vec<T>` is already in the heap.
@@ -248,12 +261,9 @@ enum WorkerCreationState<VM: VMBinding> {
         #[allow(clippy::vec_box)]
         suspended_workers: Vec<Box<GCWorker<VM>>>,
     },
-}
-
-impl<VM: VMBinding> WorkerCreationState<VM> {
-    pub fn is_created(&self) -> bool {
-        matches!(self, WorkerCreationState::Created { .. })
-    }
+    /// All `GCWorker`` structs have been transferred to worker threads, and worker threads are
+    /// running.
+    Spawned,
 }
 
 /// A worker group to manage all the GC workers.
@@ -297,8 +307,11 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     }
 
     /// Create `GCWorker` instances, but do not create threads, yet.
-    fn create_worker_structs(&self, state: &mut WorkerCreationState<VM>, mmtk: &'static MMTK<VM>) {
-        let WorkerCreationState::NotCreated { unspawned_local_work_queues } = state else {
+    pub fn create_workers(&self, mmtk: &'static MMTK<VM>) {
+        debug!("Creating GCWorker instances...");
+        let mut state = self.state.lock().unwrap();
+
+        let WorkerCreationState::NotCreated { ref mut unspawned_local_work_queues } = *state else {
             panic!("GCWorker structs have already been created");
         };
 
@@ -317,20 +330,16 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             suspended_workers.push(worker);
         }
 
-        *state = WorkerCreationState::Created { suspended_workers };
+        *state = WorkerCreationState::Resting { suspended_workers };
+        debug!("GCWorker instances created.");
     }
 
     /// Spawn all the worker threads
-    pub fn spawn(&self, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        let mut guard = self.state.lock().unwrap();
+    pub fn spawn(&self, tls: VMThread) {
+        debug!("Spawning GC workers.  PID: {}", unsafe { libc::getpid() });
+        let mut state = self.state.lock().unwrap();
 
-        // Create worker structs lazily.  If we are spawning workers after fork, worker structs
-        // will have been created already, so we can skip the creation.
-        if !guard.is_created() {
-            self.create_worker_structs(&mut *guard, mmtk);
-        }
-
-        let WorkerCreationState::Created { ref mut suspended_workers } = *guard else {
+        let WorkerCreationState::Resting { ref mut suspended_workers } = *state else {
             panic!("GCWorker structs have not been created, yet.");
         };
 
@@ -339,13 +348,27 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
 
-        debug!("Spawned {} worker threads.", self.worker_count());
+        *state = WorkerCreationState::Spawned;
+
+        debug!(
+            "Spawned {} worker threads.  PID: {}",
+            self.worker_count(),
+            unsafe { libc::getpid() }
+        );
+    }
+
+    /// Prepare the buffer for workers to surrender their `GCWorker` structs.
+    pub fn prepare_surrender_buffer(&self) {
+        let mut state = self.state.lock().unwrap();
+        *state = WorkerCreationState::Resting {
+            suspended_workers: Vec::with_capacity(self.worker_count()),
+        }
     }
 
     /// Surrender the `GCWorker` struct when a GC worker exits.
     pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
         let mut state = self.state.lock().unwrap();
-        let WorkerCreationState::Created { ref mut suspended_workers } = *state else {
+        let WorkerCreationState::Resting { ref mut suspended_workers } = *state else {
             panic!("GCWorker structs have not been created, yet.");
         };
         let ordinal = worker.ordinal;
@@ -366,13 +389,15 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn wait_until_worker_exited(&self) {
         let guard = self.state.lock().unwrap();
         let _guard = self.cond_all_workers_exited.wait_while(guard, |state| {
-            let WorkerCreationState::Created { ref suspended_workers } = *state else {
+            let WorkerCreationState::Resting { ref suspended_workers } = *state else {
                 panic!("GCWorker structs have not been created, yet.");
             };
             suspended_workers.len() != self.worker_count()
         });
 
-        debug!("All workers have exited.");
+        debug!("All workers have exited.  PID: {}", unsafe {
+            libc::getpid()
+        });
     }
 
     /// Get the number of workers in the group

@@ -85,13 +85,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.as_ref().worker_count()
     }
 
-    /// Create GC threads, including all workers.
+    /// Create GC threads, including all workers,  for the first time.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        self.worker_group.spawn(mmtk, tls)
+        self.worker_group.create_workers(mmtk);
+        self.worker_group.spawn(tls)
     }
 
     /// Ask all GC workers to exit for forking, and wait until all workers exited.
     pub fn stop_gc_threads_for_forking(self: &Arc<Self>) {
+        self.worker_group.prepare_surrender_buffer();
+
         debug!("A mutator is requesting GC threads to stop for forking...");
         self.worker_monitor.make_request(|requests| {
             if !requests.stop_for_fork {
@@ -105,6 +108,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.wait_until_worker_exited();
 
         self.worker_monitor.on_all_workers_exited();
+    }
+
+    /// Respawn GC threads after forking.
+    pub fn respawn_gc_threads_after_forking(self: &Arc<Self>, tls: VMThread) {
+        self.worker_group.spawn(tls)
     }
 
     /// Resolve the affinity of a thread.

@@ -220,6 +220,56 @@ impl<VM: VMBinding> MMTK<VM> {
         }
     }
 
+    /// Initialize the GC worker threads that are required for doing garbage collections.
+    /// This is a mandatory call for a VM during its boot process once its thread system
+    /// is ready.  This call will invoke `Collection::spawn_gc_thread()`` to create GC threads.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
+    ///     to the VM in `Collection::spawn_gc_thread()` so that the VM knows the context.
+    pub fn initialize_collection(&'static self, tls: VMThread) {
+        assert!(
+            !self.state.is_initialized(),
+            "MMTk collection has been initialized (was initialize_collection() already called before?)"
+        );
+        self.scheduler.spawn_gc_threads(self, tls);
+        self.state.initialized.store(true, Ordering::SeqCst);
+        probe!(mmtk, collection_initialized);
+    }
+
+    /// Prepare an MMTk instance for calling the `fork()` system call.
+    ///
+    /// This function makes all MMTk threads (currently including GC worker threads) save their
+    /// contexts and stop.  A subsequent call to `MMTK::after_fork()` will re-spawn the threads
+    /// using the saved contexts.
+    ///
+    /// This function returns when all MMTK threads stopped.
+    pub fn prepare_to_fork(&'static self) {
+        assert!(
+            self.state.is_initialized(),
+            "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        );
+        self.scheduler.stop_gc_threads_for_forking();
+    }
+
+    /// Call this function after the VM called the `fork()` system call.
+    ///
+    /// This function will re-spawn MMTk threads from saved contexts.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
+    ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
+    ///     context.
+    pub fn after_fork(&'static self, tls: VMThread) {
+        assert!(
+            self.state.is_initialized(),
+            "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        );
+        self.scheduler.respawn_gc_threads_after_forking(tls);
+    }
+
     /// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
     /// to clear any residual garbage and start collecting statistics for the benchmark.
     /// This is usually called by the benchmark harness as its last step before the actual benchmark.

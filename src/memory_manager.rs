@@ -480,39 +480,16 @@ pub fn start_worker<VM: VMBinding>(
     mmtk.scheduler.worker_group.surrender_gc_worker(worker);
 }
 
-/// Initialize the scheduler and GC workers that are required for doing garbage collections.
+/// Initialize the GC worker threads that are required for doing garbage collections.
 /// This is a mandatory call for a VM during its boot process once its thread system
-/// is ready.  This call will invoke Collection::spawn_gc_thread() to create GC threads.
-///
-/// This function can also be called after `uninitialize_collection` is called in order to re-spawn
-/// the GC thtreads.
+/// is ready.  This call will invoke `Collection::spawn_gc_thread()`` to create GC threads.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-/// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
-///   Collection::spawn_gc_thread() so that the VM knows the context.
+/// * `tls`: The thread that wants to enable the collection. This value will be passed back to
+///   the VM in `Collection::spawn_gc_thread()` so that the VM knows the context.
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
-    assert!(
-        !mmtk.state.is_initialized(),
-        "MMTk collection has been initialized (was initialize_collection() already called before?)"
-    );
-    mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.state.initialized.store(true, Ordering::SeqCst);
-    probe!(mmtk, collection_initialized);
-}
-
-/// Ask GC worker threads to exit.  Currently, this function is for the sole purpose of forking.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-pub fn uninitialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
-    assert!(
-        mmtk.state.is_initialized(),
-        "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
-    );
-    mmtk.scheduler.stop_gc_threads_for_forking();
-    mmtk.state.initialized.store(false, Ordering::SeqCst);
-    probe!(mmtk, collection_uninitialized);
+    mmtk.initialize_collection(tls);
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
