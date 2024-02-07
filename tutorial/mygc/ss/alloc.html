@@ -182,15 +182,15 @@
                         <h1 id="allocation-add-copyspaces"><a class="header" href="#allocation-add-copyspaces">Allocation: Add copyspaces</a></h1>
 <p>We will now change your MyGC plan from one that cannot collect garbage
 into one that implements the semispace algorithm. The first step of this
-is to add the two copyspaces, and allow collectors to allocate memory 
-into them. This involves adding two copyspaces, the code to properly initialise 
+is to add the two copyspaces, and allow collectors to allocate memory
+into them. This involves adding two copyspaces, the code to properly initialise
 and prepare the new spaces, and a copy context.</p>
 <h2 id="change-the-plan-constraints"><a class="header" href="#change-the-plan-constraints">Change the plan constraints</a></h2>
-<p>Firstly, change the plan constraints. Some of these constraints are not used 
+<p>Firstly, change the plan constraints. Some of these constraints are not used
 at the moment, but it's good to set them properly regardless.</p>
 <p>Look in <code>plan/plan_constraints.rs</code>. <code>PlanConstraints</code> lists all the possible
-options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</code> in 
-<code>mygc/global.rs</code> should be using the default value for <code>PlanConstraints</code>. 
+options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</code> in
+<code>mygc/global.rs</code> should be using the default value for <code>PlanConstraints</code>.
 We will make the following changes:</p>
 <ol>
 <li>Initialize <code>gc_header_bits</code> to 2. We reserve 2 bits in the header for GC use.</li>
@@ -203,18 +203,18 @@ We will make the following changes:</p>
 };
 </code></pre>
 <h2 id="change-the-plan-implementation"><a class="header" href="#change-the-plan-implementation">Change the plan implementation</a></h2>
-<p>Next, in <code>mygc/global.rs</code>, replace the old immortal (nogc) space with two 
+<p>Next, in <code>mygc/global.rs</code>, replace the old immortal (nogc) space with two
 copyspaces.</p>
 <h3 id="imports"><a class="header" href="#imports">Imports</a></h3>
 <p>To the import statement block:</p>
 <ol>
-<li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with 
-<code>use crate::plan::global::BasePlan;</code>. This collector is going to use 
+<li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with
+<code>use crate::plan::global::BasePlan;</code>. This collector is going to use
 copying, so there's no point to importing NoCopy any more.</li>
 <li>Add <code>use crate::plan::global::CommonPlan;</code>. Semispace uses the common
-plan, which includes an immortal space and a large object space, rather 
+plan, which includes an immortal space and a large object space, rather
 than the base plan. Any garbage collected plan should use <code>CommonPlan</code>.</li>
-<li>Add <code>use std::sync::atomic::{AtomicBool, Ordering};</code>. These are going 
+<li>Add <code>use std::sync::atomic::{AtomicBool, Ordering};</code>. These are going
 to be used to store an indicator of which copyspace is the tospace.</li>
 <li>Delete <code>#[allow(unused_imports)]</code>.</li>
 </ol>
@@ -245,9 +245,9 @@ use std::sync::atomic::{AtomicBool, Ordering}; // Add
 <p>Change <code>pub struct MyGC&lt;VM: VMBinding&gt;</code> to add new instance variables.</p>
 <ol>
 <li>Delete the existing fields in the constructor.</li>
-<li>Add <code>pub hi: AtomicBool,</code>. This is a thread-safe bool, indicating which 
+<li>Add <code>pub hi: AtomicBool,</code>. This is a thread-safe bool, indicating which
 copyspace is the tospace.</li>
-<li>Add <code>pub copyspace0: CopySpace&lt;VM&gt;,</code> 
+<li>Add <code>pub copyspace0: CopySpace&lt;VM&gt;,</code>
 and <code>pub copyspace1: CopySpace&lt;VM&gt;,</code>. These are the two copyspaces.</li>
 <li>Add <code>pub common: CommonPlan&lt;VM&gt;,</code>.
 This holds an instance of the common plan.</li>
@@ -281,21 +281,21 @@ sections.</p>
 <span class="boring">}</span></code></pre></pre>
 <h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
 <h4 id="constructor"><a class="header" href="#constructor">Constructor</a></h4>
-<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC 
+<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC
 that you just defined.</p>
 <ol>
-<li>Delete the definition of <code>mygc_space</code>. 
+<li>Delete the definition of <code>mygc_space</code>.
 Instead, we will define the two copyspaces here.</li>
-<li>Define one of the copyspaces by adding the following code: </li>
+<li>Define one of the copyspaces by adding the following code:</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>            copyspace0: CopySpace::new(plan_args.get_space_args(&quot;copyspace0&quot;, true, VMRequest::discontiguous()), false),
+</span>            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
 <span class="boring">}</span></code></pre></pre>
 <ol start="3">
-<li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace 
-instead of a tospace. (Hint: the definitions for 
-copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
+<li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace
+instead of a tospace. (Hint: the definitions for
+copyspaces are in <code>src/policy/copyspace.rs</code>.)</li>
 <li>Finally, replace the old MyGC initializer.</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
@@ -310,8 +310,8 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 
         let res = MyGC {
             hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(plan_args.get_space_args(&quot;copyspace0&quot;, true, VMRequest::discontiguous()), false),
-            copyspace1: CopySpace::new(plan_args.get_space_args(&quot;copyspace1&quot;, true, VMRequest::discontiguous()), true),
+            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
+            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
         };
 
@@ -327,10 +327,10 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 </span>impl&lt;VM: VMBinding&gt; MyGC&lt;VM&gt; {
 }
 <span class="boring">}</span></code></pre></pre>
-<p>To this, add two helper methods, <code>tospace(&amp;self)</code> 
-and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>, 
-and return a reference to the tospace and fromspace respectively. 
-<code>tospace()</code> (see below) returns a reference to the tospace, 
+<p>To this, add two helper methods, <code>tospace(&amp;self)</code>
+and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>,
+and return a reference to the tospace and fromspace respectively.
+<code>tospace()</code> (see below) returns a reference to the tospace,
 and <code>fromspace()</code> returns a reference to the fromspace.</p>
 <p>We also add another two helper methods to get <code>tospace_mut(&amp;mut self)</code>
 and <code>fromspace_mut(&amp;mut self)</code>. Those will be used later when we implement
@@ -370,7 +370,7 @@ collection for our GC plan.</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
-<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
+<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a
 reference to the common plan. Implement this method now.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -378,7 +378,7 @@ reference to the common plan. Implement this method now.</p>
         &amp;self.common
     }
 <span class="boring">}</span></code></pre></pre>
-<p>Find the helper method <code>base</code> and change it so that it calls the 
+<p>Find the helper method <code>base</code> and change it so that it calls the
 base plan <em>through</em> the common plan.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -399,9 +399,9 @@ in the <code>BasePlan</code>.</p>
         self.base().collection_required(self, space_full)
     }
 <span class="boring">}</span></code></pre></pre>
-<p>Find the method <code>get_pages_used</code>. Replace the current body with 
-<code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
-correctly count the pages contained in the tospace and the common plan 
+<p>Find the method <code>get_pages_used</code>. Replace the current body with
+<code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to
+correctly count the pages contained in the tospace and the common plan
 spaces (which will be explained later).</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -417,8 +417,8 @@ spaces (which will be explained later).</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="change-the-mutator-definition"><a class="header" href="#change-the-mutator-definition">Change the mutator definition</a></h2>
-<p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the 
-tospace, and to the two spaces controlled by the common plan. </p>
+<p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the
+tospace, and to the two spaces controlled by the common plan.</p>
 <h3 id="imports-1"><a class="header" href="#imports-1">Imports</a></h3>
 <p>Change the following import statements:</p>
 <ol>
@@ -446,9 +446,9 @@ use enum_map::EnumMap;
 // Remove mygc_mutator_noop
 <span class="boring">}</span></code></pre></pre>
 <h3 id="allocator-mapping"><a class="header" href="#allocator-mapping">Allocator mapping</a></h3>
-<p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>, 
-which maps the required allocation semantics to the corresponding allocators. 
-For example, for <code>Default</code>, we allocate using the first bump pointer allocator 
+<p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>,
+which maps the required allocation semantics to the corresponding allocators.
+For example, for <code>Default</code>, we allocate using the first bump pointer allocator
 (<code>BumpPointer(0)</code>):</p>
 <ol>
 <li>Define a <code>ReservedAllocators</code> instance to declare that we need one bump allocator.</li>
@@ -471,11 +471,11 @@ lazy_static! {
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="space-mapping"><a class="header" href="#space-mapping">Space mapping</a></h3>
-<p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what 
-space in <code>space_mapping</code>. Note that the space allocation is formatted as a list 
-of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is 
+<p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what
+space in <code>space_mapping</code>. Note that the space allocation is formatted as a list
+of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is
 bound with <code>tospace</code>.</p>
-<p>Downcast the dynamic <code>Plan</code> type to <code>MyGC</code> so we can access specific spaces in 
+<p>Downcast the dynamic <code>Plan</code> type to <code>MyGC</code> so we can access specific spaces in
 <code>MyGC</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -501,18 +501,18 @@ of a sudden in these past 2 steps, are parts of the MMTk common plan
 itself. They are used to construct allocator-space mappings for the spaces defined
 by the common plan:</p>
 <ol>
-<li>The immortal space is used for objects that the virtual machine or a 
+<li>The immortal space is used for objects that the virtual machine or a
 library never expects to die.</li>
-<li>The large object space is needed because MMTk handles particularly large 
-objects differently to normal objects, as the space overhead of copying 
-large objects is very high. Instead, this space is used by a free list 
-allocator in the common plan to avoid having to copy them. </li>
+<li>The large object space is needed because MMTk handles particularly large
+objects differently to normal objects, as the space overhead of copying
+large objects is very high. Instead, this space is used by a free list
+allocator in the common plan to avoid having to copy them.</li>
 <li>The read-only space is used to store all the immutable objects.</li>
 <li>The code spaces are used for VM generated code objects.</li>
 </ol>
-<p>With this, you should have the allocation working, but not garbage collection. 
+<p>With this, you should have the allocation working, but not garbage collection.
 Try building again. If you run HelloWorld or Fannkunchredux, they should
-work. DaCapo's lusearch should fail, as it requires garbage to be collected. </p>
+work. DaCapo's lusearch should fail, as it requires garbage to be collected.</p>
 
                     </main>
 

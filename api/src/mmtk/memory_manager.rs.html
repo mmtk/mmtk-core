@@ -902,43 +902,6 @@
 <a href="#902" id="902">902</a>
 <a href="#903" id="903">903</a>
 <a href="#904" id="904">904</a>
-<a href="#905" id="905">905</a>
-<a href="#906" id="906">906</a>
-<a href="#907" id="907">907</a>
-<a href="#908" id="908">908</a>
-<a href="#909" id="909">909</a>
-<a href="#910" id="910">910</a>
-<a href="#911" id="911">911</a>
-<a href="#912" id="912">912</a>
-<a href="#913" id="913">913</a>
-<a href="#914" id="914">914</a>
-<a href="#915" id="915">915</a>
-<a href="#916" id="916">916</a>
-<a href="#917" id="917">917</a>
-<a href="#918" id="918">918</a>
-<a href="#919" id="919">919</a>
-<a href="#920" id="920">920</a>
-<a href="#921" id="921">921</a>
-<a href="#922" id="922">922</a>
-<a href="#923" id="923">923</a>
-<a href="#924" id="924">924</a>
-<a href="#925" id="925">925</a>
-<a href="#926" id="926">926</a>
-<a href="#927" id="927">927</a>
-<a href="#928" id="928">928</a>
-<a href="#929" id="929">929</a>
-<a href="#930" id="930">930</a>
-<a href="#931" id="931">931</a>
-<a href="#932" id="932">932</a>
-<a href="#933" id="933">933</a>
-<a href="#934" id="934">934</a>
-<a href="#935" id="935">935</a>
-<a href="#936" id="936">936</a>
-<a href="#937" id="937">937</a>
-<a href="#938" id="938">938</a>
-<a href="#939" id="939">939</a>
-<a href="#940" id="940">940</a>
-<a href="#941" id="941">941</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -976,9 +939,8 @@
 /// 2. Set command line options for MMTKBuilder by [`crate::memory_manager::process`] or [`crate::memory_manager::process_bulk`].
 /// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
-///    supported. Currently we assume a binding will only need one MMTk instance.
-/// 4. Enable garbage collection in MMTk by [`crate::memory_manager::enable_collection`]. A binding should only call this once its
-///    thread system is ready. MMTk will not trigger garbage collection before this call.
+///    supported. Currently we assume a binding will only need one MMTk instance. Note that GC is enabled by default and the binding should
+///    implement `VMCollection::is_collection_enabled()` if it requires that the GC should be disabled at a particular time.
 ///
 /// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
@@ -1395,7 +1357,7 @@
         <span class="string">&quot;gc_poll() can only be called by a mutator thread.&quot;
     </span>);
 
-    <span class="kw">if </span>mmtk.state.should_trigger_gc_when_heap_is_full() &amp;&amp; mmtk.gc_trigger.poll(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
+    <span class="kw">if </span>VM::VMCollection::is_collection_enabled() &amp;&amp; mmtk.gc_trigger.poll(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
         <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
         <span class="macro">assert!</span>(mmtk.state.is_initialized(), <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
         VM::VMCollection::block_for_gc(tls);
@@ -1449,42 +1411,6 @@
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
     mmtk.state.initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
     <span class="macro">probe!</span>(mmtk, collection_initialized);
-}
-
-<span class="doccomment">/// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
-/// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
-/// Note this call is not thread safe, only one VM thread should call this.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-</span><span class="kw">pub fn </span>enable_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-    <span class="macro">debug_assert!</span>(
-        !mmtk.state.should_trigger_gc_when_heap_is_full(),
-        <span class="string">&quot;enable_collection() is called when GC is already enabled.&quot;
-    </span>);
-    mmtk.state
-        .trigger_gc_when_heap_is_full
-        .store(<span class="bool-val">true</span>, Ordering::SeqCst);
-}
-
-<span class="doccomment">/// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will
-/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the MMTk&#39;s heap size (the soft heap limit).
-/// However, there is no guarantee that the physical allocation will succeed, and if it succeeds, there is no guarantee that further allocation
-/// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
-/// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
-/// behavior. This call does not disable explicit GCs (through handle_user_collection_request()).
-/// Note this call is not thread safe, only one VM thread should call this.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-</span><span class="kw">pub fn </span>disable_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-    <span class="macro">debug_assert!</span>(
-        mmtk.state.should_trigger_gc_when_heap_is_full(),
-        <span class="string">&quot;disable_collection() is called when GC is not enabled.&quot;
-    </span>);
-    mmtk.state
-        .trigger_gc_when_heap_is_full
-        .store(<span class="bool-val">false</span>, Ordering::SeqCst);
 }
 
 <span class="doccomment">/// Process MMTk run-time options. Returns true if the option is processed successfully.

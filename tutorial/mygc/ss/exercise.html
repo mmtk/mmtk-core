@@ -180,32 +180,32 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="exercise-adding-another-copyspace"><a class="header" href="#exercise-adding-another-copyspace">Exercise: Adding another copyspace</a></h1>
-<p>Now that you have a working semispace collector, you should be familiar 
-enough with the code to start writing some yourself. The intention of this 
-exercise is to reinforce the information from the semispace section, rather 
+<p>Now that you have a working semispace collector, you should be familiar
+enough with the code to start writing some yourself. The intention of this
+exercise is to reinforce the information from the semispace section, rather
 than to create a useful new collector.</p>
 <ol>
-<li>Create a copy of your semispace collector, called <code>triplespace</code>. </li>
-<li>Add a new copyspace to the collector, called the <code>youngspace</code>, with the 
+<li>Create a copy of your semispace collector, called <code>triplespace</code>.</li>
+<li>Add a new copyspace to the collector, called the <code>youngspace</code>, with the
 following traits:
 <ul>
 <li>New objects are allocated to the youngspace (rather than the fromspace).</li>
-<li>During a collection, live objects in the youngspace are moved to the 
+<li>During a collection, live objects in the youngspace are moved to the
 tospace.</li>
 <li>Garbage is still collected at the same time for all spaces.</li>
 </ul>
 </li>
 </ol>
-<p>Triplespace is a sort of generational garbage collector. These collectors 
-separate out old objects and new objects into separate spaces. Newly 
-allocated objects should be scanned far more often than old objects, which 
-minimises the time spent repeatedly re-scanning long-lived objects. </p>
-<p>Of course, this means that the Triplespace is incredibly inefficient for a 
-generational collector, because the older objects are still being scanned 
-every collection. It wouldn't be very useful in a real-life scenario. The 
-next thing to do is to make this collector into a more efficient proper 
+<p>Triplespace is a sort of generational garbage collector. These collectors
+separate out old objects and new objects into separate spaces. Newly
+allocated objects should be scanned far more often than old objects, which
+minimises the time spent repeatedly re-scanning long-lived objects.</p>
+<p>Of course, this means that the Triplespace is incredibly inefficient for a
+generational collector, because the older objects are still being scanned
+every collection. It wouldn't be very useful in a real-life scenario. The
+next thing to do is to make this collector into a more efficient proper
 generational collector.</p>
-<p>When you are finished, try running the benchmarks and seeing how the 
+<p>When you are finished, try running the benchmarks and seeing how the
 performance of this collector compares to MyGC. Great work!</p>
 
                     </main>

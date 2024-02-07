@@ -180,26 +180,26 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="set-up-mmtk-and-openjdk"><a class="header" href="#set-up-mmtk-and-openjdk">Set up MMTk and OpenJDK</a></h1>
-<p>This tutorial can be completed with any binding. However, for the sake of 
-simplicity, only the setup for the OpenJDK binding will be described in detail 
-here. If you would like to use another binding, you will need to follow the 
-README files in their respective repositories 
-(<a href="https://github.com/mmtk/mmtk-jikesrvm">JikesRVM</a>, 
+<p>This tutorial can be completed with any binding. However, for the sake of
+simplicity, only the setup for the OpenJDK binding will be described in detail
+here. If you would like to use another binding, you will need to follow the
+README files in their respective repositories
+(<a href="https://github.com/mmtk/mmtk-jikesrvm">JikesRVM</a>,
 <a href="https://github.com/mmtk/mmtk-v8">V8</a>)
-to set them up, and find appropriate benchmarks for testing. 
-Also, while it may be useful to fork the relevant repositories to your own 
+to set them up, and find appropriate benchmarks for testing.
+Also, while it may be useful to fork the relevant repositories to your own
 account, it is not required for this tutorial.</p>
 <p>First, set up OpenJDK, MMTk, and the binding:</p>
 <ol>
 <li>Clone the OpenJDK binding and mmtk-core repository, and install any relevant
 dependencies by following the instructions in the
 <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/README.md">OpenJDK binding repository</a>.</li>
-<li>Ensure you can build OpenJDK according to the instructions in the READMEs of 
-<a href="https://github.com/mmtk/mmtk-core/blob/master/README.md">the mmtk-core repository</a> and the 
+<li>Ensure you can build OpenJDK according to the instructions in the READMEs of
+<a href="https://github.com/mmtk/mmtk-core/blob/master/README.md">the mmtk-core repository</a> and the
 <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/README.md">OpenJDK binding repository</a>.
 <ul>
-<li>Use the <code>slowdebug</code> option when building the OpenJDK binding. This is the 
-fastest debug variant to build, and allows for easier debugging and better 
+<li>Use the <code>slowdebug</code> option when building the OpenJDK binding. This is the
+fastest debug variant to build, and allows for easier debugging and better
 testing. The rest of the tutorial will assume you are using <code>slowdebug</code>.</li>
 <li>You can use the env var <code>MMTK_PLAN=[PlanName]</code> to choose a plan to use at run-time.
 The plans that are relevant to this tutorial are <code>NoGC</code> and <code>SemiSpace</code>.</li>

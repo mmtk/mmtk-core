@@ -217,7 +217,7 @@ module by following the instructions in <a href="../create.html">Create MyGC</a>
    TripleSpace {
        hi: AtomicBool::new(false),
        copyspace0: CopySpace::new(
-           &quot;copyspace0&quot;,
+           "copyspace0",
            false,
            true,
            VMRequest::discontiguous(),
@@ -226,7 +226,7 @@ module by following the instructions in <a href="../create.html">Create MyGC</a>
            &amp;mut heap,
        ),
        copyspace1: CopySpace::new(
-           &quot;copyspace1&quot;,
+           "copyspace1",
            true,
            true,
            VMRequest::discontiguous(),
@@ -237,7 +237,7 @@ module by following the instructions in <a href="../create.html">Create MyGC</a>
 
        // Add this!
        youngspace: CopySpace::new(
-           &quot;youngspace&quot;,
+           "youngspace",
            true,
            true,
            VMRequest::discontiguous(),

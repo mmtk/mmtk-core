@@ -180,8 +180,8 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
-<p>We need to add a few more things to get garbage collection working. 
-Specifically, we need to config the <code>GCWorkerCopyContext</code>, which a GC worker uses for 
+<p>We need to add a few more things to get garbage collection working.
+Specifically, we need to config the <code>GCWorkerCopyContext</code>, which a GC worker uses for
 copying objects, and GC work packets that will be scheduled for a collection.</p>
 <h2 id="copyconfig"><a class="header" href="#copyconfig">CopyConfig</a></h2>
 <p><code>CopyConfig</code> defines how a GC plan copies objects.
@@ -217,11 +217,11 @@ space here.</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
-<p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
+<p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
 it stops all mutators, runs the
 scheduler's prepare stage and resumes the mutators. The <code>StopMutators</code> work
-will invoke code from the bindings to scan threads and other roots, and those 
+will invoke code from the bindings to scan threads and other roots, and those
 scanning work will further push work for a transitive closure.</p>
 <p>Though you can add those work packets by yourself, <code>GCWorkScheduler</code> provides a
 method <code>schedule_common_work()</code> that will add common work packets for you.</p>
@@ -250,14 +250,14 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
         scheduler.schedule_common_work::&lt;MyGCWorkContext&lt;VM&gt;&gt;(self);
     }
 <span class="boring">}</span></code></pre></pre>
-<p>Delete <code>handle_user_collection_request()</code>. This function was an override of 
-a Common plan function to ignore user requested collection for NoGC. Now we 
+<p>Delete <code>handle_user_collection_request()</code>. This function was an override of
+a Common plan function to ignore user requested collection for NoGC. Now we
 remove it and allow user requested collection.</p>
 <h2 id="prepare-for-collection"><a class="header" href="#prepare-for-collection">Prepare for collection</a></h2>
 <p>The collector has a number of steps it needs to perform before each collection.
 We'll add these now.</p>
 <h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
-<p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
+<p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code>
 call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -276,8 +276,8 @@ call, and add the following code:</p>
         self.tospace_mut().set_copy_for_sft_trace(None);
     }
 <span class="boring">}</span></code></pre></pre>
-<p>This function is called at the start of a collection. It prepares the two 
-spaces in the common plan, flips the definitions for which space is 'to' 
+<p>This function is called at the start of a collection. It prepares the two
+spaces in the common plan, flips the definitions for which space is 'to'
 and which is 'from', then prepares the copyspaces with the new definition.</p>
 <p>Note that we call <code>set_copy_for_sft_trace()</code> for both spaces. This step is required
 when using <code>SFTProcessEdges</code> to tell the spaces which copy semantic to use for copying.
@@ -314,10 +314,10 @@ this optimization, you may also leave the <code>MutatorConfig::prepare_func</cod
 <code>&amp;unreachable_prepare_func</code> to indicate it should not be called.</p>
 </blockquote>
 <h2 id="release"><a class="header" href="#release">Release</a></h2>
-<p>Finally, we need to fill out the functions that are, roughly speaking, 
+<p>Finally, we need to fill out the functions that are, roughly speaking,
 run after each collection.</p>
 <h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
-<p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the 
+<p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the
 <code>unreachable!()</code> call with the following code.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -326,7 +326,7 @@ run after each collection.</p>
         self.fromspace().release();
     }
 <span class="boring">}</span></code></pre></pre>
-<p>This function is called at the end of a collection. It calls the release 
+<p>This function is called at the end of a collection. It calls the release
 routines for the common plan spaces and the fromspace.</p>
 <h3 id="release-in-mutator"><a class="header" href="#release-in-mutator">Release in mutator</a></h3>
 <p>Go back to <code>mutator.rs</code>.  Create a new function called <code>mygc_mutator_release()</code> that takes the same

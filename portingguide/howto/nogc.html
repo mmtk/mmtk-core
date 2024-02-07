@@ -206,7 +206,7 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>You may also find it helpful to take inspiration from the <a href="https://github.com/mmtk/mmtk-openjdk">OpenJDK binding</a>, particularly for a more complete example of the relevant <code>Cargo.toml</code> files.</p>
 <p>For this guide, we will assume your runtime is implemented in C or C++ as they are the most common implementation languages. However note that your runtime does not <em>need</em> to be implemented in C/C++ to work with MMTk.</p>
 <h2 id="adding-a-rust-library-to-the-runtime"><a class="header" href="#adding-a-rust-library-to-the-runtime">Adding a Rust library to the runtime</a></h2>
-<p>We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust &quot;hello world&quot; library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.</p>
+<p>We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust "hello world" library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.</p>
 <p>In case the build system is too complex and you want get to hacking, a quick and dirty way to add MMTk could be to build a static and/or dynamic binary for MMTk and link it to the runtime directly, manually building new binaries as necessary, like so:</p>
 <ol>
 <li><code>cd mmtk-X/mmtk</code></li>
@@ -217,12 +217,12 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>You would have to change the <code>crate-type</code> in <code>mmtk-X/mmtk/Cargo.toml</code> from <code>cdylib</code> to <code>staticlib</code> to build a static library.</p>
 </div>
 <p>Later, you can edit the runtime build process to build MMTk at the same time automatically.</p>
-<p><strong>Note:</strong> If the runtime you are targeting already links some Rust FFI libraries, then you may notice &quot;multiple definition&quot; linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the <code>-Wl,--allow-multiple-definition</code> linker flag, but this unfortunately isn't ideal as it increases code sizes. See <a href="https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558">here</a> and <a href="https://github.com/rust-lang/rust/issues/73632">here</a> for more details.</p>
+<p><strong>Note:</strong> If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the <code>-Wl,--allow-multiple-definition</code> linker flag, but this unfortunately isn't ideal as it increases code sizes. See <a href="https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558">here</a> and <a href="https://github.com/rust-lang/rust/issues/73632">here</a> for more details.</p>
 <p><strong>Note:</strong> It is <em>highly</em> recommended to also check-in the generated <code>Cargo.lock</code> file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.</p>
 <p>We recommend using the <code>debug</code> build when doing development work as it has helpful logging statements and assertions that will make catching bugs in your implementation easier.</p>
 <h2 id="the-vmbinding-trait"><a class="header" href="#the-vmbinding-trait">The <code>VMBinding</code> trait</a></h2>
 <p>Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. <code>mmtk-X/mmtk</code>). What we want to do is implement the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html"><code>VMBinding</code></a> trait.</p>
-<p>The <code>VMBinding</code> trait is a &quot;meta-trait&quot; (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime. We discuss each of its seven key traits briefly:</p>
+<p>The <code>VMBinding</code> trait is a "meta-trait" (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime. We discuss each of its seven key traits briefly:</p>
 <ol>
 <li><a href="https://docs.mmtk.io/api/mmtk/vm/trait.ActivePlan.html"><code>ActivePlan</code></a>: This trait implements functions related to mutators such as how many mutators exist, getting an iterator for all mutators, etc.</li>
 <li><a href="https://docs.mmtk.io/api/mmtk/vm/trait.Collection.html"><code>Collection</code></a>: This trait implements functions related to garbage collection such as starting and stopping mutators, blocking current mutator thread for GC, etc.</li>
@@ -240,8 +240,8 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>Header metadata sits in close proximity to the actual object address but it is not easy to perform bulk operations. On the other hand, side metadata sits in a dedicated metadata space where each possible object address is assigned some metadata. This makes performing bulk operations easy and does not require stealing bits from the object header (there may in fact be no bits to steal for certain runtimes), but can result in large heap sizes given the metadata space is counted as part of the heap.</p>
 <p>The choice of metadata location depends on the runtime and its object model and header layout. For example the JikesRVM runtime reserved extra space at the start of each object for GC-related metadata. Such space may not be available in your runtime. In such cases you can use side metadata to reserve per-object metadata.</p>
 <h4 id="local-vs-global-metadata"><a class="header" href="#local-vs-global-metadata">Local vs Global metadata</a></h4>
-<p>MMTk uses multiple GC policies and each policy may use a different set of object metadata from each other. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy, is referred to as &quot;local&quot; metadata.</p>
-<p>However, in certain cases, we may need to have metadata globally for the entire heap space. The classic example is the valid-object bit metadata which tells us if an arbitrary address is allocated/managed by MMTk. Such a metadata, which spans multiple policies, is referred to as &quot;global&quot; metadata.</p>
+<p>MMTk uses multiple GC policies and each policy may use a different set of object metadata from each other. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy, is referred to as "local" metadata.</p>
+<p>However, in certain cases, we may need to have metadata globally for the entire heap space. The classic example is the valid-object bit metadata which tells us if an arbitrary address is allocated/managed by MMTk. Such a metadata, which spans multiple policies, is referred to as "global" metadata.</p>
 <p>For example, the <em>Forwarding bits and pointer</em> metadata is a local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. This metadata is almost always in the header.</p>
 <p>We recommend going through the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.ObjectModel.html#required-associated-consts">list of metadata specifications</a> that are defined by MMTk. You should set them to locations that are appropriate for your runtime.</p>
 <h4 id="objectreference-vs-address"><a class="header" href="#objectreference-vs-address"><code>ObjectReference</code> vs <code>Address</code></a></h4>
@@ -269,9 +269,9 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 #include &lt;stddef.h&gt;
 #include &lt;sys/types.h&gt;
 
-// The extern &quot;C&quot; is only required if the runtime
+// The extern "C" is only required if the runtime
 // implementation language is C++
-extern &quot;C&quot; {
+extern "C" {
 
 // An arbitrary address
 typedef void* Address;
@@ -293,7 +293,7 @@ void mmtk_init();
  */
 void mmtk_set_heap_size(size_t min, size_t max);
 
-} // extern &quot;C&quot;
+} // extern "C"
 
 #endif // MMTK_H
 </code></pre>
@@ -310,7 +310,7 @@ void mmtk_set_heap_size(size_t min, size_t max);
 [...]
 </code></pre>
 <h2 id="binding-mutator-threads-to-mmtk"><a class="header" href="#binding-mutator-threads-to-mmtk">Binding mutator threads to MMTk</a></h2>
-<p>For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by &quot;binding&quot; a mutator thread to MMTk when it is initialized in the runtime.</p>
+<p>For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by "binding" a mutator thread to MMTk when it is initialized in the runtime.</p>
 <h3 id="runtime-side-changes-1"><a class="header" href="#runtime-side-changes-1">Runtime-side changes</a></h3>
 <p>Add the following function to the <code>mmtk.h</code> file:</p>
 <pre><code class="language-C">[...]

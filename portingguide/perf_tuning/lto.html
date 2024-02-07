@@ -197,7 +197,7 @@ any warning or error.</p>
 <pre><code class="language-toml">[lib]
 ...
 # be careful - LTO is only allowed for certain crate types
-crate-type = [&quot;cdylib&quot;]
+crate-type = ["cdylib"]
 </code></pre>
 <p>At the time of writing, cargo has some limitations about LTO with different crate types:</p>
 <ol>
@@ -205,7 +205,7 @@ crate-type = [&quot;cdylib&quot;]
 Check the code of <a href="https://github.com/rust-lang/cargo/blob/5f40a97e5c85affecfbc4fde67fc06bf188c07db/src/cargo/core/compiler/crate_type.rs#L33"><code>can_lto</code></a>
 for your Rust version to clarify.</li>
 <li>If the <code>crate-type</code> field includes any type that LTO is not allowed, LTO will be skipped for all the libraries generated (https://github.com/rust-lang/rust/issues/51009).
-For example, if you have <code>crate-type = [&quot;cdylib&quot;, &quot;rlib&quot;]</code> and cargo cannot do LTO for <code>rlib</code>, LTO will be skipped for <code>cdylib</code> as well.
+For example, if you have <code>crate-type = ["cdylib", "rlib"]</code> and cargo cannot do LTO for <code>rlib</code>, LTO will be skipped for <code>cdylib</code> as well.
 So only keep the crate type that you actually need in the <code>crate-type</code> field.</li>
 </ol>
 

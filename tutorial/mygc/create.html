@@ -180,27 +180,27 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="create-mygc"><a class="header" href="#create-mygc">Create MyGC</a></h1>
-<p>NoGC is a GC plan that only allocates memory, and does not have a collector. 
+<p>NoGC is a GC plan that only allocates memory, and does not have a collector.
 We're going to use it as a base for building a new garbage collector.</p>
-<p>Recall that this tutorial will take you through the steps of building a 
-collector from basic principles. To do that, you'll create your own plan 
-called <code>MyGC</code> which you'll gradually refine and improve upon through the 
-course of this tutorial. At the beginning MyGC will resemble the very 
+<p>Recall that this tutorial will take you through the steps of building a
+collector from basic principles. To do that, you'll create your own plan
+called <code>MyGC</code> which you'll gradually refine and improve upon through the
+course of this tutorial. At the beginning MyGC will resemble the very
 simple NoGC plan.</p>
 <ol>
-<li>Each plan is stored in <code>mmtk-openjdk/repos/mmtk-core/src/plan</code>. Navigate 
+<li>Each plan is stored in <code>mmtk-openjdk/repos/mmtk-core/src/plan</code>. Navigate
 there and create a copy of the folder <code>nogc</code>. Rename it to <code>mygc</code>.</li>
-<li>In <em>each file</em> within <code>mygc</code>, rename any reference to <code>nogc</code> to <code>mygc</code>. 
+<li>In <em>each file</em> within <code>mygc</code>, rename any reference to <code>nogc</code> to <code>mygc</code>.
 You will also have to separately rename any reference to <code>NoGC</code> to <code>MyGC</code>.
 <ul>
-<li>For example, in Visual Studio Code, you can (making sure case sensitivity 
-is selected in the search function) select one instance of <code>nogc</code> and either 
-right click and select &quot;Change all instances&quot; or use the CTRL-F2 shortcut, 
+<li>For example, in Visual Studio Code, you can (making sure case sensitivity
+is selected in the search function) select one instance of <code>nogc</code> and either
+right click and select "Change all instances" or use the CTRL-F2 shortcut,
 and then type <code>mygc</code>, and repeat for <code>NoGC</code>.</li>
 </ul>
 </li>
-<li>In order to use MyGC, you will need to make some changes to the following 
-files. 
+<li>In order to use MyGC, you will need to make some changes to the following
+files.
 <ol>
 <li><code>mmtk-core/src/plan/mod.rs</code>, add:
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
@@ -208,8 +208,8 @@ files.
 </span>pub mod mygc;
 <span class="boring">}</span></code></pre></pre>
 This adds <code>mygc</code> as a module.</li>
-<li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>. 
-This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>, 
+<li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>.
+This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>,
 or an environment variable for <code>MMTK_PLAN</code>:
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -227,14 +227,14 @@ pub enum PlanSelector {
 }
 <span class="boring">}</span></code></pre></pre>
 </li>
-<li><code>mmtk-core/src/plan/global.rs</code>, add new expressions to 
-<code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of 
-the existing plans. These define the location of the mutator and plan's 
-constructors. 
+<li><code>mmtk-core/src/plan/global.rs</code>, add new expressions to
+<code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of
+the existing plans. These define the location of the mutator and plan's
+constructors.
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// NOTE: Sections of this code snippet not relevant to this step of the 
-// tutorial (marked by &quot;// ...&quot;) have been omitted.
+// tutorial (marked by "// ...") have been omitted.
 pub fn create_mutator&lt;VM: VMBinding&gt;(
     tls: VMMutatorThread,
     mmtk: &amp;'static MMTK&lt;VM&gt;,
@@ -272,25 +272,25 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
 </ol>
 </li>
 </ol>
-<p>Note that all of the above changes almost exactly copy the NoGC entries in 
-each of these files. However, NoGC has some variants, such as a lock-free 
-variant. For simplicity, those are not needed for this tutorial. Remove 
-references to them in the MyGC plan now. </p>
+<p>Note that all of the above changes almost exactly copy the NoGC entries in
+each of these files. However, NoGC has some variants, such as a lock-free
+variant. For simplicity, those are not needed for this tutorial. Remove
+references to them in the MyGC plan now.</p>
 <ol>
-<li>Within <code>mygc/global.rs</code>, find any use of <code>#[cfg(feature = &quot;mygc_lock_free&quot;)]</code> 
+<li>Within <code>mygc/global.rs</code>, find any use of <code>#[cfg(feature = "mygc_lock_free")]</code>
 and delete both it <em>and the line below it</em>.</li>
-<li>Then, delete any use of the above line's negation, 
-<code>#[cfg(not(feature = &quot;mygc_lock_free&quot;))]</code>, this time without changing the 
+<li>Then, delete any use of the above line's negation,
+<code>#[cfg(not(feature = "mygc_lock_free"))]</code>, this time without changing the
 line below it.</li>
 </ol>
-<p>After you rebuild OpenJDK (and <code>mmtk-core</code>), you can run MyGC with your new 
-build (<code>MMTK_PLAN=MyGC</code>). Try testing it with the each of the three benchmarks. 
+<p>After you rebuild OpenJDK (and <code>mmtk-core</code>), you can run MyGC with your new
+build (<code>MMTK_PLAN=MyGC</code>). Try testing it with the each of the three benchmarks.
 It should work identically to NoGC.</p>
-<p>If you've got to this point, then congratulations! You have created your first 
+<p>If you've got to this point, then congratulations! You have created your first
 working MMTk collector!</p>
-<p>At this point, you should familiarise yourself with the MyGC plan if you 
-haven't already. Try answering the following questions by looking at the code 
-and <a href="../further_reading.html">Further Reading</a>: </p>
+<p>At this point, you should familiarise yourself with the MyGC plan if you
+haven't already. Try answering the following questions by looking at the code
+and <a href="../further_reading.html">Further Reading</a>:</p>
 <ul>
 <li>Where is the allocator defined?</li>
 <li>How many memory spaces are there?</li>

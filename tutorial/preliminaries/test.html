@@ -180,95 +180,95 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="test-the-build"><a class="header" href="#test-the-build">Test the build</a></h1>
-<p>A few benchmarks of varying size will be used throughout the tutorial. If you 
-haven't already, set them up now. All of the following commands should be 
+<p>A few benchmarks of varying size will be used throughout the tutorial. If you
+haven't already, set them up now. All of the following commands should be
 entered in <code>repos/openjdk</code>.</p>
 <ol>
 <li>
-<p><strong>HelloWorld</strong> (simplest, will never trigger GC): </p>
+<p><strong>HelloWorld</strong> (simplest, will never trigger GC):</p>
 <ol>
-<li>Copy the following code into a new Java file titled &quot;HelloWorld.java&quot; 
+<li>Copy the following code into a new Java file titled "HelloWorld.java"
 in <code>mmtk-openjdk/repos/openjdk</code>:
 <pre><code class="language-java">class HelloWorld {
    public static void main(String[] args) {
-      System.out.println(&quot;Hello World!&quot;);
+      System.out.println("Hello World!");
    }
 }
 </code></pre>
 </li>
-<li>Use the command 
+<li>Use the command
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java</code>.</li>
-<li>Then, run 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld</code> 
+<li>Then, run
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld</code>
 to run HelloWorld.</li>
-<li>If your program printed out <code>Hello World!</code> as expected, then 
+<li>If your program printed out <code>Hello World!</code> as expected, then
 congratulations, you have MMTk working with OpenJDK!</li>
 </ol>
 </li>
 <li>
-<p>The Computer Language Benchmarks Game <strong>fannkuchredux</strong> (micro benchmark, 
-allocates a small amount of memory but - depending on heap size and the GC 
-plan - may not trigger a collection): </p>
+<p>The Computer Language Benchmarks Game <strong>fannkuchredux</strong> (micro benchmark,
+allocates a small amount of memory but - depending on heap size and the GC
+plan - may not trigger a collection):</p>
 <ol>
-<li><a href="https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java">Copy this code</a> 
-into a new file named &quot;fannkuchredux.java&quot; 
+<li><a href="https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java">Copy this code</a>
+into a new file named "fannkuchredux.java"
 in <code>mmtk-openjdk/repos/openjdk</code>.</li>
-<li>Use the command 
+<li>Use the command
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java</code>.</li>
-<li>Then, run 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap fannkuchredux</code> 
+<li>Then, run
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap fannkuchredux</code>
 to run fannkuchredux.</li>
 </ol>
 </li>
 <li>
-<p><strong>DaCapo</strong> benchmark suite (most complex, will likely trigger multiple 
-collections): </p>
+<p><strong>DaCapo</strong> benchmark suite (most complex, will likely trigger multiple
+collections):</p>
 <ol>
-<li>Fetch using 
+<li>Fetch using
 <code>wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar</code>.</li>
-<li>DaCapo contains a variety of benchmarks, but this tutorial will only be 
-using lusearch. Run the lusearch benchmark using the command 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch</code> in <code>repos/openjdk</code>. </li>
+<li>DaCapo contains a variety of benchmarks, but this tutorial will only be
+using lusearch. Run the lusearch benchmark using the command
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch</code> in <code>repos/openjdk</code>.</li>
 </ol>
 </li>
 </ol>
 <h2 id="rust-logs"><a class="header" href="#rust-logs">Rust Logs</a></h2>
-<p>By using one of the debug builds, you gain access to the Rust logs - a useful 
-tool when testing a plan and observing the general behaviour of MMTk. 
-There are two levels of trace that are useful when using MMTk - <code>trace</code> 
-and <code>debug</code>. Generally, <code>debug</code> logs information about the slow paths 
-(allocation through MMTk, rather than fast path allocation through the binding). 
-<code>trace</code> includes all the information from <code>debug</code>, plus more information about 
-both slow and fast paths and garbage collection activities. You can set which 
-level to view the logs at by setting the environment variable <code>RUST_LOG</code>. For 
-more information, see the 
+<p>By using one of the debug builds, you gain access to the Rust logs - a useful
+tool when testing a plan and observing the general behaviour of MMTk.
+There are two levels of trace that are useful when using MMTk - <code>trace</code>
+and <code>debug</code>. Generally, <code>debug</code> logs information about the slow paths
+(allocation through MMTk, rather than fast path allocation through the binding).
+<code>trace</code> includes all the information from <code>debug</code>, plus more information about
+both slow and fast paths and garbage collection activities. You can set which
+level to view the logs at by setting the environment variable <code>RUST_LOG</code>. For
+more information, see the
 <a href="https://crates.io/crates/env_logger">env_logger crate documentation</a>.</p>
 <h2 id="working-with-different-gc-plans"><a class="header" href="#working-with-different-gc-plans">Working with different GC plans</a></h2>
 <p>You will be using multiple GC plans in this tutorial. You should
 familiarise yourself with how to do this now.</p>
 <ol>
-<li>The OpenJDK build will always generate in <code>mmtk-openjdk/repos/openjdk/build</code>. 
-From the same build, you can run different GC plans by using the environment 
-variable <code>MMTK_PLAN=[PlanName]</code>. Generally you won't need multiple VM builds. 
+<li>The OpenJDK build will always generate in <code>mmtk-openjdk/repos/openjdk/build</code>.
+From the same build, you can run different GC plans by using the environment
+variable <code>MMTK_PLAN=[PlanName]</code>. Generally you won't need multiple VM builds.
 However, if you do need to keep a build (for instance, to make quick performance
-comparisons), you can do the following: rename either the <code>build</code> folder or the 
-folder generated within it (eg <code>linux-x86_64-normal-server-$DEBUG_LEVEL</code>). 
+comparisons), you can do the following: rename either the <code>build</code> folder or the
+folder generated within it (eg <code>linux-x86_64-normal-server-$DEBUG_LEVEL</code>).
 <ol>
 <li>Renaming the <code>build</code> folder is the safest method for this.</li>
-<li>If you rename the internal folder, there is a possibility that the new 
-build will generate incorrectly. If a build appears to generate strangely 
+<li>If you rename the internal folder, there is a possibility that the new
+build will generate incorrectly. If a build appears to generate strangely
 quickly, it probably generated badly.</li>
-<li>A renamed build folder can be tested by changing the file path in 
+<li>A renamed build folder can be tested by changing the file path in
 commands as appropriate.</li>
-<li>If you plan to completely overwrite a build, deleting the folder you are 
+<li>If you plan to completely overwrite a build, deleting the folder you are
 writing over will help prevent errors.</li>
 </ol>
 </li>
-<li>Try running your build with <code>NoGC</code>. Both HelloWorld and the fannkuchredux 
-benchmark should run without issue. If you then run lusearch, it should fail 
-when a collection is triggered. It is possible to increase the heap size enough 
-that no collections will be triggered, but it is okay to let it fail for now. 
-When we build using a proper GC, it will be able to pass. The messages and 
+<li>Try running your build with <code>NoGC</code>. Both HelloWorld and the fannkuchredux
+benchmark should run without issue. If you then run lusearch, it should fail
+when a collection is triggered. It is possible to increase the heap size enough
+that no collections will be triggered, but it is okay to let it fail for now.
+When we build using a proper GC, it will be able to pass. The messages and
 errors produced should look identical or nearly identical to the log below.
 <pre><code>$ MMTK_PLAN=NoGC ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
 Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
@@ -305,7 +305,7 @@ Aborted (core dumped)
 </code></pre>
 </li>
 <li>Try running your build with <code>SemiSpace</code>. lusearch should now
-pass, as garbage will be collected, and the smaller benchmarks should run the 
+pass, as garbage will be collected, and the smaller benchmarks should run the
 same as they did while using NoGC.
 <pre><code>MMTK_PLAN=SemiSpace ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
 </code></pre>

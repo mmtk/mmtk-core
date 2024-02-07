@@ -182,111 +182,111 @@
 and researchers with a multi-runtime platform for memory management research. It is a complete re-write of the original MMTk,
 which was written in Java as part of Jikes RVM.</p>
 <iframe width="800" height="600" src="https://www.youtube.com/embed/0mldpiYW1X4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><div style="break-before: page; page-break-before: always;"></div><h1 id="mmtk-tutorial"><a class="header" href="#mmtk-tutorial">MMTk Tutorial</a></h1>
-<p>In this tutorial, you will build multiple garbage collectors from 
-scratch using MMTk. 
-You will start with an incredibly simple 'collector' called NoGC, 
-and through a series of additions and refinements end up with a 
-generational copying garbage collector. </p>
-<p>This tutorial is aimed at GC implementors who would like to implement 
-new GC algorithms/plans with MMTk. If you are a language implementor 
-interested in <em>porting</em> your runtime to MMTk, you should refer to the 
+<p>In this tutorial, you will build multiple garbage collectors from
+scratch using MMTk.
+You will start with an incredibly simple 'collector' called NoGC,
+and through a series of additions and refinements end up with a
+generational copying garbage collector.</p>
+<p>This tutorial is aimed at GC implementors who would like to implement
+new GC algorithms/plans with MMTk. If you are a language implementor
+interested in <em>porting</em> your runtime to MMTk, you should refer to the
 <a href="tutorial/../portingguide/prefix.html">porting guide</a> instead.</p>
-<p>This tutorial is a work in progress. Some sections may be rough, and others may 
-be missing information (especially about import statements). If something is 
+<p>This tutorial is a work in progress. Some sections may be rough, and others may
+be missing information (especially about import statements). If something is
 missing or inaccurate, refer to the relevant completed garbage collector if
-possible. Please also raise an issue, or create a pull request addressing 
-the problem. </p>
+possible. Please also raise an issue, or create a pull request addressing
+the problem.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="what-is-mmtk"><a class="header" href="#what-is-mmtk">What <em>is</em> MMTk?</a></h1>
-<p>The Memory Management Toolkit (MMTk) is a framework for designing and 
-implementing memory managers. It has a runtime-neutral core (mmtk-core) 
-written in Rust, and bindings that allow it to work with OpenJDK, V8, 
-and JikesRVM, with more bindings currently in development. 
+<p>The Memory Management Toolkit (MMTk) is a framework for designing and
+implementing memory managers. It has a runtime-neutral core (mmtk-core)
+written in Rust, and bindings that allow it to work with OpenJDK, V8,
+and JikesRVM, with more bindings currently in development.
 MMTk was originally written in Java as part of the JikesRVM Java runtime.
-The current version is similar in its purpose, but was made to be 
+The current version is similar in its purpose, but was made to be
 very flexible with runtime and able to be ported to many different VMs.</p>
-<p>The principal idea of MMTk is that it can be used as a 
-toolkit, allowing new GC algorithms to be rapidly developed using 
-common components. It also allows different GC algorithms to be 
+<p>The principal idea of MMTk is that it can be used as a
+toolkit, allowing new GC algorithms to be rapidly developed using
+common components. It also allows different GC algorithms to be
 compared on an apples-to-apples basis, since they share common mechanisms.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="what-will-this-tutorial-cover"><a class="header" href="#what-will-this-tutorial-cover">What will this tutorial cover?</a></h1>
-<p>This tutorial is intended to get you comfortable constructing new plans in 
+<p>This tutorial is intended to get you comfortable constructing new plans in
 MMTk.</p>
-<p>You will first be guided through building a semispace collector. After that, 
-you will extend this collector to be a generational collector, to further 
-familiarise you with different concepts in MMTk. There will also be 
-questions and exercises at various points in the tutorial, intended to 
-encourage you to think about what the code is doing, increase your general 
+<p>You will first be guided through building a semispace collector. After that,
+you will extend this collector to be a generational collector, to further
+familiarise you with different concepts in MMTk. There will also be
+questions and exercises at various points in the tutorial, intended to
+encourage you to think about what the code is doing, increase your general
 understanding of MMTk, and motivate further research.</p>
-<p>Where possible, there will be links to finished, functioning code after each 
-section so that you can check that your code is correct. Note, however, that 
-these will be full collectors. Therefore, there may be some differences between 
-these files and your collector due to your position in the tutorial. By the end 
-of each major section, your code should be functionally identical to the 
+<p>Where possible, there will be links to finished, functioning code after each
+section so that you can check that your code is correct. Note, however, that
+these will be full collectors. Therefore, there may be some differences between
+these files and your collector due to your position in the tutorial. By the end
+of each major section, your code should be functionally identical to the
 finished code provided.</p>
 <p>Furthermore, please note that this code may not be identical to the main code
 of the MMTk. It is deliberately kept separate as a simpler stable
-version. Make sure to refer to the 
-<a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code">provided tutorial code</a> 
-and not the main collector code during the tutorial. </p>
+version. Make sure to refer to the
+<a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code">provided tutorial code</a>
+and not the main collector code during the tutorial.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
 <p><em>allocator</em>: Code that allocates new objects into memory.</p>
-<p><em>collector</em>: Finds and frees memory occupied by 'dead' objects. </p>
+<p><em>collector</em>: Finds and frees memory occupied by 'dead' objects.</p>
 <p><em>dead</em>: An object that is not live.</p>
-<p><em>GC work (unit), GC packet</em>: A schedulable unit of collection work. </p>
-<p><em>GC worker</em>: A worker thread that performs garbage collection operations 
+<p><em>GC work (unit), GC packet</em>: A schedulable unit of collection work.</p>
+<p><em>GC worker</em>: A worker thread that performs garbage collection operations
 (as required by GC work units).</p>
-<p><em>live</em>: An object that is reachable, and thus can still be accessed by other 
+<p><em>live</em>: An object that is reachable, and thus can still be accessed by other
 objects, is live/alive.</p>
-<p><em>mutator</em>: Something that 'mutates', or changes, the objects stored in memory. 
-This is the term that is traditionally used in the garbage collection literature 
+<p><em>mutator</em>: Something that 'mutates', or changes, the objects stored in memory.
+This is the term that is traditionally used in the garbage collection literature
 to describe the running program (because it 'mutates' the object graph).</p>
-<p><em>plan</em>: A garbage collection algorithm expressed as a configuration of policies. 
+<p><em>plan</em>: A garbage collection algorithm expressed as a configuration of policies.
 See also <a href="tutorial/intro/glossary.html#plans-and-policies">Plans and policies</a> below.</p>
-<p><em>policy</em>: A specific garbage collection algorithm, such as marksweep, copying, 
-immix, etc. Plans are made up of an arrangement of one or more policies. 
+<p><em>policy</em>: A specific garbage collection algorithm, such as marksweep, copying,
+immix, etc. Plans are made up of an arrangement of one or more policies.
 See also <a href="tutorial/intro/glossary.html#plans-and-policies">Plans and policies</a> below.</p>
 <p><em>scheduler</em>: Dynamically dispatches units of GC work to workers.</p>
-<p><em>zeroing</em>, <em>zero initialization</em>: Initializing and resetting unused memory 
+<p><em>zeroing</em>, <em>zero initialization</em>: Initializing and resetting unused memory
 bits to have a value of 0. Required by most memory-safe programming languages.</p>
 <p>See also: <a href="tutorial/intro/../further_reading.html">Further Reading</a></p>
 <h2 id="plans-and-policies"><a class="header" href="#plans-and-policies">Plans and Policies</a></h2>
-<p>In MMTk, collectors are instantiated as plans, which can be thought of as 
-configurations of collector policies. In practice, most production 
-collectors and almost all collectors in MMTk are comprised of multiple 
-algorithms/policies. For example the gencopy plan describes a configuration 
-that combines a copying nursery with a semispace mature space. In MMTk we 
-think of these as three spaces, each of which happen to use the copyspace 
-policy, and which have a relationship which is defined by the gencopy plan. 
-Under the hood, gencopy builds upon a common plan which may also contain other 
+<p>In MMTk, collectors are instantiated as plans, which can be thought of as
+configurations of collector policies. In practice, most production
+collectors and almost all collectors in MMTk are comprised of multiple
+algorithms/policies. For example the gencopy plan describes a configuration
+that combines a copying nursery with a semispace mature space. In MMTk we
+think of these as three spaces, each of which happen to use the copyspace
+policy, and which have a relationship which is defined by the gencopy plan.
+Under the hood, gencopy builds upon a common plan which may also contain other
 policies including a space for code, a read-only space, etc.</p>
-<p>Thus, someone wishing to construct a new collector based entirely on existing 
-policies may be able to do so in MMTk by simply writing a new plan, which is 
+<p>Thus, someone wishing to construct a new collector based entirely on existing
+policies may be able to do so in MMTk by simply writing a new plan, which is
 what this tutorial covers.</p>
-<p>On the other hand, someone wishing to introduce an entirely new garbage 
-collection policy (such as Immix, for example), would need to first create 
-a policy which specifies that algorithm, before creating a plan which defines 
+<p>On the other hand, someone wishing to introduce an entirely new garbage
+collection policy (such as Immix, for example), would need to first create
+a policy which specifies that algorithm, before creating a plan which defines
 how the GC algorithm fits together and utilizes that policy.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="set-up-mmtk-and-openjdk"><a class="header" href="#set-up-mmtk-and-openjdk">Set up MMTk and OpenJDK</a></h1>
-<p>This tutorial can be completed with any binding. However, for the sake of 
-simplicity, only the setup for the OpenJDK binding will be described in detail 
-here. If you would like to use another binding, you will need to follow the 
-README files in their respective repositories 
-(<a href="https://github.com/mmtk/mmtk-jikesrvm">JikesRVM</a>, 
+<p>This tutorial can be completed with any binding. However, for the sake of
+simplicity, only the setup for the OpenJDK binding will be described in detail
+here. If you would like to use another binding, you will need to follow the
+README files in their respective repositories
+(<a href="https://github.com/mmtk/mmtk-jikesrvm">JikesRVM</a>,
 <a href="https://github.com/mmtk/mmtk-v8">V8</a>)
-to set them up, and find appropriate benchmarks for testing. 
-Also, while it may be useful to fork the relevant repositories to your own 
+to set them up, and find appropriate benchmarks for testing.
+Also, while it may be useful to fork the relevant repositories to your own
 account, it is not required for this tutorial.</p>
 <p>First, set up OpenJDK, MMTk, and the binding:</p>
 <ol>
 <li>Clone the OpenJDK binding and mmtk-core repository, and install any relevant
 dependencies by following the instructions in the
 <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/README.md">OpenJDK binding repository</a>.</li>
-<li>Ensure you can build OpenJDK according to the instructions in the READMEs of 
-<a href="https://github.com/mmtk/mmtk-core/blob/master/README.md">the mmtk-core repository</a> and the 
+<li>Ensure you can build OpenJDK according to the instructions in the READMEs of
+<a href="https://github.com/mmtk/mmtk-core/blob/master/README.md">the mmtk-core repository</a> and the
 <a href="https://github.com/mmtk/mmtk-openjdk/blob/master/README.md">OpenJDK binding repository</a>.
 <ul>
-<li>Use the <code>slowdebug</code> option when building the OpenJDK binding. This is the 
-fastest debug variant to build, and allows for easier debugging and better 
+<li>Use the <code>slowdebug</code> option when building the OpenJDK binding. This is the
+fastest debug variant to build, and allows for easier debugging and better
 testing. The rest of the tutorial will assume you are using <code>slowdebug</code>.</li>
 <li>You can use the env var <code>MMTK_PLAN=[PlanName]</code> to choose a plan to use at run-time.
 The plans that are relevant to this tutorial are <code>NoGC</code> and <code>SemiSpace</code>.</li>
@@ -309,95 +309,95 @@ not <code>mmtk-openjdk/repos/mmtk-core</code>, modify the path to point to your 
 <li>Rebuild the OpenJDK binding.</li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="test-the-build"><a class="header" href="#test-the-build">Test the build</a></h1>
-<p>A few benchmarks of varying size will be used throughout the tutorial. If you 
-haven't already, set them up now. All of the following commands should be 
+<p>A few benchmarks of varying size will be used throughout the tutorial. If you
+haven't already, set them up now. All of the following commands should be
 entered in <code>repos/openjdk</code>.</p>
 <ol>
 <li>
-<p><strong>HelloWorld</strong> (simplest, will never trigger GC): </p>
+<p><strong>HelloWorld</strong> (simplest, will never trigger GC):</p>
 <ol>
-<li>Copy the following code into a new Java file titled &quot;HelloWorld.java&quot; 
+<li>Copy the following code into a new Java file titled "HelloWorld.java"
 in <code>mmtk-openjdk/repos/openjdk</code>:
 <pre><code class="language-java">class HelloWorld {
    public static void main(String[] args) {
-      System.out.println(&quot;Hello World!&quot;);
+      System.out.println("Hello World!");
    }
 }
 </code></pre>
 </li>
-<li>Use the command 
+<li>Use the command
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac HelloWorld.java</code>.</li>
-<li>Then, run 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld</code> 
+<li>Then, run
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld</code>
 to run HelloWorld.</li>
-<li>If your program printed out <code>Hello World!</code> as expected, then 
+<li>If your program printed out <code>Hello World!</code> as expected, then
 congratulations, you have MMTk working with OpenJDK!</li>
 </ol>
 </li>
 <li>
-<p>The Computer Language Benchmarks Game <strong>fannkuchredux</strong> (micro benchmark, 
-allocates a small amount of memory but - depending on heap size and the GC 
-plan - may not trigger a collection): </p>
+<p>The Computer Language Benchmarks Game <strong>fannkuchredux</strong> (micro benchmark,
+allocates a small amount of memory but - depending on heap size and the GC
+plan - may not trigger a collection):</p>
 <ol>
-<li><a href="https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java">Copy this code</a> 
-into a new file named &quot;fannkuchredux.java&quot; 
+<li><a href="https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/master/bencher/programs/fannkuchredux/fannkuchredux.java">Copy this code</a>
+into a new file named "fannkuchredux.java"
 in <code>mmtk-openjdk/repos/openjdk</code>.</li>
-<li>Use the command 
+<li>Use the command
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/javac fannkuchredux.java</code>.</li>
-<li>Then, run 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap fannkuchredux</code> 
+<li>Then, run
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap fannkuchredux</code>
 to run fannkuchredux.</li>
 </ol>
 </li>
 <li>
-<p><strong>DaCapo</strong> benchmark suite (most complex, will likely trigger multiple 
-collections): </p>
+<p><strong>DaCapo</strong> benchmark suite (most complex, will likely trigger multiple
+collections):</p>
 <ol>
-<li>Fetch using 
+<li>Fetch using
 <code>wget https://sourceforge.net/projects/dacapobench/files/9.12-bach-MR1/dacapo-9.12-MR1-bach.jar/download -O ./dacapo-9.12-MR1-bach.jar</code>.</li>
-<li>DaCapo contains a variety of benchmarks, but this tutorial will only be 
-using lusearch. Run the lusearch benchmark using the command 
-<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch</code> in <code>repos/openjdk</code>. </li>
+<li>DaCapo contains a variety of benchmarks, but this tutorial will only be
+using lusearch. Run the lusearch benchmark using the command
+<code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch</code> in <code>repos/openjdk</code>.</li>
 </ol>
 </li>
 </ol>
 <h2 id="rust-logs"><a class="header" href="#rust-logs">Rust Logs</a></h2>
-<p>By using one of the debug builds, you gain access to the Rust logs - a useful 
-tool when testing a plan and observing the general behaviour of MMTk. 
-There are two levels of trace that are useful when using MMTk - <code>trace</code> 
-and <code>debug</code>. Generally, <code>debug</code> logs information about the slow paths 
-(allocation through MMTk, rather than fast path allocation through the binding). 
-<code>trace</code> includes all the information from <code>debug</code>, plus more information about 
-both slow and fast paths and garbage collection activities. You can set which 
-level to view the logs at by setting the environment variable <code>RUST_LOG</code>. For 
-more information, see the 
+<p>By using one of the debug builds, you gain access to the Rust logs - a useful
+tool when testing a plan and observing the general behaviour of MMTk.
+There are two levels of trace that are useful when using MMTk - <code>trace</code>
+and <code>debug</code>. Generally, <code>debug</code> logs information about the slow paths
+(allocation through MMTk, rather than fast path allocation through the binding).
+<code>trace</code> includes all the information from <code>debug</code>, plus more information about
+both slow and fast paths and garbage collection activities. You can set which
+level to view the logs at by setting the environment variable <code>RUST_LOG</code>. For
+more information, see the
 <a href="https://crates.io/crates/env_logger">env_logger crate documentation</a>.</p>
 <h2 id="working-with-different-gc-plans"><a class="header" href="#working-with-different-gc-plans">Working with different GC plans</a></h2>
 <p>You will be using multiple GC plans in this tutorial. You should
 familiarise yourself with how to do this now.</p>
 <ol>
-<li>The OpenJDK build will always generate in <code>mmtk-openjdk/repos/openjdk/build</code>. 
-From the same build, you can run different GC plans by using the environment 
-variable <code>MMTK_PLAN=[PlanName]</code>. Generally you won't need multiple VM builds. 
+<li>The OpenJDK build will always generate in <code>mmtk-openjdk/repos/openjdk/build</code>.
+From the same build, you can run different GC plans by using the environment
+variable <code>MMTK_PLAN=[PlanName]</code>. Generally you won't need multiple VM builds.
 However, if you do need to keep a build (for instance, to make quick performance
-comparisons), you can do the following: rename either the <code>build</code> folder or the 
-folder generated within it (eg <code>linux-x86_64-normal-server-$DEBUG_LEVEL</code>). 
+comparisons), you can do the following: rename either the <code>build</code> folder or the
+folder generated within it (eg <code>linux-x86_64-normal-server-$DEBUG_LEVEL</code>).
 <ol>
 <li>Renaming the <code>build</code> folder is the safest method for this.</li>
-<li>If you rename the internal folder, there is a possibility that the new 
-build will generate incorrectly. If a build appears to generate strangely 
+<li>If you rename the internal folder, there is a possibility that the new
+build will generate incorrectly. If a build appears to generate strangely
 quickly, it probably generated badly.</li>
-<li>A renamed build folder can be tested by changing the file path in 
+<li>A renamed build folder can be tested by changing the file path in
 commands as appropriate.</li>
-<li>If you plan to completely overwrite a build, deleting the folder you are 
+<li>If you plan to completely overwrite a build, deleting the folder you are
 writing over will help prevent errors.</li>
 </ol>
 </li>
-<li>Try running your build with <code>NoGC</code>. Both HelloWorld and the fannkuchredux 
-benchmark should run without issue. If you then run lusearch, it should fail 
-when a collection is triggered. It is possible to increase the heap size enough 
-that no collections will be triggered, but it is okay to let it fail for now. 
-When we build using a proper GC, it will be able to pass. The messages and 
+<li>Try running your build with <code>NoGC</code>. Both HelloWorld and the fannkuchredux
+benchmark should run without issue. If you then run lusearch, it should fail
+when a collection is triggered. It is possible to increase the heap size enough
+that no collections will be triggered, but it is okay to let it fail for now.
+When we build using a proper GC, it will be able to pass. The messages and
 errors produced should look identical or nearly identical to the log below.
 <pre><code>$ MMTK_PLAN=NoGC ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
 Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
@@ -434,34 +434,34 @@ Aborted (core dumped)
 </code></pre>
 </li>
 <li>Try running your build with <code>SemiSpace</code>. lusearch should now
-pass, as garbage will be collected, and the smaller benchmarks should run the 
+pass, as garbage will be collected, and the smaller benchmarks should run the
 same as they did while using NoGC.
 <pre><code>MMTK_PLAN=SemiSpace ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
 </code></pre>
 </li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="create-mygc"><a class="header" href="#create-mygc">Create MyGC</a></h1>
-<p>NoGC is a GC plan that only allocates memory, and does not have a collector. 
+<p>NoGC is a GC plan that only allocates memory, and does not have a collector.
 We're going to use it as a base for building a new garbage collector.</p>
-<p>Recall that this tutorial will take you through the steps of building a 
-collector from basic principles. To do that, you'll create your own plan 
-called <code>MyGC</code> which you'll gradually refine and improve upon through the 
-course of this tutorial. At the beginning MyGC will resemble the very 
+<p>Recall that this tutorial will take you through the steps of building a
+collector from basic principles. To do that, you'll create your own plan
+called <code>MyGC</code> which you'll gradually refine and improve upon through the
+course of this tutorial. At the beginning MyGC will resemble the very
 simple NoGC plan.</p>
 <ol>
-<li>Each plan is stored in <code>mmtk-openjdk/repos/mmtk-core/src/plan</code>. Navigate 
+<li>Each plan is stored in <code>mmtk-openjdk/repos/mmtk-core/src/plan</code>. Navigate
 there and create a copy of the folder <code>nogc</code>. Rename it to <code>mygc</code>.</li>
-<li>In <em>each file</em> within <code>mygc</code>, rename any reference to <code>nogc</code> to <code>mygc</code>. 
+<li>In <em>each file</em> within <code>mygc</code>, rename any reference to <code>nogc</code> to <code>mygc</code>.
 You will also have to separately rename any reference to <code>NoGC</code> to <code>MyGC</code>.
 <ul>
-<li>For example, in Visual Studio Code, you can (making sure case sensitivity 
-is selected in the search function) select one instance of <code>nogc</code> and either 
-right click and select &quot;Change all instances&quot; or use the CTRL-F2 shortcut, 
+<li>For example, in Visual Studio Code, you can (making sure case sensitivity
+is selected in the search function) select one instance of <code>nogc</code> and either
+right click and select "Change all instances" or use the CTRL-F2 shortcut,
 and then type <code>mygc</code>, and repeat for <code>NoGC</code>.</li>
 </ul>
 </li>
-<li>In order to use MyGC, you will need to make some changes to the following 
-files. 
+<li>In order to use MyGC, you will need to make some changes to the following
+files.
 <ol>
 <li><code>mmtk-core/src/plan/mod.rs</code>, add:
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
@@ -469,8 +469,8 @@ files.
 </span>pub mod mygc;
 <span class="boring">}</span></code></pre></pre>
 This adds <code>mygc</code> as a module.</li>
-<li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>. 
-This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>, 
+<li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>.
+This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>,
 or an environment variable for <code>MMTK_PLAN</code>:
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -488,14 +488,14 @@ pub enum PlanSelector {
 }
 <span class="boring">}</span></code></pre></pre>
 </li>
-<li><code>mmtk-core/src/plan/global.rs</code>, add new expressions to 
-<code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of 
-the existing plans. These define the location of the mutator and plan's 
-constructors. 
+<li><code>mmtk-core/src/plan/global.rs</code>, add new expressions to
+<code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of
+the existing plans. These define the location of the mutator and plan's
+constructors.
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// NOTE: Sections of this code snippet not relevant to this step of the 
-// tutorial (marked by &quot;// ...&quot;) have been omitted.
+// tutorial (marked by "// ...") have been omitted.
 pub fn create_mutator&lt;VM: VMBinding&gt;(
     tls: VMMutatorThread,
     mmtk: &amp;'static MMTK&lt;VM&gt;,
@@ -533,25 +533,25 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
 </ol>
 </li>
 </ol>
-<p>Note that all of the above changes almost exactly copy the NoGC entries in 
-each of these files. However, NoGC has some variants, such as a lock-free 
-variant. For simplicity, those are not needed for this tutorial. Remove 
-references to them in the MyGC plan now. </p>
+<p>Note that all of the above changes almost exactly copy the NoGC entries in
+each of these files. However, NoGC has some variants, such as a lock-free
+variant. For simplicity, those are not needed for this tutorial. Remove
+references to them in the MyGC plan now.</p>
 <ol>
-<li>Within <code>mygc/global.rs</code>, find any use of <code>#[cfg(feature = &quot;mygc_lock_free&quot;)]</code> 
+<li>Within <code>mygc/global.rs</code>, find any use of <code>#[cfg(feature = "mygc_lock_free")]</code>
 and delete both it <em>and the line below it</em>.</li>
-<li>Then, delete any use of the above line's negation, 
-<code>#[cfg(not(feature = &quot;mygc_lock_free&quot;))]</code>, this time without changing the 
+<li>Then, delete any use of the above line's negation,
+<code>#[cfg(not(feature = "mygc_lock_free"))]</code>, this time without changing the
 line below it.</li>
 </ol>
-<p>After you rebuild OpenJDK (and <code>mmtk-core</code>), you can run MyGC with your new 
-build (<code>MMTK_PLAN=MyGC</code>). Try testing it with the each of the three benchmarks. 
+<p>After you rebuild OpenJDK (and <code>mmtk-core</code>), you can run MyGC with your new
+build (<code>MMTK_PLAN=MyGC</code>). Try testing it with the each of the three benchmarks.
 It should work identically to NoGC.</p>
-<p>If you've got to this point, then congratulations! You have created your first 
+<p>If you've got to this point, then congratulations! You have created your first
 working MMTk collector!</p>
-<p>At this point, you should familiarise yourself with the MyGC plan if you 
-haven't already. Try answering the following questions by looking at the code 
-and <a href="tutorial/mygc/../further_reading.html">Further Reading</a>: </p>
+<p>At this point, you should familiarise yourself with the MyGC plan if you
+haven't already. Try answering the following questions by looking at the code
+and <a href="tutorial/mygc/../further_reading.html">Further Reading</a>:</p>
 <ul>
 <li>Where is the allocator defined?</li>
 <li>How many memory spaces are there?</li>
@@ -559,28 +559,28 @@ and <a href="tutorial/mygc/../further_reading.html">Further Reading</a>: </p>
 <li>What happens if garbage has to be collected?</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="building-a-semispace-collector"><a class="header" href="#building-a-semispace-collector">Building a semispace collector</a></h1>
-<p>In a semispace collector, the heap is divided into two equally-sized spaces, 
-called 'semispaces'. One of these is defined as a 'fromspace', and the other 
-a 'tospace'. The allocator allocates to the tospace until it is full. </p>
-<p>When the tospace is full, a stop-the-world GC is triggered. The mutator is 
-paused, and the definitions of the spaces are flipped (the 'tospace' becomes 
-a 'fromspace', and vice versa). Then, the collector scans each object in what 
-is now the fromspace. If a live object is found, a copy of it is made in the 
-tospace. That is to say, live objects are copied <em>from</em> the fromspace <em>to</em> 
-the tospace. After every object is scanned, the fromspace is cleared. The GC 
+<p>In a semispace collector, the heap is divided into two equally-sized spaces,
+called 'semispaces'. One of these is defined as a 'fromspace', and the other
+a 'tospace'. The allocator allocates to the tospace until it is full.</p>
+<p>When the tospace is full, a stop-the-world GC is triggered. The mutator is
+paused, and the definitions of the spaces are flipped (the 'tospace' becomes
+a 'fromspace', and vice versa). Then, the collector scans each object in what
+is now the fromspace. If a live object is found, a copy of it is made in the
+tospace. That is to say, live objects are copied <em>from</em> the fromspace <em>to</em>
+the tospace. After every object is scanned, the fromspace is cleared. The GC
 finishes, and the mutator is resumed.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="allocation-add-copyspaces"><a class="header" href="#allocation-add-copyspaces">Allocation: Add copyspaces</a></h1>
 <p>We will now change your MyGC plan from one that cannot collect garbage
 into one that implements the semispace algorithm. The first step of this
-is to add the two copyspaces, and allow collectors to allocate memory 
-into them. This involves adding two copyspaces, the code to properly initialise 
+is to add the two copyspaces, and allow collectors to allocate memory
+into them. This involves adding two copyspaces, the code to properly initialise
 and prepare the new spaces, and a copy context.</p>
 <h2 id="change-the-plan-constraints"><a class="header" href="#change-the-plan-constraints">Change the plan constraints</a></h2>
-<p>Firstly, change the plan constraints. Some of these constraints are not used 
+<p>Firstly, change the plan constraints. Some of these constraints are not used
 at the moment, but it's good to set them properly regardless.</p>
 <p>Look in <code>plan/plan_constraints.rs</code>. <code>PlanConstraints</code> lists all the possible
-options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</code> in 
-<code>mygc/global.rs</code> should be using the default value for <code>PlanConstraints</code>. 
+options for plan-specific constraints. At the moment, <code>MYGC_CONSTRAINTS</code> in
+<code>mygc/global.rs</code> should be using the default value for <code>PlanConstraints</code>.
 We will make the following changes:</p>
 <ol>
 <li>Initialize <code>gc_header_bits</code> to 2. We reserve 2 bits in the header for GC use.</li>
@@ -593,18 +593,18 @@ We will make the following changes:</p>
 };
 </code></pre>
 <h2 id="change-the-plan-implementation"><a class="header" href="#change-the-plan-implementation">Change the plan implementation</a></h2>
-<p>Next, in <code>mygc/global.rs</code>, replace the old immortal (nogc) space with two 
+<p>Next, in <code>mygc/global.rs</code>, replace the old immortal (nogc) space with two
 copyspaces.</p>
 <h3 id="imports"><a class="header" href="#imports">Imports</a></h3>
 <p>To the import statement block:</p>
 <ol>
-<li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with 
-<code>use crate::plan::global::BasePlan;</code>. This collector is going to use 
+<li>Replace <code>crate::plan::global::{BasePlan, NoCopy};</code> with
+<code>use crate::plan::global::BasePlan;</code>. This collector is going to use
 copying, so there's no point to importing NoCopy any more.</li>
 <li>Add <code>use crate::plan::global::CommonPlan;</code>. Semispace uses the common
-plan, which includes an immortal space and a large object space, rather 
+plan, which includes an immortal space and a large object space, rather
 than the base plan. Any garbage collected plan should use <code>CommonPlan</code>.</li>
-<li>Add <code>use std::sync::atomic::{AtomicBool, Ordering};</code>. These are going 
+<li>Add <code>use std::sync::atomic::{AtomicBool, Ordering};</code>. These are going
 to be used to store an indicator of which copyspace is the tospace.</li>
 <li>Delete <code>#[allow(unused_imports)]</code>.</li>
 </ol>
@@ -635,9 +635,9 @@ use std::sync::atomic::{AtomicBool, Ordering}; // Add
 <p>Change <code>pub struct MyGC&lt;VM: VMBinding&gt;</code> to add new instance variables.</p>
 <ol>
 <li>Delete the existing fields in the constructor.</li>
-<li>Add <code>pub hi: AtomicBool,</code>. This is a thread-safe bool, indicating which 
+<li>Add <code>pub hi: AtomicBool,</code>. This is a thread-safe bool, indicating which
 copyspace is the tospace.</li>
-<li>Add <code>pub copyspace0: CopySpace&lt;VM&gt;,</code> 
+<li>Add <code>pub copyspace0: CopySpace&lt;VM&gt;,</code>
 and <code>pub copyspace1: CopySpace&lt;VM&gt;,</code>. These are the two copyspaces.</li>
 <li>Add <code>pub common: CommonPlan&lt;VM&gt;,</code>.
 This holds an instance of the common plan.</li>
@@ -671,21 +671,21 @@ sections.</p>
 <span class="boring">}</span></code></pre></pre>
 <h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
 <h4 id="constructor"><a class="header" href="#constructor">Constructor</a></h4>
-<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC 
+<p>Change <code>fn new()</code>. This section initialises and prepares the objects in MyGC
 that you just defined.</p>
 <ol>
-<li>Delete the definition of <code>mygc_space</code>. 
+<li>Delete the definition of <code>mygc_space</code>.
 Instead, we will define the two copyspaces here.</li>
-<li>Define one of the copyspaces by adding the following code: </li>
+<li>Define one of the copyspaces by adding the following code:</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>            copyspace0: CopySpace::new(plan_args.get_space_args(&quot;copyspace0&quot;, true, VMRequest::discontiguous()), false),
+</span>            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
 <span class="boring">}</span></code></pre></pre>
 <ol start="3">
-<li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace 
-instead of a tospace. (Hint: the definitions for 
-copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
+<li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace
+instead of a tospace. (Hint: the definitions for
+copyspaces are in <code>src/policy/copyspace.rs</code>.)</li>
 <li>Finally, replace the old MyGC initializer.</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
@@ -700,8 +700,8 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 
         let res = MyGC {
             hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(plan_args.get_space_args(&quot;copyspace0&quot;, true, VMRequest::discontiguous()), false),
-            copyspace1: CopySpace::new(plan_args.get_space_args(&quot;copyspace1&quot;, true, VMRequest::discontiguous()), true),
+            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
+            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
             common: CommonPlan::new(plan_args),
         };
 
@@ -717,10 +717,10 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 </span>impl&lt;VM: VMBinding&gt; MyGC&lt;VM&gt; {
 }
 <span class="boring">}</span></code></pre></pre>
-<p>To this, add two helper methods, <code>tospace(&amp;self)</code> 
-and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>, 
-and return a reference to the tospace and fromspace respectively. 
-<code>tospace()</code> (see below) returns a reference to the tospace, 
+<p>To this, add two helper methods, <code>tospace(&amp;self)</code>
+and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;CopySpace&lt;VM&gt;</code>,
+and return a reference to the tospace and fromspace respectively.
+<code>tospace()</code> (see below) returns a reference to the tospace,
 and <code>fromspace()</code> returns a reference to the fromspace.</p>
 <p>We also add another two helper methods to get <code>tospace_mut(&amp;mut self)</code>
 and <code>fromspace_mut(&amp;mut self)</code>. Those will be used later when we implement
@@ -760,7 +760,7 @@ collection for our GC plan.</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
-<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
+<p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a
 reference to the common plan. Implement this method now.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -768,7 +768,7 @@ reference to the common plan. Implement this method now.</p>
         &amp;self.common
     }
 <span class="boring">}</span></code></pre></pre>
-<p>Find the helper method <code>base</code> and change it so that it calls the 
+<p>Find the helper method <code>base</code> and change it so that it calls the
 base plan <em>through</em> the common plan.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -789,9 +789,9 @@ in the <code>BasePlan</code>.</p>
         self.base().collection_required(self, space_full)
     }
 <span class="boring">}</span></code></pre></pre>
-<p>Find the method <code>get_pages_used</code>. Replace the current body with 
-<code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
-correctly count the pages contained in the tospace and the common plan 
+<p>Find the method <code>get_pages_used</code>. Replace the current body with
+<code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to
+correctly count the pages contained in the tospace and the common plan
 spaces (which will be explained later).</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -807,8 +807,8 @@ spaces (which will be explained later).</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="change-the-mutator-definition"><a class="header" href="#change-the-mutator-definition">Change the mutator definition</a></h2>
-<p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the 
-tospace, and to the two spaces controlled by the common plan. </p>
+<p>Next, we need to change the mutator, in <code>mutator.rs</code>, to allocate to the
+tospace, and to the two spaces controlled by the common plan.</p>
 <h3 id="imports-1"><a class="header" href="#imports-1">Imports</a></h3>
 <p>Change the following import statements:</p>
 <ol>
@@ -836,9 +836,9 @@ use enum_map::EnumMap;
 // Remove mygc_mutator_noop
 <span class="boring">}</span></code></pre></pre>
 <h3 id="allocator-mapping"><a class="header" href="#allocator-mapping">Allocator mapping</a></h3>
-<p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>, 
-which maps the required allocation semantics to the corresponding allocators. 
-For example, for <code>Default</code>, we allocate using the first bump pointer allocator 
+<p>In <code>lazy_static!</code>, make the following changes to <code>ALLOCATOR_MAPPING</code>,
+which maps the required allocation semantics to the corresponding allocators.
+For example, for <code>Default</code>, we allocate using the first bump pointer allocator
 (<code>BumpPointer(0)</code>):</p>
 <ol>
 <li>Define a <code>ReservedAllocators</code> instance to declare that we need one bump allocator.</li>
@@ -861,11 +861,11 @@ lazy_static! {
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="space-mapping"><a class="header" href="#space-mapping">Space mapping</a></h3>
-<p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what 
-space in <code>space_mapping</code>. Note that the space allocation is formatted as a list 
-of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is 
+<p>Next, in <code>create_mygc_mutator</code>, change which allocator is allocated to what
+space in <code>space_mapping</code>. Note that the space allocation is formatted as a list
+of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</code>) is
 bound with <code>tospace</code>.</p>
-<p>Downcast the dynamic <code>Plan</code> type to <code>MyGC</code> so we can access specific spaces in 
+<p>Downcast the dynamic <code>Plan</code> type to <code>MyGC</code> so we can access specific spaces in
 <code>MyGC</code>.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -891,21 +891,21 @@ of a sudden in these past 2 steps, are parts of the MMTk common plan
 itself. They are used to construct allocator-space mappings for the spaces defined
 by the common plan:</p>
 <ol>
-<li>The immortal space is used for objects that the virtual machine or a 
+<li>The immortal space is used for objects that the virtual machine or a
 library never expects to die.</li>
-<li>The large object space is needed because MMTk handles particularly large 
-objects differently to normal objects, as the space overhead of copying 
-large objects is very high. Instead, this space is used by a free list 
-allocator in the common plan to avoid having to copy them. </li>
+<li>The large object space is needed because MMTk handles particularly large
+objects differently to normal objects, as the space overhead of copying
+large objects is very high. Instead, this space is used by a free list
+allocator in the common plan to avoid having to copy them.</li>
 <li>The read-only space is used to store all the immutable objects.</li>
 <li>The code spaces are used for VM generated code objects.</li>
 </ol>
-<p>With this, you should have the allocation working, but not garbage collection. 
+<p>With this, you should have the allocation working, but not garbage collection.
 Try building again. If you run HelloWorld or Fannkunchredux, they should
-work. DaCapo's lusearch should fail, as it requires garbage to be collected. </p>
+work. DaCapo's lusearch should fail, as it requires garbage to be collected.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
-<p>We need to add a few more things to get garbage collection working. 
-Specifically, we need to config the <code>GCWorkerCopyContext</code>, which a GC worker uses for 
+<p>We need to add a few more things to get garbage collection working.
+Specifically, we need to config the <code>GCWorkerCopyContext</code>, which a GC worker uses for
 copying objects, and GC work packets that will be scheduled for a collection.</p>
 <h2 id="copyconfig"><a class="header" href="#copyconfig">CopyConfig</a></h2>
 <p><code>CopyConfig</code> defines how a GC plan copies objects.
@@ -941,11 +941,11 @@ space here.</p>
     }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
-<p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
+<p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
 it stops all mutators, runs the
 scheduler's prepare stage and resumes the mutators. The <code>StopMutators</code> work
-will invoke code from the bindings to scan threads and other roots, and those 
+will invoke code from the bindings to scan threads and other roots, and those
 scanning work will further push work for a transitive closure.</p>
 <p>Though you can add those work packets by yourself, <code>GCWorkScheduler</code> provides a
 method <code>schedule_common_work()</code> that will add common work packets for you.</p>
@@ -974,14 +974,14 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
         scheduler.schedule_common_work::&lt;MyGCWorkContext&lt;VM&gt;&gt;(self);
     }
 <span class="boring">}</span></code></pre></pre>
-<p>Delete <code>handle_user_collection_request()</code>. This function was an override of 
-a Common plan function to ignore user requested collection for NoGC. Now we 
+<p>Delete <code>handle_user_collection_request()</code>. This function was an override of
+a Common plan function to ignore user requested collection for NoGC. Now we
 remove it and allow user requested collection.</p>
 <h2 id="prepare-for-collection"><a class="header" href="#prepare-for-collection">Prepare for collection</a></h2>
 <p>The collector has a number of steps it needs to perform before each collection.
 We'll add these now.</p>
 <h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
-<p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
+<p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code>
 call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -1000,8 +1000,8 @@ call, and add the following code:</p>
         self.tospace_mut().set_copy_for_sft_trace(None);
     }
 <span class="boring">}</span></code></pre></pre>
-<p>This function is called at the start of a collection. It prepares the two 
-spaces in the common plan, flips the definitions for which space is 'to' 
+<p>This function is called at the start of a collection. It prepares the two
+spaces in the common plan, flips the definitions for which space is 'to'
 and which is 'from', then prepares the copyspaces with the new definition.</p>
 <p>Note that we call <code>set_copy_for_sft_trace()</code> for both spaces. This step is required
 when using <code>SFTProcessEdges</code> to tell the spaces which copy semantic to use for copying.
@@ -1038,10 +1038,10 @@ this optimization, you may also leave the <code>MutatorConfig::prepare_func</cod
 <code>&amp;unreachable_prepare_func</code> to indicate it should not be called.</p>
 </blockquote>
 <h2 id="release"><a class="header" href="#release">Release</a></h2>
-<p>Finally, we need to fill out the functions that are, roughly speaking, 
+<p>Finally, we need to fill out the functions that are, roughly speaking,
 run after each collection.</p>
 <h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
-<p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the 
+<p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the
 <code>unreachable!()</code> call with the following code.</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -1050,7 +1050,7 @@ run after each collection.</p>
         self.fromspace().release();
     }
 <span class="boring">}</span></code></pre></pre>
-<p>This function is called at the end of a collection. It calls the release 
+<p>This function is called at the end of a collection. It calls the release
 routines for the common plan spaces and the fromspace.</p>
 <h3 id="release-in-mutator"><a class="header" href="#release-in-mutator">Release in mutator</a></h3>
 <p>Go back to <code>mutator.rs</code>.  Create a new function called <code>mygc_mutator_release()</code> that takes the same
@@ -1253,32 +1253,32 @@ collector!</p>
 <p>If you get particularly stuck, the code for the completed <code>MyGC</code> plan
 is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/tutorial/code/mygc_semispace">here</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="exercise-adding-another-copyspace"><a class="header" href="#exercise-adding-another-copyspace">Exercise: Adding another copyspace</a></h1>
-<p>Now that you have a working semispace collector, you should be familiar 
-enough with the code to start writing some yourself. The intention of this 
-exercise is to reinforce the information from the semispace section, rather 
+<p>Now that you have a working semispace collector, you should be familiar
+enough with the code to start writing some yourself. The intention of this
+exercise is to reinforce the information from the semispace section, rather
 than to create a useful new collector.</p>
 <ol>
-<li>Create a copy of your semispace collector, called <code>triplespace</code>. </li>
-<li>Add a new copyspace to the collector, called the <code>youngspace</code>, with the 
+<li>Create a copy of your semispace collector, called <code>triplespace</code>.</li>
+<li>Add a new copyspace to the collector, called the <code>youngspace</code>, with the
 following traits:
 <ul>
 <li>New objects are allocated to the youngspace (rather than the fromspace).</li>
-<li>During a collection, live objects in the youngspace are moved to the 
+<li>During a collection, live objects in the youngspace are moved to the
 tospace.</li>
 <li>Garbage is still collected at the same time for all spaces.</li>
 </ul>
 </li>
 </ol>
-<p>Triplespace is a sort of generational garbage collector. These collectors 
-separate out old objects and new objects into separate spaces. Newly 
-allocated objects should be scanned far more often than old objects, which 
-minimises the time spent repeatedly re-scanning long-lived objects. </p>
-<p>Of course, this means that the Triplespace is incredibly inefficient for a 
-generational collector, because the older objects are still being scanned 
-every collection. It wouldn't be very useful in a real-life scenario. The 
-next thing to do is to make this collector into a more efficient proper 
+<p>Triplespace is a sort of generational garbage collector. These collectors
+separate out old objects and new objects into separate spaces. Newly
+allocated objects should be scanned far more often than old objects, which
+minimises the time spent repeatedly re-scanning long-lived objects.</p>
+<p>Of course, this means that the Triplespace is incredibly inefficient for a
+generational collector, because the older objects are still being scanned
+every collection. It wouldn't be very useful in a real-life scenario. The
+next thing to do is to make this collector into a more efficient proper
 generational collector.</p>
-<p>When you are finished, try running the benchmarks and seeing how the 
+<p>When you are finished, try running the benchmarks and seeing how the
 performance of this collector compares to MyGC. Great work!</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="triplespace-backup-instructions"><a class="header" href="#triplespace-backup-instructions">Triplespace backup instructions</a></h1>
 <p>This is <em>one</em> possible implementation of the Triplespace collector, provided
@@ -1318,7 +1318,7 @@ module by following the instructions in <a href="tutorial/mygc/ss/../create.html
    TripleSpace {
        hi: AtomicBool::new(false),
        copyspace0: CopySpace::new(
-           &quot;copyspace0&quot;,
+           "copyspace0",
            false,
            true,
            VMRequest::discontiguous(),
@@ -1327,7 +1327,7 @@ module by following the instructions in <a href="tutorial/mygc/ss/../create.html
            &amp;mut heap,
        ),
        copyspace1: CopySpace::new(
-           &quot;copyspace1&quot;,
+           "copyspace1",
            true,
            true,
            VMRequest::discontiguous(),
@@ -1338,7 +1338,7 @@ module by following the instructions in <a href="tutorial/mygc/ss/../create.html
 
        // Add this!
        youngspace: CopySpace::new(
-           &quot;youngspace&quot;,
+           "youngspace",
            true,
            true,
            VMRequest::discontiguous(),
@@ -1518,7 +1518,7 @@ generational copying (gencopy) collector will be added in future.</p>
 <blockquote>
 <p>Note: This guide is work in progress.</p>
 </blockquote>
-<p>This guide is designed to get you started on porting MMTk to a new runtime. 
+<p>This guide is designed to get you started on porting MMTk to a new runtime.
 We start with an overview of the MMTk approach to porting and then step through recommended strategies for implementing a port.</p>
 <p>There’s no fixed way to implement a new port.
 What we outline here is a distillation of best practices that have emerged from community as it has worked through many ports (each at various levels of maturity).</p>
@@ -1553,13 +1553,13 @@ The leftmost box should be entirely free of any MMTk-specific code.</p>
 <p>In principle, a port to MMTk is not particularly difficult.
 MMTk can present itself as a standard library and the core of the API is relatively simple.</p>
 <p>However, porting a runtime to a different GC (any GC) can be difficult and time consuming.
-Key questions include: </p>
+Key questions include:</p>
 <ul>
-<li>How well encapsulated is the runtime's existing collector? </li>
+<li>How well encapsulated is the runtime's existing collector?</li>
 <li>Does the runtime make tacit assumptions about the underlying collector's implementation?</li>
 <li>How many places in the runtime codebase reference some part of the GC?</li>
 <li>If the runtime has a JIT, how good is the interface between the JIT and the GC (for write barriers and allocations, for example)?</li>
-<li>Does the runtime support precise stack scanning? </li>
+<li>Does the runtime support precise stack scanning?</li>
 <li>etc.</li>
 </ul>
 <p>Thinking through these questions should give you a sense for how big a task a GC port will be.</p>
@@ -1601,7 +1601,7 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>You may also find it helpful to take inspiration from the <a href="https://github.com/mmtk/mmtk-openjdk">OpenJDK binding</a>, particularly for a more complete example of the relevant <code>Cargo.toml</code> files.</p>
 <p>For this guide, we will assume your runtime is implemented in C or C++ as they are the most common implementation languages. However note that your runtime does not <em>need</em> to be implemented in C/C++ to work with MMTk.</p>
 <h2 id="adding-a-rust-library-to-the-runtime"><a class="header" href="#adding-a-rust-library-to-the-runtime">Adding a Rust library to the runtime</a></h2>
-<p>We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust &quot;hello world&quot; library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.</p>
+<p>We recommend learning the ins and outs of your runtime's build system. You should try and add a simple Rust "hello world" library to your runtime's code and build system to investigate how easy it will be to add MMTk. Unfortunately this step is highly dependent on the runtime build system. We recommend taking a look at what other bindings do, but keep in mind that no two runtime build systems are the same even if they are using the same build tools.</p>
 <p>In case the build system is too complex and you want get to hacking, a quick and dirty way to add MMTk could be to build a static and/or dynamic binary for MMTk and link it to the runtime directly, manually building new binaries as necessary, like so:</p>
 <ol>
 <li><code>cd mmtk-X/mmtk</code></li>
@@ -1612,12 +1612,12 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>You would have to change the <code>crate-type</code> in <code>mmtk-X/mmtk/Cargo.toml</code> from <code>cdylib</code> to <code>staticlib</code> to build a static library.</p>
 </div>
 <p>Later, you can edit the runtime build process to build MMTk at the same time automatically.</p>
-<p><strong>Note:</strong> If the runtime you are targeting already links some Rust FFI libraries, then you may notice &quot;multiple definition&quot; linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the <code>-Wl,--allow-multiple-definition</code> linker flag, but this unfortunately isn't ideal as it increases code sizes. See <a href="https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558">here</a> and <a href="https://github.com/rust-lang/rust/issues/73632">here</a> for more details.</p>
+<p><strong>Note:</strong> If the runtime you are targeting already links some Rust FFI libraries, then you may notice "multiple definition" linker errors for Rust stdlib functions. Unfortunately this is a current limitation of Rust FFI wherein all symbols are bundled together in the final C lib which will cause multiple definitions errors when two or more Rust FFI libraries are linked together. There is ongoing work to stabilize the Rust package format that would hopefully make it easier in the future. A current workaround would be to use the <code>-Wl,--allow-multiple-definition</code> linker flag, but this unfortunately isn't ideal as it increases code sizes. See <a href="https://internals.rust-lang.org/t/pre-rfc-stabilize-a-version-of-the-rlib-format/17558">here</a> and <a href="https://github.com/rust-lang/rust/issues/73632">here</a> for more details.</p>
 <p><strong>Note:</strong> It is <em>highly</em> recommended to also check-in the generated <code>Cargo.lock</code> file into your version control. This improves the reproducibility of the build and ensures the same package versions are used when building in the future in order to prevent random breakages.</p>
 <p>We recommend using the <code>debug</code> build when doing development work as it has helpful logging statements and assertions that will make catching bugs in your implementation easier.</p>
 <h2 id="the-vmbinding-trait"><a class="header" href="#the-vmbinding-trait">The <code>VMBinding</code> trait</a></h2>
 <p>Now let's actually start implementing the binding. Here we take a look at the Rust side of the binding first (i.e. <code>mmtk-X/mmtk</code>). What we want to do is implement the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html"><code>VMBinding</code></a> trait.</p>
-<p>The <code>VMBinding</code> trait is a &quot;meta-trait&quot; (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime. We discuss each of its seven key traits briefly:</p>
+<p>The <code>VMBinding</code> trait is a "meta-trait" (i.e. a trait that encapsulates other traits) that we expect every binding to implement. In essence, it is the contract established between MMTk and the runtime. We discuss each of its seven key traits briefly:</p>
 <ol>
 <li><a href="https://docs.mmtk.io/api/mmtk/vm/trait.ActivePlan.html"><code>ActivePlan</code></a>: This trait implements functions related to mutators such as how many mutators exist, getting an iterator for all mutators, etc.</li>
 <li><a href="https://docs.mmtk.io/api/mmtk/vm/trait.Collection.html"><code>Collection</code></a>: This trait implements functions related to garbage collection such as starting and stopping mutators, blocking current mutator thread for GC, etc.</li>
@@ -1635,8 +1635,8 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 <p>Header metadata sits in close proximity to the actual object address but it is not easy to perform bulk operations. On the other hand, side metadata sits in a dedicated metadata space where each possible object address is assigned some metadata. This makes performing bulk operations easy and does not require stealing bits from the object header (there may in fact be no bits to steal for certain runtimes), but can result in large heap sizes given the metadata space is counted as part of the heap.</p>
 <p>The choice of metadata location depends on the runtime and its object model and header layout. For example the JikesRVM runtime reserved extra space at the start of each object for GC-related metadata. Such space may not be available in your runtime. In such cases you can use side metadata to reserve per-object metadata.</p>
 <h4 id="local-vs-global-metadata"><a class="header" href="#local-vs-global-metadata">Local vs Global metadata</a></h4>
-<p>MMTk uses multiple GC policies and each policy may use a different set of object metadata from each other. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy, is referred to as &quot;local&quot; metadata.</p>
-<p>However, in certain cases, we may need to have metadata globally for the entire heap space. The classic example is the valid-object bit metadata which tells us if an arbitrary address is allocated/managed by MMTk. Such a metadata, which spans multiple policies, is referred to as &quot;global&quot; metadata.</p>
+<p>MMTk uses multiple GC policies and each policy may use a different set of object metadata from each other. A moving policy, for example, may require extra metadata (in comparison to a non-moving policy) to store the forwarding bits and forwarding pointer. Such a metadata, which is local to a policy, is referred to as "local" metadata.</p>
+<p>However, in certain cases, we may need to have metadata globally for the entire heap space. The classic example is the valid-object bit metadata which tells us if an arbitrary address is allocated/managed by MMTk. Such a metadata, which spans multiple policies, is referred to as "global" metadata.</p>
 <p>For example, the <em>Forwarding bits and pointer</em> metadata is a local metadata used by copying policies to store forwarding bits (2-bits) and forwarding pointers (word size). Often runtimes require word-aligned addresses which means we can use the last two bits in the object header (due to alignment) and the entire object header to store the forwarding bits and pointer respectively. This metadata is almost always in the header.</p>
 <p>We recommend going through the <a href="https://docs.mmtk.io/api/mmtk/vm/trait.ObjectModel.html#required-associated-consts">list of metadata specifications</a> that are defined by MMTk. You should set them to locations that are appropriate for your runtime.</p>
 <h4 id="objectreference-vs-address"><a class="header" href="#objectreference-vs-address"><code>ObjectReference</code> vs <code>Address</code></a></h4>
@@ -1664,9 +1664,9 @@ In the case of V8, the refactoring within V8 required to get a simple NoGC plan 
 #include &lt;stddef.h&gt;
 #include &lt;sys/types.h&gt;
 
-// The extern &quot;C&quot; is only required if the runtime
+// The extern "C" is only required if the runtime
 // implementation language is C++
-extern &quot;C&quot; {
+extern "C" {
 
 // An arbitrary address
 typedef void* Address;
@@ -1688,7 +1688,7 @@ void mmtk_init();
  */
 void mmtk_set_heap_size(size_t min, size_t max);
 
-} // extern &quot;C&quot;
+} // extern "C"
 
 #endif // MMTK_H
 </code></pre>
@@ -1705,7 +1705,7 @@ void mmtk_set_heap_size(size_t min, size_t max);
 [...]
 </code></pre>
 <h2 id="binding-mutator-threads-to-mmtk"><a class="header" href="#binding-mutator-threads-to-mmtk">Binding mutator threads to MMTk</a></h2>
-<p>For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by &quot;binding&quot; a mutator thread to MMTk when it is initialized in the runtime.</p>
+<p>For MMTk to allocate objects, it needs to be aware of mutator threads. MMTk only allows mutator threads to allocate objects. We do this by "binding" a mutator thread to MMTk when it is initialized in the runtime.</p>
 <h3 id="runtime-side-changes-1"><a class="header" href="#runtime-side-changes-1">Runtime-side changes</a></h3>
 <p>Add the following function to the <code>mmtk.h</code> file:</p>
 <pre><code class="language-C">[...]
@@ -1782,7 +1782,7 @@ Although the GC itself is rather simplistic, it stresses many of the key compone
 In particular, since it always moves objects, it is an excellent stress test.</p>
 <p>An alternative route is to implement MarkSweep.
 This may be necessary in scenarios where the target VM doesn’t support object movement, or would require significant refactoring to do so.
-This can then serve as a stepping stone for future, moving GCs such as SemiSpace. </p>
+This can then serve as a stepping stone for future, moving GCs such as SemiSpace.</p>
 <p>We hope to have an Immix implementation available soon, which provides a nice middle ground between moving and non-moving (since it copies opportunistically, and can cope with a strictly non-moving requirement if needs be).</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="debugging-tips"><a class="header" href="#debugging-tips">Debugging Tips</a></h1>
 <p>In this section, we discuss debugging tips that will be useful to debug MMTk
@@ -1825,7 +1825,7 @@ any warning or error.</p>
 <pre><code class="language-toml">[lib]
 ...
 # be careful - LTO is only allowed for certain crate types
-crate-type = [&quot;cdylib&quot;]
+crate-type = ["cdylib"]
 </code></pre>
 <p>At the time of writing, cargo has some limitations about LTO with different crate types:</p>
 <ol>
@@ -1833,7 +1833,7 @@ crate-type = [&quot;cdylib&quot;]
 Check the code of <a href="https://github.com/rust-lang/cargo/blob/5f40a97e5c85affecfbc4fde67fc06bf188c07db/src/cargo/core/compiler/crate_type.rs#L33"><code>can_lto</code></a>
 for your Rust version to clarify.</li>
 <li>If the <code>crate-type</code> field includes any type that LTO is not allowed, LTO will be skipped for all the libraries generated (https://github.com/rust-lang/rust/issues/51009).
-For example, if you have <code>crate-type = [&quot;cdylib&quot;, &quot;rlib&quot;]</code> and cargo cannot do LTO for <code>rlib</code>, LTO will be skipped for <code>cdylib</code> as well.
+For example, if you have <code>crate-type = ["cdylib", "rlib"]</code> and cargo cannot do LTO for <code>rlib</code>, LTO will be skipped for <code>cdylib</code> as well.
 So only keep the crate type that you actually need in the <code>crate-type</code> field.</li>
 </ol>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="optimizing-allocation"><a class="header" href="#optimizing-allocation">Optimizing Allocation</a></h1>

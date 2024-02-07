@@ -183,13 +183,13 @@
 <p>In principle, a port to MMTk is not particularly difficult.
 MMTk can present itself as a standard library and the core of the API is relatively simple.</p>
 <p>However, porting a runtime to a different GC (any GC) can be difficult and time consuming.
-Key questions include: </p>
+Key questions include:</p>
 <ul>
-<li>How well encapsulated is the runtime's existing collector? </li>
+<li>How well encapsulated is the runtime's existing collector?</li>
 <li>Does the runtime make tacit assumptions about the underlying collector's implementation?</li>
 <li>How many places in the runtime codebase reference some part of the GC?</li>
 <li>If the runtime has a JIT, how good is the interface between the JIT and the GC (for write barriers and allocations, for example)?</li>
-<li>Does the runtime support precise stack scanning? </li>
+<li>Does the runtime support precise stack scanning?</li>
 <li>etc.</li>
 </ul>
 <p>Thinking through these questions should give you a sense for how big a task a GC port will be.</p>
