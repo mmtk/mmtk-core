@@ -2,12 +2,24 @@ use criterion::Criterion;
 
 use mmtk::memory_manager;
 use mmtk::util::test_util::fixtures::*;
+use mmtk::util::test_util::mock_method::*;
+use mmtk::util::test_util::mock_vm::{write_mockvm, MockVM};
 use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
-    // Disable GC so we won't trigger GC
+    // Setting a larger heap, although the GC should be disabled in the MockVM
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
-    memory_manager::disable_collection(fixture.mmtk());
+    {
+        write_mockvm(|mock| {
+            *mock = {
+                MockVM {
+                    is_collection_enabled: MockMethod::new_fixed(Box::new(|_| false)),
+                    ..MockVM::default()
+                }
+            }
+        });
+    }
+
     c.bench_function("alloc", |b| {
         b.iter(|| {
             let _addr =
