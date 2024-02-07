@@ -104,10 +104,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 false
             }
         });
+    }
 
-        self.worker_group.wait_until_worker_exited();
+    /// Surrender the `GCWorker` struct of a GC worker when it exits.
+    pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
+        let all_surrendered = self.worker_group.return_gc_worker_struct(worker);
 
-        self.worker_monitor.on_all_workers_exited();
+        if all_surrendered {
+            debug!("All {} workers surrendered.", self.worker_group.worker_count());
+            self.worker_monitor.on_all_workers_exited();
+        }
     }
 
     /// Respawn GC threads after forking.

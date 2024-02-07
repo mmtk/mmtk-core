@@ -477,7 +477,7 @@ pub fn start_worker<VM: VMBinding>(
     mut worker: Box<GCWorker<VM>>,
 ) {
     worker.run(tls, mmtk);
-    mmtk.scheduler.worker_group.surrender_gc_worker(worker);
+    mmtk.scheduler.surrender_gc_worker(worker);
 }
 
 /// Initialize the GC worker threads that are required for doing garbage collections.
