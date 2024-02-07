@@ -13,9 +13,6 @@ use std::sync::Mutex;
 pub struct GlobalState {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub(crate) initialized: AtomicBool,
-    /// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow
-    /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
-    pub(crate) trigger_gc_when_heap_is_full: AtomicBool,
     /// The current GC status.
     pub(crate) gc_status: Mutex<GcStatus>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
@@ -52,11 +49,6 @@ impl GlobalState {
     /// Is MMTk initialized?
     pub fn is_initialized(&self) -> bool {
         self.initialized.load(Ordering::SeqCst)
-    }
-
-    /// Should MMTK trigger GC when heap is full? If GC is disabled, we wont trigger GC even if the heap is full.
-    pub fn should_trigger_gc_when_heap_is_full(&self) -> bool {
-        self.trigger_gc_when_heap_is_full.load(Ordering::SeqCst)
     }
 
     /// Set the collection kind for the current GC. This is called before
@@ -202,7 +194,6 @@ impl Default for GlobalState {
     fn default() -> Self {
         Self {
             initialized: AtomicBool::new(false),
-            trigger_gc_when_heap_is_full: AtomicBool::new(true),
             gc_status: Mutex::new(GcStatus::NotInGC),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),

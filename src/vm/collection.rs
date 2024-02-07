@@ -139,4 +139,23 @@ pub trait Collection<VM: VMBinding> {
         // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
         0
     }
+
+    /// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
+    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
+    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
+    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
+    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
+    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
+    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
+    /// to have GC always enabled (i.e. that this method always returns true). However, we support
+    /// this to accomodate some VMs that require this behavior. Note that
+    /// `handle_user_collection_request()` calls this function, too.  If this function returns
+    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
+    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
+    fn is_collection_enabled() -> bool {
+        // By default, MMTk assumes that collections are always enabled, and the binding should define
+        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
+        // initialization is done, such as initializing class metadata for scanning objects.
+        true
+    }
 }

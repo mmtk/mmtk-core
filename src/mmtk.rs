@@ -318,7 +318,7 @@ impl<VM: VMBinding> MMTK<VM> {
             return;
         }
 
-        if force || !*self.options.ignore_system_gc {
+        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
             info!("User triggering collection");
             if exhaustive {
                 if let Some(gen) = self.get_plan().generational() {
