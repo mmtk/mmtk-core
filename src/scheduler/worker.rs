@@ -198,10 +198,9 @@ impl<VM: VMBinding> GCWorker<VM> {
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
         debug!(
-            "Worker started. PID: {}, tid: {}, ordinal: {}",
-            unsafe { libc::getpid() },
-            unsafe { libc::gettid() },
-            self.ordinal
+            "Worker started. ordinal: {}, {}",
+            self.ordinal,
+            crate::util::rust_util::debug_process_thread_id(),
         );
         WORKER_ORDINAL.with(|x| x.store(self.ordinal, Ordering::SeqCst));
         self.scheduler.resolve_affinity(self.ordinal);
@@ -235,10 +234,9 @@ impl<VM: VMBinding> GCWorker<VM> {
             work.do_work_with_stat(self, mmtk);
         }
         debug!(
-            "Worker exiting. PID: {}, tid: {}, ordinal: {}",
-            unsafe { libc::getpid() },
-            unsafe { libc::gettid() },
-            self.ordinal
+            "Worker exiting. ordinal: {}, {}",
+            self.ordinal,
+            crate::util::rust_util::debug_process_thread_id(),
         );
         probe!(mmtk, gcworker_exit);
     }
@@ -332,7 +330,10 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
     /// Spawn all the worker threads
     pub fn spawn(&self, tls: VMThread) {
-        debug!("Spawning GC workers.  PID: {}", unsafe { libc::getpid() });
+        debug!(
+            "Spawning GC workers.  {}",
+            crate::util::rust_util::debug_process_thread_id(),
+        );
         let mut state = self.state.lock().unwrap();
 
         let WorkerCreationState::Resting { ref mut suspended_workers } = *state else {
@@ -347,9 +348,9 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         *state = WorkerCreationState::Spawned;
 
         debug!(
-            "Spawned {} worker threads.  PID: {}",
+            "Spawned {} worker threads.  {}",
             self.worker_count(),
-            unsafe { libc::getpid() }
+            crate::util::rust_util::debug_process_thread_id(),
         );
     }
 
