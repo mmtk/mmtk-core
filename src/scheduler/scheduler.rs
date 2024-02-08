@@ -99,8 +99,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.prepare_surrender_buffer();
 
         debug!("A mutator is requesting GC threads to stop for forking...");
-        self.worker_monitor
-            .make_request(|requests| requests.stop_for_fork.set());
+        self.worker_monitor.make_request(WorkerGoal::StopForFork);
     }
 
     /// Surrender the `GCWorker` struct of a GC worker when it exits.
@@ -130,8 +129,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
     pub(crate) fn request_schedule_collection(&self) {
         debug!("A mutator is sending GC-scheduling request to workers...");
-        self.worker_monitor
-            .make_request(|requests| requests.gc.set());
+        self.worker_monitor.make_request(WorkerGoal::Gc);
     }
 
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
@@ -417,19 +415,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Called when the last worker parked.
     /// `should_schedule_gc` is true if a mutator requested a GC.
     fn on_last_parked(&self, worker: &GCWorker<VM>, goals: &mut WorkerGoals) -> LastParkedResult {
-        let Some(ref current_goal) = goals.current else {
+        let Some(ref current_goal) = goals.current() else {
             // There is no goal.  Find a request to respond to.
-            return self.respond_to_requests(goals);
+            return self.respond_to_requests(worker, goals);
         };
 
         match current_goal {
-            WorkerGoal::Gc { start_time } => {
+            WorkerGoal::Gc => {
                 // We are in the progress of GC.
 
                 // In stop-the-world GC, mutators cannot request for GC while GC is in progress.
                 // When we support concurrent GC, we should remove this assertion.
                 assert!(
-                    !goals.requests.gc.debug_is_set(),
+                    !goals.debug_is_requested(WorkerGoal::Gc),
                     "GC request sent to WorkerMonitor while GC is still in progress."
                 );
 
@@ -446,11 +444,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     LastParkedResult::WakeAll
                 } else {
                     // GC finished.
-                    self.on_gc_finished(worker, start_time);
+                    self.on_gc_finished(worker);
 
                     // Clear the current goal
-                    goals.current = None;
-                    self.respond_to_requests(goals)
+                    goals.on_current_goal_completed();
+                    self.respond_to_requests(worker, goals)
                 }
             }
             WorkerGoal::StopForFork => {
@@ -461,33 +459,40 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Respond to a worker reqeust.
-    fn respond_to_requests(&self, goals: &mut WorkerGoals) -> LastParkedResult {
-        assert!(goals.current.is_none());
+    fn respond_to_requests(
+        &self,
+        worker: &GCWorker<VM>,
+        goals: &mut WorkerGoals,
+    ) -> LastParkedResult {
+        assert!(goals.current().is_none());
 
-        if goals.requests.gc.poll() {
-            trace!("A mutator requested a GC to be scheduled.");
+        let Some(goal) = goals.poll_next_goal() else {
+            // No reqeusts.  Park this worker, too.
+            return LastParkedResult::ParkSelf;
+        };
 
-            // We set the eBPF trace point here so that bpftrace scripts can start recording work
-            // packet events before the `ScheduleCollection` work packet starts.
-            probe!(mmtk, gc_start);
+        match goal {
+            WorkerGoal::Gc => {
+                trace!("A mutator requested a GC to be scheduled.");
 
-            goals.current = Some(WorkerGoal::Gc {
-                start_time: Instant::now(),
-            });
+                // We set the eBPF trace point here so that bpftrace scripts can start recording
+                // work packet events before the `ScheduleCollection` work packet starts.
+                probe!(mmtk, gc_start);
 
-            self.add_schedule_collection_packet();
-            return LastParkedResult::WakeSelf;
+                {
+                    let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+                    assert!(gc_start_time.is_none(), "GC already started?");
+                    *gc_start_time = Some(Instant::now());
+                }
+
+                self.add_schedule_collection_packet();
+                LastParkedResult::WakeSelf
+            }
+            WorkerGoal::StopForFork => {
+                trace!("A mutator wanted to fork.");
+                LastParkedResult::WakeAll
+            }
         }
-
-        if goals.requests.stop_for_fork.poll() {
-            trace!("A mutator wanted to fork.");
-
-            goals.current = Some(WorkerGoal::StopForFork);
-            return LastParkedResult::WakeAll;
-        }
-
-        // No reqeusts.  Park this worker, too.
-        LastParkedResult::ParkSelf
     }
 
     /// Find more work for workers to do.  Return true if more work is available.
@@ -515,7 +520,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
     /// Return `true` if it scheduled the next GC immediately.
-    fn on_gc_finished(&self, worker: &GCWorker<VM>, start_time: &Instant) {
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());
         debug_assert!(self.all_buckets_empty());
@@ -530,6 +535,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
 
         // Compute the elapsed time of the GC.
+        let start_time = {
+            let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+            gc_start_time.take().expect("GC not started yet?")
+        };
         let elapsed = start_time.elapsed();
 
         info!(

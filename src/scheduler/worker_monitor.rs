@@ -9,7 +9,7 @@ use std::sync::{Condvar, Mutex};
 use crate::vm::VMBinding;
 
 use super::{
-    worker_goals::{WorkerGoal, WorkerGoals, WorkerRequests},
+    worker_goals::{WorkerGoal, WorkerGoals},
     GCWorker,
 };
 
@@ -97,21 +97,12 @@ impl WorkerMonitor {
         }
     }
 
-    /// Make a request.  The `callback` will be called while holding the mutex `self.sync` so that
-    /// the caller can set some of its fields to true.
-    ///
-    /// The `callback` has one parameter:
-    ///
-    /// -   a mutable reference to the `WorkerRequests` instance.
-    ///
-    /// The `callback` should return `true` if it set any field of `WorkerRequests` to true.
-    pub fn make_request<Callback>(&self, callback: Callback)
-    where
-        Callback: FnOnce(&mut WorkerRequests) -> bool,
-    {
+    /// Make a request.  Can be called by a mutator to request the workers to work towards the
+    /// given `goal`.
+    pub fn make_request(&self, goal: WorkerGoal) {
         let mut guard = self.sync.lock().unwrap();
-        let set_any_fields = callback(&mut guard.goals.requests);
-        if set_any_fields {
+        let newly_requested = guard.goals.set_request(goal);
+        if newly_requested {
             self.notify_work_available(false);
         }
     }
@@ -236,12 +227,12 @@ impl WorkerMonitor {
         );
 
         // If the current goal is `StopForFork`, return true so that the worker thread will exit.
-        matches!(sync.goals.current, Some(WorkerGoal::StopForFork))
+        matches!(sync.goals.current(), Some(WorkerGoal::StopForFork))
     }
 
     /// Called when all workers have exited.
     pub fn on_all_workers_exited(&self) {
         let mut sync = self.sync.try_lock().unwrap();
-        sync.goals.current = None;
+        sync.goals.on_current_goal_completed();
     }
 }

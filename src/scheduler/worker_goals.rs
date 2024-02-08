@@ -7,79 +7,72 @@
 //!
 //! -   When in the progress of GC, the last parker will try to open buckets or announce the GC
 //!     has finished.
-//! -   When stopping for fork, every worker should exit when waken.
+//! -   When stopping for fork, every waken worker should save its thread state (giving in the
+//!     `GCWorker` struct) and exit.
 //!
-//! The struct `WorkerRequests` keeps a list of requests from mutators, such as requests for GC
-//! and requests for forking.  But the GC workers will only respond to one request at a time.
+//! The struct `WorkerGoals` keeps the set of goals requested by mutators, but GC workers will only
+//! respond to one request at a time, and will favor higher-priority goals.
 
-use std::time::Instant;
+use enum_map::{Enum, EnumMap};
 
 /// This current and reqeusted goals.
 #[derive(Default, Debug)]
 pub(crate) struct WorkerGoals {
-    /// What are the workers doing now?
-    pub(crate) current: Option<WorkerGoal>,
-    /// Requests received from mutators.
-    pub(crate) requests: WorkerRequests,
+    /// The current goal.
+    current: Option<WorkerGoal>,
+    /// Requests received from mutators.  `requests[goal]` is true if the `goal` is requested.
+    requests: EnumMap<WorkerGoal, bool>,
 }
 
-/// The thing workers are currently doing.  This affects several things, such as what the last
-/// parked worker will do, and whether workers will stop themselves.
-#[derive(Debug)]
+/// A goal, i.e. something that workers should work together to achieve.
+///
+/// Members of this `enum` should be listed from the highest priority to the lowest priority.
+#[derive(Debug, Enum, Clone, Copy)]
 pub(crate) enum WorkerGoal {
-    Gc {
-        start_time: Instant,
-    },
-    #[allow(unused)] // TODO: Implement forking support later.
+    /// Do a garbage collection.
+    Gc,
+    /// Stop all GC threads so that the VM can call `fork()`.
     StopForFork,
 }
 
-/// Reqeusts received from mutators.  Workers respond to those requests when they do not have a
-/// current goal.  Multiple things can be requested at the same time, and workers respond to the
-/// thing with the highest priority.
-///
-/// The fields of this structs are ordered with decreasing priority.
-#[derive(Default, Debug)]
-pub(crate) struct WorkerRequests {
-    /// The VM needs to fork.  Workers should save their contexts and exit.
-    pub(crate) stop_for_fork: WorkerRequest,
-    /// GC is requested.  Workers should schedule a GC.
-    pub(crate) gc: WorkerRequest,
-}
-
-/// To record whether a specific goal has been reqeuested.
-/// It is basically a wrapper of `bool`, but forces it to be accessed in a particular way.
-#[derive(Default, Debug)] // Default: False by default.
-pub(crate) struct WorkerRequest {
-    /// True if the goal has been requested.
-    requested: bool,
-}
-
-impl WorkerRequest {
-    /// Set the goal as requested.  Return `true` if its requested state changed from `false` to
-    /// `true`.
-    pub fn set(&mut self) -> bool {
-        if !self.requested {
-            self.requested = true;
+impl WorkerGoals {
+    /// Set the `goal` as requested.  Return `true` if the requested state of the `goal` changed
+    /// from `false` to `true`.
+    pub fn set_request(&mut self, goal: WorkerGoal) -> bool {
+        if !self.requests[goal] {
+            self.requests[goal] = true;
             true
         } else {
             false
         }
     }
 
-    /// Get the requested state and clear it.  Return `true` if the requested state was `true`.
-    pub fn poll(&mut self) -> bool {
-        if self.requested {
-            self.requested = false;
-            true
-        } else {
-            false
+    /// Move the highest priority goal from the pending requests to the current request.  Return
+    /// that goal, or `None` if no goal has been requested.
+    pub fn poll_next_goal(&mut self) -> Option<WorkerGoal> {
+        for (goal, requested) in self.requests.iter_mut() {
+            if *requested {
+                *requested = false;
+                self.current = Some(goal);
+                return Some(goal);
+            }
         }
+        None
     }
 
-    /// Test if the request is set.  For debug only.  The last parked worker should use `poll` to
-    /// get the state and clear it.
-    pub fn debug_is_set(&self) -> bool {
-        self.requested
+    /// Get the current goal if exists.
+    pub fn current(&self) -> Option<WorkerGoal> {
+        self.current
+    }
+
+    /// Called when the current goal is completed.  This will clear the current goal.
+    pub fn on_current_goal_completed(&mut self) {
+        self.current = None
+    }
+
+    /// Test if the given `goal` is requested.  Used for debug purpose, only.  The workers always
+    /// respond to the request of the highest priority first.
+    pub fn debug_is_requested(&self, goal: WorkerGoal) -> bool {
+        self.requests[goal]
     }
 }
