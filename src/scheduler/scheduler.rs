@@ -111,7 +111,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let all_surrendered = self.worker_group.return_gc_worker_struct(worker);
 
         if all_surrendered {
-            debug!("All {} workers surrendered.", self.worker_group.worker_count());
+            debug!(
+                "All {} workers surrendered.",
+                self.worker_group.worker_count()
+            );
             self.worker_monitor.on_all_workers_exited();
         }
     }
