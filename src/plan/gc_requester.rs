@@ -28,8 +28,8 @@ impl<VM: VMBinding> GCRequester<VM> {
 
         if !self.request_flag.swap(true, Ordering::Relaxed) {
             // `GCWorkScheduler::request_schedule_collection` needs to hold a mutex to communicate
-            // with GC workers, so only the first mutator that changed the `request_flag` to `true`
-            // shall do it.
+            // with GC workers, which is expensive for functions like `poll`.  We use the atomic
+            // flag `request_flag` to elide the need to acquire the mutex in subsequent calls.
             self.scheduler.request_schedule_collection();
         }
     }

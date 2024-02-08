@@ -26,7 +26,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Workers
     pub(crate) worker_group: Arc<WorkerGroup<VM>>,
-    /// Monitor for worker synchronization, including a mutex and conditional variables.
+    /// For synchronized communication between workers and with mutators.
     pub(crate) worker_monitor: Arc<WorkerMonitor>,
     /// How to assign the affinity of each GC thread. Specified by the user.
     affinity: AffinityKind,
@@ -85,25 +85,22 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.as_ref().worker_count()
     }
 
-    /// Create GC threads, including all workers,  for the first time.
+    /// Create GC threads for the first time.  It will also create the `GCWorker` instances.
+    ///
+    /// Currently GC threads only include worker threads, and we currently have only one worker
+    /// group.  We may add more worker groups in the future.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
         self.worker_group.create_workers(mmtk);
         self.worker_group.spawn(tls)
     }
 
-    /// Ask all GC workers to exit for forking, and wait until all workers exited.
+    /// Ask all GC workers to exit for forking.
     pub fn stop_gc_threads_for_forking(self: &Arc<Self>) {
         self.worker_group.prepare_surrender_buffer();
 
         debug!("A mutator is requesting GC threads to stop for forking...");
-        self.worker_monitor.make_request(|requests| {
-            if !requests.stop_for_fork {
-                requests.stop_for_fork = true;
-                true
-            } else {
-                false
-            }
-        });
+        self.worker_monitor
+            .make_request(|requests| requests.stop_for_fork.set());
     }
 
     /// Surrender the `GCWorker` struct of a GC worker when it exits.
@@ -119,7 +116,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
     }
 
-    /// Respawn GC threads after forking.
+    /// Respawn GC threads after forking.  This will reuse the `GCWorker` instances of stopped
+    /// workers.
     pub fn respawn_gc_threads_after_forking(self: &Arc<Self>, tls: VMThread) {
         self.worker_group.spawn(tls)
     }
@@ -132,14 +130,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
     pub(crate) fn request_schedule_collection(&self) {
         debug!("A mutator is sending GC-scheduling request to workers...");
-        self.worker_monitor.make_request(|requests| {
-            if !requests.gc {
-                requests.gc = true;
-                true
-            } else {
-                false
-            }
-        });
+        self.worker_monitor
+            .make_request(|requests| requests.gc.set());
     }
 
     /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
@@ -437,7 +429,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 // In stop-the-world GC, mutators cannot request for GC while GC is in progress.
                 // When we support concurrent GC, we should remove this assertion.
                 assert!(
-                    !goals.requests.gc,
+                    !goals.requests.gc.debug_is_set(),
                     "GC request sent to WorkerMonitor while GC is still in progress."
                 );
 
@@ -472,9 +464,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     fn respond_to_requests(&self, goals: &mut WorkerGoals) -> LastParkedResult {
         assert!(goals.current.is_none());
 
-        if goals.requests.gc {
+        if goals.requests.gc.poll() {
             trace!("A mutator requested a GC to be scheduled.");
-            goals.requests.gc = false;
 
             // We set the eBPF trace point here so that bpftrace scripts can start recording work
             // packet events before the `ScheduleCollection` work packet starts.
@@ -488,9 +479,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             return LastParkedResult::WakeSelf;
         }
 
-        if goals.requests.stop_for_fork {
+        if goals.requests.stop_for_fork.poll() {
             trace!("A mutator wanted to fork.");
-            goals.requests.stop_for_fork = false;
 
             goals.current = Some(WorkerGoal::StopForFork);
             return LastParkedResult::WakeAll;

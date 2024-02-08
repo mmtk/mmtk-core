@@ -258,7 +258,8 @@ impl<VM: VMBinding> MMTK<VM> {
     /// [`crate::memory_manager::start_worker`].
     ///
     /// A subsequent call to `MMTK::after_fork()` will re-spawn the threads using their saved
-    /// contexts.
+    /// contexts.  The VM must not allocate objects in the MMTk heap before calling
+    /// `MMTK::after_fork()`.
     ///
     /// # Caution!
     ///
