@@ -43,7 +43,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                     conversions::bytes_to_pages_up(min),
                     conversions::bytes_to_pages_up(max),
                 )),
-                GCTriggerSelector::Delegated => unimplemented!(),
+                GCTriggerSelector::Delegated => <VM::VMCollection as crate::vm::Collection<VM>>::create_gc_trigger().unwrap(),
             },
             options,
             gc_requester,
