@@ -18,6 +18,7 @@ use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
 use crate::vm::VMBinding;
 use crate::Mutator;
+use crate::util::heap::gc_trigger::GCTriggerPolicy;
 
 use super::mock_method::*;
 
@@ -205,6 +206,7 @@ pub struct MockVM {
     pub post_forwarding: MockMethod<VMWorkerThread, ()>,
     pub vm_live_bytes: MockMethod<(), usize>,
     pub is_collection_enabled: MockMethod<(), bool>,
+    pub create_gc_trigger: MockMethod<(), Option<Box<dyn GCTriggerPolicy<MockVM>>>>,
     // object model
     pub copy_object: MockMethod<
         (
@@ -282,6 +284,7 @@ impl Default for MockVM {
             post_forwarding: MockMethod::new_default(),
             vm_live_bytes: MockMethod::new_default(),
             is_collection_enabled: MockMethod::new_fixed(Box::new(|_| true)),
+            create_gc_trigger: MockMethod::new_unimplemented(),
 
             copy_object: MockMethod::new_unimplemented(),
             copy_object_to: MockMethod::new_unimplemented(),
@@ -458,6 +461,10 @@ impl crate::vm::Collection<MockVM> for MockVM {
 
     fn vm_live_bytes() -> usize {
         mock!(vm_live_bytes())
+    }
+
+    fn create_gc_trigger() -> Option<Box<dyn GCTriggerPolicy<MockVM>>> {
+        mock!(create_gc_trigger())
     }
 }
 
