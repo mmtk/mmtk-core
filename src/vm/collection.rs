@@ -160,7 +160,9 @@ pub trait Collection<VM: VMBinding> {
         true
     }
 
-    fn create_gc_trigger() -> Option<Box<dyn GCTriggerPolicy<VM>>> {
+    /// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+    /// `crate::util::options::GCTriggerSelector::Delegated`.
+    fn create_gc_trigger() -> Box<dyn GCTriggerPolicy<VM>> {
         unimplemented!()
     }
 }

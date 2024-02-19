@@ -8,6 +8,7 @@ use crate::scheduler::gc_work::SFTProcessEdges;
 use crate::scheduler::*;
 use crate::util::alloc::AllocationError;
 use crate::util::copy::*;
+use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::specs::*;
@@ -18,7 +19,6 @@ use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
 use crate::vm::VMBinding;
 use crate::Mutator;
-use crate::util::heap::gc_trigger::GCTriggerPolicy;
 
 use super::mock_method::*;
 
