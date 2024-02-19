@@ -206,7 +206,7 @@ pub struct MockVM {
     pub post_forwarding: MockMethod<VMWorkerThread, ()>,
     pub vm_live_bytes: MockMethod<(), usize>,
     pub is_collection_enabled: MockMethod<(), bool>,
-    pub create_gc_trigger: MockMethod<(), Option<Box<dyn GCTriggerPolicy<MockVM>>>>,
+    pub create_gc_trigger: MockMethod<(), Box<dyn GCTriggerPolicy<MockVM>>>,
     // object model
     pub copy_object: MockMethod<
         (
@@ -463,7 +463,7 @@ impl crate::vm::Collection<MockVM> for MockVM {
         mock!(vm_live_bytes())
     }
 
-    fn create_gc_trigger() -> Option<Box<dyn GCTriggerPolicy<MockVM>>> {
+    fn create_gc_trigger() -> Box<dyn GCTriggerPolicy<MockVM>> {
         mock!(create_gc_trigger())
     }
 }
