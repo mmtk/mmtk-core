@@ -251,10 +251,6 @@ pub(crate) fn get_system_total_memory() -> u64 {
     sys.total_memory()
 }
 
-pub(crate) fn get_system_constrained_memory() -> u64 {
-    unimplemented!()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
