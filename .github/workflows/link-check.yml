@@ -1,0 +1,30 @@
+name: Check broken links in docs
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  check-broken-links-in-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Restore lychee cache
+        uses: actions/cache@v3
+        with:
+            path: .lycheecache
+            key: cache-lychee-${{ github.sha }}
+            restore-keys: cache-lychee-
+      - name: Check links in docs/*.md
+        uses: lycheeverse/lychee-action@v1.9.0
+        with:
+          fail: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --base docs --accept '200,201,202,203,204,429,500' --no-progress --cache --max-cache-age 1d './docs/**/*.md' --exclude https://users.cecs.anu.edu.au/~steveb/pubs/papers/**
+      - name: Save lychee cache
+        uses: actions/cache/save@v3
+        if: always()
+        with:
+            path: .lycheecache
+            key: ${{ steps.restore-cache.outputs.cache-primary-key }}
