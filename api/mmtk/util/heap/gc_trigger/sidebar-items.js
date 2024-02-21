@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["FixedHeapSizeTrigger","GCTrigger","MemBalancerStats","MemBalancerTrigger"],"trait":["GCTriggerPolicy"]};
+window.SIDEBAR_ITEMS = {"struct":["FixedHeapSizeTrigger","GCTrigger","MemBalancerStats","MemBalancerTrigger","SpaceStats"],"trait":["GCTriggerPolicy"]};

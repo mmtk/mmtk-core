@@ -365,6 +365,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopyConfig;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::statistics::counter::EventCounter;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
@@ -493,14 +494,13 @@
             .store(next_gc_full_heap, Ordering::Relaxed);
     }
 
-    <span class="kw">fn </span>collection_required(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        space_full: bool,
-        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span><span class="kw">crate</span>::policy::space::Space&lt;<span class="self">Self</span>::VM&gt;&gt;,
-    ) -&gt; bool {
+    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
         <span class="kw">let </span>nursery_full =
             <span class="self">self</span>.immix.immix_space.get_pages_allocated() &gt; <span class="self">self</span>.options().get_max_nursery_pages();
-        <span class="kw">if </span>space_full &amp;&amp; space.is_some() &amp;&amp; space.unwrap().name() != <span class="self">self</span>.immix.immix_space.name() {
+        <span class="kw">if </span>space_full
+            &amp;&amp; space.is_some()
+            &amp;&amp; space.as_ref().unwrap().<span class="number">0</span>.name() != <span class="self">self</span>.immix.immix_space.name()
+        {
             <span class="self">self</span>.next_gc_full_heap.store(<span class="bool-val">true</span>, Ordering::SeqCst);
         }
         <span class="self">self</span>.immix.collection_required(space_full, space) || nursery_full

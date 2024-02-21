@@ -260,6 +260,7 @@
 <a href="#260" id="260">260</a>
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -279,6 +280,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -352,7 +354,7 @@
             )
     }
 
-    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool
+    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool
     <span class="kw">where
         </span><span class="self">Self</span>: Sized,
     {

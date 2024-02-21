@@ -209,6 +209,7 @@
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
@@ -226,6 +227,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="attr">#[cfg(not(feature = <span class="string">&quot;vo_bit&quot;</span>))]
@@ -370,7 +372,7 @@
             .add(<span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC::&lt;<span class="self">Self</span>&gt;::new(<span class="self">self</span>));
     }
 
-    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, _space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
+    <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, _space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
         <span class="self">self</span>.base().collection_required(<span class="self">self</span>, space_full)
     }
 

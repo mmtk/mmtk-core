@@ -340,6 +340,7 @@
 <a href="#340" id="340">340</a>
 <a href="#341" id="341">341</a>
 <a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -348,6 +349,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::VMRequest;
 <span class="kw">use </span><span class="kw">crate</span>::util::statistics::counter::EventCounter;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -440,7 +442,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         plan: <span class="kw-2">&amp;</span>P,
         space_full: bool,
-        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
+        space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;VM&gt;&gt;,
     ) -&gt; bool {
         <span class="kw">let </span>cur_nursery = <span class="self">self</span>.nursery.reserved_pages();
         <span class="kw">let </span>max_nursery = <span class="self">self</span>.common.base.options.get_max_nursery_pages();
@@ -462,7 +464,7 @@
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
         </span><span class="kw">let </span>is_triggered_by_nursery = space.map_or(<span class="bool-val">false</span>, |s| {
-            s.common().descriptor == <span class="self">self</span>.nursery.common().descriptor
+            s.<span class="number">0</span>.common().descriptor == <span class="self">self</span>.nursery.common().descriptor
         });
         <span class="comment">// If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         </span><span class="kw">if </span>space_full &amp;&amp; !is_triggered_by_nursery {

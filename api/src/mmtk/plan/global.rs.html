@@ -741,6 +741,7 @@
 <a href="#741" id="741">741</a>
 <a href="#742" id="742">742</a>
 <a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
@@ -757,6 +758,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::{CopyConfig, GCWorkerCopyContext};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::SpaceStats;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::HeapMeta;
@@ -956,7 +958,7 @@
     /// # Arguments
     /// * `space_full`: the allocation to a specific space failed, must recover pages within &#39;space&#39;.
     /// * `space`: an option to indicate if there is a space that has failed in an allocation.
-    </span><span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool;
+    </span><span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool;
 
     <span class="comment">// Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods

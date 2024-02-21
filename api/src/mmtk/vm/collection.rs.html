@@ -159,7 +159,15 @@
 <a href="#159" id="159">159</a>
 <a href="#160" id="160">160</a>
 <a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
+<span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTriggerPolicy;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use crate</span>::{scheduler::<span class="kw-2">*</span>, Mutator};
@@ -319,5 +327,11 @@
         // initialization is done, such as initializing class metadata for scanning objects.
         </span><span class="bool-val">true
     </span>}
+
+    <span class="doccomment">/// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+    /// `crate::util::options::GCTriggerSelector::Delegated`.
+    </span><span class="kw">fn </span>create_gc_trigger() -&gt; Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt; {
+        <span class="macro">unimplemented!</span>()
+    }
 }
 </code></pre></div></section></main></body></html>

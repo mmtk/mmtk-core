@@ -367,6 +367,11 @@
 <a href="#367" id="367">367</a>
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::global_state::{GcStatus, GlobalState};
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
@@ -666,6 +671,11 @@
     /// [java-soft-ref]: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/ref/SoftReference.html
     </span><span class="kw">pub fn </span>is_emergency_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.state.is_emergency_collection()
+    }
+
+    <span class="doccomment">/// Return true if the current GC is trigger manually by the user/binding.
+    </span><span class="kw">pub fn </span>is_user_triggered_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.state.is_user_triggered_collection()
     }
 
     <span class="doccomment">/// The application code has requested a collection. This is just a GC hint, and
