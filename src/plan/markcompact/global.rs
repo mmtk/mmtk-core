@@ -15,6 +15,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 #[cfg(not(feature = "vo_bit"))]
@@ -159,7 +160,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
 

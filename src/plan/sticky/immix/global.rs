@@ -10,6 +10,7 @@ use crate::policy::space::Space;
 use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
@@ -138,14 +139,13 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             .store(next_gc_full_heap, Ordering::Relaxed);
     }
 
-    fn collection_required(
-        &self,
-        space_full: bool,
-        space: Option<&dyn crate::policy::space::Space<Self::VM>>,
-    ) -> bool {
+    fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
         let nursery_full =
             self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
-        if space_full && space.is_some() && space.unwrap().name() != self.immix.immix_space.name() {
+        if space_full
+            && space.is_some()
+            && space.as_ref().unwrap().0.name() != self.immix.immix_space.name()
+        {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
         self.immix.collection_required(space_full, space) || nursery_full
