@@ -43,7 +43,13 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             args.get_space_args(
                 "nursery",
                 true,
-                VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), false),
+                VMRequest::fixed_extent(
+                    args.global_args
+                        .options
+                        .nursery
+                        .estimate_virtual_memory_in_pages(),
+                    false,
+                ),
             ),
             true,
         );
@@ -102,7 +108,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         space: Option<SpaceStats<VM>>,
     ) -> bool {
         let cur_nursery = self.nursery.reserved_pages();
-        let max_nursery = self.common.base.options.get_max_nursery_pages();
+        let max_nursery = self.common.base.gc_trigger.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
         trace!(
             "nursery_full = {:?} (nursery = {}, max_nursery = {})",
@@ -261,7 +267,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
         let available = plan.get_available_pages();
-        let min_nursery = plan.base().options.get_min_nursery_pages();
+        let min_nursery = plan.base().gc_trigger.get_min_nursery_pages();
         let next_gc_full_heap = available < min_nursery;
         trace!(
             "next gc will be full heap? {}, available pages = {}, min nursery = {}",
