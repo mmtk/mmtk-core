@@ -49,11 +49,11 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
     ///
     /// If the slot is not holding an object reference (For example, if it is holding NULL or a
     /// tagged non-reference value.  See trait-level doc comment.), this method should return
-    /// `ObjectReference::NULL`.
+    /// `None`.
     ///
     /// If the slot holds an object reference with tag bits, the returned value shall be the object
     /// reference with the tag bits removed.
-    fn load(&self) -> ObjectReference;
+    fn load(&self) -> Option<ObjectReference>;
 
     /// Store the object reference `object` into the slot.
     ///
@@ -83,12 +83,14 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
     }
 }
 
-/// A simple edge implementation that represents a word-sized slot where an ObjectReference value
-/// is stored as is.  It is the default edge type, and should be suitable for most VMs.
+/// A simple edge implementation that represents a word-sized slot which holds the raw address of
+/// an `ObjectReference`, or 0 if it is holding a null reference.
+///
+/// It is the default edge type, and should be suitable for most VMs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct SimpleEdge {
-    slot_addr: *mut Atomic<ObjectReference>,
+    slot_addr: *mut Atomic<Address>,
 }
 
 impl SimpleEdge {
@@ -113,12 +115,13 @@ impl SimpleEdge {
 unsafe impl Send for SimpleEdge {}
 
 impl Edge for SimpleEdge {
-    fn load(&self) -> ObjectReference {
-        unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) }
+    fn load(&self) -> Option<ObjectReference> {
+        let addr = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
+        ObjectReference::from_raw_address(addr)
     }
 
     fn store(&self, object: ObjectReference) {
-        unsafe { (*self.slot_addr).store(object, atomic::Ordering::Relaxed) }
+        unsafe { (*self.slot_addr).store(object.to_raw_address(), atomic::Ordering::Relaxed) }
     }
 }
 
@@ -133,8 +136,9 @@ impl Edge for SimpleEdge {
 /// simply as an `ObjectReference`.  The intention and the semantics are clearer with
 /// `SimpleEdge`.
 impl Edge for Address {
-    fn load(&self) -> ObjectReference {
-        unsafe { Address::load(*self) }
+    fn load(&self) -> Option<ObjectReference> {
+        let addr = unsafe { Address::load(*self) };
+        ObjectReference::from_raw_address(addr)
     }
 
     fn store(&self, object: ObjectReference) {

@@ -16,7 +16,7 @@ impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
     fn visit_edge(&mut self, edge: ES) {
         #[cfg(debug_assertions)]
         trace!(
-            "(FunctionClosure) Visit edge {:?} (pointing to {})",
+            "(FunctionClosure) Visit edge {:?} (pointing to {:?})",
             edge,
             edge.load()
         );
