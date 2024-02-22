@@ -30,7 +30,7 @@
     - [Before Starting a Port](portingguide/before_start.md)
     - [How to Undertake a Port](portingguide/howto/prefix.md)
         - [NoGC](portingguide/howto/nogc.md)
-        - [Next Steps](portingguide/howto/next_steps.md)
+        - [Non-Moving GC](portingguide/howto/non_moving_gc.md)
     - [Debugging Tips](portingguide/debugging/prefix.md)
         - [Enabling Debug Assertions](portingguide/debugging/assertions.md)
     - [Performance Tuning](portingguide/perf_tuning/prefix.md)
