@@ -410,10 +410,20 @@ pub enum NurserySize {
     /// bound. Hence, it is considered to be a "variable size" nursery. By default, a Bounded
     /// nursery has a lower bound of 2 MB and an upper bound of 32 MB for 32-bit systems and 1 TB
     /// for 64-bit systems.
-    Bounded { min: usize, max: usize },
+    Bounded {
+        /// The lower bound of the nursery size in bytes. Default to [`DEFAULT_MIN_NURSERY`].
+        min: usize,
+        /// The upper bound of the nursery size in bytes. Default to [`DEFAULT_MAX_NURSERY`].
+        max: usize,
+    },
     /// A bounded nursery that is porportional to the current heap size. By default, a proportional bounded
     // nursery has a lower bound of 20% of the heap size, and has an upper bound of 100% of the heap size.
-    ProportionalBounded { min: f64, max: f64 },
+    ProportionalBounded {
+        /// The lower bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MIN_NURSERY`].
+        min: f64,
+        /// The upper bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MAX_NURSERY`].
+        max: f64,
+    },
     /// A Fixed nursery has the same upper and lower bounds. The size controls both the upper and
     /// lower bounds. Note that this is considered less performant than a Bounded nursery since a
     /// Fixed nursery size can be too restrictive and cause more GCs.
