@@ -7,6 +7,7 @@ use std::str::FromStr;
 use strum_macros::EnumString;
 
 use super::conversions;
+use super::heap::vm_layout::BYTES_IN_CHUNK;
 
 /// The default stress factor. This is set to the max usize,
 /// which means we will never trigger a stress GC for the default value.
@@ -432,7 +433,7 @@ pub enum NurserySize {
 
 impl NurserySize {
     /// Estimate the virtual memory needed for the nursery space. This is used during space creation.
-    pub fn estimate_virtual_memory_in_pages(&self) -> usize {
+    pub fn estimate_virtual_memory_in_bytes(&self) -> usize {
         let virtual_memory_bytes = match *self {
             NurserySize::Bounded { min: _, max } => max,
             // Just use the default max nursery size -- the nursery won't get larger than that.
@@ -440,7 +441,7 @@ impl NurserySize {
             NurserySize::ProportionalBounded { min: _, max: _ } => DEFAULT_MAX_NURSERY,
             NurserySize::Fixed(sz) => sz,
         };
-        conversions::bytes_to_pages_up(virtual_memory_bytes)
+        conversions::raw_align_up(virtual_memory_bytes, BYTES_IN_CHUNK)
     }
 
     /// Return true if the values are valid.

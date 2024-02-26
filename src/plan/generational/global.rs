@@ -47,7 +47,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
                     args.global_args
                         .options
                         .nursery
-                        .estimate_virtual_memory_in_pages(),
+                        .estimate_virtual_memory_in_bytes(),
                     false,
                 ),
             ),
