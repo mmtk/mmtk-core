@@ -98,9 +98,6 @@ impl FromStr for PerfEventOptions {
     }
 }
 
-/// The default nursery space size.
-#[cfg(target_pointer_width = "64")]
-pub const NURSERY_SIZE: usize = (1 << 20) << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "64")]
@@ -110,17 +107,16 @@ pub const DEFAULT_MIN_NURSERY: usize = 20 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "64")]
 pub const DEFAULT_MAX_NURSERY: usize = (1 << 20) << LOG_BYTES_IN_MBYTE;
 
-/// The default nursery space size.
-#[cfg(target_pointer_width = "32")]
-pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
+/// The default max nursery size for 32 bits.
+pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
-pub const DEFAULT_MAX_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
+pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
 /// The default min nursery size proportional to the current heap size
 pub const DEFAULT_PROPORTIONAL_MIN_NURSERY: f64 = 0.2;
@@ -437,8 +433,13 @@ impl NurserySize {
         let virtual_memory_bytes = match *self {
             NurserySize::Bounded { min: _, max } => max,
             // Just use the default max nursery size -- the nursery won't get larger than that.
-            // See get_max_nursery_bytes()
-            NurserySize::ProportionalBounded { min: _, max: _ } => DEFAULT_MAX_NURSERY,
+            NurserySize::ProportionalBounded { min: _, max: _ } => {
+                if !crate::util::heap::vm_layout::vm_layout().force_use_contiguous_spaces {
+                    DEFAULT_MAX_NURSERY_32
+                } else {
+                    DEFAULT_MAX_NURSERY
+                }
+            }
             NurserySize::Fixed(sz) => sz,
         };
         conversions::raw_align_up(virtual_memory_bytes, BYTES_IN_CHUNK)
