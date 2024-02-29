@@ -557,6 +557,19 @@ pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
 }
 
+/// Return the percentage of fragmentation of the immixspace (e.g. 42.98 percent). To do that we count the size of every live object
+/// in the immixspace. Since MMTk accounts for memory in pages, we return the ratio between this number and
+/// the number of used bytes (according to the used pages by the immixspace).
+/// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
+/// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
+#[cfg(feature = "count_live_bytes_immixspace")]
+pub fn fragmentation_rate_in_immixspace<VM: VMBinding>(mmtk: &MMTK<VM>) -> f64 {
+    mmtk.state
+        .fragmentation_rate_in_immixspace
+        .load(Ordering::SeqCst) as f64
+        / 100.0
+}
+
 /// Return the starting address of the heap. *Note that currently MMTk uses
 /// a fixed address range as heap.*
 pub fn starting_heap_address() -> Address {

@@ -43,6 +43,11 @@ pub struct GlobalState {
     /// This stores the size in bytes for all the live objects in last GC. This counter is only updated in the GC release phase.
     #[cfg(feature = "count_live_bytes_in_gc")]
     pub(crate) live_bytes_in_last_gc: AtomicUsize,
+    /// These keep track of the fragmentation rate in immixspace
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub(crate) live_bytes_in_immixspace: AtomicUsize,
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub(crate) fragmentation_rate_in_immixspace: AtomicUsize,
 }
 
 impl GlobalState {
@@ -188,6 +193,38 @@ impl GlobalState {
     pub fn set_live_bytes_in_last_gc(&self, size: usize) {
         self.live_bytes_in_last_gc.store(size, Ordering::SeqCst);
     }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn get_live_bytes_in_last_gc(&self) -> usize {
+        self.live_bytes_in_immixspace.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn set_live_bytes_in_immixspace(&self, size: usize) {
+        self.live_bytes_in_immixspace.store(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn get_live_bytes_in_immixspace(&self) -> usize {
+        self.live_bytes_in_immixspace.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn increase_live_bytes_in_immixspace_by(&self, size: usize) {
+        self.live_bytes_in_immixspace
+            .fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn get_fragmentation_rate_in_immixspace(&self) -> usize {
+        self.fragmentation_rate_in_immixspace.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn set_fragmentation_rate_in_immixspace(&self, size: usize) {
+        self.fragmentation_rate_in_immixspace
+            .store(size, Ordering::SeqCst);
+    }
 }
 
 impl Default for GlobalState {
@@ -209,6 +246,10 @@ impl Default for GlobalState {
             malloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "count_live_bytes_in_gc")]
             live_bytes_in_last_gc: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_immixspace")]
+            live_bytes_in_immixspace: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_immixspace")]
+            fragmentation_rate_in_immixspace: AtomicUsize::new(0),
         }
     }
 }
