@@ -489,7 +489,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             let f_rate_usize: usize = (f_rate * 10000.0) as usize;
 
-            debug_assert!(f_rate <= 1.0 && f_rate >= 0.0);
+            debug_assert!((0.0..=1.0).contains(&f_rate));
 
             self.common
                 .global_state
