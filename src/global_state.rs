@@ -195,11 +195,6 @@ impl GlobalState {
     }
 
     #[cfg(feature = "count_live_bytes_immixspace")]
-    pub fn get_live_bytes_in_last_gc(&self) -> usize {
-        self.live_bytes_in_immixspace.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "count_live_bytes_immixspace")]
     pub fn set_live_bytes_in_immixspace(&self, size: usize) {
         self.live_bytes_in_immixspace.store(size, Ordering::SeqCst);
     }
