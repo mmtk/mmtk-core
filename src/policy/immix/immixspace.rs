@@ -54,6 +54,11 @@ pub struct ImmixSpace<VM: VMBinding> {
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
     space_args: ImmixSpaceArgs,
+    /// Keeping track of fragmentation rate
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    live_bytes_in_immixspace: AtomicUsize,
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    fragmentation_rate: AtomicUsize,
 }
 
 /// Some arguments for Immix Space.
@@ -221,9 +226,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         // count the bytes for each object in immixspace to
         // check for fragmentation
         #[cfg(feature = "count_live_bytes_immixspace")]
-        self.common
-            .global_state
-            .increase_live_bytes_in_immixspace_by(VM::VMObjectModel::get_current_size(object));
+        self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
     }
 
     fn may_move_objects<const KIND: TraceKind>() -> bool {
@@ -322,6 +325,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mark_state: Self::MARKED_STATE,
             scheduler: scheduler.clone(),
             space_args,
+            #[cfg(feature = "count_live_bytes_immixspace")]
+            live_bytes_in_immixspace: AtomicUsize::new(0),
+            #[cfg(feature = "count_live_bytes_immixspace")]
+            fragmentation_rate: AtomicUsize::new(0),
         }
     }
 
@@ -474,26 +481,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         // calculate the fragmentation rate
         #[cfg(feature = "count_live_bytes_immixspace")]
         {
-            trace!(
-                "Live bytes in immixspace = {}",
-                self.common.global_state.get_live_bytes_in_immixspace()
-            );
+            trace!("Live bytes in immixspace = {}", self.get_live_bytes());
             trace!("Reserved pages in immixspace = {}", self.reserved_pages());
 
             trace!(
                 "Reserved bytes in immixspace = {}",
                 self.reserved_pages() << LOG_BYTES_IN_PAGE
             );
-            let f_rate: f64 = self.common.global_state.get_live_bytes_in_immixspace() as f64
-                / (self.reserved_pages() << LOG_BYTES_IN_PAGE) as f64;
+            let f_rate: f64 =
+                self.get_live_bytes() as f64 / (self.reserved_pages() << LOG_BYTES_IN_PAGE) as f64;
 
             let f_rate_usize: usize = (f_rate * 10000.0) as usize;
 
             debug_assert!((0.0..=1.0).contains(&f_rate));
 
-            self.common
-                .global_state
-                .set_fragmentation_rate_in_immixspace(f_rate_usize);
+            self.set_fragmentation_rate(f_rate_usize);
         }
 
         did_defrag
@@ -838,6 +840,27 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
         }
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn get_live_bytes(&self) -> usize {
+        self.live_bytes_in_immixspace.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn increase_live_bytes(&self, size: usize) {
+        self.live_bytes_in_immixspace
+            .fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn get_fragmentation_rate(&self) -> usize {
+        self.fragmentation_rate.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn set_fragmentation_rate(&self, size: usize) {
+        self.fragmentation_rate.store(size, Ordering::SeqCst);
     }
 }
 

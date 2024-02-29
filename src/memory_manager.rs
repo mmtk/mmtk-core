@@ -564,10 +564,21 @@ pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 #[cfg(feature = "count_live_bytes_immixspace")]
 pub fn fragmentation_rate_in_immixspace<VM: VMBinding>(mmtk: &MMTK<VM>) -> f64 {
-    mmtk.state
-        .fragmentation_rate_in_immixspace
-        .load(Ordering::SeqCst) as f64
-        / 100.0
+    use crate::policy::immix::ImmixSpace;
+    use crate::policy::space::Space;
+    let mut rate = None;
+    mmtk.get_plan()
+        .for_each_space(&mut |space: &dyn Space<VM>| {
+            if let Some(immix) = space.downcast_ref::<ImmixSpace<VM>>() {
+                assert!(
+                    rate.is_none(),
+                    "There are multiple Immix spaces in the plan."
+                );
+                // Get the stats here from ImmixSpace
+                rate = Some(immix.get_fragmentation_rate());
+            }
+        });
+    rate.expect("No Immix space in the plan.") as f64 / 100.0
 }
 
 /// Return the starting address of the heap. *Note that currently MMTk uses
