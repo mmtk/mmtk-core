@@ -450,6 +450,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
             }
         }
+
+        #[cfg(feature = "count_live_bytes_immixspace")]
+        self.set_live_bytes(0);
     }
 
     /// Release for the immix space. This is called when a GC finished.
@@ -845,6 +848,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[cfg(feature = "count_live_bytes_immixspace")]
     pub fn get_live_bytes(&self) -> usize {
         self.live_bytes_in_immixspace.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "count_live_bytes_immixspace")]
+    pub fn set_live_bytes(&self, size: usize) {
+        self.live_bytes_in_immixspace.store(size, Ordering::SeqCst)
     }
 
     #[cfg(feature = "count_live_bytes_immixspace")]
