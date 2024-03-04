@@ -54,11 +54,9 @@ pub struct ImmixSpace<VM: VMBinding> {
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
     space_args: ImmixSpaceArgs,
-    /// Keeping track of fragmentation rate
-    #[cfg(feature = "count_live_bytes_immixspace")]
-    live_bytes_in_immixspace: AtomicUsize,
-    #[cfg(feature = "count_live_bytes_immixspace")]
-    occupation_rate: AtomicUsize,
+    /// Keeping track of live bytes
+    #[cfg(feature = "dump_memory_stats")]
+    live_bytes: AtomicUsize,
 }
 
 /// Some arguments for Immix Space.
@@ -223,9 +221,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
             self.mark_lines(object);
         }
 
-        // count the bytes for each object in immixspace to
-        // check for fragmentation
-        #[cfg(feature = "count_live_bytes_immixspace")]
+        // count the bytes for each object in immixspace
+        #[cfg(feature = "dump_memory_stats")]
         self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
     }
 
@@ -325,10 +322,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mark_state: Self::MARKED_STATE,
             scheduler: scheduler.clone(),
             space_args,
-            #[cfg(feature = "count_live_bytes_immixspace")]
-            live_bytes_in_immixspace: AtomicUsize::new(0),
-            #[cfg(feature = "count_live_bytes_immixspace")]
-            occupation_rate: AtomicUsize::new(0),
+            #[cfg(feature = "dump_memory_stats")]
+            live_bytes: AtomicUsize::new(0),
         }
     }
 
@@ -451,7 +446,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
         }
 
-        #[cfg(feature = "count_live_bytes_immixspace")]
+        #[cfg(feature = "dump_memory_stats")]
         self.set_live_bytes(0);
     }
 
@@ -481,14 +476,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         self.lines_consumed.store(0, Ordering::Relaxed);
 
-        // calculate the fragmentation rate
-        #[cfg(feature = "count_live_bytes_immixspace")]
-        self.dump_memory_stats();
-
         did_defrag
     }
 
-    fn dump_memory_stats(&mut self) {
+    #[cfg(feature = "dump_memory_stats")]
+    pub(crate) fn dump_memory_stats(&self) {
         #[derive(Default)]
         struct Dist {
             live_blocks: usize,
@@ -505,11 +497,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 .filter(|b| b.get_state() != BlockState::Unallocated)
             {
                 dist.live_blocks += 1;
-                for _line in block
-                    .lines()
-                    .filter(|l| l.is_marked(self.line_mark_state.load(Ordering::Acquire)))
-                {
-                    dist.live_lines = 1;
+                match block.get_state() {
+                    BlockState::Marked => {
+                        panic!("At this point the block should have been swept already");
+                    }
+                    BlockState::Unmarked => {
+                        // Block is unmarked and cannot be reused (has no holes)
+                        dist.live_lines += Block::LINES;
+                    }
+                    BlockState::Reusable { unavailable_lines } => {
+                        dist.live_lines += unavailable_lines as usize;
+                    }
+                    BlockState::Unallocated => {}
                 }
             }
         }
@@ -518,31 +517,22 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             "{} immixspace",
             chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
         );
-        println!("Live bytes = {}", self.get_live_bytes());
-        println!("Reserved pages = {}", self.reserved_pages());
+        println!("\tLive bytes = {}", self.get_live_bytes());
+        println!("\tReserved pages = {}", self.reserved_pages());
         println!(
-            "Reserved pages (bytes) = {}",
+            "\tReserved pages (bytes) = {}",
             self.reserved_pages() << LOG_BYTES_IN_PAGE
         );
-        println!("Live blocks = {}", dist.live_blocks);
+        println!("\tLive blocks = {}", dist.live_blocks);
         println!(
-            "Live blocks (bytes) = {}",
+            "\tLive blocks (bytes) = {}",
             dist.live_blocks << Block::LOG_BYTES
         );
-        println!("Live lines = {}", dist.live_lines);
+        println!("\tLive lines = {}", dist.live_lines);
         println!(
-            "Live lines (bytes) = {}",
+            "\tLive lines (bytes) = {}",
             dist.live_lines << Line::LOG_BYTES
         );
-
-        let o_rate: f64 =
-            self.get_live_bytes() as f64 / (self.reserved_pages() << LOG_BYTES_IN_PAGE) as f64;
-
-        let o_rate_usize: usize = (o_rate * 10000.0) as usize;
-
-        debug_assert!((0.0..=1.0).contains(&o_rate));
-
-        self.set_occupation_rate(o_rate_usize);
     }
 
     /// Generate chunk sweep tasks
@@ -886,30 +876,19 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
-    #[cfg(feature = "count_live_bytes_immixspace")]
+    #[cfg(feature = "dump_memory_stats")]
     pub fn get_live_bytes(&self) -> usize {
-        self.live_bytes_in_immixspace.load(Ordering::SeqCst)
+        self.live_bytes.load(Ordering::SeqCst)
     }
 
-    #[cfg(feature = "count_live_bytes_immixspace")]
+    #[cfg(feature = "dump_memory_stats")]
     pub fn set_live_bytes(&self, size: usize) {
-        self.live_bytes_in_immixspace.store(size, Ordering::SeqCst)
+        self.live_bytes.store(size, Ordering::SeqCst)
     }
 
-    #[cfg(feature = "count_live_bytes_immixspace")]
+    #[cfg(feature = "dump_memory_stats")]
     pub fn increase_live_bytes(&self, size: usize) {
-        self.live_bytes_in_immixspace
-            .fetch_add(size, Ordering::SeqCst);
-    }
-
-    #[cfg(feature = "count_live_bytes_immixspace")]
-    pub fn get_occupation_rate(&self) -> usize {
-        self.occupation_rate.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "count_live_bytes_immixspace")]
-    pub fn set_occupation_rate(&self, size: usize) {
-        self.occupation_rate.store(size, Ordering::SeqCst);
+        self.live_bytes.fetch_add(size, Ordering::SeqCst);
     }
 }
 

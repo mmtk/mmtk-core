@@ -153,8 +153,8 @@ malloc_counted_size = []
 # Count the size of all live objects in GC
 count_live_bytes_in_gc = []
 
-# Count the size of live objects in immixspace (the ones that can actually be opportunistically moved)
-count_live_bytes_immixspace = []
+# Dump memory stats about the plan (live bytes, live lines, live blocks, and used pages)
+dump_memory_stats = []
 
 # Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
 # capture the type names of work packets.

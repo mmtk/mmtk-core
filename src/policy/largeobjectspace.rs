@@ -6,6 +6,8 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::BYTES_IN_PAGE;
+#[cfg(feature = "dump_memory_stats")]
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
 use crate::util::opaque_pointer::*;
@@ -13,6 +15,8 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+#[cfg(feature = "dump_memory_stats")]
+use std::sync::atomic::AtomicUsize;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -28,6 +32,9 @@ pub struct LargeObjectSpace<VM: VMBinding> {
     mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
+    /// Keeping track of live bytes
+    #[cfg(feature = "dump_memory_stats")]
+    live_bytes: AtomicUsize,
 }
 
 impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
@@ -136,6 +143,11 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjec
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         false
     }
+
+    #[cfg(feature = "dump_memory_stats")]
+    fn post_scan_object(&self, object: ObjectReference) {
+        self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+    }
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
@@ -162,6 +174,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             mark_state: 0,
             in_nursery_gc: false,
             treadmill: TreadMill::new(),
+            #[cfg(feature = "dump_memory_stats")]
+            live_bytes: AtomicUsize::new(0),
         }
     }
 
@@ -172,6 +186,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         }
         self.treadmill.flip(full_heap);
         self.in_nursery_gc = !full_heap;
+        #[cfg(feature = "dump_memory_stats")]
+        self.set_live_bytes(0);
     }
 
     pub fn release(&mut self, full_heap: bool) {
@@ -302,6 +318,35 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn get_live_bytes(&self) -> usize {
+        self.live_bytes.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn set_live_bytes(&self, size: usize) {
+        self.live_bytes.store(size, Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn increase_live_bytes(&self, size: usize) {
+        self.live_bytes.fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub(crate) fn dump_memory_stats(&self) {
+        println!(
+            "{} los",
+            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+        println!("\tLive bytes = {}", self.get_live_bytes());
+        println!("\tReserved pages = {}", self.reserved_pages());
+        println!(
+            "\tReserved pages (bytes) = {}",
+            self.reserved_pages() << LOG_BYTES_IN_PAGE
+        );
     }
 }
 
