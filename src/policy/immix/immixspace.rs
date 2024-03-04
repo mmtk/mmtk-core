@@ -58,7 +58,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     #[cfg(feature = "count_live_bytes_immixspace")]
     live_bytes_in_immixspace: AtomicUsize,
     #[cfg(feature = "count_live_bytes_immixspace")]
-    fragmentation_rate: AtomicUsize,
+    occupation_rate: AtomicUsize,
 }
 
 /// Some arguments for Immix Space.
@@ -328,7 +328,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             #[cfg(feature = "count_live_bytes_immixspace")]
             live_bytes_in_immixspace: AtomicUsize::new(0),
             #[cfg(feature = "count_live_bytes_immixspace")]
-            fragmentation_rate: AtomicUsize::new(0),
+            occupation_rate: AtomicUsize::new(0),
         }
     }
 
@@ -483,25 +483,66 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         // calculate the fragmentation rate
         #[cfg(feature = "count_live_bytes_immixspace")]
-        {
-            trace!("Live bytes in immixspace = {}", self.get_live_bytes());
-            trace!("Reserved pages in immixspace = {}", self.reserved_pages());
-
-            trace!(
-                "Reserved bytes in immixspace = {}",
-                self.reserved_pages() << LOG_BYTES_IN_PAGE
-            );
-            let f_rate: f64 =
-                self.get_live_bytes() as f64 / (self.reserved_pages() << LOG_BYTES_IN_PAGE) as f64;
-
-            let f_rate_usize: usize = (f_rate * 10000.0) as usize;
-
-            debug_assert!((0.0..=1.0).contains(&f_rate));
-
-            self.set_fragmentation_rate(f_rate_usize);
-        }
+        self.dump_memory_stats();
 
         did_defrag
+    }
+
+    fn dump_memory_stats(&mut self) {
+        #[derive(Default)]
+        struct Dist {
+            live_blocks: usize,
+            live_lines: usize,
+        }
+        let mut dist = Dist::default();
+        for chunk in self.chunk_map.all_chunks() {
+            if !self.address_in_space(chunk.start()) {
+                continue;
+            }
+
+            for block in chunk
+                .iter_region::<Block>()
+                .filter(|b| b.get_state() != BlockState::Unallocated)
+            {
+                dist.live_blocks += 1;
+                for _line in block
+                    .lines()
+                    .filter(|l| l.is_marked(self.line_mark_state.load(Ordering::Acquire)))
+                {
+                    dist.live_lines = 1;
+                }
+            }
+        }
+
+        println!(
+            "{} immixspace",
+            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+        println!("Live bytes = {}", self.get_live_bytes());
+        println!("Reserved pages = {}", self.reserved_pages());
+        println!(
+            "Reserved pages (bytes) = {}",
+            self.reserved_pages() << LOG_BYTES_IN_PAGE
+        );
+        println!("Live blocks = {}", dist.live_blocks);
+        println!(
+            "Live blocks (bytes) = {}",
+            dist.live_blocks << Block::LOG_BYTES
+        );
+        println!("Live lines = {}", dist.live_lines);
+        println!(
+            "Live lines (bytes) = {}",
+            dist.live_lines << Line::LOG_BYTES
+        );
+
+        let o_rate: f64 =
+            self.get_live_bytes() as f64 / (self.reserved_pages() << LOG_BYTES_IN_PAGE) as f64;
+
+        let o_rate_usize: usize = (o_rate * 10000.0) as usize;
+
+        debug_assert!((0.0..=1.0).contains(&o_rate));
+
+        self.set_occupation_rate(o_rate_usize);
     }
 
     /// Generate chunk sweep tasks
@@ -862,13 +903,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     #[cfg(feature = "count_live_bytes_immixspace")]
-    pub fn get_fragmentation_rate(&self) -> usize {
-        self.fragmentation_rate.load(Ordering::SeqCst)
+    pub fn get_occupation_rate(&self) -> usize {
+        self.occupation_rate.load(Ordering::SeqCst)
     }
 
     #[cfg(feature = "count_live_bytes_immixspace")]
-    pub fn set_fragmentation_rate(&self, size: usize) {
-        self.fragmentation_rate.store(size, Ordering::SeqCst);
+    pub fn set_occupation_rate(&self, size: usize) {
+        self.occupation_rate.store(size, Ordering::SeqCst);
     }
 }
 

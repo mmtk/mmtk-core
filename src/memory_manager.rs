@@ -557,13 +557,13 @@ pub fn live_bytes_in_last_gc<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
     mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
 }
 
-/// Return the percentage of fragmentation of the immixspace (e.g. 42.98 percent). To do that we count the size of every live object
+/// Return the percentage of occupation of the immixspace (e.g. 42.98 percent). To do that we count the size of every live object
 /// in the immixspace. Since MMTk accounts for memory in pages, we return the ratio between this number and
 /// the number of used bytes (according to the used pages by the immixspace).
 /// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 #[cfg(feature = "count_live_bytes_immixspace")]
-pub fn fragmentation_rate_in_immixspace<VM: VMBinding>(mmtk: &MMTK<VM>) -> f64 {
+pub fn occupation_rate_in_immixspace<VM: VMBinding>(mmtk: &MMTK<VM>) -> f64 {
     use crate::policy::immix::ImmixSpace;
     use crate::policy::space::Space;
     let mut rate = None;
@@ -575,7 +575,7 @@ pub fn fragmentation_rate_in_immixspace<VM: VMBinding>(mmtk: &MMTK<VM>) -> f64 {
                     "There are multiple Immix spaces in the plan."
                 );
                 // Get the stats here from ImmixSpace
-                rate = Some(immix.get_fragmentation_rate());
+                rate = Some(immix.get_occupation_rate());
             }
         });
     rate.expect("No Immix space in the plan.") as f64 / 100.0
