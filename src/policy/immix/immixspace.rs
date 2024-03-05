@@ -481,12 +481,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     #[cfg(feature = "dump_memory_stats")]
     pub(crate) fn dump_memory_stats(&self) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
         #[derive(Default)]
         struct Dist {
             live_blocks: usize,
             live_lines: usize,
         }
         let mut dist = Dist::default();
+
         for chunk in self.chunk_map.all_chunks() {
             if !self.address_in_space(chunk.start()) {
                 continue;
@@ -497,6 +500,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 .filter(|b| b.get_state() != BlockState::Unallocated)
             {
                 dist.live_blocks += 1;
+
+                let line_mark_state = self.line_mark_state.load(Ordering::Acquire);
+                let mut live_lines_in_table = 0;
+                let mut live_lines_from_block_state = 0;
+
+                for line in block.lines() {
+                    if line.is_marked(line_mark_state) {
+                        live_lines_in_table += 1;
+                    }
+                }
+
                 match block.get_state() {
                     BlockState::Marked => {
                         panic!("At this point the block should have been swept already");
@@ -504,19 +518,25 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     BlockState::Unmarked => {
                         // Block is unmarked and cannot be reused (has no holes)
                         dist.live_lines += Block::LINES;
+                        live_lines_from_block_state += Block::LINES;
                     }
                     BlockState::Reusable { unavailable_lines } => {
                         dist.live_lines += unavailable_lines as usize;
+                        live_lines_from_block_state += unavailable_lines as usize;
                     }
                     BlockState::Unallocated => {}
                 }
+
+                assert_eq!(live_lines_in_table, live_lines_from_block_state);
             }
         }
 
-        println!(
-            "{} immixspace",
-            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
-        );
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+
+        println!("{:?} immixspace", since_the_epoch.as_millis());
         println!("\tLive bytes = {}", self.get_live_bytes());
         println!("\tReserved pages = {}", self.reserved_pages());
         println!(

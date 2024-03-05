@@ -143,11 +143,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjec
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
         false
     }
-
-    #[cfg(feature = "dump_memory_stats")]
-    fn post_scan_object(&self, object: ObjectReference) {
-        self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
-    }
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
@@ -298,6 +293,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 break;
             }
         }
+        #[cfg(feature = "dump_memory_stats")]
+        self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
         true
     }
 
@@ -337,10 +334,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     #[cfg(feature = "dump_memory_stats")]
     pub(crate) fn dump_memory_stats(&self) {
-        println!(
-            "{} los",
-            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
-        );
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+
+        println!("{} los", since_the_epoch.as_millis());
         println!("\tLive bytes = {}", self.get_live_bytes());
         println!("\tReserved pages = {}", self.reserved_pages());
         println!(

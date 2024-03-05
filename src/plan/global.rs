@@ -316,7 +316,7 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
         })
     }
 
-    // Dump memory stats for the plan
+    /// Dump memory stats for the plan
     #[cfg(feature = "dump_memory_stats")]
     fn dump_memory_stats(&self) {}
 }
