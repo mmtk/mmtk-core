@@ -57,6 +57,11 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Keeping track of live bytes
     #[cfg(feature = "dump_memory_stats")]
     live_bytes: AtomicUsize,
+    /// Keeping track of the number of traced/copied objects
+    #[cfg(feature = "dump_memory_stats")]
+    live_objects: AtomicUsize,
+    #[cfg(feature = "dump_memory_stats")]
+    copied_objects: AtomicUsize,
 }
 
 /// Some arguments for Immix Space.
@@ -221,9 +226,13 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
             self.mark_lines(object);
         }
 
-        // count the bytes for each object in immixspace
+        // count the bytes for each object
         #[cfg(feature = "dump_memory_stats")]
         self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
+        // increase the number of objects scanned
+        #[cfg(feature = "dump_memory_stats")]
+        self.increase_live_objects(1);
     }
 
     fn may_move_objects<const KIND: TraceKind>() -> bool {
@@ -324,6 +333,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             space_args,
             #[cfg(feature = "dump_memory_stats")]
             live_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "dump_memory_stats")]
+            live_objects: AtomicUsize::new(0),
+            #[cfg(feature = "dump_memory_stats")]
+            copied_objects: AtomicUsize::new(0),
         }
     }
 
@@ -448,6 +461,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
         #[cfg(feature = "dump_memory_stats")]
         self.set_live_bytes(0);
+        #[cfg(feature = "dump_memory_stats")]
+        self.set_live_objects(0);
+        #[cfg(feature = "dump_memory_stats")]
+        self.set_copied_objects(0);
     }
 
     /// Release for the immix space. This is called when a GC finished.
@@ -537,6 +554,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .expect("Time went backwards");
 
         println!("{:?} mmtk_immixspace", since_the_epoch.as_millis());
+        println!("\t#Live objects = {}", self.get_live_objects());
+        println!("\t#Copied objects = {}", self.get_copied_objects());
         println!("\tLive bytes = {}", self.get_live_bytes());
         println!("\tReserved pages = {}", self.reserved_pages());
         println!(
@@ -727,6 +746,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 let new_object =
                     object_forwarding::forward_object::<VM>(object, semantics, copy_context);
 
+                // increase the number of objects being moved
+                #[cfg(feature = "dump_memory_stats")]
+                self.increase_copied_objects(1);
+
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_forwarded::<VM>(new_object);
 
@@ -909,6 +932,36 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[cfg(feature = "dump_memory_stats")]
     pub fn increase_live_bytes(&self, size: usize) {
         self.live_bytes.fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn get_live_objects(&self) -> usize {
+        self.live_objects.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn set_live_objects(&self, size: usize) {
+        self.live_objects.store(size, Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn increase_live_objects(&self, size: usize) {
+        self.live_objects.fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn get_copied_objects(&self) -> usize {
+        self.copied_objects.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn set_copied_objects(&self, size: usize) {
+        self.copied_objects.store(size, Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn increase_copied_objects(&self, size: usize) {
+        self.copied_objects.fetch_add(size, Ordering::SeqCst);
     }
 }
 
