@@ -341,7 +341,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards");
 
-        println!("{} los", since_the_epoch.as_millis());
+        println!("{} mmtk_los", since_the_epoch.as_millis());
         println!("\tLive bytes = {}", self.get_live_bytes());
         println!("\tReserved pages = {}", self.reserved_pages());
         println!(

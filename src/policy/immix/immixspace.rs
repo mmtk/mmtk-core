@@ -536,7 +536,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards");
 
-        println!("{:?} immixspace", since_the_epoch.as_millis());
+        println!("{:?} mmtk_immixspace", since_the_epoch.as_millis());
         println!("\tLive bytes = {}", self.get_live_bytes());
         println!("\tReserved pages = {}", self.reserved_pages());
         println!(
