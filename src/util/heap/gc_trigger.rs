@@ -72,7 +72,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
             info!(
-                "[POLL] {}{} ({}/{} pages)",
+                "[POLL] {}{} ({}/{} pages{})",
                 if let Some(space) = space {
                     format!("{}: ", space.get_name())
                 } else {
@@ -81,6 +81,11 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 "Triggering collection",
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
+                if crate::plan::LOG_DETAILED_SPACE_USAGE {
+                    format!(": {}", crate::plan::get_detailed_space_usage_string(plan))
+                } else {
+                    "".to_owned()
+                },
             );
             self.gc_requester.request();
             return true;
