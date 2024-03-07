@@ -5,6 +5,8 @@ use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::sft::GCWorkerMutRef;
+#[cfg(feature = "objects_moved_stats")]
+use crate::policy::OBJECTS_COPIED;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
@@ -399,6 +401,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     trace!(" copy from {} to {}", obj, new_object);
                     let end_of_new_object =
                         VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+
+                    #[cfg(feature = "objects_moved_stats")]
+                    unsafe {
+                        OBJECTS_COPIED.fetch_add(1, Ordering::SeqCst);
+                    }
                     // update VO bit,
                     vo_bit::set_vo_bit::<VM>(new_object);
                     to = new_object.to_object_start::<VM>() + copied_size;

@@ -7,6 +7,8 @@ pub use immixspace::*;
 
 use crate::policy::immix::block::Block;
 use crate::util::linear_scan::Region;
+#[cfg(feature = "objects_moved_stats")]
+use std::sync::atomic::AtomicUsize;
 
 /// The max object size for immix: half of a block
 pub const MAX_IMMIX_OBJECT_SIZE: usize = Block::BYTES >> 1;
@@ -55,6 +57,9 @@ pub const NEVER_MOVE_OBJECTS: bool = !DEFRAG && !PREFER_COPY_ON_NURSERY_GC;
 /// Mark lines when scanning objects.
 /// Otherwise, do it at mark time.
 pub const MARK_LINE_AT_SCAN_TIME: bool = true;
+
+#[cfg(feature = "objects_moved_stats")]
+pub static mut IMMIXSPACE_OBJECTS_MARKED: AtomicUsize = AtomicUsize::new(0);
 
 macro_rules! validate {
     ($x: expr) => { assert!($x, stringify!($x)) };

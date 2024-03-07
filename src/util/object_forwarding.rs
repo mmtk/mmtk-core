@@ -18,6 +18,9 @@ const FORWARDING_POINTER_MASK: usize = 0x00ff_ffff_ffff_fff8;
 #[cfg(target_pointer_width = "32")]
 const FORWARDING_POINTER_MASK: usize = 0xffff_fffc;
 
+#[cfg(feature = "objects_moved_stats")]
+use crate::policy::OBJECTS_COPIED;
+
 /// Attempt to become the worker thread who will forward the object.
 /// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.
 pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
@@ -80,6 +83,10 @@ pub fn forward_object<VM: VMBinding>(
     copy_context: &mut GCWorkerCopyContext<VM>,
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
+    #[cfg(feature = "objects_moved_stats")]
+    unsafe {
+        OBJECTS_COPIED.fetch_add(1, Ordering::SeqCst);
+    }
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,

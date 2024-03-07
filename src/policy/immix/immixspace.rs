@@ -3,6 +3,8 @@ use super::line::*;
 use super::{block::*, defrag::Defrag};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
+#[cfg(feature = "objects_moved_stats")]
+use crate::policy::immix::IMMIXSPACE_OBJECTS_MARKED;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
@@ -17,6 +19,7 @@ use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
@@ -711,6 +714,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 break;
             }
+        }
+
+        #[cfg(feature = "objects_moved_stats")]
+        unsafe {
+            IMMIXSPACE_OBJECTS_MARKED.fetch_add(1, Ordering::SeqCst);
         }
         true
     }
