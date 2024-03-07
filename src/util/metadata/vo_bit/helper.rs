@@ -86,9 +86,6 @@ const fn strategy<VM: VMBinding>() -> VOBitUpdateStrategy {
     // TODO: Revisit this choice in the future if non-trivial changes are made and the performance
     // characterestics may change for the strategies.
     match VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.as_spec() {
-        // Note that currently ImmixSpace doesn't support in-header mark bits,
-        // but the DummyVM for testing declares mark bits to be "in header" as a place holder
-        // because it never runs GC.
         MetadataSpec::InHeader(_) => VOBitUpdateStrategy::ClearAndReconstruct,
         MetadataSpec::OnSide(_) => VOBitUpdateStrategy::CopyFromMarkBits,
     }
