@@ -521,9 +521,10 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
                 mmtk.edge_logger.log_edge(*edge);
             }
         }
+        let nodes = VectorObjectQueue::with_capacity_opt(VM::override_scan_objects_packet_size());
         Self {
             edges,
-            nodes: VectorObjectQueue::new(),
+            nodes,
             mmtk,
             worker: std::ptr::null_mut(),
             roots,

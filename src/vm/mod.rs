@@ -80,4 +80,21 @@ where
     /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
     /// it merely asserts with this constant.
     const ALLOC_END_ALIGNMENT: usize = 1;
+
+    /// Override the packet size of the `ScanObjects` work packet.  If it returns `Some(size)`,
+    /// each `ScanObjects` work packets will contain at most `size` objects; otherwise the packet
+    /// size will be determined by mmtk-core.
+    ///
+    /// This method is used for working around a load-balance problem on some VMs that use object-
+    /// enqueuing tracing.  The default packet size (4096) may be too large for some workloads, in
+    /// which case only a few work packets will be available and most GC workers will be idle.  The
+    /// binding can reduce the packet size to increase the level of parallelism.  But if the packet
+    /// size is too small, it will introduce extra scheduling overhead for executing each work
+    /// packet.
+    ///
+    /// TODO: We should support work stealing within work packets and make this workaround
+    /// unnecessary.
+    fn override_scan_objects_packet_size() -> Option<usize> {
+        None
+    }
 }
