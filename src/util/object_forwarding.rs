@@ -5,6 +5,52 @@ use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ForwardingState {
+    NotTriggered,
+    BeingForwarded,
+    Forwarded,
+    MarkedWontForward,
+}
+
+impl ForwardingState {
+    pub fn encode(&self, mark_state: bool) -> u8 {
+        match mark_state {
+            false => match self {
+                ForwardingState::NotTriggered => 0b00,
+                ForwardingState::BeingForwarded => 0b10,
+                ForwardingState::Forwarded => 0b11,
+                ForwardingState::MarkedWontForward => 0b01,
+            },
+            true => match self {
+                ForwardingState::NotTriggered => 0b01,
+                ForwardingState::BeingForwarded => 0b10,
+                ForwardingState::Forwarded => 0b11,
+                ForwardingState::MarkedWontForward => 0b00,
+            },
+        }
+    }
+
+    pub fn decode(value: u8, mark_state: bool) -> Self {
+        match mark_state {
+            false => match value {
+                0b00 => ForwardingState::NotTriggered,
+                0b10 => ForwardingState::BeingForwarded,
+                0b11 => ForwardingState::Forwarded,
+                0b01 => ForwardingState::MarkedWontForward,
+                _ => unreachable!(),
+            },
+            true => match value {
+                0b01 => ForwardingState::NotTriggered,
+                0b10 => ForwardingState::BeingForwarded,
+                0b11 => ForwardingState::Forwarded,
+                0b00 => ForwardingState::MarkedWontForward,
+                _ => unreachable!(),
+            },
+        }
+    }
+}
+
 const FORWARDING_NOT_TRIGGERED_YET: u8 = 0b00;
 const BEING_FORWARDED: u8 = 0b10;
 const FORWARDED: u8 = 0b11;
