@@ -299,6 +299,11 @@ impl<VM: VMBinding> MMTK<VM> {
         self.state.is_emergency_collection()
     }
 
+    /// Return true if the current GC is trigger manually by the user/binding.
+    pub fn is_user_triggered_collection(&self) -> bool {
+        self.state.is_user_triggered_collection()
+    }
+
     /// The application code has requested a collection. This is just a GC hint, and
     /// we may ignore it.
     ///
