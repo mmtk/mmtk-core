@@ -79,6 +79,57 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> DerefMut
     }
 }
 
+macro_rules! wrap_nursery_process_edges_as_new_type {
+    ($ty_name: ident) => {
+        pub struct $ty_name<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>(
+            GenNurseryProcessEdges<VM, P>,
+        );
+        impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdgesWork
+            for $ty_name<VM, P>
+        {
+            type VM = <GenNurseryProcessEdges<VM, P> as ProcessEdgesWork>::VM;
+            type ScanObjectsWorkType =
+                <GenNurseryProcessEdges<VM, P> as ProcessEdgesWork>::ScanObjectsWorkType;
+            fn new(
+                edges: Vec<EdgeOf<Self>>,
+                roots: bool,
+                mmtk: &'static MMTK<VM>,
+                bucket: WorkBucketStage,
+            ) -> Self {
+                Self(GenNurseryProcessEdges::new(edges, roots, mmtk, bucket))
+            }
+            fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+                self.0.trace_object(object)
+            }
+            fn process_edge(&mut self, slot: EdgeOf<Self>) {
+                self.0.process_edge(slot)
+            }
+
+            fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
+                self.0.create_scan_work(nodes)
+            }
+        }
+        impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> Deref
+            for $ty_name<VM, P>
+        {
+            type Target = ProcessEdgesBase<VM>;
+            fn deref(&self) -> &Self::Target {
+                self.0.deref()
+            }
+        }
+        impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> DerefMut
+            for $ty_name<VM, P>
+        {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                self.0.deref_mut()
+            }
+        }
+    };
+}
+
+wrap_nursery_process_edges_as_new_type!(GenNurseryProcessEdgesFromModBuf);
+wrap_nursery_process_edges_as_new_type!(GenNurseryProcessEdgesFromRegionModBuf);
+
 /// The modbuf contains a list of objects in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet scans the recorded objects and forwards pointers if necessary.

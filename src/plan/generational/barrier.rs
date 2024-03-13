@@ -10,9 +10,7 @@ use crate::vm::edge_shape::MemorySlice;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-use super::gc_work::GenNurseryProcessEdges;
-use super::gc_work::ProcessModBuf;
-use super::gc_work::ProcessRegionModBuf;
+use super::gc_work::*;
 use super::global::GenerationalPlanExt;
 
 pub struct GenObjectBarrierSemantics<
@@ -45,7 +43,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
         let buf = self.modbuf.take();
         if !buf.is_empty() {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessModBuf::<GenNurseryProcessEdges<VM, P>>::new(buf));
+                .add(ProcessModBuf::<GenNurseryProcessEdgesFromModBuf<VM, P>>::new(buf));
         }
     }
 
@@ -54,7 +52,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>>
         if !buf.is_empty() {
             debug_assert!(!buf.is_empty());
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRegionModBuf::<
-                GenNurseryProcessEdges<VM, P>,
+                GenNurseryProcessEdgesFromRegionModBuf<VM, P>,
             >::new(buf));
         }
     }
