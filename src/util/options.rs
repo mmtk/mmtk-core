@@ -101,7 +101,7 @@ impl FromStr for PerfEventOptions {
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "64")]
-pub const DEFAULT_MIN_NURSERY: usize = 20 << LOG_BYTES_IN_MBYTE;
+pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "64")]

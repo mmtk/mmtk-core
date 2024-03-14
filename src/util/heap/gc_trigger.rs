@@ -147,7 +147,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
                 if min_bytes < DEFAULT_MIN_NURSERY {
                     warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
-                    DEFAULT_MAX_NURSERY
+                    DEFAULT_MIN_NURSERY
                 } else {
                     min_bytes
                 }
