@@ -16,6 +16,7 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -64,7 +65,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
+    fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool
     where
         Self: Sized,
     {

@@ -20,7 +20,7 @@ jobs:
           # - this action
           # - minimal tests for stable Rust (we allow them to fail)
           # - binding tests (it may take long to run)
-          ignoreActions: "ready-to-merge,check-public-api-changes,minimal-tests-core/x86_64-unknown-linux-gnu/stable,minimal-tests-core/i686-unknown-linux-gnu/stable,minimal-tests-core/x86_64-apple-darwin/stable,v8-binding-test,openjdk-binding-test,jikesrvm-binding-test,julia-binding-test,ruby-binding-test (release),ruby-binding-test (debug)"
+          ignoreActions: "ready-to-merge,check-broken-links-in-docs,check-public-api-changes,minimal-tests-core/x86_64-unknown-linux-gnu/stable,minimal-tests-core/i686-unknown-linux-gnu/stable,minimal-tests-core/x86_64-apple-darwin/stable,v8-binding-test,openjdk-binding-test,jikesrvm-binding-test,julia-binding-test,ruby-binding-test (release),ruby-binding-test (debug)"
           # This action uses API. We have a quota of 1000 per hour.
           checkInterval: 600
         env:

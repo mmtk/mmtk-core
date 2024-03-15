@@ -1,4 +1,5 @@
 use crate::util::alloc::AllocationError;
+use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
@@ -154,5 +155,11 @@ pub trait Collection<VM: VMBinding> {
         // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
         // initialization is done, such as initializing class metadata for scanning objects.
         true
+    }
+
+    /// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+    /// `crate::util::options::GCTriggerSelector::Delegated`.
+    fn create_gc_trigger() -> Box<dyn GCTriggerPolicy<VM>> {
+        unimplemented!()
     }
 }

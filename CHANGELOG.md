@@ -1,3 +1,26 @@
+0.23.0 (2024-02-09)
+===
+
+## What's Changed
+
+### API
+* Ask from binding if GC is disabled by @udesou in https://github.com/mmtk/mmtk-core/pull/1075
+
+### CI
+* Stop using the deprecated set-output in our CI configs by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1059
+* Rename CI tests to minimal/extended tests by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1073
+* Properly get PR number for merge group by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1077
+
+### Misc
+* MMTk Enhancement Proposal by @wks in https://github.com/mmtk/mmtk-core/pull/1056
+* Timeline visualization tool by @wks in https://github.com/mmtk/mmtk-core/pull/1022
+* Add a document for project principles by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1069
+* Fix un-cleared VO bits for contiguous monotone PR by @wks in https://github.com/mmtk/mmtk-core/pull/1071
+* Use live memory to estimate collection pages in mem balancer by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1050
+* Fix issues in sanity GC by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1079
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.22.1...v0.23.0
+
 0.22.1 (2024-01-11)
 ===
 

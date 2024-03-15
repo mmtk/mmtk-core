@@ -6,6 +6,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
@@ -98,7 +99,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         &self,
         plan: &P,
         space_full: bool,
-        space: Option<&dyn Space<VM>>,
+        space: Option<SpaceStats<VM>>,
     ) -> bool {
         let cur_nursery = self.nursery.reserved_pages();
         let max_nursery = self.common.base.options.get_max_nursery_pages();
@@ -120,7 +121,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
         let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.common().descriptor == self.nursery.common().descriptor
+            s.0.common().descriptor == self.nursery.common().descriptor
         });
         // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         if space_full && !is_triggered_by_nursery {
