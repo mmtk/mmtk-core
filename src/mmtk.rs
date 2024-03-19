@@ -245,21 +245,33 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Prepare an MMTk instance for calling the `fork()` system call.
     ///
     /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
-    /// on other platforms by libraries such as Cygwin.  If `fork()` is called when the process has
-    /// multiple threads, it will only duplicate the current thread into the child process, and the
-    /// child process can only call async-signal-safe functions, notably `exec()`.  For VMs that
-    /// that use multi-process concurrency, it is imperative that when calling `fork()`, only one
-    /// thread may exist in the process.
+    /// on other platforms by libraries such as Cygwin.  The properties of the `fork()` system call
+    /// requires the users to do some preparation before calling it.
+    ///
+    /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
+    /// will only duplicate the current thread into the child process, and the child process can
+    /// only call async-signal-safe functions, notably `exec()`.  For VMs that that use
+    /// multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
+    /// exist in the process.
+    ///
+    /// -   **File descriptors**: The child process inherits copies of the parent's set of open
+    /// file descriptors.  This may or may not be desired depending on use cases.
     ///
     /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
-    /// GC threads to save their contexts and return from their entry-point functions.
+    /// GC threads to save their contexts and return from their entry-point functions.  Currently,
+    /// such threads only include GC workers, and the entry point is
+    /// [`crate::memory_manager::start_worker`].  A subsequent call to `MMTK::after_fork()` will
+    /// re-spawn the threads using their saved contexts.  The VM must not allocate objects in the
+    /// MMTk heap before calling `MMTK::after_fork()`.
     ///
-    /// Currently, such threads only include GC workers, and the entry point is
-    /// [`crate::memory_manager::start_worker`].
+    /// TODO: Currently, the MMTk core does not keep any files open for a long time.  In the
+    /// future, this function and the `after_fork` function may be used for handling open file
+    /// descriptors across invocations of `fork()`.  One possible use case is logging GC activities
+    /// and statistics to files, such as performing heap dumps across multiple GCs.
     ///
-    /// A subsequent call to `MMTK::after_fork()` will re-spawn the threads using their saved
-    /// contexts.  The VM must not allocate objects in the MMTk heap before calling
-    /// `MMTK::after_fork()`.
+    /// If a VM intends to execute another program by calling `fork()` and immediately calling
+    /// `exec`, it may skip this function because the state of the MMTk instance will be irrelevant
+    /// in that case.
     ///
     /// # Caution!
     ///
