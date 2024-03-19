@@ -452,8 +452,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 }
             }
             WorkerGoal::StopForFork => {
-                // A worker parked again when it is asked to exit.
-                unimplemented!()
+                panic!(
+                    "Worker {} parked again when it is asked to exit.",
+                    worker.ordinal
+                )
             }
         }
     }
