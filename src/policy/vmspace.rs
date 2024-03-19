@@ -208,6 +208,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             &crate::util::heap::layout::available_range()
         )
         .is_empty());
+        info!("Set [{:X}, {:X}) as VM region (heap available range [{:X}, {:X}))", chunk_start, chunk_end, crate::util::heap::layout::available_range().start, crate::util::heap::layout::available_range().end);
 
         debug!(
             "Align VM space ({}, {}) to chunk ({}, {})",

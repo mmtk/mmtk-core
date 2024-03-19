@@ -199,7 +199,7 @@ mod space_map {
                 // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
                 if index != table_size - 1 {
                     assert!(start >= space_start);
-                    assert!(start + bytes <= space_start + vm_layout().max_space_extent());
+                    assert!(start + bytes <= space_start + vm_layout().max_space_extent(), "start = {:X} + bytes = {} should be smaller than space_start {:X} + max extent {}, index {}, table size {}", start, bytes, space_start, vm_layout().max_space_extent(), index, table_size - 1);
                 }
             }
 
