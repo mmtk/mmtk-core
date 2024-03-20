@@ -22,13 +22,15 @@ pub fn acquire_typed_allocator() {
 
             // ANCHOR: avoid_resolving_allocator
             // At boot time
-            let selector =
-                memory_manager::get_allocator_mapping(fixture.mmtk, AllocationSemantics::Default);
+            let selector = memory_manager::get_allocator_mapping(
+                fixture.get_mmtk(),
+                AllocationSemantics::Default,
+            );
             unsafe {
                 DEFAULT_ALLOCATOR_OFFSET =
                     crate::plan::Mutator::<MockVM>::get_allocator_base_offset(selector);
             }
-            let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+            let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
 
             // At run time: allocate with the default semantics without resolving allocator
             let default_allocator: &mut BumpAllocator<MockVM> = {

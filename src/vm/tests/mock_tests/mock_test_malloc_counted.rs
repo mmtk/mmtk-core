@@ -12,15 +12,15 @@ pub fn malloc_free() {
         default_setup,
         || {
             MMTK.with_fixture(|fixture| {
-                let bytes_before = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_before = memory_manager::get_malloc_bytes(fixture.get_mmtk());
 
-                let res = memory_manager::counted_malloc(&fixture.mmtk, 8);
+                let res = memory_manager::counted_malloc(fixture.get_mmtk(), 8);
                 assert!(!res.is_zero());
-                let bytes_after_alloc = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_after_alloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 8, bytes_after_alloc);
 
-                memory_manager::free_with_size(&fixture.mmtk, res, 8);
-                let bytes_after_free = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                memory_manager::free_with_size(fixture.get_mmtk(), res, 8);
+                let bytes_after_free = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
@@ -34,15 +34,15 @@ pub fn calloc_free() {
         default_setup,
         || {
             MMTK.with_fixture(|fixture| {
-                let bytes_before = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_before = memory_manager::get_malloc_bytes(fixture.get_mmtk());
 
-                let res = memory_manager::counted_calloc(&fixture.mmtk, 1, 8);
+                let res = memory_manager::counted_calloc(fixture.get_mmtk(), 1, 8);
                 assert!(!res.is_zero());
-                let bytes_after_alloc = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_after_alloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 8, bytes_after_alloc);
 
-                memory_manager::free_with_size(&fixture.mmtk, res, 8);
-                let bytes_after_free = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                memory_manager::free_with_size(fixture.get_mmtk(), res, 8);
+                let bytes_after_free = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
@@ -56,21 +56,21 @@ pub fn realloc_grow() {
         default_setup,
         || {
             MMTK.with_fixture(|fixture| {
-                let bytes_before = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_before = memory_manager::get_malloc_bytes(fixture.get_mmtk());
 
-                let res1 = memory_manager::counted_malloc(&fixture.mmtk, 8);
+                let res1 = memory_manager::counted_malloc(&fixture.get_mmtk(), 8);
                 assert!(!res1.is_zero());
-                let bytes_after_alloc = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_after_alloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 8, bytes_after_alloc);
 
                 // grow to 16 bytes
-                let res2 = memory_manager::realloc_with_old_size(&fixture.mmtk, res1, 16, 8);
+                let res2 = memory_manager::realloc_with_old_size(fixture.get_mmtk(), res1, 16, 8);
                 assert!(!res2.is_zero());
-                let bytes_after_realloc = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_after_realloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 16, bytes_after_realloc);
 
-                memory_manager::free_with_size(&fixture.mmtk, res2, 16);
-                let bytes_after_free = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                memory_manager::free_with_size(&fixture.get_mmtk(), res2, 16);
+                let bytes_after_free = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },
@@ -84,21 +84,21 @@ pub fn realloc_shrink() {
         default_setup,
         || {
             MMTK.with_fixture(|fixture| {
-                let bytes_before = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_before = memory_manager::get_malloc_bytes(fixture.get_mmtk());
 
-                let res1 = memory_manager::counted_malloc(&fixture.mmtk, 16);
+                let res1 = memory_manager::counted_malloc(fixture.get_mmtk(), 16);
                 assert!(!res1.is_zero());
-                let bytes_after_alloc = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_after_alloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 16, bytes_after_alloc);
 
                 // shrink to 8 bytes
-                let res2 = memory_manager::realloc_with_old_size(&fixture.mmtk, res1, 8, 16);
+                let res2 = memory_manager::realloc_with_old_size(fixture.get_mmtk(), res1, 8, 16);
                 assert!(!res2.is_zero());
-                let bytes_after_realloc = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                let bytes_after_realloc = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before + 8, bytes_after_realloc);
 
-                memory_manager::free_with_size(&fixture.mmtk, res2, 8);
-                let bytes_after_free = memory_manager::get_malloc_bytes(&fixture.mmtk);
+                memory_manager::free_with_size(fixture.get_mmtk(), res2, 8);
+                let bytes_after_free = memory_manager::get_malloc_bytes(fixture.get_mmtk());
                 assert_eq!(bytes_before, bytes_after_free);
             });
         },

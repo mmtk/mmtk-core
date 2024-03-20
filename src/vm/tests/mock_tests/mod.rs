@@ -39,6 +39,8 @@ mod mock_test_issue867_allocate_unrealistically_large_object;
 #[cfg(feature = "malloc_counted_size")]
 mod mock_test_malloc_counted;
 mod mock_test_malloc_ms;
+#[cfg(all(target_pointer_width = "64", feature = "vm_space"))]
+mod mock_test_mmtk_julia_pr_143;
 #[cfg(feature = "nogc_lock_free")]
 mod mock_test_nogc_lock_free;
 #[cfg(target_pointer_width = "64")]

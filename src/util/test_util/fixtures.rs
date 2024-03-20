@@ -115,7 +115,7 @@ impl<T: FixtureContent> Default for SerialFixture<T> {
 }
 
 pub struct MMTKFixture {
-    pub mmtk: &'static MMTK<MockVM>,
+    mmtk: *mut MMTK<MockVM>,
 }
 
 impl FixtureContent for MMTKFixture {
@@ -143,13 +143,21 @@ impl MMTKFixture {
 
         let mmtk = memory_manager::mmtk_init(&builder);
         let mmtk_ptr = Box::into_raw(mmtk);
-        let mmtk_static: &'static MMTK<MockVM> = unsafe { &*mmtk_ptr };
 
         if initialize_collection {
+            let mmtk_static: &'static MMTK<MockVM> = unsafe { &*mmtk_ptr };
             memory_manager::initialize_collection(mmtk_static, VMThread::UNINITIALIZED);
         }
 
-        MMTKFixture { mmtk: mmtk_static }
+        MMTKFixture { mmtk: mmtk_ptr }
+    }
+
+    pub fn get_mmtk(&self) -> &'static MMTK<MockVM> {
+        unsafe { &*self.mmtk }
+    }
+
+    pub fn get_mmtk_mut(&mut self) -> &'static mut MMTK<MockVM> {
+        unsafe { &mut *self.mmtk }
     }
 }
 
@@ -186,7 +194,7 @@ impl MutatorFixture {
             true,
         );
         let mutator =
-            memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
+            memory_manager::bind_mutator(mmtk.get_mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
         Self { mmtk, mutator }
     }
 
@@ -196,12 +204,12 @@ impl MutatorFixture {
     {
         let mmtk = MMTKFixture::create_with_builder(with_builder, true);
         let mutator =
-            memory_manager::bind_mutator(mmtk.mmtk, VMMutatorThread(VMThread::UNINITIALIZED));
+            memory_manager::bind_mutator(mmtk.get_mmtk(), VMMutatorThread(VMThread::UNINITIALIZED));
         Self { mmtk, mutator }
     }
 
     pub fn mmtk(&self) -> &'static MMTK<MockVM> {
-        self.mmtk.mmtk
+        self.mmtk.get_mmtk()
     }
 }
 
