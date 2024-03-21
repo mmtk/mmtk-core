@@ -282,23 +282,21 @@ unsafe impl<VM: VMBinding> Sync for WorkerGroup<VM> {}
 impl<VM: VMBinding> WorkerGroup<VM> {
     /// Create a WorkerGroup
     pub fn new(num_workers: usize) -> Arc<Self> {
-        let unspawned_local_work_queues = (0..num_workers)
+        let local_work_queues = (0..num_workers)
             .map(|_| deque::Worker::new_fifo())
             .collect::<Vec<_>>();
 
         let workers_shared = (0..num_workers)
             .map(|i| {
                 Arc::new(GCWorkerShared::<VM>::new(Some(
-                    unspawned_local_work_queues[i].stealer(),
+                    local_work_queues[i].stealer(),
                 )))
             })
             .collect::<Vec<_>>();
 
         Arc::new(Self {
             workers_shared,
-            state: Mutex::new(WorkerCreationState::NotCreated {
-                local_work_queues: unspawned_local_work_queues,
-            }),
+            state: Mutex::new(WorkerCreationState::NotCreated { local_work_queues }),
         })
     }
 
@@ -312,19 +310,21 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         };
 
         assert_eq!(self.workers_shared.len(), local_work_queues.len());
-        let mut workers = Vec::with_capacity(self.workers_shared.len());
 
         // Spawn each worker thread.
-        for (ordinal, shared) in self.workers_shared.iter().enumerate() {
-            let worker = Box::new(GCWorker::new(
-                mmtk,
-                ordinal,
-                mmtk.scheduler.clone(),
-                shared.clone(),
-                local_work_queues.pop().unwrap(),
-            ));
-            workers.push(worker);
-        }
+        let workers = (local_work_queues.drain(..))
+            .zip(self.workers_shared.iter())
+            .enumerate()
+            .map(|(ordinal, (queue, shared))| {
+                Box::new(GCWorker::new(
+                    mmtk,
+                    ordinal,
+                    mmtk.scheduler.clone(),
+                    shared.clone(),
+                    queue,
+                ))
+            })
+            .collect::<Vec<_>>();
 
         *state = WorkerCreationState::Resting { workers };
         debug!("GCWorker instances created.");
