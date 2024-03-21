@@ -104,7 +104,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Surrender the `GCWorker` struct of a GC worker when it exits.
     pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
-        let all_surrendered = self.worker_group.return_gc_worker_struct(worker);
+        let all_surrendered = self.worker_group.surrender_gc_worker(worker);
 
         if all_surrendered {
             debug!(

@@ -242,25 +242,27 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 }
 
+/// Data that are owned by a worker group but depend on whether the `GCWorker` structs and the
+/// actual GC worker threads have been created or not.
 enum WorkerCreationState<VM: VMBinding> {
-    /// `GCWorker`` structs have not been created yet.
+    /// `GCWorker` structs have not been created yet.
     NotCreated {
         /// The local work queues for to-be-created workers.
-        unspawned_local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
+        local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
     },
-    /// `GCWorker`` structs are created, but worker threads are either not been spawn, yet, or in
-    /// the progress of stopping for forking.
+    /// `GCWorker` structs are created, but worker threads are either not spawn, yet, or in the
+    /// progress of stopping for forking.
     Resting {
-        /// `Worker` instances for worker threads that have not been created yet, or worker thread
-        /// that are suspended (e.g. for forking).
+        /// `GCWorker` instances not currently owned by active GC worker threads.  Once GC workers
+        /// are (re-)spawn, they will take ownership of these `GCWorker` instances.
         // Note: Clippy warns about `Vec<Box<T>>` because `Vec<T>` is already in the heap.
         // However, the purpose of this `Vec` is allowing GC worker threads to give their
         // `Box<GCWorker<VM>>` instances back to this pool.  Therefore, the `Box` is necessary.
         #[allow(clippy::vec_box)]
-        suspended_workers: Vec<Box<GCWorker<VM>>>,
+        workers: Vec<Box<GCWorker<VM>>>,
     },
-    /// All `GCWorker`` structs have been transferred to worker threads, and worker threads are
-    /// running.
+    /// All worker threads are spawn and running.  `GCWorker` structs have been transferred to
+    /// worker threads.
     Spawned,
 }
 
@@ -272,9 +274,9 @@ pub(crate) struct WorkerGroup<VM: VMBinding> {
     state: Mutex<WorkerCreationState<VM>>,
 }
 
-/// We have to persuade Rust that `WorkerGroup` is safe to share because it thinks one worker can
-/// refer to another worker via the path "worker -> scheduler -> worker_group -> suspended_workers
-/// -> worker" which it thinks is cyclic reference and unsafe.
+/// We have to persuade Rust that `WorkerGroup` is safe to share because the compiler thinks one
+/// worker can refer to another worker via the path "worker -> scheduler -> worker_group ->
+/// `Resting::workers` -> worker" which is cyclic reference and unsafe.
 unsafe impl<VM: VMBinding> Sync for WorkerGroup<VM> {}
 
 impl<VM: VMBinding> WorkerGroup<VM> {
@@ -295,7 +297,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         Arc::new(Self {
             workers_shared,
             state: Mutex::new(WorkerCreationState::NotCreated {
-                unspawned_local_work_queues,
+                local_work_queues: unspawned_local_work_queues,
             }),
         })
     }
@@ -305,12 +307,12 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         debug!("Creating GCWorker instances...");
         let mut state = self.state.lock().unwrap();
 
-        let WorkerCreationState::NotCreated { ref mut unspawned_local_work_queues } = *state else {
+        let WorkerCreationState::NotCreated { ref mut local_work_queues } = *state else {
             panic!("GCWorker structs have already been created");
         };
 
-        assert_eq!(self.workers_shared.len(), unspawned_local_work_queues.len());
-        let mut suspended_workers = Vec::with_capacity(self.workers_shared.len());
+        assert_eq!(self.workers_shared.len(), local_work_queues.len());
+        let mut workers = Vec::with_capacity(self.workers_shared.len());
 
         // Spawn each worker thread.
         for (ordinal, shared) in self.workers_shared.iter().enumerate() {
@@ -319,12 +321,12 @@ impl<VM: VMBinding> WorkerGroup<VM> {
                 ordinal,
                 mmtk.scheduler.clone(),
                 shared.clone(),
-                unspawned_local_work_queues.pop().unwrap(),
+                local_work_queues.pop().unwrap(),
             ));
-            suspended_workers.push(worker);
+            workers.push(worker);
         }
 
-        *state = WorkerCreationState::Resting { suspended_workers };
+        *state = WorkerCreationState::Resting { workers };
         debug!("GCWorker instances created.");
     }
 
@@ -336,12 +338,12 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         );
         let mut state = self.state.lock().unwrap();
 
-        let WorkerCreationState::Resting { ref mut suspended_workers } = *state else {
+        let WorkerCreationState::Resting { ref mut workers } = *state else {
             panic!("GCWorker structs have not been created, yet.");
         };
 
         // Drain the queue.  We transfer the ownership of each `GCWorker` instance to a GC thread.
-        for worker in suspended_workers.drain(..) {
+        for worker in workers.drain(..) {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
 
@@ -358,26 +360,26 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn prepare_surrender_buffer(&self) {
         let mut state = self.state.lock().unwrap();
         *state = WorkerCreationState::Resting {
-            suspended_workers: Vec::with_capacity(self.worker_count()),
+            workers: Vec::with_capacity(self.worker_count()),
         }
     }
 
     /// Return the `GCWorker` struct to the worker group.
     /// This function returns `true` if all workers returned their `GCWorker` structs.
-    pub fn return_gc_worker_struct(&self, worker: Box<GCWorker<VM>>) -> bool {
+    pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) -> bool {
         let mut state = self.state.lock().unwrap();
-        let WorkerCreationState::Resting { ref mut suspended_workers } = *state else {
+        let WorkerCreationState::Resting { ref mut workers } = *state else {
             panic!("GCWorker structs have not been created, yet.");
         };
         let ordinal = worker.ordinal;
-        suspended_workers.push(worker);
+        workers.push(worker);
         trace!(
             "Worker {} surrendered. ({}/{})",
             ordinal,
-            suspended_workers.len(),
+            workers.len(),
             self.worker_count()
         );
-        suspended_workers.len() == self.worker_count()
+        workers.len() == self.worker_count()
     }
 
     /// Get the number of workers in the group
