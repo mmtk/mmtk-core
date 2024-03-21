@@ -73,6 +73,7 @@ mod freelist;
 mod int_array_freelist;
 /// Implementation of GenericFreeList backed by raw memory, allocated
 /// on demand direct from the OS (via mmap).
+#[cfg(target_pointer_width = "64")]
 mod raw_memory_freelist;
 
 pub use self::address::Address;
