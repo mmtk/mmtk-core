@@ -63,9 +63,6 @@ jobs:
       # Test
       - name: Test
         run: ./.github/scripts/ci-test.sh
-      - name: Setup tmate session
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
 
       # Style checks
       - name: Style checks
