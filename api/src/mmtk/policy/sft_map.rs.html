@@ -576,6 +576,19 @@
 <a href="#576" id="576">576</a>
 <a href="#577" id="577">577</a>
 <a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -645,18 +658,24 @@
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>create_sft_map() -&gt; Box&lt;<span class="kw">dyn </span>SFTMap&gt; {
     <span class="macro">cfg_if::cfg_if! </span>{
-        <span class="kw">if </span><span class="attr">#[cfg(all(feature = <span class="string">&quot;malloc_mark_sweep&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))] </span>{
-            <span class="comment">// 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
-            </span>Box::new(dense_chunk_map::SFTDenseChunkMap::new())
-        } <span class="kw">else if </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)] </span>{
-            <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
-            <span class="kw">if </span>vm_layout().force_use_contiguous_spaces {
-                Box::new(space_map::SFTSpaceMap::new())
+        <span class="kw">if </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)] </span>{
+            <span class="comment">// For 64bits, we generally want to use the space map, which requires using contiguous space and no off-heap memory.
+            // If the requirements do not meet, we have to choose a different SFT map implementation.
+            </span><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
+            <span class="kw">if </span>!vm_layout().force_use_contiguous_spaces {
+                <span class="comment">// This is usually the case for compressed pointer. Use the 32bits implementation.
+                </span>Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
+            } <span class="kw">else if </span><span class="macro">cfg!</span>(any(feature = <span class="string">&quot;malloc_mark_sweep&quot;</span>, feature = <span class="string">&quot;vm_space&quot;</span>)) {
+                <span class="comment">// We have off-heap memory (malloc&#39;d objects, or VM space). We have to use a chunk-based map.
+                </span>Box::new(dense_chunk_map::SFTDenseChunkMap::new())
             } <span class="kw">else </span>{
-                Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
+                <span class="comment">// We can use space map.
+                </span>Box::new(space_map::SFTSpaceMap::new())
             }
         } <span class="kw">else if </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)] </span>{
-            Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
+            <span class="comment">// Use sparse chunk map. As we have limited virtual address range on 32 bits,
+            // it is okay to have a sparse chunk map which maps every chunk into an index in the array.
+            </span>Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
         } <span class="kw">else </span>{
             <span class="macro">compile_err!</span>(<span class="string">&quot;Cannot figure out which SFT map to use.&quot;</span>);
         }
@@ -732,16 +751,18 @@
     <span class="doccomment">/// Space map is a small table, and it has one entry for each MMTk space.
     </span><span class="kw">pub struct </span>SFTSpaceMap {
         sft: Vec&lt;SFTRefStorage&gt;,
+        space_address_start: Address,
+        space_address_end: Address,
     }
 
     <span class="kw">unsafe impl </span>Sync <span class="kw">for </span>SFTSpaceMap {}
 
     <span class="kw">impl </span>SFTMap <span class="kw">for </span>SFTSpaceMap {
-        <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
-            <span class="comment">// Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
-            // So any address has an SFT entry.
-            </span><span class="bool-val">true
-        </span>}
+        <span class="kw">fn </span>has_sft_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
+            <span class="comment">// An arbitrary address from Address::ZERO to Address::MAX will be cyclically mapped to an index between 0 and 31
+            // Only addresses between the virtual address range we use have valid entries.
+            </span>addr &gt;= <span class="self">self</span>.space_address_start &amp;&amp; addr &lt; <span class="self">self</span>.space_address_end
+        }
 
         <span class="kw">fn </span>get_side_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>SideMetadataSpec&gt; {
             <span class="prelude-val">None
@@ -764,7 +785,6 @@
             start: Address,
             bytes: usize,
         ) {
-            <span class="kw">let </span>table_size = <span class="self">Self</span>::addr_to_index(Address::MAX) + <span class="number">1</span>;
             <span class="kw">let </span>index = <span class="self">Self</span>::addr_to_index(start);
             <span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
                 <span class="comment">// Make sure we only update from empty to a valid space, or overwrite the space
@@ -772,13 +792,16 @@
                 <span class="macro">assert!</span>((<span class="kw-2">*</span>old).name() == EMPTY_SFT_NAME || (<span class="kw-2">*</span>old).name() == (<span class="kw-2">*</span>space).name());
                 <span class="comment">// Make sure the range is in the space
                 </span><span class="kw">let </span>space_start = <span class="self">Self</span>::index_to_space_start(index);
-                <span class="comment">// FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
-                // but the VM space is an exception. Any address after the last space is considered as the last space,
-                // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
-                </span><span class="kw">if </span>index != table_size - <span class="number">1 </span>{
-                    <span class="macro">assert!</span>(start &gt;= space_start);
-                    <span class="macro">assert!</span>(start + bytes &lt;= space_start + vm_layout().max_space_extent());
-                }
+                <span class="macro">assert!</span>(start &gt;= space_start);
+                <span class="macro">assert!</span>(
+                    start + bytes &lt;= space_start + vm_layout().max_space_extent(),
+                    <span class="string">&quot;The range of {} + {} bytes does not fall into the space range {} and {}, \
+                    and it is probably outside the address range we use.&quot;</span>,
+                    start,
+                    bytes,
+                    space_start,
+                    space_start + vm_layout().max_space_extent()
+                );
             }
 
             <span class="self">self</span>.sft.get_unchecked(index).store(space);
@@ -794,13 +817,16 @@
         <span class="doccomment">/// Create a new space map.
         </span><span class="attr">#[allow(clippy::assertions_on_constants)] </span><span class="comment">// We assert to make sure the constants
         </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+            <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES;
             <span class="kw">let </span>table_size = <span class="self">Self</span>::addr_to_index(Address::MAX) + <span class="number">1</span>;
-            <span class="macro">debug_assert!</span>(table_size &gt;= <span class="kw">crate</span>::util::heap::layout::heap_parameters::MAX_SPACES);
+            <span class="macro">debug_assert!</span>(table_size &gt;= MAX_SPACES);
             <span class="self">Self </span>{
                 sft: std::iter::repeat_with(SFTRefStorage::default)
                     .take(table_size)
                     .collect(),
-            }
+                space_address_start: <span class="self">Self</span>::index_to_space_range(<span class="number">1</span>).<span class="number">0</span>, <span class="comment">// the start of the first space
+                </span>space_address_end: <span class="self">Self</span>::index_to_space_range(MAX_SPACES - <span class="number">1</span>).<span class="number">1</span>, <span class="comment">// the end of the last space
+            </span>}
         }
 
         <span class="kw">fn </span>addr_to_index(addr: Address) -&gt; usize {
@@ -839,7 +865,7 @@
 
             <span class="kw">let </span>assert_for_index = |i: usize| {
                 <span class="kw">let </span>(start, end) = SFTSpaceMap::index_to_space_range(i);
-                <span class="macro">debug!</span>(<span class="string">&quot;Space: Index#{} = [{}, {})&quot;</span>, i, start, end);
+                <span class="macro">println!</span>(<span class="string">&quot;Space: Index#{} = [{}, {})&quot;</span>, i, start, end);
                 <span class="macro">assert_eq!</span>(SFTSpaceMap::addr_to_index(start), i);
                 <span class="macro">assert_eq!</span>(SFTSpaceMap::addr_to_index(end - <span class="number">1</span>), i);
             };

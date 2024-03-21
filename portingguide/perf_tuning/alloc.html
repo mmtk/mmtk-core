@@ -215,7 +215,7 @@ the binding needs to turn the boxed pointer into a raw pointer before storing it
                 }
 
                 // Bind an MMTk mutator
-                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+                let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
                 // Store the pointer in TLS
                 let mut storage = MutatorInTLS { ptr: mutator };
 
@@ -234,7 +234,7 @@ have an assertion to ensure that the native type has the exact same layout as th
                 }
 
                 // Bind an MMTk mutator
-                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+                let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
                 // Store the struct (or use memcpy for non-Rust code)
                 let mut storage = MutatorInTLS { embed: *mutator };
                 // Allocate
@@ -278,7 +278,7 @@ If a plan does not do bump-pointer allocation, we may still implement fast-paths
                 }
 
                 // Bind an MMTk mutator
-                let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+                let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
                 // Create a fastpath BumpPointer with default(). The BumpPointer from default() will guarantee to fail on the first allocation
                 // so the allocation goes to the slowpath and we will get an allocation buffer from MMTk.
                 let default_bump_pointer = BumpPointer::default();
@@ -300,7 +300,7 @@ If a plan does not do bump-pointer allocation, we may still implement fast-paths
                     } else {
                         use crate::util::alloc::Allocator;
                         let selector = memory_manager::get_allocator_mapping(
-                            fixture.mmtk,
+                            fixture.get_mmtk(),
                             AllocationSemantics::Default,
                         );
                         let default_allocator = unsafe {
@@ -365,13 +365,15 @@ with the default allocation semantics, we can use the offset to get a reference 
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>            // At boot time
-            let selector =
-                memory_manager::get_allocator_mapping(fixture.mmtk, AllocationSemantics::Default);
+            let selector = memory_manager::get_allocator_mapping(
+                fixture.get_mmtk(),
+                AllocationSemantics::Default,
+            );
             unsafe {
                 DEFAULT_ALLOCATOR_OFFSET =
                     crate::plan::Mutator::&lt;MockVM&gt;::get_allocator_base_offset(selector);
             }
-            let mutator = memory_manager::bind_mutator(fixture.mmtk, tls_opaque_pointer);
+            let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
 
             // At run time: allocate with the default semantics without resolving allocator
             let default_allocator: &amp;mut BumpAllocator&lt;MockVM&gt; = {

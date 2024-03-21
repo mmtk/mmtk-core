@@ -255,20 +255,6 @@
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
 <a href="#257" id="257">257</a>
-<a href="#258" id="258">258</a>
-<a href="#259" id="259">259</a>
-<a href="#260" id="260">260</a>
-<a href="#261" id="261">261</a>
-<a href="#262" id="262">262</a>
-<a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -398,20 +384,6 @@
         <span class="comment">// The default implementation checks with vm map. But vm map has some assumptions about
         // the address range for spaces and the VM space may break those assumptions (as the space is
         // mmapped by the runtime rather than us). So we we use SFT here.
-
-        // However, SFT map may not be an ideal solution either for 64 bits. The default
-        // implementation of SFT map on 64 bits is `SFTSpaceMap`, which maps the entire address
-        // space into an index between 0 and 31, and assumes any address with the same index
-        // is in the same space (with the same SFT). MMTk spaces uses 1-16. We guarantee that
-        // VM space does not overlap with the address range that MMTk spaces may use. So
-        // any region used as VM space will have an index of 0, or 17-31, and all the addresses
-        // that are mapped to the same index will be considered as in the VM space. That means,
-        // after we map a region as VM space, the nearby addresses will also be considered
-        // as in the VM space if we use the default `SFTSpaceMap`. We can guarantee the nearby
-        // addresses are not MMTk spaces, but we cannot tell whether they really in the VM space
-        // or not.
-        // A solution to this is to use `SFTDenseChunkMap` if `vm_space` is enabled on 64 bits.
-        // `SFTDenseChunkMap` has an overhead of a few percentages (~3%) compared to `SFTSpaceMap`.
         </span>SFT_MAP.get_checked(start).name() == <span class="self">self</span>.name()
     }
 }
