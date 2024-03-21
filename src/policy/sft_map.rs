@@ -202,7 +202,15 @@ mod space_map {
                 // Make sure the range is in the space
                 let space_start = Self::index_to_space_start(index);
                 assert!(start >= space_start);
-                assert!(start + bytes <= space_start + vm_layout().max_space_extent(), "The range of {} + {} bytes does not fall into the space range {} and {}, and it is probably outside the address range we use.", start, bytes, space_start, space_start + vm_layout().max_space_extent());
+                assert!(
+                    start + bytes <= space_start + vm_layout().max_space_extent(),
+                    "The range of {} + {} bytes does not fall into the space range {} and {}, \
+                    and it is probably outside the address range we use.",
+                    start,
+                    bytes,
+                    space_start,
+                    space_start + vm_layout().max_space_extent()
+                );
             }
 
             self.sft.get_unchecked(index).store(space);
