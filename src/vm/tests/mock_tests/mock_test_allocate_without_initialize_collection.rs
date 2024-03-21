@@ -25,7 +25,7 @@ pub fn allocate_without_initialize_collection() {
 
             // Build mutator
             let mut mutator = memory_manager::bind_mutator(
-                fixture.mmtk,
+                fixture.get_mmtk(),
                 VMMutatorThread(VMThread::UNINITIALIZED),
             );
 
