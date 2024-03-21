@@ -229,16 +229,16 @@ mod tests {
     #[test]
     fn ensure_mapped_1page() {
         serial_test(|| {
+            let pages = 1;
+            let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
+            let end_chunk =
+                ByteMapMmapper::address_to_mmap_chunks_up(FIXED_ADDRESS + pages_to_bytes(pages));
+            let test_memory_size = (end_chunk - start_chunk) * MMAP_CHUNK_BYTES;
             with_cleanup(
                 || {
                     let mmapper = ByteMapMmapper::new();
-                    let pages = 1;
                     mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
-                    let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
-                    let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
-                        FIXED_ADDRESS + pages_to_bytes(pages),
-                    );
                     for chunk in start_chunk..end_chunk {
                         assert_eq!(
                             mmapper.mapped[chunk].load(Ordering::Relaxed),
@@ -247,7 +247,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_size).unwrap();
                 },
             )
         })
@@ -256,16 +256,16 @@ mod tests {
     #[test]
     fn ensure_mapped_1chunk() {
         serial_test(|| {
+            let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
+            let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
+            let end_chunk =
+                ByteMapMmapper::address_to_mmap_chunks_up(FIXED_ADDRESS + pages_to_bytes(pages));
+            let test_memory_size = (end_chunk - start_chunk) * MMAP_CHUNK_BYTES;
             with_cleanup(
                 || {
                     let mmapper = ByteMapMmapper::new();
-                    let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
-                    let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
-                    let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
-                        FIXED_ADDRESS + pages_to_bytes(pages),
-                    );
                     for chunk in start_chunk..end_chunk {
                         assert_eq!(
                             mmapper.mapped[chunk].load(Ordering::Relaxed),
@@ -274,7 +274,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_size).unwrap();
                 },
             )
         })
@@ -283,11 +283,14 @@ mod tests {
     #[test]
     fn ensure_mapped_more_than_1chunk() {
         serial_test(|| {
+            let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
+            let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
+            let end_chunk =
+                ByteMapMmapper::address_to_mmap_chunks_up(FIXED_ADDRESS + pages_to_bytes(pages));
+            let test_memory_size = (end_chunk - start_chunk) * MMAP_CHUNK_BYTES;
             with_cleanup(
                 || {
                     let mmapper = ByteMapMmapper::new();
-                    let pages =
-                        (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
                     mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
@@ -303,7 +306,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_size).unwrap();
                 },
             )
         })
@@ -312,6 +315,7 @@ mod tests {
     #[test]
     fn protect() {
         serial_test(|| {
+            let test_memory_size = MMAP_CHUNK_BYTES * 2;
             with_cleanup(
                 || {
                     // map 2 chunks
@@ -335,7 +339,7 @@ mod tests {
                     );
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_size).unwrap();
                 },
             )
         })
@@ -344,6 +348,7 @@ mod tests {
     #[test]
     fn ensure_mapped_on_protected_chunks() {
         serial_test(|| {
+            let test_memory_size = MMAP_CHUNK_BYTES * 2;
             with_cleanup(
                 || {
                     // map 2 chunks
@@ -380,7 +385,7 @@ mod tests {
                     );
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_size).unwrap();
                 },
             )
         })
