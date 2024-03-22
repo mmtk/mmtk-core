@@ -222,8 +222,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
     /// Initialize the GC worker threads that are required for doing garbage collections.
     /// This is a mandatory call for a VM during its boot process once its thread system
-    /// is ready.  This function should be called exactly once, and should be called before
-    /// allocating objects in the MMTk heap.
+    /// is ready.  This function should be called exactly once.
     ///
     /// Internally, this function will spawn the GC worker threads, and the `tls` argument is used
     /// for this purpose.
