@@ -283,6 +283,7 @@ impl<VM: VMBinding> MMTK<VM> {
             self.state.is_initialized(),
             "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
         );
+        probe!(mmtk, prepare_to_fork);
         self.scheduler.stop_gc_threads_for_forking();
     }
 
@@ -300,6 +301,7 @@ impl<VM: VMBinding> MMTK<VM> {
             self.state.is_initialized(),
             "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
         );
+        probe!(mmtk, after_fork);
         self.scheduler.respawn_gc_threads_after_forking(tls);
     }
 

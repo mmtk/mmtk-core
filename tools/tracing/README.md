@@ -17,8 +17,10 @@ shipped with the MMTk release you use.
 Currently, the core provides the following tracepoints.
 
 -   `mmtk:collection_initialized()`: All GC worker threads are spawn
--   `mmtk:collection_uninitialized()`: All GC worker threads exited.  This may happend during
-    execution, for example, if the VM needs to fork and requests GC workers to exit.
+-   `mmtk:prepare_fork()`: The VM requests MMTk core to prepare for calling `fork()`.
+-   `mmtk:after_fork()`: The VM notifies MMTk core it has finished calling `fork()`.
+-   `mmtk:goal_set(goal: int)`: GC workers have started working on a goal.
+-   `mmtk:goal_complete(goal: int)`: GC workers have fihisned working on a goal.
 -   `mmtk:harness_begin()`: the timing iteration of a benchmark begins
 -   `mmtk:harness_end()`: the timing iteration of a benchmark ends
 -   `mmtk:gcworker_run()`: a GC worker thread enters its work loop

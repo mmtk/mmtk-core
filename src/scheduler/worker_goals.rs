@@ -54,6 +54,7 @@ impl WorkerGoals {
             if *requested {
                 *requested = false;
                 self.current = Some(goal);
+                probe!(mmtk, goal_set, goal);
                 return Some(goal);
             }
         }
@@ -67,6 +68,7 @@ impl WorkerGoals {
 
     /// Called when the current goal is completed.  This will clear the current goal.
     pub fn on_current_goal_completed(&mut self) {
+        probe!(mmtk, goal_complete);
         self.current = None
     }
 
