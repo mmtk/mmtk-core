@@ -2,7 +2,7 @@
 //! working towards on a high level.
 //!
 //! A "goal" is represented by a `WorkerGoal`.  All workers work towards a single goal at a time.
-//! THe current goal influences the behavior of GC workers, especially the last parked worker.
+//! The current goal influences the behavior of GC workers, especially the last parked worker.
 //! For example,
 //!
 //! -   When in the progress of GC, the last parker will try to open buckets or announce the GC

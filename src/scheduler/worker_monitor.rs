@@ -9,6 +9,7 @@ use std::sync::{Condvar, Mutex};
 use crate::vm::VMBinding;
 
 use super::{
+    worker::WorkerShouldExit,
     worker_goals::{WorkerGoal, WorkerGoals},
     GCWorker,
 };
@@ -123,7 +124,14 @@ impl WorkerMonitor {
     /// The argument of `on_last_parked` is true if `sync.gc_requested` is `true`.
     /// The return value of `on_last_parked` will determine whether this worker and other workers
     /// will wake up or block waiting.
-    pub fn park_and_wait<VM, F>(&self, worker: &GCWorker<VM>, on_last_parked: F) -> bool
+    ///
+    /// This function returns `Ok(())` if the current worker should continue working,
+    /// or `Err(WorkerShouldExit)` if the current worker should exit now.
+    pub fn park_and_wait<VM, F>(
+        &self,
+        worker: &GCWorker<VM>,
+        on_last_parked: F,
+    ) -> Result<(), WorkerShouldExit>
     where
         VM: VMBinding,
         F: FnOnce(&mut WorkerGoals) -> LastParkedResult,
@@ -226,8 +234,12 @@ impl WorkerMonitor {
             sync.parker.worker_count,
         );
 
-        // If the current goal is `StopForFork`, return true so that the worker thread will exit.
-        matches!(sync.goals.current(), Some(WorkerGoal::StopForFork))
+        // If the current goal is `StopForFork`, the worker thread should exit.
+        if matches!(sync.goals.current(), Some(WorkerGoal::StopForFork)) {
+            return Err(WorkerShouldExit);
+        }
+
+        Ok(())
     }
 
     /// Called when all workers have exited.

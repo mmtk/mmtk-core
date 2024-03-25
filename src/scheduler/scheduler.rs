@@ -1,4 +1,4 @@
-use self::worker::{PollResult, WorkerShouldExit};
+use self::worker::PollResult;
 
 use super::gc_work::ScheduleCollection;
 use super::stat::SchedulerStat;
@@ -402,18 +402,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 return Ok(work);
             }
 
-            let should_exit = self
-                .worker_monitor
-                .park_and_wait(worker, |goals| self.on_last_parked(worker, goals));
-
-            if should_exit {
-                return Err(WorkerShouldExit);
-            }
+            self.worker_monitor
+                .park_and_wait(worker, |goals| self.on_last_parked(worker, goals))?;
         }
     }
 
-    /// Called when the last worker parked.
-    /// `should_schedule_gc` is true if a mutator requested a GC.
+    /// Called when the last worker parked.  `goal` allows this function to inspect and change the
+    /// current goal.
     fn on_last_parked(&self, worker: &GCWorker<VM>, goals: &mut WorkerGoals) -> LastParkedResult {
         let Some(ref current_goal) = goals.current() else {
             // There is no goal.  Find a request to respond to.
@@ -469,7 +464,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         assert!(goals.current().is_none());
 
         let Some(goal) = goals.poll_next_goal() else {
-            // No reqeusts.  Park this worker, too.
+            // No requests.  Park this worker, too.
             return LastParkedResult::ParkSelf;
         };
 
