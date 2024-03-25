@@ -54,6 +54,14 @@ pub struct ImmixSpace<VM: VMBinding> {
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
     space_args: ImmixSpaceArgs,
+    /// Keeping track of live bytes
+    #[cfg(feature = "dump_memory_stats")]
+    live_bytes: AtomicUsize,
+    /// Keeping track of the number of traced/copied objects
+    #[cfg(feature = "dump_memory_stats")]
+    live_objects: AtomicUsize,
+    #[cfg(feature = "dump_memory_stats")]
+    copied_objects: AtomicUsize,
 }
 
 /// Some arguments for Immix Space.
@@ -217,6 +225,14 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
             debug_assert!(self.in_space(object));
             self.mark_lines(object);
         }
+
+        // count the bytes for each object
+        #[cfg(feature = "dump_memory_stats")]
+        self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+
+        // increase the number of objects scanned
+        #[cfg(feature = "dump_memory_stats")]
+        self.increase_live_objects(1);
     }
 
     fn may_move_objects<const KIND: TraceKind>() -> bool {
@@ -315,6 +331,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mark_state: Self::MARKED_STATE,
             scheduler: scheduler.clone(),
             space_args,
+            #[cfg(feature = "dump_memory_stats")]
+            live_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "dump_memory_stats")]
+            live_objects: AtomicUsize::new(0),
+            #[cfg(feature = "dump_memory_stats")]
+            copied_objects: AtomicUsize::new(0),
         }
     }
 
@@ -436,6 +458,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 self.scheduler.work_buckets[WorkBucketStage::ClearVOBits].bulk_add(work_packets);
             }
         }
+
+        #[cfg(feature = "dump_memory_stats")]
+        self.set_live_bytes(0);
+        #[cfg(feature = "dump_memory_stats")]
+        self.set_live_objects(0);
+        #[cfg(feature = "dump_memory_stats")]
+        self.set_copied_objects(0);
     }
 
     /// Release for the immix space. This is called when a GC finished.
@@ -465,6 +494,84 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.lines_consumed.store(0, Ordering::Relaxed);
 
         did_defrag
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub(crate) fn dump_memory_stats(&self) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        #[derive(Default)]
+        struct Dist {
+            live_blocks: usize,
+            live_lines: usize,
+        }
+        let mut dist = Dist::default();
+
+        for chunk in self.chunk_map.all_chunks() {
+            if !self.address_in_space(chunk.start()) {
+                continue;
+            }
+
+            for block in chunk
+                .iter_region::<Block>()
+                .filter(|b| b.get_state() != BlockState::Unallocated)
+            {
+                dist.live_blocks += 1;
+
+                let line_mark_state = self.line_mark_state.load(Ordering::Acquire);
+                let mut live_lines_in_table = 0;
+                let mut live_lines_from_block_state = 0;
+
+                for line in block.lines() {
+                    if line.is_marked(line_mark_state) {
+                        live_lines_in_table += 1;
+                    }
+                }
+
+                match block.get_state() {
+                    BlockState::Marked => {
+                        panic!("At this point the block should have been swept already");
+                    }
+                    BlockState::Unmarked => {
+                        // Block is unmarked and cannot be reused (has no holes)
+                        dist.live_lines += Block::LINES;
+                        live_lines_from_block_state += Block::LINES;
+                    }
+                    BlockState::Reusable { unavailable_lines } => {
+                        dist.live_lines += unavailable_lines as usize;
+                        live_lines_from_block_state += unavailable_lines as usize;
+                    }
+                    BlockState::Unallocated => {}
+                }
+
+                assert_eq!(live_lines_in_table, live_lines_from_block_state);
+            }
+        }
+
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+
+        println!("{:?} mmtk_immixspace", since_the_epoch.as_millis());
+        println!("\t#Live objects = {}", self.get_live_objects());
+        println!("\t#Copied objects = {}", self.get_copied_objects());
+        println!("\tLive bytes = {}", self.get_live_bytes());
+        println!("\tReserved pages = {}", self.reserved_pages());
+        println!(
+            "\tReserved pages (bytes) = {}",
+            self.reserved_pages() << LOG_BYTES_IN_PAGE
+        );
+        println!("\tLive blocks = {}", dist.live_blocks);
+        println!(
+            "\tLive blocks (bytes) = {}",
+            dist.live_blocks << Block::LOG_BYTES
+        );
+        println!("\tLive lines = {}", dist.live_lines);
+        println!(
+            "\tLive lines (bytes) = {}",
+            dist.live_lines << Line::LOG_BYTES
+        );
     }
 
     /// Generate chunk sweep tasks
@@ -639,6 +746,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 let new_object =
                     object_forwarding::forward_object::<VM>(object, semantics, copy_context);
 
+                // increase the number of objects being moved
+                #[cfg(feature = "dump_memory_stats")]
+                self.increase_copied_objects(1);
+
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_forwarded::<VM>(new_object);
 
@@ -806,6 +917,51 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
         }
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn get_live_bytes(&self) -> usize {
+        self.live_bytes.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn set_live_bytes(&self, size: usize) {
+        self.live_bytes.store(size, Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn increase_live_bytes(&self, size: usize) {
+        self.live_bytes.fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn get_live_objects(&self) -> usize {
+        self.live_objects.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn set_live_objects(&self, size: usize) {
+        self.live_objects.store(size, Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn increase_live_objects(&self, size: usize) {
+        self.live_objects.fetch_add(size, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn get_copied_objects(&self) -> usize {
+        self.copied_objects.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn set_copied_objects(&self, size: usize) {
+        self.copied_objects.store(size, Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "dump_memory_stats")]
+    pub fn increase_copied_objects(&self, size: usize) {
+        self.copied_objects.fetch_add(size, Ordering::SeqCst);
     }
 }
 

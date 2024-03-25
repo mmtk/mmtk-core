@@ -315,6 +315,10 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
             space.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         })
     }
+
+    /// Dump memory stats for the plan
+    #[cfg(feature = "dump_memory_stats")]
+    fn dump_memory_stats(&self) {}
 }
 
 impl_downcast!(Plan assoc VM);

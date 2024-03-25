@@ -116,6 +116,12 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
     }
+
+    #[cfg(feature = "dump_memory_stats")]
+    fn dump_memory_stats(&self) {
+        self.immix_space.dump_memory_stats();
+        self.common.los.dump_memory_stats();
+    }
 }
 
 impl<VM: VMBinding> Immix<VM> {
