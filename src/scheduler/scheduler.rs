@@ -90,8 +90,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Currently GC threads only include worker threads, and we currently have only one worker
     /// group.  We may add more worker groups in the future.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        self.worker_group.create_workers(mmtk);
-        self.worker_group.spawn(tls)
+        self.worker_group.initial_spawn(tls, mmtk);
     }
 
     /// Ask all GC workers to exit for forking.
@@ -119,7 +118,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// workers.  `tls` is the VM thread that requests GC threads to be re-spawn, and will be
     /// passed down to [`crate::vm::Collection::spawn_gc_thread`].
     pub fn respawn_gc_threads_after_forking(self: &Arc<Self>, tls: VMThread) {
-        self.worker_group.spawn(tls)
+        self.worker_group.respawn(tls)
     }
 
     /// Resolve the affinity of a thread.

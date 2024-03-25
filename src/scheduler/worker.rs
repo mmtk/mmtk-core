@@ -253,41 +253,41 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 }
 
-/// Data that are owned by a worker group but depend on whether the `GCWorker` structs and the
-/// actual GC worker threads have been created or not.
+/// Stateful part of [`WorkerGroup`].
 enum WorkerCreationState<VM: VMBinding> {
-    /// `GCWorker` structs have not been created yet.
-    NotCreated {
+    /// The initial state.  `GCWorker` structs have not been created and GC worker threads have not
+    /// been spawn.
+    Initial {
         /// The local work queues for to-be-created workers.
         local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
     },
-    /// `GCWorker` structs are created, but worker threads are either not spawn, yet, or in the
-    /// progress of stopping for forking.
-    Resting {
+    /// All worker threads are spawn and running.  `GCWorker` structs have been transferred to
+    /// worker threads.
+    Spawned,
+    /// Worker threads are stopping, or have already stopped, for forking. Instances of `GCWorker`
+    /// structs are collected here to be reused when GC workers are respawn.
+    Surrendered {
         /// `GCWorker` instances not currently owned by active GC worker threads.  Once GC workers
-        /// are (re-)spawn, they will take ownership of these `GCWorker` instances.
+        /// are respawn, they will take ownership of these `GCWorker` instances.
         // Note: Clippy warns about `Vec<Box<T>>` because `Vec<T>` is already in the heap.
         // However, the purpose of this `Vec` is allowing GC worker threads to give their
         // `Box<GCWorker<VM>>` instances back to this pool.  Therefore, the `Box` is necessary.
         #[allow(clippy::vec_box)]
         workers: Vec<Box<GCWorker<VM>>>,
     },
-    /// All worker threads are spawn and running.  `GCWorker` structs have been transferred to
-    /// worker threads.
-    Spawned,
 }
 
 /// A worker group to manage all the GC workers.
 pub(crate) struct WorkerGroup<VM: VMBinding> {
     /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
-    /// The stateful part
-    state: Mutex<WorkerCreationState<VM>>,
+    /// The stateful part.  `None` means state transition is underway.
+    state: Mutex<Option<WorkerCreationState<VM>>>,
 }
 
 /// We have to persuade Rust that `WorkerGroup` is safe to share because the compiler thinks one
 /// worker can refer to another worker via the path "worker -> scheduler -> worker_group ->
-/// `Resting::workers` -> worker" which is cyclic reference and unsafe.
+/// `Surrendered::workers` -> worker" which is cyclic reference and unsafe.
 unsafe impl<VM: VMBinding> Sync for WorkerGroup<VM> {}
 
 impl<VM: VMBinding> WorkerGroup<VM> {
@@ -307,23 +307,50 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
         Arc::new(Self {
             workers_shared,
-            state: Mutex::new(WorkerCreationState::NotCreated { local_work_queues }),
+            state: Mutex::new(Some(WorkerCreationState::Initial { local_work_queues })),
         })
     }
 
-    /// Create `GCWorker` instances, but do not create threads, yet.
-    pub fn create_workers(&self, mmtk: &'static MMTK<VM>) {
-        debug!("Creating GCWorker instances...");
+    /// Spawn GC worker threads for the first time.
+    pub fn initial_spawn(&self, tls: VMThread, mmtk: &'static MMTK<VM>) {
         let mut state = self.state.lock().unwrap();
 
-        let WorkerCreationState::NotCreated { ref mut local_work_queues } = *state else {
+        let WorkerCreationState::Initial { local_work_queues } = state.take().unwrap() else {
             panic!("GCWorker structs have already been created");
         };
 
+        let workers = self.create_workers(local_work_queues, mmtk);
+        self.spawn(workers, tls);
+
+        *state = Some(WorkerCreationState::Spawned);
+    }
+
+    /// Respawn GC threads after stopping for forking.
+    pub fn respawn(&self, tls: VMThread) {
+        let mut state = self.state.lock().unwrap();
+
+        let WorkerCreationState::Surrendered { workers } = state.take().unwrap() else {
+            panic!("GCWorker structs have not been created, yet.");
+        };
+
+        self.spawn(workers, tls);
+
+        *state = Some(WorkerCreationState::Spawned)
+    }
+
+    /// Create `GCWorker` instances.
+    #[allow(clippy::vec_box)] // See `WorkerCreationState::Surrendered`.
+    fn create_workers(
+        &self,
+        local_work_queues: Vec<deque::Worker<Box<dyn GCWork<VM>>>>,
+        mmtk: &'static MMTK<VM>,
+    ) -> Vec<Box<GCWorker<VM>>> {
+        debug!("Creating GCWorker instances...");
+
         assert_eq!(self.workers_shared.len(), local_work_queues.len());
 
-        // Spawn each worker thread.
-        let workers = (local_work_queues.drain(..))
+        // Each `GCWorker` instance corresponds to a `GCWorkerShared` at the same index.
+        let workers = (local_work_queues.into_iter())
             .zip(self.workers_shared.iter())
             .enumerate()
             .map(|(ordinal, (queue, shared))| {
@@ -337,28 +364,22 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             })
             .collect::<Vec<_>>();
 
-        *state = WorkerCreationState::Resting { workers };
-        debug!("GCWorker instances created.");
+        debug!("Created {} GCWorker instances.", workers.len());
+        workers
     }
 
     /// Spawn all the worker threads
-    pub fn spawn(&self, tls: VMThread) {
+    #[allow(clippy::vec_box)] // See `WorkerCreationState::Surrendered`.
+    fn spawn(&self, workers: Vec<Box<GCWorker<VM>>>, tls: VMThread) {
         debug!(
             "Spawning GC workers.  {}",
             crate::util::rust_util::debug_process_thread_id(),
         );
-        let mut state = self.state.lock().unwrap();
 
-        let WorkerCreationState::Resting { ref mut workers } = *state else {
-            panic!("GCWorker structs have not been created, yet.");
-        };
-
-        // Drain the queue.  We transfer the ownership of each `GCWorker` instance to a GC thread.
-        for worker in workers.drain(..) {
+        // We transfer the ownership of each `GCWorker` instance to a GC thread.
+        for worker in workers {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
-
-        *state = WorkerCreationState::Spawned;
 
         debug!(
             "Spawned {} worker threads.  {}",
@@ -370,16 +391,18 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Prepare the buffer for workers to surrender their `GCWorker` structs.
     pub fn prepare_surrender_buffer(&self) {
         let mut state = self.state.lock().unwrap();
-        *state = WorkerCreationState::Resting {
+        assert!(matches!(*state, Some(WorkerCreationState::Spawned)));
+
+        *state = Some(WorkerCreationState::Surrendered {
             workers: Vec::with_capacity(self.worker_count()),
-        }
+        })
     }
 
     /// Return the `GCWorker` struct to the worker group.
     /// This function returns `true` if all workers returned their `GCWorker` structs.
     pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) -> bool {
         let mut state = self.state.lock().unwrap();
-        let WorkerCreationState::Resting { ref mut workers } = *state else {
+        let WorkerCreationState::Surrendered { ref mut workers } = state.as_mut().unwrap() else {
             panic!("GCWorker structs have not been created, yet.");
         };
         let ordinal = worker.ordinal;
