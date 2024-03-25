@@ -705,10 +705,7 @@ mod gc_trigger_tests {
 options! {
     /// The GC plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::GenImmix,
-    /// Number of GC worker threads. (There is always one GC controller thread besides the GC workers)
-    // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
-    // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
-    // See: https://github.com/mmtk/mmtk-core/issues/532
+    /// Number of GC worker threads.
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
     /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,

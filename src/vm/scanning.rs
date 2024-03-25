@@ -124,7 +124,7 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     /// Create work packets to handle transitively pinning (TP) roots.
     ///
     /// Similar to `create_process_pinning_roots_work`, this work packet will not move objects in `nodes`.
-    /// Unlike ``create_process_pinning_roots_work`, no objects in the transitive closure of `nodes` will be moved, either.
+    /// Unlike `create_process_pinning_roots_work`, no objects in the transitive closure of `nodes` will be moved, either.
     ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by root edges.

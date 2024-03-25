@@ -16,11 +16,15 @@ shipped with the MMTk release you use.
 
 Currently, the core provides the following tracepoints.
 
--   `mmtk:collection_initialized()`: GC is enabled
+-   `mmtk:collection_initialized()`: All GC worker threads are spawn
+-   `mmtk:prepare_fork()`: The VM requests MMTk core to prepare for calling `fork()`.
+-   `mmtk:after_fork()`: The VM notifies MMTk core it has finished calling `fork()`.
+-   `mmtk:goal_set(goal: int)`: GC workers have started working on a goal.
+-   `mmtk:goal_complete(goal: int)`: GC workers have fihisned working on a goal.
 -   `mmtk:harness_begin()`: the timing iteration of a benchmark begins
 -   `mmtk:harness_end()`: the timing iteration of a benchmark ends
--   `mmtk:gccontroller_run()`: the GC controller thread enters its work loop
 -   `mmtk:gcworker_run()`: a GC worker thread enters its work loop
+-   `mmtk:gcworker_exit()`: a GC worker thread exits its work loop
 -   `mmtk:gc_start()`: a collection epoch starts
 -   `mmtk:gc_end()`: a collection epoch ends
 -   `mmtk:process_edges(num_edges: int, is_roots: bool)`: a invocation of the `process_edges`

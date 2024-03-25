@@ -82,7 +82,7 @@ where
     func(&mut lock)
 }
 
-/// A test that uses `MockVM`` should use this method to wrap the entire test
+/// A test that uses `MockVM` should use this method to wrap the entire test
 /// that may use `MockVM`.
 ///
 /// # Arguents
