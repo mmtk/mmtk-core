@@ -461,33 +461,16 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     }
 }
 
-/// Run the main loop of a GC worker.
-///
-/// This method runs until the worker exits.  Currently a worker may exit after
-/// [`crate::mmtk::MMTK::prepare_to_fork`] is called.
-///
-/// Arguments:
-/// * `tls`: The thread that will be used as the GC worker.
-/// * `worker`: The execution context of the GC worker thread.
-///   It is the `GCWorker` passed to `Collection::spawn_gc_thread`.
-/// * `mmtk`: A reference to an MMTk instance.
+/// Wrapper for [`crate::scheduler::GCWorker::run`].
 pub fn start_worker<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: VMWorkerThread,
-    mut worker: Box<GCWorker<VM>>,
+    worker: Box<GCWorker<VM>>,
 ) {
     worker.run(tls, mmtk);
-    mmtk.scheduler.surrender_gc_worker(worker);
 }
 
-/// Initialize the GC worker threads that are required for doing garbage collections.
-/// This is a mandatory call for a VM during its boot process once its thread system
-/// is ready.  This call will invoke `Collection::spawn_gc_thread()`` to create GC threads.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-/// * `tls`: The thread that wants to enable the collection. This value will be passed back to
-///   the VM in `Collection::spawn_gc_thread()` so that the VM knows the context.
+/// Wrapper for [`crate::mmtk::MMTK::initialize_collection`].
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     mmtk.initialize_collection(tls);
 }

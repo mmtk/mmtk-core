@@ -222,15 +222,17 @@ impl<VM: VMBinding> MMTK<VM> {
 
     /// Initialize the GC worker threads that are required for doing garbage collections.
     /// This is a mandatory call for a VM during its boot process once its thread system
-    /// is ready.  This function should be called exactly once.
+    /// is ready.
     ///
-    /// Internally, this function will spawn the GC worker threads, and the `tls` argument is used
-    /// for this purpose.
+    /// Internally, this function will invoke [`Collection::spawn_gc_thread()`] to spawn GC worker
+    /// threads.
     ///
     /// # Arguments
     ///
     /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
-    ///     to the VM in `Collection::spawn_gc_thread()` so that the VM knows the context.
+    ///     to the VM in [`Collection::spawn_gc_thread()`] so that the VM knows the context.
+    ///
+    /// [`Collection::spawn_gc_thread()`]: crate::vm::Collection::spawn_gc_thread()
     pub fn initialize_collection(&'static self, tls: VMThread) {
         assert!(
             !self.state.is_initialized(),

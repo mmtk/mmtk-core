@@ -193,9 +193,18 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.scheduler().poll(self)
     }
 
-    /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
-    /// Each worker will keep polling and executing work packets in a loop.
-    pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+    /// Entry point of the worker thread.
+    ///
+    /// This function will resolve thread affinity, if it has been specified by the user.
+    ///
+    /// Each worker will keep polling and executing work packets in a loop.  It runs until the
+    /// worker is requested to exit.  Currently a worker may exit after
+    /// [`crate::mmtk::MMTK::prepare_to_fork`] is called.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for this GC worker thread.
+    /// * `mmtk`: A reference to an MMTk instance.
+    pub fn run(mut self: Box<Self>, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         probe!(mmtk, gcworker_run);
         debug!(
             "Worker started. ordinal: {}, {}",
@@ -231,7 +240,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             std::hint::black_box(unsafe { *(typename.as_ptr()) });
 
             probe!(mmtk, work, typename.as_ptr(), typename.len());
-            work.do_work_with_stat(self, mmtk);
+            work.do_work_with_stat(&mut self, mmtk);
         }
         debug!(
             "Worker exiting. ordinal: {}, {}",
@@ -239,6 +248,8 @@ impl<VM: VMBinding> GCWorker<VM> {
             crate::util::rust_util::debug_process_thread_id(),
         );
         probe!(mmtk, gcworker_exit);
+
+        mmtk.scheduler.surrender_gc_worker(self);
     }
 }
 

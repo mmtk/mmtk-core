@@ -116,7 +116,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Respawn GC threads after forking.  This will reuse the `GCWorker` instances of stopped
-    /// workers.
+    /// workers.  `tls` is the VM thread that requests GC threads to be re-spawn, and will be
+    /// passed down to [`crate::vm::Collection::spawn_gc_thread`].
     pub fn respawn_gc_threads_after_forking(self: &Arc<Self>, tls: VMThread) {
         self.worker_group.spawn(tls)
     }
