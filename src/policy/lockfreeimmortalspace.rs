@@ -198,7 +198,9 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // Create a VM request of fixed size
         let vmrequest = VMRequest::fixed_size(aligned_total_bytes);
         // Reserve the space
-        let VMRequest::Extent{ extent, top } = vmrequest else { unreachable!() };
+        let VMRequest::Extent { extent, top } = vmrequest else {
+            unreachable!()
+        };
         let start = args.heap.reserve(extent, top);
 
         let space = Self {

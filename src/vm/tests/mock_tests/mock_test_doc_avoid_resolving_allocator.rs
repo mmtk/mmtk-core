@@ -18,7 +18,6 @@ pub fn acquire_typed_allocator() {
         || {
             let fixture = MMTKFixture::create();
             let tls_opaque_pointer = VMMutatorThread(VMThread(OpaquePointer::UNINITIALIZED));
-            static mut DEFAULT_ALLOCATOR_OFFSET: usize = 0;
 
             // ANCHOR: avoid_resolving_allocator
             // At boot time
@@ -26,17 +25,15 @@ pub fn acquire_typed_allocator() {
                 fixture.get_mmtk(),
                 AllocationSemantics::Default,
             );
-            unsafe {
-                DEFAULT_ALLOCATOR_OFFSET =
-                    crate::plan::Mutator::<MockVM>::get_allocator_base_offset(selector);
-            }
+            let default_allocator_offset =
+                crate::plan::Mutator::<MockVM>::get_allocator_base_offset(selector);
             let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
 
             // At run time: allocate with the default semantics without resolving allocator
             let default_allocator: &mut BumpAllocator<MockVM> = {
                 let mutator_addr = Address::from_ref(&*mutator);
                 unsafe {
-                    (mutator_addr + DEFAULT_ALLOCATOR_OFFSET).as_mut_ref::<BumpAllocator<MockVM>>()
+                    (mutator_addr + default_allocator_offset).as_mut_ref::<BumpAllocator<MockVM>>()
                 }
             };
             let addr = default_allocator.alloc(8, 8, 0);
