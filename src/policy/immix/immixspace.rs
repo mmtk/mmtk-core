@@ -33,6 +33,80 @@ use std::sync::{atomic::AtomicU8, atomic::AtomicUsize, Arc};
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
+#[cfg(feature = "dump_memory_stats")]
+#[derive(Default)]
+/// Keeping track of the number of traced/copied/tpinned objects and live bytes
+struct ImmixSpaceStats {
+    live_bytes: AtomicUsize,
+    traced_objects: AtomicUsize,
+    pinned_objects: AtomicUsize,
+    tpinned_objects: AtomicUsize,
+    copied_objects: AtomicUsize,
+}
+
+#[cfg(feature = "dump_memory_stats")]
+impl ImmixSpaceStats {
+    pub fn get_live_bytes(&self) -> usize {
+        self.live_bytes.load(Ordering::SeqCst)
+    }
+
+    pub fn set_live_bytes(&self, size: usize) {
+        self.live_bytes.store(size, Ordering::SeqCst)
+    }
+
+    pub fn increase_live_bytes(&self, size: usize) {
+        self.live_bytes.fetch_add(size, Ordering::SeqCst);
+    }
+
+    pub fn get_traced_objects(&self) -> usize {
+        self.traced_objects.load(Ordering::SeqCst)
+    }
+
+    pub fn set_traced_objects(&self, size: usize) {
+        self.traced_objects.store(size, Ordering::SeqCst)
+    }
+
+    pub fn increase_traced_objects(&self, size: usize) {
+        self.traced_objects.fetch_add(size, Ordering::SeqCst);
+    }
+
+    pub fn get_copied_objects(&self) -> usize {
+        self.copied_objects.load(Ordering::SeqCst)
+    }
+
+    pub fn set_copied_objects(&self, size: usize) {
+        self.copied_objects.store(size, Ordering::SeqCst)
+    }
+
+    pub fn increase_copied_objects(&self, size: usize) {
+        self.copied_objects.fetch_add(size, Ordering::SeqCst);
+    }
+
+    pub fn get_pinned_objects(&self) -> usize {
+        self.pinned_objects.load(Ordering::SeqCst)
+    }
+
+    pub fn set_pinned_objects(&self, size: usize) {
+        self.pinned_objects.store(size, Ordering::SeqCst)
+    }
+
+    pub fn increase_pinned_objects(&self, size: usize) {
+        self.pinned_objects.fetch_add(size, Ordering::SeqCst);
+    }
+
+    pub fn get_tpinned_objects(&self) -> usize {
+        self.tpinned_objects.load(Ordering::SeqCst)
+    }
+
+    pub fn set_tpinned_objects(&self, size: usize) {
+        self.tpinned_objects.store(size, Ordering::SeqCst)
+    }
+
+    pub fn increase_tpinned_objects(&self, size: usize) {
+        self.tpinned_objects.fetch_add(size, Ordering::SeqCst);
+    }
+}
+
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: BlockPageResource<VM, Block>,
@@ -54,14 +128,9 @@ pub struct ImmixSpace<VM: VMBinding> {
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// Some settings for this space
     space_args: ImmixSpaceArgs,
-    /// Keeping track of live bytes
+    /// Keeping track of immix stats
     #[cfg(feature = "dump_memory_stats")]
-    live_bytes: AtomicUsize,
-    /// Keeping track of the number of traced/copied objects
-    #[cfg(feature = "dump_memory_stats")]
-    live_objects: AtomicUsize,
-    #[cfg(feature = "dump_memory_stats")]
-    copied_objects: AtomicUsize,
+    immix_stats: ImmixSpaceStats,
 }
 
 /// Some arguments for Immix Space.
@@ -194,7 +263,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     ) -> ObjectReference {
         debug_assert!(!object.is_null());
         if KIND == TRACE_KIND_TRANSITIVE_PIN {
-            self.trace_object_without_moving(queue, object)
+            self.trace_object_without_moving(queue, object, true)
         } else if KIND == TRACE_KIND_DEFRAG {
             if Block::containing::<VM>(object).is_defrag_source() {
                 debug_assert!(self.in_defrag());
@@ -211,10 +280,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
                     false,
                 )
             } else {
-                self.trace_object_without_moving(queue, object)
+                self.trace_object_without_moving(queue, object, false)
             }
         } else if KIND == TRACE_KIND_FAST {
-            self.trace_object_without_moving(queue, object)
+            self.trace_object_without_moving(queue, object, false)
         } else {
             unreachable!()
         }
@@ -228,11 +297,11 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
 
         // count the bytes for each object
         #[cfg(feature = "dump_memory_stats")]
-        self.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
+        self.immix_stats.increase_live_bytes(VM::VMObjectModel::get_current_size(object));
 
         // increase the number of objects scanned
         #[cfg(feature = "dump_memory_stats")]
-        self.increase_live_objects(1);
+        self.immix_stats.increase_traced_objects(1);
     }
 
     fn may_move_objects<const KIND: TraceKind>() -> bool {
@@ -332,11 +401,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             scheduler: scheduler.clone(),
             space_args,
             #[cfg(feature = "dump_memory_stats")]
-            live_bytes: AtomicUsize::new(0),
-            #[cfg(feature = "dump_memory_stats")]
-            live_objects: AtomicUsize::new(0),
-            #[cfg(feature = "dump_memory_stats")]
-            copied_objects: AtomicUsize::new(0),
+            immix_stats: Default::default()
         }
     }
 
@@ -460,11 +525,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
 
         #[cfg(feature = "dump_memory_stats")]
-        self.set_live_bytes(0);
-        #[cfg(feature = "dump_memory_stats")]
-        self.set_live_objects(0);
-        #[cfg(feature = "dump_memory_stats")]
-        self.set_copied_objects(0);
+        {
+            self.immix_stats.set_live_bytes(0);
+            self.immix_stats.set_traced_objects(0);
+            self.immix_stats.set_copied_objects(0);
+            self.immix_stats.set_tpinned_objects(0);
+            self.immix_stats.set_pinned_objects(0);
+        }
     }
 
     /// Release for the immix space. This is called when a GC finished.
@@ -554,9 +621,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .expect("Time went backwards");
 
         println!("{:?} mmtk_immixspace", since_the_epoch.as_millis());
-        println!("\t#Live objects = {}", self.get_live_objects());
-        println!("\t#Copied objects = {}", self.get_copied_objects());
-        println!("\tLive bytes = {}", self.get_live_bytes());
+        println!("\t#Live objects = {}", self.immix_stats.get_traced_objects());
+        println!("\t#Copied objects = {}", self.immix_stats.get_copied_objects());
+        println!("\t#Pinned objects = {}", self.immix_stats.get_pinned_objects());
+        println!("\t#Transitively pinned objects = {}", self.immix_stats.get_tpinned_objects());
+        println!("\tLive bytes = {}", self.immix_stats.get_live_bytes());
         println!("\tReserved pages = {}", self.reserved_pages());
         println!(
             "\tReserved pages (bytes) = {}",
@@ -650,6 +719,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
+        _is_tpinned: bool
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         vo_bit::helper::on_trace_object::<VM>(object);
@@ -670,6 +740,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // Visit node
             queue.enqueue(object);
             self.unlog_object_if_needed(object);
+
+            #[cfg(feature = "dump_memory_stats")]
+            if _is_tpinned {
+                // increase the number of objects being tpinned
+                #[cfg(feature = "dump_memory_stats")]
+                self.immix_stats.increase_tpinned_objects(1);
+            }
+
             return object;
         }
         object
@@ -724,6 +802,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             object_forwarding::clear_forwarding_bits::<VM>(object);
             object
         } else {
+            #[cfg(feature = "dump_memory_stats")]
+            if self.is_pinned(object) {
+                self.immix_stats.increase_pinned_objects(1);
+            }
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
             let new_object = if self.is_pinned(object)
@@ -748,7 +830,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
                 // increase the number of objects being moved
                 #[cfg(feature = "dump_memory_stats")]
-                self.increase_copied_objects(1);
+                self.immix_stats.increase_copied_objects(1);
 
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_forwarded::<VM>(new_object);
@@ -917,51 +999,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.mark_lines(object);
         }
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn get_live_bytes(&self) -> usize {
-        self.live_bytes.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn set_live_bytes(&self, size: usize) {
-        self.live_bytes.store(size, Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn increase_live_bytes(&self, size: usize) {
-        self.live_bytes.fetch_add(size, Ordering::SeqCst);
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn get_live_objects(&self) -> usize {
-        self.live_objects.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn set_live_objects(&self, size: usize) {
-        self.live_objects.store(size, Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn increase_live_objects(&self, size: usize) {
-        self.live_objects.fetch_add(size, Ordering::SeqCst);
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn get_copied_objects(&self) -> usize {
-        self.copied_objects.load(Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn set_copied_objects(&self, size: usize) {
-        self.copied_objects.store(size, Ordering::SeqCst)
-    }
-
-    #[cfg(feature = "dump_memory_stats")]
-    pub fn increase_copied_objects(&self, size: usize) {
-        self.copied_objects.fetch_add(size, Ordering::SeqCst);
     }
 }
 
