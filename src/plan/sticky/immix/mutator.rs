@@ -1,7 +1,7 @@
 use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::immix;
-use crate::plan::mutator_context::{create_space_mapping, unreachable_prepare_func, MutatorConfig};
+use crate::plan::mutator_context::{common_prepare_func, create_space_mapping, MutatorConfig};
 use crate::plan::sticky::immix::global::StickyImmix;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::AllocatorSelector;
@@ -29,7 +29,7 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::Immix(0), stickyimmix.get_immix_space()));
             vec
         }),
-        prepare_func: &unreachable_prepare_func,
+        prepare_func: &common_prepare_func,
         release_func: &stickyimmix_mutator_release,
     };
 

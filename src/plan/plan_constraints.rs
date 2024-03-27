@@ -59,7 +59,7 @@ impl PlanConstraints {
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
-            needs_prepare_mutator: true,
+            needs_prepare_mutator: !cfg!(feature = "eager_sweeping"),
         }
     }
 }
