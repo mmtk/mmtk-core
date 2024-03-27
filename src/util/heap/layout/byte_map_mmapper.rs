@@ -229,16 +229,16 @@ mod tests {
     #[test]
     fn ensure_mapped_1page() {
         serial_test(|| {
+            let pages = 1;
+            let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
+            let end_chunk =
+                ByteMapMmapper::address_to_mmap_chunks_up(FIXED_ADDRESS + pages_to_bytes(pages));
+            let test_memory_bytes = (end_chunk - start_chunk) * MMAP_CHUNK_BYTES;
             with_cleanup(
                 || {
                     let mmapper = ByteMapMmapper::new();
-                    let pages = 1;
                     mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
-                    let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
-                    let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
-                        FIXED_ADDRESS + pages_to_bytes(pages),
-                    );
                     for chunk in start_chunk..end_chunk {
                         assert_eq!(
                             mmapper.mapped[chunk].load(Ordering::Relaxed),
@@ -247,7 +247,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_bytes).unwrap();
                 },
             )
         })
@@ -256,16 +256,16 @@ mod tests {
     #[test]
     fn ensure_mapped_1chunk() {
         serial_test(|| {
+            let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
+            let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
+            let end_chunk =
+                ByteMapMmapper::address_to_mmap_chunks_up(FIXED_ADDRESS + pages_to_bytes(pages));
+            let test_memory_bytes = (end_chunk - start_chunk) * MMAP_CHUNK_BYTES;
             with_cleanup(
                 || {
                     let mmapper = ByteMapMmapper::new();
-                    let pages = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
-                    let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
-                    let end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
-                        FIXED_ADDRESS + pages_to_bytes(pages),
-                    );
                     for chunk in start_chunk..end_chunk {
                         assert_eq!(
                             mmapper.mapped[chunk].load(Ordering::Relaxed),
@@ -274,7 +274,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_bytes).unwrap();
                 },
             )
         })
@@ -283,11 +283,14 @@ mod tests {
     #[test]
     fn ensure_mapped_more_than_1chunk() {
         serial_test(|| {
+            let pages = (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
+            let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
+            let end_chunk =
+                ByteMapMmapper::address_to_mmap_chunks_up(FIXED_ADDRESS + pages_to_bytes(pages));
+            let test_memory_bytes = (end_chunk - start_chunk) * MMAP_CHUNK_BYTES;
             with_cleanup(
                 || {
                     let mmapper = ByteMapMmapper::new();
-                    let pages =
-                        (MMAP_CHUNK_BYTES + MMAP_CHUNK_BYTES / 2) >> LOG_BYTES_IN_PAGE as usize;
                     mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
@@ -303,7 +306,7 @@ mod tests {
                     }
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_bytes).unwrap();
                 },
             )
         })
@@ -312,17 +315,20 @@ mod tests {
     #[test]
     fn protect() {
         serial_test(|| {
+            let test_memory_bytes = MMAP_CHUNK_BYTES * 2;
+            let test_memory_pages = test_memory_bytes >> LOG_BYTES_IN_PAGE;
+            let protect_memory_bytes = MMAP_CHUNK_BYTES;
+            let protect_memory_pages = protect_memory_bytes >> LOG_BYTES_IN_PAGE;
             with_cleanup(
                 || {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
-                    let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages)
                         .unwrap();
 
                     // protect 1 chunk
-                    mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
+                    mmapper.protect(FIXED_ADDRESS, protect_memory_pages);
 
                     let chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     assert_eq!(
@@ -335,7 +341,7 @@ mod tests {
                     );
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_bytes).unwrap();
                 },
             )
         })
@@ -344,17 +350,20 @@ mod tests {
     #[test]
     fn ensure_mapped_on_protected_chunks() {
         serial_test(|| {
+            let test_memory_bytes = MMAP_CHUNK_BYTES * 2;
+            let test_memory_pages = test_memory_bytes >> LOG_BYTES_IN_PAGE;
+            let protect_memory_pages_1 = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE; // protect one chunk in the first protect
+            let protect_memory_pages_2 = test_memory_pages; // protect both chunks in the second protect
             with_cleanup(
                 || {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
-                    let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages)
                         .unwrap();
 
                     // protect 1 chunk
-                    mmapper.protect(FIXED_ADDRESS, pages_per_chunk);
+                    mmapper.protect(FIXED_ADDRESS, protect_memory_pages_1);
 
                     let chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     assert_eq!(
@@ -368,7 +377,7 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(FIXED_ADDRESS, protect_memory_pages_2)
                         .unwrap();
                     assert_eq!(
                         mmapper.mapped[chunk].load(Ordering::Relaxed),
@@ -380,7 +389,7 @@ mod tests {
                     );
                 },
                 || {
-                    memory::munmap(FIXED_ADDRESS, MAX_SIZE).unwrap();
+                    memory::munmap(FIXED_ADDRESS, test_memory_bytes).unwrap();
                 },
             )
         })
