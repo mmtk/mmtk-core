@@ -1,10 +1,10 @@
 use super::Immix;
 use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::mutator_context::create_space_mapping;
-use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::ReservedAllocators;
+use crate::plan::mutator_context::{common_prepare_func, common_release_func};
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::ImmixAllocator;
@@ -16,7 +16,7 @@ use crate::{
 };
 use enum_map::EnumMap;
 
-pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     let immix_allocator = unsafe {
         mutator
             .allocators
@@ -25,6 +25,8 @@ pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMW
     .downcast_mut::<ImmixAllocator<VM>>()
     .unwrap();
     immix_allocator.reset();
+
+    common_release_func(mutator, tls)
 }
 
 pub(in crate::plan) const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
@@ -52,7 +54,7 @@ pub fn create_immix_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::Immix(0), &immix.immix_space));
             vec
         }),
-        prepare_func: &unreachable_prepare_func,
+        prepare_func: &common_prepare_func,
         release_func: &immix_mutator_release,
     };
 

@@ -19,17 +19,17 @@ use enum_map::EnumMap;
 
 // Add
 pub fn mygc_mutator_prepare<VM: VMBinding>(
-    _mutator: &mut Mutator<VM>,
-    _tls: VMWorkerThread,
+    mutator: &mut Mutator<VM>,
+    tls: VMWorkerThread,
 ) {
-    // Do nothing
+    crate::plan::mutator_context::common_prepare_func::<VM>(mutator, tls);
 }
 
 // Add
 // ANCHOR: release
 pub fn mygc_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
-    _tls: VMWorkerThread,
+    tls: VMWorkerThread,
 ) {
     // rebind the allocation bump pointer to the appropriate semispace
     let bump_allocator = unsafe {
@@ -46,6 +46,8 @@ pub fn mygc_mutator_release<VM: VMBinding>(
             .unwrap()
             .tospace(),
     );
+
+    crate::plan::mutator_context::common_release_func::<VM>(mutator, tls);
 }
 // ANCHOR_END: release
 

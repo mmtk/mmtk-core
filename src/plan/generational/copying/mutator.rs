@@ -3,9 +3,9 @@ use super::GenCopy;
 use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::generational::create_gen_space_mapping;
-use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::mutator_context::{common_prepare_func, common_release_func};
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::BumpAllocator;
@@ -13,7 +13,7 @@ use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
 
-pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     // reset nursery allocator
     let bump_allocator = unsafe {
         mutator
@@ -23,6 +23,8 @@ pub fn gencopy_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: V
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
     bump_allocator.reset();
+
+    common_release_func(mutator, tls);
 }
 
 pub fn create_gencopy_mutator<VM: VMBinding>(
@@ -36,7 +38,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
             mmtk.get_plan(),
             &gencopy.gen.nursery,
         )),
-        prepare_func: &unreachable_prepare_func,
+        prepare_func: &common_prepare_func,
         release_func: &gencopy_mutator_release,
     };
 
