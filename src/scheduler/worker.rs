@@ -109,6 +109,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 
 /// A special error type that indicate a worker should exit.
 /// This may happen if the VM needs to fork and asks workers to exit.
+#[derive(Debug)]
 pub(crate) struct WorkerShouldExit;
 
 /// The result type of `GCWorker::pool`.

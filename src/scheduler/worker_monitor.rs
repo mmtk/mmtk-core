@@ -6,12 +6,9 @@
 
 use std::sync::{Condvar, Mutex};
 
-use crate::vm::VMBinding;
-
 use super::{
     worker::WorkerShouldExit,
     worker_goals::{WorkerGoal, WorkerGoals},
-    GCWorker,
 };
 
 /// The result type of the `on_last_parked` call-back in `WorkMonitor::park_and_wait`.
@@ -127,13 +124,12 @@ impl WorkerMonitor {
     ///
     /// This function returns `Ok(())` if the current worker should continue working,
     /// or `Err(WorkerShouldExit)` if the current worker should exit now.
-    pub fn park_and_wait<VM, F>(
+    pub fn park_and_wait<F>(
         &self,
-        worker: &GCWorker<VM>,
+        ordinal: usize,
         on_last_parked: F,
     ) -> Result<(), WorkerShouldExit>
     where
-        VM: VMBinding,
         F: FnOnce(&mut WorkerGoals) -> LastParkedResult,
     {
         let mut sync = self.sync.lock().unwrap();
@@ -142,7 +138,7 @@ impl WorkerMonitor {
         let all_parked = sync.parker.inc_parked_workers();
         trace!(
             "Worker {} parked.  parked/total: {}/{}.  All parked: {}",
-            worker.ordinal,
+            ordinal,
             sync.parker.parked_workers,
             sync.parker.worker_count,
             all_parked
@@ -151,7 +147,7 @@ impl WorkerMonitor {
         let mut should_wait = false;
 
         if all_parked {
-            trace!("Worker {} is the last worker parked.", worker.ordinal);
+            trace!("Worker {} is the last worker parked.", ordinal);
             let result = on_last_parked(&mut sync.goals);
             match result {
                 LastParkedResult::ParkSelf => {
@@ -229,7 +225,7 @@ impl WorkerMonitor {
         sync.parker.dec_parked_workers();
         trace!(
             "Worker {} unparked.  parked/total: {}/{}.",
-            worker.ordinal,
+            ordinal,
             sync.parker.parked_workers,
             sync.parker.worker_count,
         );
@@ -246,5 +242,102 @@ impl WorkerMonitor {
     pub fn on_all_workers_exited(&self) {
         let mut sync = self.sync.try_lock().unwrap();
         sync.goals.on_current_goal_completed();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    };
+
+    use super::WorkerMonitor;
+
+    /// Test if the `WorkerMonitor::park_and_wait` method calls the `on_last_parked` callback
+    /// properly.
+    #[test]
+    fn test_last_worker_park_wake_all() {
+        let number_threads = 4;
+        let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
+        let on_last_parked_called = AtomicUsize::new(0);
+        let should_unpark = AtomicBool::new(false);
+
+        std::thread::scope(|scope| {
+            for ordinal in 0..number_threads {
+                let worker_monitor = worker_monitor.clone();
+                let on_last_parked_called = &on_last_parked_called;
+                let should_unpark = &should_unpark;
+                scope.spawn(move || {
+                    // This emulates the use pattern in the scheduler, i.e. checking the condition
+                    // ("Is there any work packets available") without holding a mutex.
+                    while !should_unpark.load(Ordering::SeqCst) {
+                        println!("Thread {} parking...", ordinal);
+                        worker_monitor
+                            .park_and_wait(ordinal, |_goals| {
+                                println!("Thread {} is the last thread parked.", ordinal);
+                                on_last_parked_called.fetch_add(1, Ordering::SeqCst);
+                                should_unpark.store(true, Ordering::SeqCst);
+                                super::LastParkedResult::WakeAll
+                            })
+                            .unwrap();
+                        println!("Thread {} unparked.", ordinal);
+                    }
+                });
+            }
+        });
+
+        // `on_last_parked` should only be called once.
+        assert_eq!(on_last_parked_called.load(Ordering::SeqCst), 1);
+    }
+
+    /// Like `test_last_worker_park_wake_all`, but only wake up the last parked worker when it
+    /// parked.
+    #[test]
+    fn test_last_worker_park_wake_self() {
+        let number_threads = 4;
+        let worker_monitor = Arc::new(WorkerMonitor::new(number_threads));
+        let on_last_parked_called = AtomicUsize::new(0);
+        let threads_running = AtomicUsize::new(0);
+        let should_unpark = AtomicBool::new(false);
+
+        std::thread::scope(|scope| {
+            for ordinal in 0..number_threads {
+                let worker_monitor = worker_monitor.clone();
+                let on_last_parked_called = &on_last_parked_called;
+                let threads_running = &threads_running;
+                let should_unpark = &should_unpark;
+                scope.spawn(move || {
+                    let mut i_am_the_last_parked_worker = false;
+                    // Record the number of threads entering the following `while` loop.
+                    threads_running.fetch_add(1, Ordering::SeqCst);
+                    while !should_unpark.load(Ordering::SeqCst) {
+                        println!("Thread {} parking...", ordinal);
+                        worker_monitor
+                            .park_and_wait(ordinal, |_goals| {
+                                println!("Thread {} is the last thread parked.", ordinal);
+                                on_last_parked_called.fetch_add(1, Ordering::SeqCst);
+                                should_unpark.store(true, Ordering::SeqCst);
+                                i_am_the_last_parked_worker = true;
+                                super::LastParkedResult::WakeSelf
+                            })
+                            .unwrap();
+                        println!("Thread {} unparked.", ordinal);
+                    }
+                    threads_running.fetch_sub(1, Ordering::SeqCst);
+
+                    if i_am_the_last_parked_worker {
+                        println!("The last parked worker woke up");
+                        // Only the current worker should wake and leave the `while` loop above.
+                        assert_eq!(threads_running.load(Ordering::SeqCst), number_threads - 1);
+                        should_unpark.store(true, Ordering::SeqCst);
+                        worker_monitor.notify_work_available(true);
+                    }
+                });
+            }
+        });
+
+        // `on_last_parked` should only be called once.
+        assert_eq!(on_last_parked_called.load(Ordering::SeqCst), 1);
     }
 }

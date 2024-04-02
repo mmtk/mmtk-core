@@ -402,8 +402,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 return Ok(work);
             }
 
+            let ordinal = worker.ordinal;
             self.worker_monitor
-                .park_and_wait(worker, |goals| self.on_last_parked(worker, goals))?;
+                .park_and_wait(ordinal, |goals| self.on_last_parked(worker, goals))?;
         }
     }
 

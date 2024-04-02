@@ -78,3 +78,39 @@ impl WorkerGoals {
         self.requests[goal]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{WorkerGoal, WorkerGoals};
+
+    #[test]
+    fn test_poll_none() {
+        let mut goals = WorkerGoals::default();
+        let next_goal = goals.poll_next_goal();
+
+        assert!(matches!(next_goal, None));
+        assert!(matches!(goals.current(), None));
+    }
+
+    #[test]
+    fn test_poll_one() {
+        let mut goals = WorkerGoals::default();
+        goals.set_request(WorkerGoal::StopForFork);
+        let next_goal = goals.poll_next_goal();
+
+        assert!(matches!(next_goal, Some(WorkerGoal::StopForFork)));
+        assert!(matches!(goals.current(), Some(WorkerGoal::StopForFork)));
+    }
+
+    #[test]
+    fn test_goals_priority() {
+        let mut goals = WorkerGoals::default();
+        goals.set_request(WorkerGoal::StopForFork);
+        goals.set_request(WorkerGoal::Gc);
+
+        let next_goal = goals.poll_next_goal();
+
+        assert!(matches!(next_goal, Some(WorkerGoal::Gc)));
+        assert!(matches!(goals.current(), Some(WorkerGoal::Gc)));
+    }
+}
