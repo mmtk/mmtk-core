@@ -98,7 +98,7 @@ fn simple_spawn_gc_thread(
     }
 }
 
-/// Test the `initial_collection` function with actual running GC threads, and the functions for
+/// Test the `initialize_collection` function with actual running GC threads, and the functions for
 /// supporting forking.
 #[test]
 pub fn test_initialize_collection_and_fork() {

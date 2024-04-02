@@ -516,7 +516,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Called when GC has finished, i.e. when all work packets have been executed.
-    /// Return `true` if it scheduled the next GC immediately.
     fn on_gc_finished(&self, worker: &GCWorker<VM>) {
         // All GC workers must have parked by now.
         debug_assert!(!self.worker_group.has_designated_work());

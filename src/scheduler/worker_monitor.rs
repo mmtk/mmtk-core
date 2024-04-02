@@ -2,7 +2,7 @@
 //!
 //! -   allowing workers to park,
 //! -   letting the last parked worker take action, and
-//! -   letting workers and mutators to notify workers when workers are given things to do.
+//! -   letting workers and mutators notify workers when workers are given things to do.
 
 use std::sync::{Condvar, Mutex};
 
@@ -118,7 +118,7 @@ impl WorkerMonitor {
         }
     }
 
-    /// Park a worker and wait on the CondVar `work_available`.
+    /// Park a worker and wait on the CondVar `workers_have_anything_to_do`.
     ///
     /// If it is the last worker parked, `on_last_parked` will be called.
     /// The argument of `on_last_parked` is true if `sync.gc_requested` is `true`.
@@ -179,10 +179,10 @@ impl WorkerMonitor {
             //      }
             //      unlock();
             //
-            // The actual condition for this `self.work_available.wait(sync)` is:
+            // The actual condition for this `self.workers_have_anything_to_do.wait(sync)` is:
             //
             // 1.  any work packet is available, or
-            // 2.  a request for scheduling GC is submitted.
+            // 2.  a goal (such as doing GC) is requested
             //
             // But it is not used like the typical use pattern shown above, mainly because work
             // packets can be added without holding the mutex `self.sync`.  This means one worker
@@ -200,8 +200,8 @@ impl WorkerMonitor {
             // available, no other workers can add another work packet (because they all parked).
             // So the **last** parked worker can open more buckets or declare GC finished.
             //
-            // Condition (2), i.e. `sync.should_schedule_gc` is guarded by the mutator `sync`.
-            // When set (by a mutator via `request_schedule_collection`), it will notify a
+            // Condition (2), i.e. goals added to `sync.goals`, is guarded by the monitor `sync`.
+            // When a mutator adds a goal via `WorkerMonitor::make_request`, it will notify a
             // worker; and the last parked worker always checks it before waiting.  So this
             // condition will not be set without any worker noticing.
             //
@@ -211,8 +211,8 @@ impl WorkerMonitor {
 
             // Notes on spurious wake-up:
             //
-            // 1.  The condition variable `work_available` is guarded by `self.sync`.  Because the
-            //     last parked worker is holding the mutex `self.sync` when executing
+            // 1.  The condition variable `workers_have_anything_to_do` is guarded by `self.sync`.
+            //     Because the last parked worker is holding the mutex `self.sync` when executing
             //     `on_last_parked`, no workers can unpark (even if they spuriously wake up) during
             //     `on_last_parked` because they cannot re-acquire the mutex `self.sync`.
             //
