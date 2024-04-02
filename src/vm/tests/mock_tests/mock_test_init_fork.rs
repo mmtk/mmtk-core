@@ -40,9 +40,9 @@ const NUM_WORKER_THREADS: usize = 4;
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 /// A convenient wrapper that panics on timeout.
-fn wait_timeout_while<'a, 'c, T, F>(
+fn wait_timeout_while<'a, T, F>(
     guard: MutexGuard<'a, T>,
-    condvar: &'c Condvar,
+    condvar: &Condvar,
     condition: F,
 ) -> MutexGuard<'a, T>
 where
