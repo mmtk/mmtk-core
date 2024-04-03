@@ -88,8 +88,8 @@ mod tests {
         let mut goals = WorkerGoals::default();
         let next_goal = goals.poll_next_goal();
 
-        assert!(matches!(next_goal, None));
-        assert!(matches!(goals.current(), None));
+        assert!(next_goal.is_none());
+        assert!(goals.current().is_none());
     }
 
     #[test]
