@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/metadata/side_metadata/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/metadata/side_metadata/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1748,7 +1750,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::metadata_val_traits::<span class="kw-2">*</span>;
-<span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>num_traits::FromPrimitive;
@@ -1765,7 +1767,7 @@
 </span><span class="attr">#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 </span><span class="kw">pub struct </span>SideMetadataSpec {
     <span class="doccomment">/// The name for this side metadata.
-    </span><span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+    </span><span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
     <span class="doccomment">/// Is this side metadata global? Local metadata is used by certain spaces,
     /// while global metadata is used by all the spaces.
     </span><span class="kw">pub </span>is_global: bool,
@@ -1780,7 +1782,7 @@
 <span class="kw">impl </span>SideMetadataSpec {
     <span class="doccomment">/// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
     </span><span class="kw">pub const fn </span>is_absolute_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.is_global || <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>)
+        <span class="self">self</span>.is_global || <span class="macro">cfg!</span>(target_pointer_width = <span class="string">"64"</span>)
     }
 
     <span class="doccomment">/// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
@@ -1801,7 +1803,7 @@
     }
 
     <span class="doccomment">/// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
-    </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+    </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
     </span><span class="kw">pub const fn </span>upper_bound_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SideMetadataOffset {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_absolute_offset());
         SideMetadataOffset {
@@ -1811,7 +1813,7 @@
     }
 
     <span class="doccomment">/// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
-    </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
     </span><span class="kw">pub const fn </span>upper_bound_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SideMetadataOffset {
         <span class="kw">if </span><span class="self">self</span>.is_absolute_offset() {
             SideMetadataOffset {
@@ -1842,7 +1844,7 @@
     /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
     /// after this spec. This spec must be a chunked side metadata spec (which uses relative offset). Only 32 bit local
     /// side metadata uses chunked metadata.
-    </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
     </span><span class="kw">pub const fn </span>upper_bound_address_for_chunked(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address) -&gt; Address {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.is_rel_offset());
         address_to_meta_chunk_addr(data_addr).add(<span class="kw">unsafe </span>{ <span class="self">self</span>.upper_bound_offset().rel_offset })
@@ -1855,7 +1857,7 @@
         <span class="kw">let </span>meta_start = address_to_meta_address(<span class="self">self</span>, data_addr).align_down(BYTES_IN_PAGE);
 
         <span class="macro">trace!</span>(
-            <span class="string">&quot;ensure_metadata_is_mapped({}).meta_start({})&quot;</span>,
+            <span class="string">"ensure_metadata_is_mapped({}).meta_start({})"</span>,
             data_addr,
             meta_start
         );
@@ -1875,14 +1877,14 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(v) = val {
                     <span class="macro">assert!</span>(
                         v.to_u8().unwrap() &lt; (<span class="number">1 </span>&lt;&lt; (<span class="number">1 </span>&lt;&lt; log_b)),
-                        <span class="string">&quot;Input value {:?} is invalid for the spec {:?}&quot;</span>,
+                        <span class="string">"Input value {:?} is invalid for the spec {:?}"</span>,
                         v,
                         <span class="self">self
                     </span>);
                 }
             }
             <span class="number">3</span>..=<span class="number">6 </span>=&gt; <span class="macro">assert_eq!</span>(T::LOG2, log_b <span class="kw">as </span>u32),
-            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;side metadata &gt; {}-bits is not supported&quot;</span>, <span class="number">1 </span>&lt;&lt; log_b),
+            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">"side metadata &gt; {}-bits is not supported"</span>, <span class="number">1 </span>&lt;&lt; log_b),
         }
     }
 
@@ -1905,7 +1907,7 @@
         update_bytes: <span class="kw-2">&amp;</span><span class="kw">impl </span>Fn(Address, Address),
         update_bits: <span class="kw-2">&amp;</span><span class="kw">impl </span>Fn(Address, u8, u8),
     ) {
-        <span class="comment">// Start/end is the same, we don&#39;t need to do anything.
+        <span class="comment">// Start/end is the same, we don't need to do anything.
         </span><span class="kw">if </span>meta_start_addr == meta_end_addr &amp;&amp; meta_start_bit == meta_end_bit {
             <span class="kw">return</span>;
         }
@@ -2030,10 +2032,10 @@
         // chunks are stored in discontiguous memory. For example, Chunk #2 follows Chunk #1, but the side metadata
         // for Chunk #2 does not immediately follow the side metadata for Chunk #1. So when we bulk update metadata for Chunk #1,
         // we cannot update up to the metadata address for the Chunk #2 start. Otherwise it may modify unrelated metadata
-        // between the two chunks&#39; metadata.
+        // between the two chunks' metadata.
         // Instead, we compute how many bytes/bits we need to update.
         // The data for which the metadata will be updates has to be in the same chunk.
-        </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
         </span><span class="kw">let </span>update_discontiguous = |data_start: Address, data_bytes: usize| {
             <span class="kw">use </span><span class="kw">crate</span>::util::constants::BITS_IN_BYTE;
             <span class="kw">if </span>data_bytes == <span class="number">0 </span>{
@@ -2042,7 +2044,7 @@
             <span class="macro">debug_assert_eq!</span>(
                 data_start.align_down(BYTES_IN_CHUNK),
                 (data_start + data_bytes - <span class="number">1</span>).align_down(BYTES_IN_CHUNK),
-                <span class="string">&quot;The data to be zeroed in discontiguous specs needs to be in the same chunk&quot;
+                <span class="string">"The data to be zeroed in discontiguous specs needs to be in the same chunk"
             </span>);
             <span class="kw">let </span>meta_start = address_to_meta_address(<span class="self">self</span>, data_start);
             <span class="kw">let </span>meta_start_shift = meta_byte_lshift(<span class="self">self</span>, data_start);
@@ -2064,10 +2066,10 @@
             update_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
         };
 
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) || <span class="self">self</span>.is_global {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">"64"</span>) || <span class="self">self</span>.is_global {
             update_contiguous(start, size);
         }
-        <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
         </span><span class="kw">if </span>!<span class="self">self</span>.is_global {
             <span class="comment">// per chunk policy-specific metadata for 32-bits targets
             </span><span class="kw">let </span>chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
@@ -2097,17 +2099,17 @@
     <span class="doccomment">/// Bulk-zero a specific metadata for a memory region. Note that this method is more sophisiticated than a simple memset, especially in the following
     /// cases:
     /// * the metadata for the range includes partial bytes (a few bits in the same byte).
-    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk zero for each chunk&#39;s side metadata.
+    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk zero for each chunk's side metadata.
     ///
     /// # Arguments
     ///
     /// * `start`: The starting address of a memory region. The side metadata starting from this data address will be zeroed.
     /// * `size`: The size of the memory region.
     </span><span class="kw">pub fn </span>bzero_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span>sanity::verify_bzero(<span class="self">self</span>, start, size);
 
         <span class="self">self</span>.bulk_update_metadata(start, size, <span class="kw-2">&amp;</span><span class="self">Self</span>::zero_meta_bits)
@@ -2116,17 +2118,17 @@
     <span class="doccomment">/// Bulk set a specific metadata for a memory region. Note that this method is more sophisiticated than a simple memset, especially in the following
     /// cases:
     /// * the metadata for the range includes partial bytes (a few bits in the same byte).
-    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk set for each chunk&#39;s side metadata.
+    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk set for each chunk's side metadata.
     ///
     /// # Arguments
     ///
     /// * `start`: The starting address of a memory region. The side metadata starting from this data address will be set to all 1s in the bits.
     /// * `size`: The size of the memory region.
     </span><span class="kw">pub fn </span>bset_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span>sanity::verify_bset(<span class="self">self</span>, start, size);
 
         <span class="self">self</span>.bulk_update_metadata(start, size, <span class="kw-2">&amp;</span><span class="self">Self</span>::set_meta_bits)
@@ -2145,10 +2147,10 @@
     /// * `size`: The size of the memory region.
     /// * `other`: The other metadata to copy from.
     </span><span class="kw">pub fn </span>bcopy_metadata_contiguous(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize, other: <span class="kw-2">&amp;</span>SideMetadataSpec) {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span>sanity::verify_bcopy(<span class="self">self</span>, start, size, other);
 
         <span class="macro">debug_assert_eq!</span>(other.log_bytes_in_region, <span class="self">self</span>.log_bytes_in_region);
@@ -2212,14 +2214,14 @@
         // with the actual side metadata.
         // To achieve this, we need to apply a lock when we access side metadata. This will hide some concurrency bugs,
         // but makes it possible for us to assert our side metadata implementation is correct.
-        </span><span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        </span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
 
         <span class="comment">// A few checks
         </span><span class="attr">#[cfg(debug_assertions)]
         </span>{
             <span class="self">self</span>.assert_value_type::&lt;T&gt;(input);
-            <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
             </span><span class="self">self</span>.assert_metadata_mapped(data_addr);
         }
 
@@ -2258,7 +2260,7 @@
                 }
             },
             |_v| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_load(<span class="self">self</span>, data_addr, _v);
             },
         )
@@ -2291,7 +2293,7 @@
                 }
             },
             |<span class="kw">_</span>| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_store(<span class="self">self</span>, data_addr, metadata);
             },
         )
@@ -2316,7 +2318,7 @@
                 }
             },
             |_v| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_load(<span class="self">self</span>, data_addr, _v);
             },
         )
@@ -2347,7 +2349,7 @@
                 }
             },
             |<span class="kw">_</span>| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_store(<span class="self">self</span>, data_addr, metadata);
             },
         )
@@ -2399,7 +2401,7 @@
     </span><span class="kw">pub unsafe fn </span>set_raw_byte_atomic(<span class="kw-2">&amp;</span><span class="self">self</span>, data_addr: Address, order: Ordering) {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.log_num_of_bits &lt; <span class="number">3</span>);
         <span class="macro">cfg_if::cfg_if! </span>{
-            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)] </span>{
+            <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)] </span>{
                 <span class="comment">// For extreme assertions, we only set 1 to the given address.
                 </span><span class="self">self</span>.store_atomic::&lt;u8&gt;(data_addr, <span class="number">1</span>, order)
             } <span class="kw">else </span>{
@@ -2467,7 +2469,7 @@
                 }
             },
             |_res| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span><span class="kw">if </span>_res.is_ok() {
                     sanity::verify_store(<span class="self">self</span>, data_addr, new_metadata);
                 }
@@ -2476,7 +2478,7 @@
     }
 
     <span class="doccomment">/// This is used to implement fetch_add/sub for bits.
-    /// For fetch_and/or, we don&#39;t necessarily need this method. We could directly do fetch_and/or on the u8.
+    /// For fetch_and/or, we don't necessarily need this method. We could directly do fetch_and/or on the u8.
     </span><span class="kw">fn </span>fetch_ops_on_bits&lt;F: Fn(u8) -&gt; u8&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         data_addr: Address,
@@ -2534,7 +2536,7 @@
                 }
             },
             |_old_val| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_update::&lt;T&gt;(<span class="self">self</span>, data_addr, _old_val, _old_val.wrapping_add(<span class="kw-2">&amp;</span>val))
             },
         )
@@ -2568,13 +2570,13 @@
                 }
             },
             |_old_val| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_update::&lt;T&gt;(<span class="self">self</span>, data_addr, _old_val, _old_val.wrapping_sub(<span class="kw-2">&amp;</span>val))
             },
         )
     }
 
-    <span class="doccomment">/// Bitwise &#39;and&#39; the value with the current value for this side metadata for the given address.
+    <span class="doccomment">/// Bitwise 'and' the value with the current value for this side metadata for the given address.
     /// This method has similar semantics to `fetch_and` in Rust atomics.
     /// Returns the previous value.
     </span><span class="kw">pub fn </span>fetch_and_atomic&lt;T: MetadataValue&gt;(
@@ -2602,13 +2604,13 @@
                 }
             },
             |_old_val| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_update::&lt;T&gt;(<span class="self">self</span>, data_addr, _old_val, _old_val.bitand(val))
             },
         )
     }
 
-    <span class="doccomment">/// Bitwise &#39;or&#39; the value with the current value for this side metadata for the given address.
+    <span class="doccomment">/// Bitwise 'or' the value with the current value for this side metadata for the given address.
     /// This method has similar semantics to `fetch_or` in Rust atomics.
     /// Returns the previous value.
     </span><span class="kw">pub fn </span>fetch_or_atomic&lt;T: MetadataValue&gt;(
@@ -2636,7 +2638,7 @@
                 }
             },
             |_old_val| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span>sanity::verify_update::&lt;T&gt;(<span class="self">self</span>, data_addr, _old_val, _old_val.bitor(val))
             },
         )
@@ -2682,9 +2684,9 @@
                 }
             },
             |_result| {
-                <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+                <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
                 </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(old_val) = _result {
-                    <span class="macro">println!</span>(<span class="string">&quot;Ok({})&quot;</span>, old_val);
+                    <span class="macro">println!</span>(<span class="string">"Ok({})"</span>, old_val);
                     sanity::verify_update::&lt;T&gt;(<span class="self">self</span>, data_addr, old_val, f(old_val).unwrap())
                 }
             },
@@ -2693,21 +2695,21 @@
 }
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>SideMetadataSpec {
-    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
         f.write_fmt(<span class="macro">format_args!</span>(
-            <span class="string">&quot;SideMetadataSpec {} {{ \
+            <span class="string">"SideMetadataSpec {} {{ \
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
             **log_bytes_in_region: 0x{:x} \
-            }}&quot;</span>,
+            }}"</span>,
             <span class="self">self</span>.name,
             <span class="self">self</span>.is_global,
             <span class="kw">unsafe </span>{
                 <span class="kw">if </span><span class="self">self</span>.is_absolute_offset() {
-                    <span class="macro">format!</span>(<span class="string">&quot;0x{:x}&quot;</span>, <span class="self">self</span>.offset.addr)
+                    <span class="macro">format!</span>(<span class="string">"0x{:x}"</span>, <span class="self">self</span>.offset.addr)
                 } <span class="kw">else </span>{
-                    <span class="macro">format!</span>(<span class="string">&quot;0x{:x}&quot;</span>, <span class="self">self</span>.offset.rel_offset)
+                    <span class="macro">format!</span>(<span class="string">"0x{:x}"</span>, <span class="self">self</span>.offset.rel_offset)
                 }
             },
             <span class="self">self</span>.log_num_of_bits,
@@ -2775,7 +2777,7 @@
 }
 
 <span class="doccomment">/// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
-/// side metadata spec as well as the plan&#39;s specs.
+/// side metadata spec as well as the plan's specs.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>SideMetadataContext {
     <span class="comment">// For plans
     </span><span class="kw">pub </span>global: Vec&lt;SideMetadataSpec&gt;,
@@ -2788,7 +2790,7 @@
     </span><span class="kw">pub fn </span>new_global_specs(specs: <span class="kw-2">&amp;</span>[SideMetadataSpec]) -&gt; Vec&lt;SideMetadataSpec&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>ret = <span class="macro">vec!</span>[];
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;vo_bit&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span>ret.push(VO_BIT_SIDE_METADATA_SPEC);
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(spec) = <span class="kw">crate</span>::mmtk::SFT_MAP.get_side_metadata() {
@@ -2833,7 +2835,7 @@
     /// This can be called at page granularity.
     </span><span class="kw">pub fn </span>try_map_metadata_space(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">debug!</span>(
-            <span class="string">&quot;try_map_metadata_space({}, 0x{:x}, {}, {})&quot;</span>,
+            <span class="string">"try_map_metadata_space({}, 0x{:x}, {}, {})"</span>,
             start,
             size,
             <span class="self">self</span>.global.len(),
@@ -2851,7 +2853,7 @@
     /// NOTE: Accessing addresses in this range will produce a segmentation fault if swap-space is not mapped using the `try_map_metadata_space` function.
     </span><span class="kw">pub fn </span>try_map_metadata_address_range(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">debug!</span>(
-            <span class="string">&quot;try_map_metadata_address_range({}, 0x{:x}, {}, {})&quot;</span>,
+            <span class="string">"try_map_metadata_address_range({}, 0x{:x}, {}, {})"</span>,
             start,
             size,
             <span class="self">self</span>.global.len(),
@@ -2877,38 +2879,38 @@
             }
         }
 
-        <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
         </span><span class="kw">let </span><span class="kw-2">mut </span>lsize: usize = <span class="number">0</span>;
 
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.local.iter() {
             <span class="comment">// For local side metadata, we always have to reserve address space for all
             // local metadata required by all policies in MMTk to be able to calculate a constant offset for each local metadata at compile-time
-            // (it&#39;s like assigning an ID to each policy).
+            // (it's like assigning an ID to each policy).
             // As the plan is chosen at run-time, we will never know which subset of policies will be used during run-time.
-            // We can&#39;t afford this much address space in 32-bits.
+            // We can't afford this much address space in 32-bits.
             // So, we switch to the chunk-based approach for this specific case.
             //
             // The global metadata is different in that for each plan, we can calculate its constant base addresses at compile-time.
             // Using the chunk-based approach will need the same address space size as the current not-chunked approach.
-            </span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+            </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
             </span>{
                 <span class="kw">match </span>try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
                     <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
                     <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span>Result::Err(e),
                 }
             }
-            <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+            <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
             </span>{
                 lsize += metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
             }
         }
 
-        <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+        <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
         </span><span class="kw">if </span>lsize &gt; <span class="number">0 </span>{
             <span class="kw">let </span>max = BYTES_IN_CHUNK &gt;&gt; <span class="kw">super</span>::constants::LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
             <span class="macro">debug_assert!</span>(
                 lsize &lt;= max,
-                <span class="string">&quot;local side metadata per chunk (0x{:x}) must be less than (0x{:x})&quot;</span>,
+                <span class="string">"local side metadata per chunk (0x{:x}) must be less than (0x{:x})"</span>,
                 lsize,
                 max
             );
@@ -2926,11 +2928,11 @@
     /// Note-1: This function is only used for test and debug right now.
     ///
     /// Note-2: This function uses munmap() which works at page granularity.
-    ///     If the corresponding metadata space&#39;s size is not a multiple of page size,
+    ///     If the corresponding metadata space's size is not a multiple of page size,
     ///     the actual unmapped space will be bigger than what you specify.
     </span><span class="attr">#[cfg(test)]
     </span><span class="kw">pub fn </span>ensure_unmap_metadata_space(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize) {
-        <span class="macro">trace!</span>(<span class="string">&quot;ensure_unmap_metadata_space({}, 0x{:x})&quot;</span>, start, size);
+        <span class="macro">trace!</span>(<span class="string">"ensure_unmap_metadata_space({}, 0x{:x})"</span>, start, size);
         <span class="macro">debug_assert!</span>(start.is_aligned_to(BYTES_IN_PAGE));
         <span class="macro">debug_assert!</span>(size % BYTES_IN_PAGE == <span class="number">0</span>);
 
@@ -2939,11 +2941,11 @@
         }
 
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.local.iter() {
-            <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+            <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
             </span>{
                 ensure_munmap_contiguos_metadata_space(start, size, spec);
             }
-            <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+            <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
             </span>{
                 ensure_munmap_chunked_metadata_space(start, size, spec);
             }
@@ -2953,11 +2955,11 @@
 
 <span class="doccomment">/// A byte array in side-metadata
 </span><span class="kw">pub struct </span>MetadataByteArrayRef&lt;<span class="kw">const </span>ENTRIES: usize&gt; {
-    <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
     </span>heap_range_start: Address,
-    <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
     </span>spec: SideMetadataSpec,
-    data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; ENTRIES],
+    data: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>[u8; ENTRIES],
 }
 
 <span class="kw">impl</span>&lt;<span class="kw">const </span>ENTRIES: usize&gt; MetadataByteArrayRef&lt;ENTRIES&gt; {
@@ -2972,17 +2974,17 @@
     </span><span class="kw">pub fn </span>new(metadata_spec: <span class="kw-2">&amp;</span>SideMetadataSpec, start: Address, bytes: usize) -&gt; <span class="self">Self </span>{
         <span class="macro">debug_assert_eq!</span>(
             metadata_spec.log_num_of_bits, LOG_BITS_IN_BYTE <span class="kw">as </span>usize,
-            <span class="string">&quot;Each heap entry should map to a byte in side-metadata&quot;
+            <span class="string">"Each heap entry should map to a byte in side-metadata"
         </span>);
         <span class="macro">debug_assert_eq!</span>(
             bytes &gt;&gt; metadata_spec.log_bytes_in_region,
             ENTRIES,
-            <span class="string">&quot;Heap range size and MetadataByteArray size does not match&quot;
+            <span class="string">"Heap range size and MetadataByteArray size does not match"
         </span>);
         <span class="self">Self </span>{
-            <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
             </span>heap_range_start: start,
-            <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
             </span>spec: <span class="kw-2">*</span>metadata_spec,
             <span class="comment">// # Safety
             // The metadata memory is assumed to be mapped when accessing.
@@ -2999,10 +3001,10 @@
     <span class="doccomment">/// Get a byte from the metadata byte array at the given index.
     </span><span class="attr">#[allow(clippy::let_and_return)]
     </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; u8 {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">let </span>_lock = sanity::SANITY_LOCK.lock().unwrap();
         <span class="kw">let </span>value = <span class="self">self</span>.data[index];
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span>{
             <span class="kw">let </span>data_addr = <span class="self">self</span>.heap_range_start + (index &lt;&lt; <span class="self">self</span>.spec.log_bytes_in_region);
             sanity::verify_load::&lt;u8&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>.spec, data_addr, value);
@@ -3023,7 +3025,7 @@
     </span><span class="kw">fn </span>calculate_reserved_pages_one_spec() {
         <span class="comment">// 1 bit per 8 bytes - 1:64
         </span><span class="kw">let </span>spec = SideMetadataSpec {
-            name: <span class="string">&quot;test_spec&quot;</span>,
+            name: <span class="string">"test_spec"</span>,
             is_global: <span class="bool-val">true</span>,
             offset: ZERO_OFFSET,
             log_num_of_bits: <span class="number">0</span>,
@@ -3044,7 +3046,7 @@
     </span><span class="kw">fn </span>calculate_reserved_pages_multi_specs() {
         <span class="comment">// 1 bit per 8 bytes - 1:64
         </span><span class="kw">let </span>gspec = SideMetadataSpec {
-            name: <span class="string">&quot;gspec&quot;</span>,
+            name: <span class="string">"gspec"</span>,
             is_global: <span class="bool-val">true</span>,
             offset: ZERO_OFFSET,
             log_num_of_bits: <span class="number">0</span>,
@@ -3052,7 +3054,7 @@
         };
         <span class="comment">// 2 bits per page - 2 / (4k * 8) = 1:16k
         </span><span class="kw">let </span>lspec = SideMetadataSpec {
-            name: <span class="string">&quot;lspec&quot;</span>,
+            name: <span class="string">"lspec"</span>,
             is_global: <span class="bool-val">false</span>,
             offset: ZERO_OFFSET,
             log_num_of_bits: <span class="number">1</span>,
@@ -3075,7 +3077,7 @@
     ) {
         serial_test(|| {
             <span class="kw">let </span>spec = SideMetadataSpec {
-                name: <span class="string">&quot;Test Spec $tname&quot;</span>,
+                name: <span class="string">"Test Spec $tname"</span>,
                 is_global: <span class="bool-val">true</span>,
                 offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                 log_num_of_bits: log_bits,
@@ -3086,7 +3088,7 @@
                 local: <span class="macro">vec!</span>[],
             };
             <span class="kw">let </span><span class="kw-2">mut </span>sanity = SideMetadataSanity::new();
-            sanity.verify_metadata_context(<span class="string">&quot;TestPolicy&quot;</span>, <span class="kw-2">&amp;</span>context);
+            sanity.verify_metadata_context(<span class="string">"TestPolicy"</span>, <span class="kw-2">&amp;</span>context);
 
             <span class="kw">let </span>data_addr = vm_layout::vm_layout().heap_start;
             <span class="kw">let </span>meta_addr = address_to_meta_address(<span class="kw-2">&amp;</span>spec, data_addr);
@@ -3190,7 +3192,7 @@
                         <span class="kw">let </span>new_val = <span class="number">0</span>;
                         <span class="kw">let </span>res = spec.compare_exchange_atomic::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;(<span class="macro-nonterminal">data_addr</span>, old_val, new_val, Ordering::SeqCst, Ordering::SeqCst);
                         <span class="macro">assert!</span>(res.is_ok());
-                        <span class="macro">assert_eq!</span>(res.unwrap(), old_val, <span class="string">&quot;old vals do not match&quot;</span>);
+                        <span class="macro">assert_eq!</span>(res.unwrap(), old_val, <span class="string">"old vals do not match"</span>);
 
                         <span class="kw">let </span>after_update = spec.load_atomic::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;(<span class="macro-nonterminal">data_addr</span>, Ordering::SeqCst);
                         <span class="macro">assert_eq!</span>(after_update, new_val);
@@ -3357,9 +3359,9 @@
                         <span class="comment">// max and max should be max
                         </span><span class="kw">let </span>old_val = spec.load_atomic::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;(<span class="macro-nonterminal">data_addr</span>, Ordering::SeqCst);
                         <span class="kw">let </span>old_val_from_fetch = spec.fetch_and_atomic::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;(<span class="macro-nonterminal">data_addr</span>, max_value, Ordering::SeqCst);
-                        <span class="macro">assert_eq!</span>(old_val_from_fetch, old_val, <span class="string">&quot;old values do not match&quot;</span>);
-                        <span class="macro">assert_eq!</span>(spec.load_atomic::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;(<span class="macro-nonterminal">data_addr</span>, Ordering::SeqCst), max_value, <span class="string">&quot;load values do not match&quot;</span>);
-                        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ <span class="kw-2">*</span>meta_ptr }, &lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;<span class="macro-nonterminal">::MAX</span>, <span class="string">&quot;raw values do not match&quot;</span>);
+                        <span class="macro">assert_eq!</span>(old_val_from_fetch, old_val, <span class="string">"old values do not match"</span>);
+                        <span class="macro">assert_eq!</span>(spec.load_atomic::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;(<span class="macro-nonterminal">data_addr</span>, Ordering::SeqCst), max_value, <span class="string">"load values do not match"</span>);
+                        <span class="macro">assert_eq!</span>(<span class="kw">unsafe </span>{ <span class="kw-2">*</span>meta_ptr }, &lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;<span class="macro-nonterminal">::MAX</span>, <span class="string">"raw values do not match"</span>);
 
                         <span class="comment">// max and last_bit_zero should last_bit_zero
                         </span><span class="kw">let </span>last_bit_zero = max_value - <span class="number">1</span>;
@@ -3452,9 +3454,9 @@
     <span class="macro">test_side_metadata_access!</span>(
         test_usize,
         usize,
-        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">"64"</span>) {
             <span class="number">6
-        </span>} <span class="kw">else if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;32&quot;</span>) {
+        </span>} <span class="kw">else if </span><span class="macro">cfg!</span>(target_pointer_width = <span class="string">"32"</span>) {
             <span class="number">5
         </span>} <span class="kw">else </span>{
             <span class="macro">unreachable!</span>()

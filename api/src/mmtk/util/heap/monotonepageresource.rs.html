@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/monotonepageresource.rs`."><title>monotonepageresource.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/monotonepageresource.rs`."><title>monotonepageresource.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -475,18 +477,18 @@
         tls: VMThread,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;PRAllocResult, PRAllocFail&gt; {
         <span class="macro">debug!</span>(
-            <span class="string">&quot;In MonotonePageResource, reserved_pages = {}, required_pages = {}&quot;</span>,
+            <span class="string">"In MonotonePageResource, reserved_pages = {}, required_pages = {}"</span>,
             reserved_pages, required_pages
         );
         <span class="kw">let </span><span class="kw-2">mut </span>new_chunk = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>rtn = sync.cursor;
         <span class="macro">debug!</span>(
-            <span class="string">&quot;cursor = {}, sentinel = {}, current_chunk = {}&quot;</span>,
+            <span class="string">"cursor = {}, sentinel = {}, current_chunk = {}"</span>,
             sync.cursor, sync.sentinel, sync.current_chunk
         );
 
-        <span class="kw">if </span><span class="macro">cfg!</span>(debug = <span class="string">&quot;true&quot;</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(debug = <span class="string">"true"</span>) {
             <span class="comment">/*
              * Cursor should always be zero, or somewhere in the current chunk.  If we have just
              * allocated exactly enough pages to exhaust the current chunk, then cursor can point
@@ -496,7 +498,7 @@
                 || (chunk_align_down(sync.cursor) != sync.current_chunk
                     &amp;&amp; chunk_align_down(sync.cursor) != sync.current_chunk + BYTES_IN_CHUNK)
             {
-                <span class="self">self</span>.log_chunk_fields(space_descriptor, <span class="string">&quot;MonotonePageResource.alloc_pages:fail&quot;</span>);
+                <span class="self">self</span>.log_chunk_fields(space_descriptor, <span class="string">"MonotonePageResource.alloc_pages:fail"</span>);
             }
             <span class="macro">assert!</span>(sync.current_chunk &lt;= sync.cursor);
             <span class="macro">assert!</span>(
@@ -507,12 +509,12 @@
         }
 
         <span class="kw">let </span>bytes = pages_to_bytes(required_pages);
-        <span class="macro">debug!</span>(<span class="string">&quot;bytes={}&quot;</span>, bytes);
+        <span class="macro">debug!</span>(<span class="string">"bytes={}"</span>, bytes);
         <span class="kw">let </span><span class="kw-2">mut </span>tmp = sync.cursor + bytes;
-        <span class="macro">debug!</span>(<span class="string">&quot;tmp={:?}&quot;</span>, tmp);
+        <span class="macro">debug!</span>(<span class="string">"tmp={:?}"</span>, tmp);
 
         <span class="kw">if </span>!<span class="self">self</span>.common().contiguous &amp;&amp; tmp &gt; sync.sentinel {
-            <span class="comment">/* we&#39;re out of virtual memory within our discontiguous region, so ask for more */
+            <span class="comment">/* we're out of virtual memory within our discontiguous region, so ask for more */
             </span><span class="kw">let </span>required_chunks = required_chunks(required_pages);
             sync.current_chunk = <span class="self">self
                 </span>.common
@@ -524,7 +526,7 @@
                 </span>} <span class="kw">else </span>{
                     required_chunks &lt;&lt; LOG_BYTES_IN_CHUNK
                 };
-            <span class="comment">//println!(&quot;{} {}-&gt;{}&quot;, self.common.space.unwrap().get_name(), sync.cursor, sync.sentinel);
+            <span class="comment">//println!("{} {}-&gt;{}", self.common.space.unwrap().get_name(), sync.cursor, sync.sentinel);
             </span>rtn = sync.cursor;
             tmp = sync.cursor + bytes;
             new_chunk = <span class="bool-val">true</span>;
@@ -532,18 +534,18 @@
 
         <span class="macro">debug_assert!</span>(rtn &gt;= sync.cursor &amp;&amp; rtn &lt; sync.cursor + bytes);
         <span class="kw">if </span>tmp &gt; sync.sentinel {
-            <span class="comment">//debug!(&quot;tmp={:?} &gt; sync.sentinel={:?}&quot;, tmp, sync.sentinel);
+            <span class="comment">//debug!("tmp={:?} &gt; sync.sentinel={:?}", tmp, sync.sentinel);
             </span>Result::Err(PRAllocFail)
         } <span class="kw">else </span>{
-            <span class="comment">//debug!(&quot;tmp={:?} &lt;= sync.sentinel={:?}&quot;, tmp, sync.sentinel);
+            <span class="comment">//debug!("tmp={:?} &lt;= sync.sentinel={:?}", tmp, sync.sentinel);
             </span>sync.cursor = tmp;
-            <span class="macro">debug!</span>(<span class="string">&quot;update cursor = {}&quot;</span>, tmp);
+            <span class="macro">debug!</span>(<span class="string">"update cursor = {}"</span>, tmp);
 
             <span class="comment">/* In a contiguous space we can bump along into the next chunk, so preserve the currentChunk invariant */
             </span><span class="kw">if </span><span class="self">self</span>.common().contiguous &amp;&amp; chunk_align_down(sync.cursor) != sync.current_chunk {
                 <span class="macro">debug_assert!</span>(
                     chunk_align_down(sync.cursor) &gt; sync.current_chunk,
-                    <span class="string">&quot;Not monotonic.  chunk_align_down(sync.cursor): {}, sync.current_chunk: {}&quot;</span>,
+                    <span class="string">"Not monotonic.  chunk_align_down(sync.cursor): {}, sync.current_chunk: {}"</span>,
                     chunk_align_down(sync.cursor),
                     sync.current_chunk,
                 );
@@ -561,11 +563,11 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; MonotonePageResource&lt;VM&gt; {
-    <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new_contiguous(start: Address, bytes: usize, vm_map: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>sentinel = start + bytes;
 
         MonotonePageResource {
-            common: CommonPageResource::new(<span class="bool-val">true</span>, <span class="macro">cfg!</span>(target_pointer_width = <span class="string">&quot;64&quot;</span>), vm_map),
+            common: CommonPageResource::new(<span class="bool-val">true</span>, <span class="macro">cfg!</span>(target_pointer_width = <span class="string">"64"</span>), vm_map),
             sync: Mutex::new(MonotonePageResourceSync {
                 cursor: start,
                 current_chunk: chunk_align_down(start),
@@ -580,7 +582,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new_discontiguous(vm_map: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap) -&gt; <span class="self">Self </span>{
         MonotonePageResource {
             common: CommonPageResource::new(<span class="bool-val">false</span>, <span class="bool-val">true</span>, vm_map),
             sync: Mutex::new(MonotonePageResourceSync {
@@ -601,7 +603,7 @@
     <span class="kw">fn </span>log_chunk_fields(<span class="kw-2">&amp;</span><span class="self">self</span>, space_descriptor: SpaceDescriptor, site: <span class="kw-2">&amp;</span>str) {
         <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="macro">debug!</span>(
-            <span class="string">&quot;[{:?}]{}: cursor={}, current_chunk={}, delta={}&quot;</span>,
+            <span class="string">"[{:?}]{}: cursor={}, current_chunk={}, delta={}"</span>,
             space_descriptor,
             site,
             sync.cursor,
@@ -735,13 +737,13 @@
 
     <span class="doccomment">/// Iterate over all contiguous memory regions in this space.
     /// For contiguous space, this iterator should yield only once, and returning a contiguous memory region covering the whole space.
-    </span><span class="kw">pub fn </span>iterate_allocated_regions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = (Address, usize)&gt; + <span class="lifetime">&#39;_ </span>{
-        <span class="kw">struct </span>Iter&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
-            pr: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MonotonePageResource&lt;VM&gt;,
+    </span><span class="kw">pub fn </span>iterate_allocated_regions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = (Address, usize)&gt; + <span class="lifetime">'_ </span>{
+        <span class="kw">struct </span>Iter&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; {
+            pr: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>MonotonePageResource&lt;VM&gt;,
             contiguous_space: <span class="prelude-ty">Option</span>&lt;Range&lt;Address&gt;&gt;,
             discontiguous_start: Address,
         }
-        <span class="kw">impl</span>&lt;VM: VMBinding&gt; Iterator <span class="kw">for </span>Iter&lt;<span class="lifetime">&#39;_</span>, VM&gt; {
+        <span class="kw">impl</span>&lt;VM: VMBinding&gt; Iterator <span class="kw">for </span>Iter&lt;<span class="lifetime">'_</span>, VM&gt; {
             <span class="kw">type </span>Item = (Address, usize);
             <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(range) = <span class="self">self</span>.contiguous_space.take() {

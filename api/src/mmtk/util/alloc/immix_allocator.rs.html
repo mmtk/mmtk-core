@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/alloc/immix_allocator.rs`."><title>immix_allocator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/alloc/immix_allocator.rs`."><title>immix_allocator.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -423,7 +425,7 @@
     <span class="doccomment">/// The fastpath bump pointer.
     </span><span class="kw">pub </span>bump_pointer: BumpPointer,
     <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
-    </span>space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt;,
+    </span>space: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>ImmixSpace&lt;VM&gt;,
     context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
     <span class="doccomment">/// *unused*
     </span>hot: bool,
@@ -447,7 +449,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Allocator&lt;VM&gt; <span class="kw">for </span>ImmixAllocator&lt;VM&gt; {
-    <span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt; {
+    <span class="kw">fn </span>get_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Space&lt;VM&gt; {
         <span class="self">self</span>.space <span class="kw">as _
     </span>}
 
@@ -466,7 +468,7 @@
     <span class="kw">fn </span>alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="macro">debug_assert!</span>(
             size &lt;= <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE,
-            <span class="string">&quot;Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}&quot;</span>,
+            <span class="string">"Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}"</span>,
             size,
             <span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE
         );
@@ -476,7 +478,7 @@
 
         <span class="kw">if </span>new_cursor &gt; <span class="self">self</span>.bump_pointer.limit {
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: Thread local buffer used up, go to alloc slow path&quot;</span>,
+                <span class="string">"{:?}: Thread local buffer used up, go to alloc slow path"</span>,
                 <span class="self">self</span>.tls
             );
             <span class="kw">if </span>get_maximum_aligned_size::&lt;VM&gt;(size, align) &gt; Line::BYTES {
@@ -491,7 +493,7 @@
             </span>fill_alignment_gap::&lt;VM&gt;(<span class="self">self</span>.bump_pointer.cursor, result);
             <span class="self">self</span>.bump_pointer.cursor = new_cursor;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}&quot;</span>,
+                <span class="string">"{:?}: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}"</span>,
                 <span class="self">self</span>.tls,
                 size,
                 result,
@@ -504,7 +506,7 @@
 
     <span class="doccomment">/// Acquire a clean block from ImmixSpace for allocation.
     </span><span class="kw">fn </span>alloc_slow_once(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once&quot;</span>, <span class="self">self</span>.tls);
+        <span class="macro">trace!</span>(<span class="string">"{:?}: alloc_slow_once"</span>, <span class="self">self</span>.tls);
         <span class="self">self</span>.acquire_clean_block(size, align, offset)
     }
 
@@ -519,12 +521,12 @@
         offset: usize,
         need_poll: bool,
     ) -&gt; Address {
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_precise_stress&quot;</span>, <span class="self">self</span>.tls);
+        <span class="macro">trace!</span>(<span class="string">"{:?}: alloc_slow_once_precise_stress"</span>, <span class="self">self</span>.tls);
         <span class="comment">// If we are required to make a poll, we call acquire_clean_block() which will acquire memory
         // from the space which includes a GC poll.
         </span><span class="kw">if </span>need_poll {
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: alloc_slow_once_precise_stress going to poll&quot;</span>,
+                <span class="string">"{:?}: alloc_slow_once_precise_stress going to poll"</span>,
                 <span class="self">self</span>.tls
             );
             <span class="kw">let </span>ret = <span class="self">self</span>.acquire_clean_block(size, align, offset);
@@ -532,7 +534,7 @@
             // special slowpath.
             </span><span class="self">self</span>.set_limit_for_stress();
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: alloc_slow_once_precise_stress done - forced stress poll&quot;</span>,
+                <span class="string">"{:?}: alloc_slow_once_precise_stress done - forced stress poll"</span>,
                 <span class="self">self</span>.tls
             );
             <span class="kw">return </span>ret;
@@ -544,17 +546,17 @@
         // and if so, then directly acquire a new one
         </span><span class="self">self</span>.restore_limit_for_stress();
         <span class="kw">let </span>ret = <span class="kw">if </span><span class="self">self</span>.require_new_block(size, align, offset) {
-            <span class="comment">// We don&#39;t have enough space in thread local block to service the allocation request,
+            <span class="comment">// We don't have enough space in thread local block to service the allocation request,
             // hence allocate a new block
             </span><span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: alloc_slow_once_precise_stress - acquire new block&quot;</span>,
+                <span class="string">"{:?}: alloc_slow_once_precise_stress - acquire new block"</span>,
                 <span class="self">self</span>.tls
             );
             <span class="self">self</span>.acquire_clean_block(size, align, offset)
         } <span class="kw">else </span>{
             <span class="comment">// This `alloc()` call should always succeed given the if-branch checks if we are out
             // of thread local block space
-            </span><span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_precise_stress - alloc()&quot;</span>, <span class="self">self</span>.tls,);
+            </span><span class="macro">trace!</span>(<span class="string">"{:?}: alloc_slow_once_precise_stress - alloc()"</span>, <span class="self">self</span>.tls,);
             <span class="self">self</span>.alloc(size, align, offset)
         };
         <span class="comment">// Set fake limits
@@ -570,7 +572,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ImmixAllocator&lt;VM&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         tls: VMThread,
-        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
+        space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;,
         context: Arc&lt;AllocatorContext&lt;VM&gt;&gt;,
         copy: bool,
     ) -&gt; <span class="self">Self </span>{
@@ -587,13 +589,13 @@
         }
     }
 
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>immix_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>ImmixSpace&lt;VM&gt; {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>immix_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>ImmixSpace&lt;VM&gt; {
         <span class="self">self</span>.space
     }
 
     <span class="doccomment">/// Large-object (larger than a line) bump allocation.
     </span><span class="kw">fn </span>overflow_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}: overflow_alloc&quot;</span>, <span class="self">self</span>.tls);
+        <span class="macro">trace!</span>(<span class="string">"{:?}: overflow_alloc"</span>, <span class="self">self</span>.tls);
         <span class="kw">let </span>start = align_allocation_no_fill::&lt;VM&gt;(<span class="self">self</span>.large_bump_pointer.cursor, align, offset);
         <span class="kw">let </span>end = start + size;
         <span class="kw">if </span>end &gt; <span class="self">self</span>.large_bump_pointer.limit {
@@ -610,7 +612,7 @@
 
     <span class="doccomment">/// Bump allocate small objects into recyclable lines (i.e. holes).
     </span><span class="kw">fn </span>alloc_slow_hot(<span class="kw-2">&amp;mut </span><span class="self">self</span>, size: usize, align: usize, offset: usize) -&gt; Address {
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_hot&quot;</span>, <span class="self">self</span>.tls);
+        <span class="macro">trace!</span>(<span class="string">"{:?}: alloc_slow_hot"</span>, <span class="self">self</span>.tls);
         <span class="kw">if </span><span class="self">self</span>.acquire_recyclable_lines(size, align, offset) {
             <span class="comment">// If stress test is active, then we need to go to the slow path instead of directly
             // calling `alloc()`. This is because the `acquire_recyclable_lines()` function
@@ -619,7 +621,7 @@
             // as the newly recycled line will service the allocation request. If we set the stress
             // factor limit directly in `acquire_recyclable_lines()`, then we risk running into an
             // loop of failing the fastpath (i.e. `alloc()`) and then trying to allocate from a
-            // recyclable line.  Hence, we bring the &quot;if we&#39;re in stress test&quot; check up a level and
+            // recyclable line.  Hence, we bring the "if we're in stress test" check up a level and
             // directly call `alloc_slow_inline()` which will properly account for the allocation
             // request as well as allocate from the newly recycled line
             </span><span class="kw">let </span>stress_test = <span class="self">self</span>.context.options.is_stress_test_gc_enabled();
@@ -644,7 +646,7 @@
                 </span><span class="self">self</span>.bump_pointer.cursor = start_line.start();
                 <span class="self">self</span>.bump_pointer.limit = end_line.start();
                 <span class="macro">trace!</span>(
-                    <span class="string">&quot;{:?}: acquire_recyclable_lines -&gt; {:?} [{:?}, {:?}) {:?}&quot;</span>,
+                    <span class="string">"{:?}: acquire_recyclable_lines -&gt; {:?} [{:?}, {:?}) {:?}"</span>,
                     <span class="self">self</span>.tls,
                     <span class="self">self</span>.line,
                     start_line,
@@ -680,7 +682,7 @@
     </span><span class="kw">fn </span>acquire_recyclable_block(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
         <span class="kw">match </span><span class="self">self</span>.immix_space().get_reusable_block(<span class="self">self</span>.copy) {
             <span class="prelude-val">Some</span>(block) =&gt; {
-                <span class="macro">trace!</span>(<span class="string">&quot;{:?}: acquire_recyclable_block -&gt; {:?}&quot;</span>, <span class="self">self</span>.tls, block);
+                <span class="macro">trace!</span>(<span class="string">"{:?}: acquire_recyclable_block -&gt; {:?}"</span>, <span class="self">self</span>.tls, block);
                 <span class="comment">// Set the hole-searching cursor to the start of this block.
                 </span><span class="self">self</span>.line = <span class="prelude-val">Some</span>(block.start_line());
                 <span class="bool-val">true
@@ -695,7 +697,7 @@
             <span class="prelude-val">None </span>=&gt; Address::ZERO,
             <span class="prelude-val">Some</span>(block) =&gt; {
                 <span class="macro">trace!</span>(
-                    <span class="string">&quot;{:?}: Acquired a new block {:?} -&gt; {:?}&quot;</span>,
+                    <span class="string">"{:?}: Acquired a new block {:?} -&gt; {:?}"</span>,
                     <span class="self">self</span>.tls,
                     block.start(),
                     block.end()
@@ -745,7 +747,7 @@
                 <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.bump_pointer.limit - <span class="self">self</span>.bump_pointer.cursor) };
             <span class="self">self</span>.bump_pointer.limit = new_limit;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: set_limit_for_stress. normal c {} l {} -&gt; {}&quot;</span>,
+                <span class="string">"{:?}: set_limit_for_stress. normal c {} l {} -&gt; {}"</span>,
                 <span class="self">self</span>.tls,
                 <span class="self">self</span>.bump_pointer.cursor,
                 old_limit,
@@ -760,7 +762,7 @@
             };
             <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: set_limit_for_stress. large c {} l {} -&gt; {}&quot;</span>,
+                <span class="string">"{:?}: set_limit_for_stress. large c {} l {} -&gt; {}"</span>,
                 <span class="self">self</span>.tls,
                 <span class="self">self</span>.large_bump_pointer.cursor,
                 old_lg_limit,
@@ -779,7 +781,7 @@
             <span class="kw">let </span>new_limit = <span class="self">self</span>.bump_pointer.cursor + <span class="self">self</span>.bump_pointer.limit.as_usize();
             <span class="self">self</span>.bump_pointer.limit = new_limit;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: restore_limit_for_stress. normal c {} l {} -&gt; {}&quot;</span>,
+                <span class="string">"{:?}: restore_limit_for_stress. normal c {} l {} -&gt; {}"</span>,
                 <span class="self">self</span>.tls,
                 <span class="self">self</span>.bump_pointer.cursor,
                 old_limit,
@@ -793,7 +795,7 @@
                 <span class="self">self</span>.large_bump_pointer.cursor + <span class="self">self</span>.large_bump_pointer.limit.as_usize();
             <span class="self">self</span>.large_bump_pointer.limit = new_lg_limit;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: restore_limit_for_stress. large c {} l {} -&gt; {}&quot;</span>,
+                <span class="string">"{:?}: restore_limit_for_stress. large c {} l {} -&gt; {}"</span>,
                 <span class="self">self</span>.tls,
                 <span class="self">self</span>.large_bump_pointer.cursor,
                 old_lg_limit,

@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/reference_processor.rs`."><title>reference_processor.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/reference_processor.rs`."><title>reference_processor.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -579,7 +581,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
 <span class="doccomment">/// Holds all reference processors for each weak reference Semantics.
-/// Currently this is based on Java&#39;s weak reference semantics (soft/weak/phantom).
+/// Currently this is based on Java's weak reference semantics (soft/weak/phantom).
 /// We should make changes to make this general rather than Java specific.
 </span><span class="kw">pub struct </span>ReferenceProcessors {
     soft: ReferenceProcessor,
@@ -605,17 +607,17 @@
     }
 
     <span class="kw">pub fn </span>add_soft_candidate(<span class="kw-2">&amp;</span><span class="self">self</span>, reff: ObjectReference) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Add soft candidate: {}&quot;</span>, reff);
+        <span class="macro">trace!</span>(<span class="string">"Add soft candidate: {}"</span>, reff);
         <span class="self">self</span>.soft.add_candidate(reff);
     }
 
     <span class="kw">pub fn </span>add_weak_candidate(<span class="kw-2">&amp;</span><span class="self">self</span>, reff: ObjectReference) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Add weak candidate: {}&quot;</span>, reff);
+        <span class="macro">trace!</span>(<span class="string">"Add weak candidate: {}"</span>, reff);
         <span class="self">self</span>.weak.add_candidate(reff);
     }
 
     <span class="kw">pub fn </span>add_phantom_candidate(<span class="kw-2">&amp;</span><span class="self">self</span>, reff: ObjectReference) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Add phantom candidate: {}&quot;</span>, reff);
+        <span class="macro">trace!</span>(<span class="string">"Add phantom candidate: {}"</span>, reff);
         <span class="self">self</span>.phantom.add_candidate(reff);
     }
 
@@ -632,10 +634,10 @@
     /// However, for some plans like mark compact, at the point we do ref scanning, we do not know
     /// the forwarding addresses yet, thus we cannot do forwarding during scan refs. And for those
     /// plans, this separate step is required.
-    </span><span class="kw">pub fn </span>forward_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    </span><span class="kw">pub fn </span>forward_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="macro">debug_assert!</span>(
             mmtk.get_plan().constraints().needs_forward_after_liveness,
-            <span class="string">&quot;A plan with needs_forward_after_liveness=false does not need a separate forward step&quot;
+            <span class="string">"A plan with needs_forward_after_liveness=false does not need a separate forward step"
         </span>);
         <span class="self">self</span>.soft
             .forward::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
@@ -648,7 +650,7 @@
     <span class="comment">// Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft &gt; weak &gt; phantom
 
     </span><span class="doccomment">/// Scan soft references.
-    </span><span class="kw">pub fn </span>scan_soft_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    </span><span class="kw">pub fn </span>scan_soft_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="comment">// For soft refs, it is up to the VM to decide when to reclaim this.
         // If this is not an emergency collection, we have no heap stress. We simply retain soft refs.
         </span><span class="kw">if </span>!mmtk.state.is_emergency_collection() {
@@ -661,7 +663,7 @@
     }
 
     <span class="doccomment">/// Scan weak references.
-    </span><span class="kw">pub fn </span>scan_weak_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    </span><span class="kw">pub fn </span>scan_weak_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="self">self</span>.weak.scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
     }
 
@@ -669,7 +671,7 @@
     </span><span class="kw">pub fn </span>scan_phantom_refs&lt;E: ProcessEdgesWork&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         trace: <span class="kw-2">&amp;mut </span>E,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;,
     ) {
         <span class="self">self</span>.phantom
             .scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
@@ -683,9 +685,9 @@
 }
 
 <span class="comment">// XXX: We differ from the original implementation
-//      by ignoring &quot;stress,&quot; i.e. where the array
+//      by ignoring "stress," i.e. where the array
 //      of references is grown by 1 each time. We
-//      can&#39;t do this here b/c std::vec::Vec doesn&#39;t
+//      can't do this here b/c std::vec::Vec doesn't
 //      allow us to customize its behaviour like that.
 //      (Similarly, GROWTH_FACTOR is locked at 2.0, but
 //      luckily this is also the value used by Java MMTk.)
@@ -697,7 +699,7 @@
 ///    is created, or when a weak reference is traced during GC.
 /// 2. We scan references after the GC determins liveness.
 /// 3. We forward references if the GC needs forwarding after liveness.
-/// 4. We inform the binding of references whose referents are cleared during this GC by enqueue&#39;ing.
+/// 4. We inform the binding of references whose referents are cleared during this GC by enqueue'ing.
 </span><span class="kw">pub struct </span>ReferenceProcessor {
     <span class="doccomment">/// Most of the reference processor is protected by a mutex.
     </span>sync: Mutex&lt;ReferenceProcessorSync&gt;,
@@ -707,14 +709,14 @@
 
     <span class="doccomment">/// Is it allowed to add candidate to this reference processor? The value is true for most of the time,
     /// but it is set to false once we finish forwarding references, at which point we do not expect to encounter
-    /// any &#39;new&#39; reference in the same GC. This makes sure that no new entry will be added to our reference table once
+    /// any 'new' reference in the same GC. This makes sure that no new entry will be added to our reference table once
     /// we finish forwarding, as we will not be able to process the entry in that GC.
     </span><span class="comment">// This avoids an issue in the following scenario in mark compact:
     // 1. First trace: add a candidate WR
     // 2. Weak reference scan: scan the reference table, as MC does not forward object in the first trace. This scan does not update any reference.
     // 3. Second trace: call add_candidate again with WR, but WR gets ignored as we already have WR in our reference table.
-    // 4. Weak reference forward: call trace_object for WR, which pushes WR to the node buffer and update WR -&gt; WR&#39; in our reference table.
-    // 5. When we trace objects in the node buffer, we will attempt to add WR as a candidate. As we have updated WR to WR&#39; in our reference
+    // 4. Weak reference forward: call trace_object for WR, which pushes WR to the node buffer and update WR -&gt; WR' in our reference table.
+    // 5. When we trace objects in the node buffer, we will attempt to add WR as a candidate. As we have updated WR to WR' in our reference
     //    table, we would accept WR as a candidate. But we will not trace WR again, and WR will be invalid after this GC.
     // This flag is set to false after Step 4, so in Step 5, we will ignore adding WR.
     </span>allow_new_candidate: AtomicBool,
@@ -817,13 +819,13 @@
                 <span class="kw">if </span>!VM::VMReferenceGlue::is_referent_cleared(referent) {
                     <span class="macro">debug_assert!</span>(
                         referent.is_in_any_space(),
-                        <span class="string">&quot;Referent {:?} (of reference {:?}) is not in any space&quot;</span>,
+                        <span class="string">"Referent {:?} (of reference {:?}) is not in any space"</span>,
                         referent,
                         reff
                     );
                 }
             });
-            <span class="comment">// For references that will be enqueue&#39;d, the referent needs to be valid, and the referent needs to be null.
+            <span class="comment">// For references that will be enqueue'd, the referent needs to be valid, and the referent needs to be null.
             </span>sync.enqueued_references.iter().for_each(|reff| {
                 <span class="macro">debug_assert!</span>(!reff.is_null());
                 <span class="macro">debug_assert!</span>(reff.is_in_any_space());
@@ -833,7 +835,7 @@
         }
 
         <span class="kw">if </span>!sync.enqueued_references.is_empty() {
-            <span class="macro">trace!</span>(<span class="string">&quot;enqueue: {:?}&quot;</span>, sync.enqueued_references);
+            <span class="macro">trace!</span>(<span class="string">"enqueue: {:?}"</span>, sync.enqueued_references);
             VM::VMReferenceGlue::enqueue_references(<span class="kw-2">&amp;</span>sync.enqueued_references, tls);
             sync.enqueued_references.clear();
         }
@@ -846,7 +848,7 @@
     /// nursery is not used for this.
     </span><span class="kw">pub fn </span>forward&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, _nursery: bool) {
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        <span class="macro">debug!</span>(<span class="string">&quot;Starting ReferenceProcessor.forward({:?})&quot;</span>, <span class="self">self</span>.semantics);
+        <span class="macro">debug!</span>(<span class="string">"Starting ReferenceProcessor.forward({:?})"</span>, <span class="self">self</span>.semantics);
 
         <span class="comment">// Forward a single reference
         </span><span class="kw">fn </span>forward_reference&lt;E: ProcessEdgesWork&gt;(
@@ -857,7 +859,7 @@
             {
                 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
                 <span class="macro">trace!</span>(
-                    <span class="string">&quot;Forwarding reference: {} (size: {})&quot;</span>,
+                    <span class="string">"Forwarding reference: {} (size: {})"</span>,
                     reference,
                     &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMObjectModel::get_current_size(reference)
                 );
@@ -868,18 +870,18 @@
                 &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::set_referent(reference, new_referent);
 
                 <span class="macro">trace!</span>(
-                    <span class="string">&quot; referent: {} (forwarded to {})&quot;</span>,
+                    <span class="string">" referent: {} (forwarded to {})"</span>,
                     old_referent,
                     new_referent
                 );
             }
 
             <span class="kw">let </span>new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
-            <span class="macro">trace!</span>(<span class="string">&quot; reference: forwarded to {}&quot;</span>, new_reference);
+            <span class="macro">trace!</span>(<span class="string">" reference: forwarded to {}"</span>, new_reference);
 
             <span class="macro">debug_assert!</span>(
                 !new_reference.is_null(),
-                <span class="string">&quot;reference {:?}&#39;s forwarding pointer is NULL&quot;</span>,
+                <span class="string">"reference {:?}'s forwarding pointer is NULL"</span>,
                 reference
             );
             new_reference
@@ -897,7 +899,7 @@
             .map(|reff| forward_reference::&lt;E&gt;(trace, <span class="kw-2">*</span>reff))
             .collect();
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Ending ReferenceProcessor.forward({:?})&quot;</span>, <span class="self">self</span>.semantics);
+        <span class="macro">debug!</span>(<span class="string">"Ending ReferenceProcessor.forward({:?})"</span>, <span class="self">self</span>.semantics);
 
         <span class="comment">// We finish forwarding. No longer accept new candidates.
         </span><span class="self">self</span>.disallow_new_candidate();
@@ -910,10 +912,10 @@
     </span><span class="kw">fn </span>scan&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, _nursery: bool) {
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Starting ReferenceProcessor.scan({:?})&quot;</span>, <span class="self">self</span>.semantics);
+        <span class="macro">debug!</span>(<span class="string">"Starting ReferenceProcessor.scan({:?})"</span>, <span class="self">self</span>.semantics);
 
         <span class="macro">trace!</span>(
-            <span class="string">&quot;{:?} Reference table is {:?}&quot;</span>,
+            <span class="string">"{:?} Reference table is {:?}"</span>,
             <span class="self">self</span>.semantics,
             sync.references
         );
@@ -930,7 +932,7 @@
             .collect();
 
         <span class="macro">debug!</span>(
-            <span class="string">&quot;{:?} reference table from {} to {} ({} enqueued)&quot;</span>,
+            <span class="string">"{:?} reference table from {} to {} ({} enqueued)"</span>,
             <span class="self">self</span>.semantics,
             sync.references.len(),
             new_set.len(),
@@ -939,7 +941,7 @@
         sync.references = new_set;
         sync.enqueued_references = enqueued_references;
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Ending ReferenceProcessor.scan({:?})&quot;</span>, <span class="self">self</span>.semantics);
+        <span class="macro">debug!</span>(<span class="string">"Ending ReferenceProcessor.scan({:?})"</span>, <span class="self">self</span>.semantics);
     }
 
     <span class="doccomment">/// Retain referent in the reference table. This method deals only with soft references.
@@ -951,9 +953,9 @@
 
         <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Starting ReferenceProcessor.retain({:?})&quot;</span>, <span class="self">self</span>.semantics);
+        <span class="macro">debug!</span>(<span class="string">"Starting ReferenceProcessor.retain({:?})"</span>, <span class="self">self</span>.semantics);
         <span class="macro">trace!</span>(
-            <span class="string">&quot;{:?} Reference table is {:?}&quot;</span>,
+            <span class="string">"{:?} Reference table is {:?}"</span>,
             <span class="self">self</span>.semantics,
             sync.references
         );
@@ -961,7 +963,7 @@
         <span class="kw">for </span>reference <span class="kw">in </span>sync.references.iter() {
             <span class="macro">debug_assert!</span>(!reference.is_null());
 
-            <span class="macro">trace!</span>(<span class="string">&quot;Processing reference: {:?}&quot;</span>, reference);
+            <span class="macro">trace!</span>(<span class="string">"Processing reference: {:?}"</span>, reference);
 
             <span class="kw">if </span>!reference.is_live() {
                 <span class="comment">// Reference is currently unreachable but may get reachable by the
@@ -974,10 +976,10 @@
             <span class="kw">if </span>!&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::is_referent_cleared(referent) {
                 <span class="self">Self</span>::keep_referent_alive(trace, referent);
             }
-            <span class="macro">trace!</span>(<span class="string">&quot; ~&gt; {:?} (retained)&quot;</span>, referent);
+            <span class="macro">trace!</span>(<span class="string">" ~&gt; {:?} (retained)"</span>, referent);
         }
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Ending ReferenceProcessor.retain({:?})&quot;</span>, <span class="self">self</span>.semantics);
+        <span class="macro">debug!</span>(<span class="string">"Ending ReferenceProcessor.retain({:?})"</span>, <span class="self">self</span>.semantics);
     }
 
     <span class="doccomment">/// Process a reference.
@@ -995,39 +997,39 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="macro">debug_assert!</span>(!reference.is_null());
 
-        <span class="macro">trace!</span>(<span class="string">&quot;Process reference: {}&quot;</span>, reference);
+        <span class="macro">trace!</span>(<span class="string">"Process reference: {}"</span>, reference);
 
-        <span class="comment">// If the reference is dead, we&#39;re done with it. Let it (and
+        <span class="comment">// If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
         </span><span class="kw">if </span>!reference.is_live() {
             &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::clear_referent(reference);
-            <span class="macro">trace!</span>(<span class="string">&quot; UNREACHABLE reference: {}&quot;</span>, reference);
-            <span class="macro">trace!</span>(<span class="string">&quot; (unreachable)&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">" UNREACHABLE reference: {}"</span>, reference);
+            <span class="macro">trace!</span>(<span class="string">" (unreachable)"</span>);
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
         <span class="comment">// The reference object is live
         </span><span class="kw">let </span>new_reference = <span class="self">Self</span>::get_forwarded_reference(trace, reference);
         <span class="kw">let </span>old_referent = &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::get_referent(reference);
-        <span class="macro">trace!</span>(<span class="string">&quot; ~&gt; {}&quot;</span>, old_referent);
+        <span class="macro">trace!</span>(<span class="string">" ~&gt; {}"</span>, old_referent);
 
         <span class="comment">// If the application has cleared the referent the Java spec says
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
         </span><span class="kw">if </span>&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::is_referent_cleared(old_referent) {
-            <span class="macro">trace!</span>(<span class="string">&quot; (cleared referent) &quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">" (cleared referent) "</span>);
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
-        <span class="macro">trace!</span>(<span class="string">&quot; =&gt; {}&quot;</span>, new_reference);
+        <span class="macro">trace!</span>(<span class="string">" =&gt; {}"</span>, new_reference);
 
         <span class="kw">if </span>old_referent.is_live() {
             <span class="comment">// Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
             </span><span class="kw">let </span>new_referent = <span class="self">Self</span>::get_forwarded_referent(trace, old_referent);
             <span class="macro">debug_assert!</span>(new_referent.is_live());
-            <span class="macro">trace!</span>(<span class="string">&quot; ~&gt; {}&quot;</span>, new_referent);
+            <span class="macro">trace!</span>(<span class="string">" ~&gt; {}"</span>, new_referent);
 
             <span class="comment">// The reference object stays on the waiting list, and the
             // referent is untouched. The only thing we must do is
@@ -1040,7 +1042,7 @@
             <span class="prelude-val">Some</span>(new_reference)
         } <span class="kw">else </span>{
             <span class="comment">// Referent is unreachable. Clear the referent and enqueue the reference object.
-            </span><span class="macro">trace!</span>(<span class="string">&quot; UNREACHABLE referent: {}&quot;</span>, old_referent);
+            </span><span class="macro">trace!</span>(<span class="string">" UNREACHABLE referent: {}"</span>, old_referent);
 
             &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::clear_referent(new_reference);
             enqueued_references.push(new_reference);
@@ -1057,7 +1059,7 @@
 <span class="attr">#[derive(Default)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>SoftRefProcessing&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>SoftRefProcessing&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::SoftRefClosure);
         w.set_worker(worker);
         mmtk.reference_processors.scan_soft_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
@@ -1073,7 +1075,7 @@
 <span class="attr">#[derive(Default)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WeakRefProcessing&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>WeakRefProcessing&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::WeakRefClosure);
         w.set_worker(worker);
         mmtk.reference_processors.scan_weak_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
@@ -1089,7 +1091,7 @@
 <span class="attr">#[derive(Default)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>PhantomRefProcessing&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>PhantomRefProcessing&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::PhantomRefClosure);
         w.set_worker(worker);
         mmtk.reference_processors.scan_phantom_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
@@ -1105,7 +1107,7 @@
 <span class="attr">#[derive(Default)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>RefForwarding&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>RefForwarding&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::RefForwarding);
         w.set_worker(worker);
         mmtk.reference_processors.forward_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
@@ -1121,7 +1123,7 @@
 <span class="attr">#[derive(Default)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>RefEnqueue&lt;VM: VMBinding&gt;(PhantomData&lt;VM&gt;);
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>RefEnqueue&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         mmtk.reference_processors.enqueue_refs::&lt;VM&gt;(worker.tls);
     }
 }

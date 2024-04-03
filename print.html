@@ -2031,17 +2031,15 @@ with the default allocation semantics, we can use the offset to get a reference 
                 fixture.get_mmtk(),
                 AllocationSemantics::Default,
             );
-            unsafe {
-                DEFAULT_ALLOCATOR_OFFSET =
-                    crate::plan::Mutator::&lt;MockVM&gt;::get_allocator_base_offset(selector);
-            }
+            let default_allocator_offset =
+                crate::plan::Mutator::&lt;MockVM&gt;::get_allocator_base_offset(selector);
             let mutator = memory_manager::bind_mutator(fixture.get_mmtk(), tls_opaque_pointer);
 
             // At run time: allocate with the default semantics without resolving allocator
             let default_allocator: &amp;mut BumpAllocator&lt;MockVM&gt; = {
                 let mutator_addr = Address::from_ref(&amp;*mutator);
                 unsafe {
-                    (mutator_addr + DEFAULT_ALLOCATOR_OFFSET).as_mut_ref::&lt;BumpAllocator&lt;MockVM&gt;&gt;()
+                    (mutator_addr + default_allocator_offset).as_mut_ref::&lt;BumpAllocator&lt;MockVM&gt;&gt;()
                 }
             };
             let addr = default_allocator.alloc(8, 8, 0);

@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -752,7 +754,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::immortalspace::ImmortalSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{PlanCreateSpaceArgs, Space};
-<span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::policy::vmspace::VMSpace;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
@@ -780,7 +782,7 @@
 
 <span class="kw">pub fn </span>create_mutator&lt;VM: VMBinding&gt;(
     tls: VMMutatorThread,
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
 ) -&gt; Box&lt;Mutator&lt;VM&gt;&gt; {
     Box::new(<span class="kw">match </span><span class="kw-2">*</span>mmtk.options.plan {
         PlanSelector::NoGC =&gt; <span class="kw">crate</span>::plan::nogc::mutator::create_nogc_mutator(tls, mmtk),
@@ -837,7 +839,7 @@
         }
     };
 
-    <span class="comment">// We have created Plan in the heap, and we won&#39;t explicitly move it.
+    <span class="comment">// We have created Plan in the heap, and we won't explicitly move it.
     // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
     </span><span class="kw">let </span>sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap =
         <span class="kw">unsafe </span>{ <span class="kw">crate</span>::mmtk::SFT_MAP.get_mut() }.as_mut();
@@ -852,7 +854,7 @@
 <span class="doccomment">/// Create thread local GC worker.
 </span><span class="kw">pub fn </span>create_gc_worker_context&lt;VM: VMBinding&gt;(
     tls: VMWorkerThread,
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
 ) -&gt; GCWorkerCopyContext&lt;VM&gt; {
     GCWorkerCopyContext::&lt;VM&gt;::new(tls, mmtk, mmtk.get_plan().create_copy_config())
 }
@@ -878,19 +880,19 @@
 /// Methods in this trait:
 ///
 /// Only methods that will be overridden by each specific plan should be included in this trait. The trait may
-/// provide a default implementation, and each plan can override the implementation. For methods that won&#39;t be
+/// provide a default implementation, and each plan can override the implementation. For methods that won't be
 /// overridden, we should implement those methods in BasePlan (or CommonPlan) and call them from there instead.
 /// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and
 /// they may call a wrong method by mistake.
 </span><span class="comment">// TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
-</span><span class="kw">pub trait </span>Plan: <span class="lifetime">&#39;static </span>+ HasSpaces + Sync + Downcast {
+</span><span class="kw">pub trait </span>Plan: <span class="lifetime">'static </span>+ HasSpaces + Sync + Downcast {
     <span class="doccomment">/// Get the plan constraints for the plan.
-    /// This returns a non-constant value. A constant value can be found in each plan&#39;s module if needed.
-    </span><span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints;
+    /// This returns a non-constant value. A constant value can be found in each plan's module if needed.
+    </span><span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>PlanConstraints;
 
     <span class="doccomment">/// Create a copy config for this plan. A copying GC plan MUST override this method,
     /// and provide a valid config.
-    </span><span class="kw">fn </span>create_copy_config(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) -&gt; CopyConfig&lt;<span class="self">Self</span>::VM&gt; {
+    </span><span class="kw">fn </span>create_copy_config(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) -&gt; CopyConfig&lt;<span class="self">Self</span>::VM&gt; {
         <span class="comment">// Use the empty default copy config for non copying GC.
         </span>CopyConfig::default()
     }
@@ -902,11 +904,11 @@
     </span><span class="kw">fn </span>base_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BasePlan&lt;<span class="self">Self</span>::VM&gt;;
 
     <span class="doccomment">/// Schedule work for the upcoming GC.
-    </span><span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, _scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;);
+    </span><span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, _scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;);
 
     <span class="doccomment">/// Get the common plan. CommonPlan is included by most of MMTk GC plans.
     </span><span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonPlan&lt;<span class="self">Self</span>::VM&gt; {
-        <span class="macro">panic!</span>(<span class="string">&quot;Common Plan not handled!&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"Common Plan not handled!"</span>)
     }
 
     <span class="doccomment">/// Return a reference to `GenerationalPlan` to allow
@@ -924,7 +926,7 @@
 
     <span class="doccomment">/// Get the allocator mapping between [`crate::AllocationSemantics`] and [`crate::util::alloc::AllocatorSelector`].
     /// This defines what space this plan will allocate objects into for different semantics.
-    </span><span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;;
+    </span><span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt;;
 
     <span class="doccomment">/// Prepare the plan before a GC. This is invoked in an initial step in the GC.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
@@ -934,7 +936,7 @@
     /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
     </span><span class="kw">fn </span>prepare_worker(<span class="kw-2">&amp;</span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;<span class="self">Self</span>::VM&gt;) {}
 
-    <span class="doccomment">/// Release the plan after transitive closure. A plan can implement this method to call each policy&#39;s release,
+    <span class="doccomment">/// Release the plan after transitive closure. A plan can implement this method to call each policy's release,
     /// or create any work packet that should be done in release.
     /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     </span><span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread);
@@ -956,7 +958,7 @@
     /// in which case, this method may not be called. This method returns true to trigger a collection.
     ///
     /// # Arguments
-    /// * `space_full`: the allocation to a specific space failed, must recover pages within &#39;space&#39;.
+    /// * `space_full`: the allocation to a specific space failed, must recover pages within 'space'.
     /// * `space`: an option to indicate if there is a space that has failed in an allocation.
     </span><span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool;
 
@@ -978,7 +980,7 @@
         <span class="kw">let </span>total = used_pages + collection_reserve + vm_live_pages;
 
         <span class="macro">trace!</span>(
-            <span class="string">&quot;Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}&quot;</span>,
+            <span class="string">"Reserved pages = {}, used pages: {}, collection reserve: {}, VM live pages: {}"</span>,
             total,
             used_pages,
             collection_reserve,
@@ -1012,7 +1014,7 @@
         //    buffers for copy allocators).
         </span><span class="kw">let </span>available_pages = total_pages.saturating_sub(reserved_pages);
         <span class="macro">trace!</span>(
-            <span class="string">&quot;Total pages = {}, reserved pages = {}, available pages = {}&quot;</span>,
+            <span class="string">"Total pages = {}, reserved pages = {}, available pages = {}"</span>,
             total_pages,
             reserved_pages,
             available_pages,
@@ -1073,13 +1075,13 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
 
     <span class="comment">// Spaces in base plan
-    </span><span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+    </span><span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
     #[space]
     </span><span class="kw">pub </span>code_space: ImmortalSpace&lt;VM&gt;,
-    <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
     #[space]
     </span><span class="kw">pub </span>code_lo_space: ImmortalSpace&lt;VM&gt;,
-    <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
     #[space]
     </span><span class="kw">pub </span>ro_space: ImmortalSpace&lt;VM&gt;,
 
@@ -1095,39 +1097,39 @@ BasePlan should contain all plan-related state and functions that are _fundament
     ///
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
-    </span><span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+    </span><span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
     #[space]
     </span><span class="kw">pub </span>vm_space: VMSpace&lt;VM&gt;,
 }
 
 <span class="doccomment">/// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
-/// is passed to each plan&#39;s constructor.
-</span><span class="kw">pub struct </span>CreateGeneralPlanArgs&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
-    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
+/// is passed to each plan's constructor.
+</span><span class="kw">pub struct </span>CreateGeneralPlanArgs&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; {
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap,
+    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Mmapper,
     <span class="kw">pub </span>options: Arc&lt;Options&gt;,
     <span class="kw">pub </span>state: Arc&lt;GlobalState&gt;,
     <span class="kw">pub </span>gc_trigger: Arc&lt;<span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-    <span class="kw">pub </span>stats: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Stats,
-    <span class="kw">pub </span>heap: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>HeapMeta,
+    <span class="kw">pub </span>stats: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>Stats,
+    <span class="kw">pub </span>heap: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>HeapMeta,
 }
 
 <span class="doccomment">/// Args needed for creating a specific plan. This includes plan-specific args, such as plan constrainst
-/// and their global side metadata specs. This is created in each plan&#39;s constructor, and will be passed
+/// and their global side metadata specs. This is created in each plan's constructor, and will be passed
 /// to `CommonPlan` or `BasePlan`. Also you can create `PlanCreateSpaceArg` from this type, and use that
 /// to create spaces.
-</span><span class="kw">pub struct </span>CreateSpecificPlanArgs&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
-    <span class="kw">pub </span>global_args: CreateGeneralPlanArgs&lt;<span class="lifetime">&#39;a</span>, VM&gt;,
-    <span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints,
+</span><span class="kw">pub struct </span>CreateSpecificPlanArgs&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; {
+    <span class="kw">pub </span>global_args: CreateGeneralPlanArgs&lt;<span class="lifetime">'a</span>, VM&gt;,
+    <span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>PlanConstraints,
     <span class="kw">pub </span>global_side_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; CreateSpecificPlanArgs&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; CreateSpecificPlanArgs&lt;<span class="lifetime">'a</span>, VM&gt; {
     <span class="doccomment">/// Get a PlanCreateSpaceArgs that can be used to create a space
     </span><span class="kw">pub fn </span>get_space_args(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
         zeroed: bool,
         vmrequest: VMRequest,
     ) -&gt; PlanCreateSpaceArgs&lt;VM&gt; {
@@ -1149,30 +1151,30 @@ BasePlan should contain all plan-related state and functions that are _fundament
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; BasePlan&lt;VM&gt; {
-    <span class="attr">#[allow(unused_mut)] </span><span class="comment">// &#39;args&#39; only needs to be mutable for certain features
+    <span class="attr">#[allow(unused_mut)] </span><span class="comment">// 'args' only needs to be mutable for certain features
     </span><span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; BasePlan&lt;VM&gt; {
         BasePlan {
-            <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
             </span>code_space: ImmortalSpace::new(args.get_space_args(
-                <span class="string">&quot;code_space&quot;</span>,
+                <span class="string">"code_space"</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
             </span>code_lo_space: ImmortalSpace::new(args.get_space_args(
-                <span class="string">&quot;code_lo_space&quot;</span>,
+                <span class="string">"code_lo_space"</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
             </span>ro_space: ImmortalSpace::new(args.get_space_args(
-                <span class="string">&quot;ro_space&quot;</span>,
+                <span class="string">"ro_space"</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
             </span>vm_space: VMSpace::new(args.get_space_args(
-                <span class="string">&quot;vm_space&quot;</span>,
+                <span class="string">"vm_space"</span>,
                 <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
@@ -1189,18 +1191,18 @@ BasePlan should contain all plan-related state and functions that are _fundament
         </span><span class="attr">#[allow(unused_mut)]
         </span><span class="kw">let </span><span class="kw-2">mut </span>pages = <span class="number">0</span>;
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span>{
             pages += <span class="self">self</span>.code_space.reserved_pages();
             pages += <span class="self">self</span>.code_lo_space.reserved_pages();
         }
-        <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
         </span>{
             pages += <span class="self">self</span>.ro_space.reserved_pages();
         }
 
-        <span class="comment">// If we need to count malloc&#39;d size as part of our heap, we add it here.
-        </span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+        <span class="comment">// If we need to count malloc'd size as part of our heap, we add it here.
+        </span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
         </span>{
             pages += <span class="self">self</span>.global_state.get_malloc_bytes_in_pages();
         }
@@ -1216,27 +1218,27 @@ BasePlan should contain all plan-related state and functions that are _fundament
         object: ObjectReference,
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span><span class="kw">if </span><span class="self">self</span>.code_space.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in code space&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in code space"</span>);
             <span class="kw">return </span><span class="self">self</span>.code_space.trace_object::&lt;Q&gt;(queue, object);
         }
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span><span class="kw">if </span><span class="self">self</span>.code_lo_space.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in large code space&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in large code space"</span>);
             <span class="kw">return </span><span class="self">self</span>.code_lo_space.trace_object::&lt;Q&gt;(queue, object);
         }
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
         </span><span class="kw">if </span><span class="self">self</span>.ro_space.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in ro_space space&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in ro_space space"</span>);
             <span class="kw">return </span><span class="self">self</span>.ro_space.trace_object(queue, object);
         }
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
         </span><span class="kw">if </span><span class="self">self</span>.vm_space.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in boot space&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in boot space"</span>);
             <span class="kw">return </span><span class="self">self</span>.vm_space.trace_object(queue, object);
         }
 
@@ -1244,24 +1246,24 @@ BasePlan should contain all plan-related state and functions that are _fundament
     }
 
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread, _full_heap: bool) {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span><span class="self">self</span>.code_space.prepare();
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span><span class="self">self</span>.code_lo_space.prepare();
-        <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
         </span><span class="self">self</span>.ro_space.prepare();
-        <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
         </span><span class="self">self</span>.vm_space.prepare();
     }
 
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread, _full_heap: bool) {
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span><span class="self">self</span>.code_space.release();
-        <span class="attr">#[cfg(feature = <span class="string">&quot;code_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
         </span><span class="self">self</span>.code_lo_space.release();
-        <span class="attr">#[cfg(feature = <span class="string">&quot;ro_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"ro_space"</span>)]
         </span><span class="self">self</span>.ro_space.release();
-        <span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
         </span><span class="self">self</span>.vm_space.release();
     }
 
@@ -1273,23 +1275,23 @@ BasePlan should contain all plan-related state and functions that are _fundament
             );
         <span class="kw">if </span>stress_force_gc {
             <span class="macro">debug!</span>(
-                <span class="string">&quot;Stress GC: allocation_bytes = {}, stress_factor = {}&quot;</span>,
+                <span class="string">"Stress GC: allocation_bytes = {}, stress_factor = {}"</span>,
                 <span class="self">self</span>.global_state.allocation_bytes.load(Ordering::Relaxed),
                 <span class="kw-2">*</span><span class="self">self</span>.options.stress_factor
             );
-            <span class="macro">debug!</span>(<span class="string">&quot;Doing stress GC&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">"Doing stress GC"</span>);
             <span class="self">self</span>.global_state
                 .allocation_bytes
                 .store(<span class="number">0</span>, Ordering::SeqCst);
         }
 
         <span class="macro">debug!</span>(
-            <span class="string">&quot;self.get_reserved_pages()={}, self.get_total_pages()={}&quot;</span>,
+            <span class="string">"self.get_reserved_pages()={}, self.get_total_pages()={}"</span>,
             plan.get_reserved_pages(),
             plan.get_total_pages()
         );
         <span class="comment">// Check if we reserved more pages (including the collection copy reserve)
-        // than the heap&#39;s total pages. In that case, we will have to do a GC.
+        // than the heap's total pages. In that case, we will have to do a GC.
         </span><span class="kw">let </span>heap_full = plan.base().gc_trigger.is_heap_full();
 
         space_full || stress_force_gc || heap_full
@@ -1316,16 +1318,16 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; CommonPlan&lt;VM&gt; {
         CommonPlan {
             immortal: ImmortalSpace::new(args.get_space_args(
-                <span class="string">&quot;immortal&quot;</span>,
+                <span class="string">"immortal"</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
             los: LargeObjectSpace::new(
-                args.get_space_args(<span class="string">&quot;los&quot;</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+                args.get_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
                 <span class="bool-val">false</span>,
             ),
             nonmoving: ImmortalSpace::new(args.get_space_args(
-                <span class="string">&quot;nonmoving&quot;</span>,
+                <span class="string">"nonmoving"</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
@@ -1347,15 +1349,15 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
         <span class="kw">if </span><span class="self">self</span>.immortal.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in immortal space&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in immortal space"</span>);
             <span class="kw">return </span><span class="self">self</span>.immortal.trace_object(queue, object);
         }
         <span class="kw">if </span><span class="self">self</span>.los.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in los&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in los"</span>);
             <span class="kw">return </span><span class="self">self</span>.los.trace_object(queue, object);
         }
         <span class="kw">if </span><span class="self">self</span>.nonmoving.in_space(object) {
-            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in nonmoving space&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"trace_object: object in nonmoving space"</span>);
             <span class="kw">return </span><span class="self">self</span>.nonmoving.trace_object(queue, object);
         }
         <span class="self">self</span>.base.trace_object::&lt;Q&gt;(queue, object, worker)

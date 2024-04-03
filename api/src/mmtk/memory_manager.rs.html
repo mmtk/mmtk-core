@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/memory_manager.rs`."><title>memory_manager.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../mmtk/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/memory_manager.rs`."><title>memory_manager.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -944,11 +946,11 @@
 ///
 /// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
-/// the VM&#39;s thread system is ready to spawn GC workers.
+/// the VM's thread system is ready to spawn GC workers.
 ///
 /// Note that this method returns a boxed pointer of MMTK, which means MMTk has a bound lifetime with the box pointer. However, some of our current APIs assume
 /// that MMTk has a static lifetime, which presents a mismatch with this API. We plan to address the lifetime issue in the future. At this point, we recommend a binding
-/// to &#39;expand&#39; the lifetime for the boxed pointer to static. There could be multiple ways to achieve it: 1. `Box::leak()` will turn the box pointer to raw pointer
+/// to 'expand' the lifetime for the boxed pointer to static. There could be multiple ways to achieve it: 1. `Box::leak()` will turn the box pointer to raw pointer
 /// which has static lifetime, 2. create MMTK as a lazily initialized static variable
 /// (see [what we do for our dummy binding](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/src/lib.rs#L42))
 ///
@@ -956,24 +958,24 @@
 /// * `builder`: The reference to a MMTk builder.
 </span><span class="kw">pub fn </span>mmtk_init&lt;VM: VMBinding&gt;(builder: <span class="kw-2">&amp;</span>MMTKBuilder) -&gt; Box&lt;MMTK&lt;VM&gt;&gt; {
     <span class="kw">match </span><span class="kw">crate</span>::util::logger::try_init() {
-        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(<span class="string">&quot;MMTk initialized the logger.&quot;</span>),
+        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(<span class="string">"MMTk initialized the logger."</span>),
         <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(
-            <span class="string">&quot;MMTk failed to initialize the logger. Possibly a logger has been initialized by user.&quot;
+            <span class="string">"MMTk failed to initialize the logger. Possibly a logger has been initialized by user."
         </span>),
     }
-    <span class="attr">#[cfg(all(feature = <span class="string">&quot;perf_counter&quot;</span>, target_os = <span class="string">&quot;linux&quot;</span>))]
+    <span class="attr">#[cfg(all(feature = <span class="string">"perf_counter"</span>, target_os = <span class="string">"linux"</span>))]
     </span>{
         <span class="kw">use </span>std::fs::File;
         <span class="kw">use </span>std::io::Read;
-        <span class="kw">let </span><span class="kw-2">mut </span>status = File::open(<span class="string">&quot;/proc/self/status&quot;</span>).unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>status = File::open(<span class="string">"/proc/self/status"</span>).unwrap();
         <span class="kw">let </span><span class="kw-2">mut </span>contents = String::new();
         status.read_to_string(<span class="kw-2">&amp;mut </span>contents).unwrap();
         <span class="kw">for </span>line <span class="kw">in </span>contents.lines() {
-            <span class="kw">let </span>split: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = line.split(<span class="string">&#39;\t&#39;</span>).collect();
-            <span class="kw">if </span>split[<span class="number">0</span>] == <span class="string">&quot;Threads:&quot; </span>{
+            <span class="kw">let </span>split: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = line.split(<span class="string">'\t'</span>).collect();
+            <span class="kw">if </span>split[<span class="number">0</span>] == <span class="string">"Threads:" </span>{
                 <span class="kw">let </span>threads = split[<span class="number">1</span>].parse::&lt;i32&gt;().unwrap();
                 <span class="kw">if </span>threads != <span class="number">1 </span>{
-                    <span class="macro">warn!</span>(<span class="string">&quot;Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread&quot;</span>, threads);
+                    <span class="macro">warn!</span>(<span class="string">"Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread"</span>, threads);
                 }
             }
         }
@@ -981,11 +983,11 @@
     <span class="kw">let </span>mmtk = builder.build();
 
     <span class="macro">info!</span>(
-        <span class="string">&quot;Initialized MMTk with {:?} ({:?})&quot;</span>,
+        <span class="string">"Initialized MMTk with {:?} ({:?})"</span>,
         <span class="kw-2">*</span>mmtk.options.plan, <span class="kw-2">*</span>mmtk.options.gc_trigger
     );
-    <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
-    </span><span class="macro">warn!</span>(<span class="string">&quot;The feature &#39;extreme_assertions&#39; is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.&quot;</span>);
+    <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+    </span><span class="macro">warn!</span>(<span class="string">"The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected."</span>);
     Box::new(mmtk)
 }
 
@@ -993,8 +995,8 @@
 /// and can also be set through this function call. A VM space can be discontiguous. This function can be called multiple times,
 /// and all the address ranges passed as arguments in the function will be considered as part of the VM space.
 /// Currently we do not allow removing regions from VM space.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;vm_space&quot;</span>)]
-</span><span class="kw">pub fn </span>set_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
+</span><span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
+</span><span class="kw">pub fn </span>set_vm_space&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>MMTK&lt;VM&gt;, start: Address, size: usize) {
     <span class="kw">unsafe </span>{ mmtk.get_plan_mut() }
         .base_mut()
         .vm_space
@@ -1012,14 +1014,14 @@
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that will be associated with the mutator.
 </span><span class="kw">pub fn </span>bind_mutator&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     tls: VMMutatorThread,
 ) -&gt; Box&lt;Mutator&lt;VM&gt;&gt; {
     <span class="kw">let </span>mutator = <span class="kw">crate</span>::plan::create_mutator(tls, mmtk);
 
     <span class="kw">const </span>LOG_ALLOCATOR_MAPPING: bool = <span class="bool-val">false</span>;
     <span class="kw">if </span>LOG_ALLOCATOR_MAPPING {
-        <span class="macro">info!</span>(<span class="string">&quot;{:?}&quot;</span>, mutator.config);
+        <span class="macro">info!</span>(<span class="string">"{:?}"</span>, mutator.config);
     }
     mutator
 }
@@ -1036,7 +1038,7 @@
     mutator.on_destroy();
 }
 
-<span class="doccomment">/// Flush the mutator&#39;s local states.
+<span class="doccomment">/// Flush the mutator's local states.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator.
@@ -1067,8 +1069,8 @@
     // We need to make sure that all allocations comply with the min object size.
     // Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min
     // object size (the VM does not need to know this). However, for the VM bindings we support at the moment,
-    // their object sizes are all larger than MMTk&#39;s min object size, so we simply put an assertion here.
-    // If you plan to use MMTk with a VM with its object size smaller than MMTk&#39;s min object size, you should
+    // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
+    // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
     </span><span class="macro">debug_assert!</span>(size &gt;= MIN_OBJECT_SIZE);
     <span class="comment">// Assert alignment
@@ -1199,7 +1201,7 @@
 /// The data within the slice does not necessarily to be all valid pointers,
 /// but the VM binding will be able to filter out non-reference values on edge iteration.
 ///
-/// For VMs that performs a heap memory copy operation, for example OpenJDK&#39;s array copy operation, the binding needs to
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
 /// or the pre/post barrier.
 ///
@@ -1210,7 +1212,7 @@
 ///
 /// The size of `src` and `dst` shoule be equal
 </span><span class="kw">pub fn </span>memory_region_copy&lt;VM: VMBinding&gt;(
-    mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+    mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
     src: VM::VMMemorySlice,
     dst: VM::VMMemorySlice,
 ) {
@@ -1224,7 +1226,7 @@
 /// The data within the slice does not necessarily to be all valid pointers,
 /// but the VM binding will be able to filter out non-reference values on edge iteration.
 ///
-/// For VMs that performs a heap memory copy operation, for example OpenJDK&#39;s array copy operation, the binding needs to
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
 /// or the pre/post barrier.
 ///
@@ -1235,7 +1237,7 @@
 ///
 /// The size of `src` and `dst` shoule be equal
 </span><span class="kw">pub fn </span>memory_region_copy_pre&lt;VM: VMBinding&gt;(
-    mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+    mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
     src: VM::VMMemorySlice,
     dst: VM::VMMemorySlice,
 ) {
@@ -1249,7 +1251,7 @@
 /// The data within the slice does not necessarily to be all valid pointers,
 /// but the VM binding will be able to filter out non-reference values on edge iteration.
 ///
-/// For VMs that performs a heap memory copy operation, for example OpenJDK&#39;s array copy operation, the binding needs to
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
 /// or the pre/post barrier.
 ///
@@ -1260,7 +1262,7 @@
 ///
 /// The size of `src` and `dst` shoule be equal
 </span><span class="kw">pub fn </span>memory_region_copy_post&lt;VM: VMBinding&gt;(
-    mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+    mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
     src: VM::VMMemorySlice,
     dst: VM::VMMemorySlice,
 ) {
@@ -1290,7 +1292,7 @@
 <span class="doccomment">/// The standard malloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
 /// Thus the method requires a reference to an MMTk instance. MMTk either uses its own allocator, or forward the call to a
 /// library malloc.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
 </span><span class="kw">pub fn </span>counted_malloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, size: usize) -&gt; Address {
     <span class="kw">crate</span>::util::malloc::counted_malloc(mmtk, size)
 }
@@ -1302,7 +1304,7 @@
 
 <span class="doccomment">/// The standard calloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
 /// Thus the method requires a reference to an MMTk instance.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
 </span><span class="kw">pub fn </span>counted_calloc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, num: usize, size: usize) -&gt; Address {
     <span class="kw">crate</span>::util::malloc::counted_calloc(mmtk, num, size)
 }
@@ -1314,8 +1316,8 @@
 
 <span class="doccomment">/// The standard realloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
 /// Thus the method requires a reference to an MMTk instance, and the size of the existing memory that will be reallocated.
-/// The `addr` in the arguments must be an address that is earlier returned from MMTk&#39;s `malloc()`, `calloc()` or `realloc()`.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+</span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
 </span><span class="kw">pub fn </span>realloc_with_old_size&lt;VM: VMBinding&gt;(
     mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;,
     addr: Address,
@@ -1326,21 +1328,21 @@
 }
 
 <span class="doccomment">/// The standard free.
-/// The `addr` in the arguments must be an address that is earlier returned from MMTk&#39;s `malloc()`, `calloc()` or `realloc()`.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
 </span><span class="kw">pub fn </span>free(addr: Address) {
     <span class="kw">crate</span>::util::malloc::free(addr)
 }
 
 <span class="doccomment">/// The standard free except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
 /// Thus the method requires a reference to an MMTk instance, and the size of the memory to free.
-/// The `addr` in the arguments must be an address that is earlier returned from MMTk&#39;s `malloc()`, `calloc()` or `realloc()`.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+</span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
 </span><span class="kw">pub fn </span>free_with_size&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, addr: Address, old_size: usize) {
     <span class="kw">crate</span>::util::malloc::free_with_size(mmtk, addr, old_size)
 }
 
-<span class="doccomment">/// Get the current active malloc&#39;d bytes. Here MMTk only accounts for bytes that are done through those &#39;counted malloc&#39; functions.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;malloc_counted_size&quot;</span>)]
+<span class="doccomment">/// Get the current active malloc'd bytes. Here MMTk only accounts for bytes that are done through those 'counted malloc' functions.
+</span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
 </span><span class="kw">pub fn </span>get_malloc_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
     mmtk.state.malloc_bytes.load(Ordering::SeqCst)
 }
@@ -1348,18 +1350,18 @@
 <span class="doccomment">/// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block
 /// the current thread, and trigger a GC. Otherwise, it will simply return.
 /// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.
-/// However, if a binding uses counted malloc (which won&#39;t poll for GC), they may want to poll for GC manually.
+/// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
 /// This function should only be used by mutator threads.
 </span><span class="kw">pub fn </span>gc_poll&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;, tls: VMMutatorThread) {
     <span class="kw">use </span><span class="kw">crate</span>::vm::{ActivePlan, Collection};
     <span class="macro">debug_assert!</span>(
         VM::VMActivePlan::is_mutator(tls.<span class="number">0</span>),
-        <span class="string">&quot;gc_poll() can only be called by a mutator thread.&quot;
+        <span class="string">"gc_poll() can only be called by a mutator thread."
     </span>);
 
     <span class="kw">if </span>VM::VMCollection::is_collection_enabled() &amp;&amp; mmtk.gc_trigger.poll(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
-        <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
-        <span class="macro">assert!</span>(mmtk.state.is_initialized(), <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
+        <span class="macro">debug!</span>(<span class="string">"Collection required"</span>);
+        <span class="macro">assert!</span>(mmtk.state.is_initialized(), <span class="string">"GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."</span>);
         VM::VMCollection::block_for_gc(tls);
     }
 }
@@ -1372,7 +1374,7 @@
 ///   It is the `GCController` passed to `Collection::spawn_gc_thread`.
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>start_control_collector&lt;VM: VMBinding&gt;(
-    _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     tls: VMWorkerThread,
     gc_controller: <span class="kw-2">&amp;mut </span>GCController&lt;VM&gt;,
 ) {
@@ -1387,7 +1389,7 @@
 ///   It is the `GCWorker` passed to `Collection::spawn_gc_thread`.
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>start_worker&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     tls: VMWorkerThread,
     worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
 ) {
@@ -1403,10 +1405,10 @@
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_gc_thread() so that the VM knows the context.
-</span><span class="kw">pub fn </span>initialize_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;, tls: VMThread) {
+</span><span class="kw">pub fn </span>initialize_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMThread) {
     <span class="macro">assert!</span>(
         !mmtk.state.is_initialized(),
-        <span class="string">&quot;MMTk collection has been initialized (was initialize_collection() already called before?)&quot;
+        <span class="string">"MMTk collection has been initialized (was initialize_collection() already called before?)"
     </span>);
     mmtk.scheduler.spawn_gc_threads(mmtk, tls);
     mmtk.state.initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
@@ -1427,7 +1429,7 @@
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-/// * `options`: a string that is key value pairs separated by white spaces, e.g. &quot;threads=1 stress_factor=4096&quot;
+/// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
 </span><span class="kw">pub fn </span>process_bulk(builder: <span class="kw-2">&amp;mut </span>MMTKBuilder, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
     builder.set_options_bulk_by_str(options)
 }
@@ -1456,7 +1458,7 @@
 /// the heap is fragmented.
 /// The value returned by this method is only updated when we finish tracing in a GC. A recommended timing
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
 </span><span class="kw">pub fn </span>live_bytes_in_last_gc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
     mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
 }
@@ -1513,7 +1515,7 @@
 /// 3.  Return false otherwise.  This function never panics.
 ///
 /// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the &quot;valid object (VO) bits&quot; side metadata, i.e. a bitmap.
+/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
 /// For space efficiency, each bit of the bitmap governs a small region of memory.
 /// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
 /// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
@@ -1539,7 +1541,7 @@
 ///
 /// Argument:
 /// * `addr`: An arbitrary address.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
 </span><span class="kw">pub fn </span>is_mmtk_object(addr: Address) -&gt; bool {
     <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
     SFT_MAP.get_checked(addr).is_mmtk_object(addr)
@@ -1547,7 +1549,7 @@
 
 <span class="doccomment">/// Return true if the `object` lies in a region of memory where
 /// -   only MMTk can allocate into, or
-/// -   only MMTk&#39;s delegated memory allocator (such as a malloc implementation) can allocate into
+/// -   only MMTk's delegated memory allocator (such as a malloc implementation) can allocate into
 ///     for allocation requests from MMTk.
 /// Return false otherwise.  This function never panics.
 ///
@@ -1643,7 +1645,7 @@
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-</span><span class="kw">pub fn </span>harness_end&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+</span><span class="kw">pub fn </span>harness_end&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
     mmtk.harness_end();
 }
 
@@ -1655,11 +1657,11 @@
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
 </span><span class="kw">pub fn </span>add_finalizer&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     object: &lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType,
 ) {
     <span class="kw">if </span><span class="kw-2">*</span>mmtk.options.no_finalizer {
-        <span class="macro">warn!</span>(<span class="string">&quot;add_finalizer() is called when no_finalizer = true&quot;</span>);
+        <span class="macro">warn!</span>(<span class="string">"add_finalizer() is called when no_finalizer = true"</span>);
     }
 
     mmtk.finalizable_processor.lock().unwrap().add(object);
@@ -1672,7 +1674,7 @@
 ///
 /// Arguments:
 /// * `object`: The object to be pinned
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
 </span><span class="kw">pub fn </span>pin_object&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
     <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
     SFT_MAP
@@ -1686,7 +1688,7 @@
 ///
 /// Arguments:
 /// * `object`: The object to be pinned
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
 </span><span class="kw">pub fn </span>unpin_object&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
     <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
     SFT_MAP
@@ -1698,7 +1700,7 @@
 ///
 /// Arguments:
 /// * `object`: The object to be checked
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+</span><span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
 </span><span class="kw">pub fn </span>is_pinned&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
     <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
     SFT_MAP
@@ -1715,10 +1717,10 @@
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>get_finalized_object&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
 ) -&gt; <span class="prelude-ty">Option</span>&lt;&lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType&gt; {
     <span class="kw">if </span><span class="kw-2">*</span>mmtk.options.no_finalizer {
-        <span class="macro">warn!</span>(<span class="string">&quot;get_finalized_object() is called when no_finalizer = true&quot;</span>);
+        <span class="macro">warn!</span>(<span class="string">"get_finalized_object() is called when no_finalizer = true"</span>);
     }
 
     mmtk.finalizable_processor
@@ -1728,17 +1730,17 @@
 }
 
 <span class="doccomment">/// Pop all the finalizers that were registered for finalization. The returned objects may or may not be ready for
-/// finalization. After this call, MMTk&#39;s finalizer processor should have no registered finalizer any more.
+/// finalization. After this call, MMTk's finalizer processor should have no registered finalizer any more.
 ///
 /// This is useful for some VMs which require all finalizable objects to be finalized on exit.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 </span><span class="kw">pub fn </span>get_all_finalizers&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
 ) -&gt; Vec&lt;&lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType&gt; {
     <span class="kw">if </span><span class="kw-2">*</span>mmtk.options.no_finalizer {
-        <span class="macro">warn!</span>(<span class="string">&quot;get_all_finalizers() is called when no_finalizer = true&quot;</span>);
+        <span class="macro">warn!</span>(<span class="string">"get_all_finalizers() is called when no_finalizer = true"</span>);
     }
 
     mmtk.finalizable_processor
@@ -1754,11 +1756,11 @@
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `object`: the given object that MMTk will pop its finalizers
 </span><span class="kw">pub fn </span>get_finalizers_for&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     object: ObjectReference,
 ) -&gt; Vec&lt;&lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType&gt; {
     <span class="kw">if </span><span class="kw-2">*</span>mmtk.options.no_finalizer {
-        <span class="macro">warn!</span>(<span class="string">&quot;get_finalizers() is called when no_finalizer = true&quot;</span>);
+        <span class="macro">warn!</span>(<span class="string">"get_finalizers() is called when no_finalizer = true"</span>);
     }
 
     mmtk.finalizable_processor
@@ -1767,13 +1769,13 @@
         .get_finalizers_for(object)
 }
 
-<span class="doccomment">/// Get the number of workers. MMTk spawns worker threads for the &#39;threads&#39; defined in the options.
+<span class="doccomment">/// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
 /// So the number of workers is derived from the threads option. Note the feature single_worker overwrites
 /// the threads option, and force one worker thread.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-</span><span class="kw">pub fn </span>num_of_workers&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) -&gt; usize {
+</span><span class="kw">pub fn </span>num_of_workers&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) -&gt; usize {
     mmtk.scheduler.num_workers()
 }
 
@@ -1785,7 +1787,7 @@
 /// * `bucket`: Which work bucket to add this packet to.
 /// * `packet`: The work packet to be added.
 </span><span class="kw">pub fn </span>add_work_packet&lt;VM: VMBinding, W: GCWork&lt;VM&gt;&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     bucket: WorkBucketStage,
     packet: W,
 ) {
@@ -1800,7 +1802,7 @@
 /// * `bucket`: Which work bucket to add these packets to.
 /// * `packet`: The work packets to be added.
 </span><span class="kw">pub fn </span>add_work_packets&lt;VM: VMBinding&gt;(
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     bucket: WorkBucketStage,
     packets: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
 ) {

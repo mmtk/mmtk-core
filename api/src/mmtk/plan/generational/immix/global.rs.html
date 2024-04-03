@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/generational/immix/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/generational/immix/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -296,7 +298,7 @@
 
 <span class="doccomment">/// Generational immix. This implements the functionality of a two-generation copying
 /// collector where the higher generation is an immix space.
-/// See the PLDI&#39;08 paper by Blackburn and McKinley for a description
+/// See the PLDI'08 paper by Blackburn and McKinley for a description
 /// of the algorithm: &lt;http://doi.acm.org/10.1145/1375581.1375586&gt;.
 </span><span class="attr">#[derive(HasSpaces, PlanTraceObject)]
 </span><span class="kw">pub struct </span>GenImmix&lt;VM: VMBinding&gt; {
@@ -318,7 +320,7 @@
 </span><span class="kw">pub const </span>GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     <span class="comment">// The maximum object size that can be allocated without LOS is restricted by the max immix object size.
     // This might be too restrictive, as our default allocator is bump pointer (nursery allocator) which
-    // can allocate objects larger than max immix object size. However, for copying, we haven&#39;t implemented
+    // can allocate objects larger than max immix object size. However, for copying, we haven't implemented
     // copying to LOS so we always copy from nursery to the mature immix space. In this case, we should not
     // allocate objects larger than the max immix object size to nursery as well.
     // TODO: We may want to fix this, as this possibly has negative performance impact.
@@ -330,11 +332,11 @@
 };
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Plan <span class="kw">for </span>GenImmix&lt;VM&gt; {
-    <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PlanConstraints {
+    <span class="kw">fn </span>constraints(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>PlanConstraints {
         <span class="kw-2">&amp;</span>GENIMMIX_CONSTRAINTS
     }
 
-    <span class="kw">fn </span>create_copy_config(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>) -&gt; CopyConfig&lt;<span class="self">Self</span>::VM&gt; {
+    <span class="kw">fn </span>create_copy_config(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) -&gt; CopyConfig&lt;<span class="self">Self</span>::VM&gt; {
         <span class="kw">use </span>enum_map::enum_map;
         CopyConfig {
             copy_mapping: <span class="macro">enum_map! </span>{
@@ -366,10 +368,10 @@
     // in different if branches.
     </span><span class="attr">#[allow(clippy::if_same_then_else)]
     #[allow(clippy::branches_sharing_code)]
-    </span><span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;) {
+    </span><span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;) {
         <span class="kw">let </span>is_full_heap = <span class="self">self</span>.requires_full_heap_collection();
         <span class="kw">if </span>!is_full_heap {
-            <span class="macro">debug!</span>(<span class="string">&quot;Nursery GC&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">"Nursery GC"</span>);
             scheduler.schedule_common_work::&lt;GenImmixNurseryGCWorkContext&lt;VM&gt;&gt;(<span class="self">self</span>);
         } <span class="kw">else </span>{
             <span class="kw">crate</span>::plan::immix::Immix::schedule_immix_full_heap_collection::&lt;
@@ -380,7 +382,7 @@
         }
     }
 
-    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
+    <span class="kw">fn </span>get_allocator_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; {
         <span class="kw-2">&amp;</span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING
     }
 
@@ -497,10 +499,10 @@
                 <span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs::&lt;VM&gt;(),
         };
         <span class="kw">let </span>immix_space = ImmixSpace::new(
-            plan_args.get_space_args(<span class="string">&quot;immix_mature&quot;</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+            plan_args.get_space_args(<span class="string">"immix_mature"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: <span class="bool-val">false</span>,
-                <span class="comment">// We don&#39;t need to unlog objects at tracing. Instead, we unlog objects at copying.
+                <span class="comment">// We don't need to unlog objects at tracing. Instead, we unlog objects at copying.
                 // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
                 </span>unlog_object_when_traced: <span class="bool-val">false</span>,
                 <span class="comment">// In GenImmix, young objects are not allocated in ImmixSpace directly.

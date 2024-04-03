@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/worker.rs`."><title>worker.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/worker.rs`."><title>worker.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -474,7 +476,7 @@
 <span class="kw">use </span>atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 <span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Stealer};
 <span class="kw">use </span>crossbeam::queue::ArrayQueue;
-<span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
 </span><span class="kw">use </span>std::sync::atomic::AtomicUsize;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 <span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
@@ -483,8 +485,8 @@
 </span><span class="kw">pub type </span>ThreadId = usize;
 
 <span class="macro">thread_local! </span>{
-    <span class="doccomment">/// Current worker&#39;s ordinal
-    </span><span class="kw">static </span>WORKER_ORDINAL: Atomic&lt;ThreadId&gt; = Atomic::new(ThreadId::MAX);
+    <span class="doccomment">/// Current worker's ordinal
+    </span><span class="kw">static </span>WORKER_ORDINAL: Atomic&lt;ThreadId&gt; = <span class="kw">const </span>{ Atomic::new(ThreadId::MAX) };
 }
 
 <span class="doccomment">/// Get current worker ordinal. Return `None` if the current thread is not a worker.
@@ -493,7 +495,7 @@
     <span class="macro">debug_assert_ne!</span>(
         ordinal,
         ThreadId::MAX,
-        <span class="string">&quot;Thread-local variable WORKER_ORDINAL not set yet.&quot;
+        <span class="string">"Thread-local variable WORKER_ORDINAL not set yet."
     </span>);
     ordinal
 }
@@ -506,7 +508,7 @@
     <span class="doccomment">/// Accumulated bytes for live objects in this GC. When each worker scans
     /// objects, we increase the live bytes. We get this value from each worker
     /// at the end of a GC, and reset this counter.
-    </span><span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
     </span>live_bytes: AtomicUsize,
     <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
     ///
@@ -522,19 +524,19 @@
     <span class="kw">pub fn </span>new(stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             stat: Default::default(),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
             </span>live_bytes: AtomicUsize::new(<span class="number">0</span>),
             designated_work: ArrayQueue::new(<span class="number">16</span>),
             stealer,
         }
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>increase_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>, bytes: usize) {
         <span class="self">self</span>.live_bytes.fetch_add(bytes, Ordering::Relaxed);
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_and_clear_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.live_bytes.swap(<span class="number">0</span>, Ordering::SeqCst)
     }
@@ -601,12 +603,12 @@
 
     <span class="doccomment">/// Wake up workers when more work packets are made available for workers.
     /// This function is called when adding work packets to buckets.
-    /// This function doesn&#39;t change the `work_group_state` variable.
+    /// This function doesn't change the `work_group_state` variable.
     /// If workers are in the `Sleeping` state, use `resume_and_wait` to resume workers.
     </span><span class="kw">pub fn </span>notify_work_available(<span class="kw-2">&amp;</span><span class="self">self</span>, all: bool) {
         <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
 
-        <span class="comment">// Don&#39;t notify workers if we are adding packets when workers are sleeping.
+        <span class="comment">// Don't notify workers if we are adding packets when workers are sleeping.
         // This could happen when we add `ScheduleCollection` or schedule sentinels.
         </span><span class="kw">if </span>sync.worker_group_state == WorkerGroupState::Sleeping {
             <span class="kw">return</span>;
@@ -651,19 +653,19 @@
 
         <span class="comment">// Park this worker
         </span><span class="kw">let </span>all_parked = sync.inc_parked_workers();
-        <span class="macro">trace!</span>(<span class="string">&quot;Worker {} parked.&quot;</span>, worker.ordinal);
+        <span class="macro">trace!</span>(<span class="string">"Worker {} parked."</span>, worker.ordinal);
 
         <span class="kw">if </span>all_parked {
-            <span class="comment">// If all workers are parked, enter &quot;Sleeping&quot; state and notify controller.
+            <span class="comment">// If all workers are parked, enter "Sleeping" state and notify controller.
             </span>sync.worker_group_state = WorkerGroupState::Sleeping;
             <span class="macro">debug!</span>(
-                <span class="string">&quot;Worker {} notifies the coordinator that all workerer parked.&quot;</span>,
+                <span class="string">"Worker {} notifies the coordinator that all workerer parked."</span>,
                 worker.ordinal
             );
             <span class="self">self</span>.all_workers_parked.notify_one();
         } <span class="kw">else </span>{
             <span class="comment">// Otherwise wait until notified.
-            // Note: The condition for this `cond.wait` is &quot;more work is available&quot;.
+            // Note: The condition for this `cond.wait` is "more work is available".
             // If this worker spuriously wakes up, then in the next loop iteration, the
             // `poll_schedulable_work` invocation above will fail, and the worker will reach
             // here and wait again.
@@ -680,7 +682,7 @@
 
         <span class="comment">// Unpark this worker.
         </span>sync.dec_parked_workers();
-        <span class="macro">trace!</span>(<span class="string">&quot;Worker {} unparked.&quot;</span>, worker.ordinal);
+        <span class="macro">trace!</span>(<span class="string">"Worker {} unparked."</span>, worker.ordinal);
     }
 }
 
@@ -721,7 +723,7 @@
     <span class="doccomment">/// The copy context, used to implement copying GC.
     </span>copy: GCWorkerCopyContext&lt;VM&gt;,
     <span class="doccomment">/// The reference to the MMTk instance.
-    </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.
     /// False if this struct belongs to a standalone GCWorker thread.
     </span>is_coordinator: bool,
@@ -735,8 +737,8 @@
 <span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>GCWorkerShared&lt;VM&gt; {}
 
 <span class="comment">// Error message for borrowing `GCWorkerShared::stat`.
-</span><span class="kw">const </span>STAT_BORROWED_MSG: <span class="kw-2">&amp;</span>str = <span class="string">&quot;GCWorkerShared.stat is already borrowed.  This may happen if \
-    the mutator calls harness_begin or harness_end while the GC is running.&quot;</span>;
+</span><span class="kw">const </span>STAT_BORROWED_MSG: <span class="kw-2">&amp;</span>str = <span class="string">"GCWorkerShared.stat is already borrowed.  This may happen if \
+    the mutator calls harness_begin or harness_end while the GC is running."</span>;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorkerShared&lt;VM&gt; {
     <span class="kw">pub fn </span>borrow_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicRef&lt;WorkerLocalStat&lt;VM&gt;&gt; {
@@ -750,7 +752,7 @@
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorker&lt;VM&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         ordinal: ThreadId,
         scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
         is_coordinator: bool,
@@ -829,7 +831,7 @@
 
     <span class="doccomment">/// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
     /// Each worker will keep polling and executing work packets in a loop.
-    </span><span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    </span><span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="macro">probe!</span>(mmtk, gcworker_run);
         WORKER_ORDINAL.with(|x| x.store(<span class="self">self</span>.ordinal, Ordering::SeqCst));
         <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
@@ -850,10 +852,10 @@
             </span><span class="attr">#[allow(unused_variables)]
             </span><span class="kw">let </span>typename = work.get_type_name();
 
-            <span class="attr">#[cfg(feature = <span class="string">&quot;bpftrace_workaround&quot;</span>)]
+            <span class="attr">#[cfg(feature = <span class="string">"bpftrace_workaround"</span>)]
             </span><span class="comment">// Workaround a problem where bpftrace script cannot see the work packet names,
             // by force loading from the packet name.
-            // See the &quot;Known issues&quot; section in `tools/tracing/timeline/README.md`
+            // See the "Known issues" section in `tools/tracing/timeline/README.md`
             </span>std::hint::black_box(<span class="kw">unsafe </span>{ <span class="kw-2">*</span>(typename.as_ptr()) });
 
             <span class="macro">probe!</span>(mmtk, work, typename.as_ptr(), typename.len());
@@ -891,7 +893,7 @@
     }
 
     <span class="doccomment">/// Spawn all the worker threads
-    </span><span class="kw">pub fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;, tls: VMThread) {
+    </span><span class="kw">pub fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMThread) {
         <span class="kw">let </span><span class="kw-2">mut </span>unspawned_local_work_queues = <span class="self">self</span>.unspawned_local_work_queues.lock().unwrap();
         <span class="comment">// Spawn each worker thread.
         </span><span class="kw">for </span>(ordinal, shared) <span class="kw">in </span><span class="self">self</span>.workers_shared.iter().enumerate() {
@@ -913,14 +915,14 @@
         <span class="self">self</span>.workers_shared.len()
     }
 
-    <span class="doccomment">/// Return true if there&#39;re any pending designated work
+    <span class="doccomment">/// Return true if there're any pending designated work
     </span><span class="kw">pub fn </span>has_designated_work(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.workers_shared
             .iter()
             .any(|w| !w.designated_work.is_empty())
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
     </span><span class="kw">pub fn </span>get_and_clear_worker_live_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.workers_shared
             .iter()

@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/gc_trigger.rs`."><title>gc_trigger.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/heap/gc_trigger.rs`."><title>gc_trigger.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -601,7 +603,7 @@
 </span><span class="kw">pub struct </span>GCTrigger&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// The current plan. This is uninitialized when we create it, and later initialized
     /// once we have a fixed address for the plan.
-    </span>plan: MaybeUninit&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;,
+    </span>plan: MaybeUninit&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;&gt;,
     <span class="doccomment">/// The triggering policy.
     </span><span class="kw">pub </span>policy: Box&lt;<span class="kw">dyn </span>GCTriggerPolicy&lt;VM&gt;&gt;,
     gc_requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
@@ -636,7 +638,7 @@
     }
 
     <span class="doccomment">/// Set the plan. This is called in `create_plan()` after we created a boxed plan.
-    </span><span class="kw">pub fn </span>set_plan(<span class="kw-2">&amp;mut </span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) {
+    </span><span class="kw">pub fn </span>set_plan(<span class="kw-2">&amp;mut </span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) {
         <span class="self">self</span>.plan.write(plan);
     }
 
@@ -645,7 +647,7 @@
     /// collector with an opportunity to collect.
     ///
     /// Arguments:
-    /// * `space_full`: Space request failed, must recover pages within &#39;space&#39;.
+    /// * `space_full`: Space request failed, must recover pages within 'space'.
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;&gt;) -&gt; bool {
         <span class="kw">let </span>plan = <span class="kw">unsafe </span>{ <span class="self">self</span>.plan.assume_init() };
@@ -654,13 +656,13 @@
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
             <span class="macro">info!</span>(
-                <span class="string">&quot;[POLL] {}{} ({}/{} pages)&quot;</span>,
+                <span class="string">"[POLL] {}{} ({}/{} pages)"</span>,
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(space) = space {
-                    <span class="macro">format!</span>(<span class="string">&quot;{}: &quot;</span>, space.get_name())
+                    <span class="macro">format!</span>(<span class="string">"{}: "</span>, space.get_name())
                 } <span class="kw">else </span>{
-                    <span class="string">&quot;&quot;</span>.to_string()
+                    <span class="string">""</span>.to_string()
                 },
-                <span class="string">&quot;Triggering collection&quot;</span>,
+                <span class="string">"Triggering collection"</span>,
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
@@ -691,11 +693,11 @@
 <span class="doccomment">/// Provides statistics about the space. This is exposed to bindings, as it is used
 /// in both [`crate::plan::Plan`] and [`GCTriggerPolicy`].
 </span><span class="comment">// This type exists so we do not need to expose the `Space` trait to the bindings.
-</span><span class="kw">pub struct </span>SpaceStats&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt;(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>Space&lt;VM&gt;);
+</span><span class="kw">pub struct </span>SpaceStats&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt;(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw">dyn </span>Space&lt;VM&gt;);
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; SpaceStats&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; SpaceStats&lt;<span class="lifetime">'a</span>, VM&gt; {
     <span class="doccomment">/// Create new SpaceStats.
-    </span><span class="kw">fn </span>new(space: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw">dyn </span>Space&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">fn </span>new(space: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw">dyn </span>Space&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>(space)
     }
 
@@ -718,14 +720,14 @@
     /// can never accomodate the pending allocation.
     </span><span class="kw">fn </span>on_pending_allocation(<span class="kw-2">&amp;</span><span class="self">self</span>, _pages: usize) {}
     <span class="doccomment">/// Inform the triggering policy that a GC starts.
-    </span><span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    </span><span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
     <span class="doccomment">/// Inform the triggering policy that a GC is about to start the release work. This is called
     /// in the global Release work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
     /// satisfy this assumption: they schedule other release work in `plan.release()`.
-    </span><span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    </span><span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
     <span class="doccomment">/// Inform the triggering policy that a GC ends.
-    </span><span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {}
+    </span><span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {}
     <span class="doccomment">/// Is a GC required now? The GC trigger may implement its own heuristics to decide when
     /// a GC should be performed. However, we recommend the implementation to do its own checks
     /// first, and always call `plan.collection_required(space_full, space)` at the end as a fallback to see if the plan needs
@@ -871,7 +873,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         _plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>GenerationalPlan&lt;VM = VM&gt;,
     ) {
-        <span class="comment">// We don&#39;t need to do anything
+        <span class="comment">// We don't need to do anything
     </span>}
     <span class="kw">fn </span>generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
@@ -886,13 +888,13 @@
                 .saturating_sub(<span class="self">self</span>.gc_end_live_pages);
             <span class="self">self</span>.allocation_pages = promoted <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;promoted = mature live before release {} - mature live at prev gc end {} = {}&quot;</span>,
+                <span class="string">"promoted = mature live before release {} - mature live at prev gc end {} = {}"</span>,
                 <span class="self">self</span>.gc_release_live_pages,
                 <span class="self">self</span>.gc_end_live_pages,
                 promoted
             );
             <span class="macro">trace!</span>(
-                <span class="string">&quot;allocated pages (accumulated to) = {}&quot;</span>,
+                <span class="string">"allocated pages (accumulated to) = {}"</span>,
                 <span class="self">self</span>.allocation_pages
             );
         }
@@ -907,7 +909,7 @@
             <span class="comment">// Use live pages as an estimate for pages traversed during GC
             </span><span class="self">self</span>.collection_pages = <span class="self">self</span>.gc_end_live_pages <span class="kw">as </span>f64;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;collected pages = mature live at gc end {} - mature live at gc release {} = {}&quot;</span>,
+                <span class="string">"collected pages = mature live at gc end {} - mature live at gc release {} = {}"</span>,
                 <span class="self">self</span>.gc_release_live_pages,
                 <span class="self">self</span>.gc_end_live_pages,
                 <span class="self">self</span>.collection_pages
@@ -922,29 +924,29 @@
     // * allocation = live pages at the start of GC - live pages at the end of last GC
     // * collection = live pages at the end of GC - live pages before release
 
-    </span><span class="kw">fn </span>non_generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    </span><span class="kw">fn </span>non_generational_mem_stats_on_gc_start&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.allocation_pages = mmtk
             .get_plan()
             .get_reserved_pages()
             .saturating_sub(<span class="self">self</span>.gc_end_live_pages) <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
-            <span class="string">&quot;allocated pages = used {} - live in last gc {} = {}&quot;</span>,
+            <span class="string">"allocated pages = used {} - live in last gc {} = {}"</span>,
             mmtk.get_plan().get_reserved_pages(),
             <span class="self">self</span>.gc_end_live_pages,
             <span class="self">self</span>.allocation_pages
         );
     }
-    <span class="kw">fn </span>non_generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>non_generational_mem_stats_on_gc_release&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.gc_release_live_pages = mmtk.get_plan().get_reserved_pages();
-        <span class="macro">trace!</span>(<span class="string">&quot;live before release = {}&quot;</span>, <span class="self">self</span>.gc_release_live_pages);
+        <span class="macro">trace!</span>(<span class="string">"live before release = {}"</span>, <span class="self">self</span>.gc_release_live_pages);
     }
-    <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>non_generational_mem_stats_on_gc_end&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
-        <span class="macro">trace!</span>(<span class="string">&quot;live pages = {}&quot;</span>, <span class="self">self</span>.gc_end_live_pages);
+        <span class="macro">trace!</span>(<span class="string">"live pages = {}"</span>, <span class="self">self</span>.gc_end_live_pages);
         <span class="comment">// Use live pages as an estimate for pages traversed during GC
         </span><span class="self">self</span>.collection_pages = <span class="self">self</span>.gc_end_live_pages <span class="kw">as </span>f64;
         <span class="macro">trace!</span>(
-            <span class="string">&quot;collected pages = live at gc end {} - live at gc release {} = {}&quot;</span>,
+            <span class="string">"collected pages = live at gc end {} - live at gc release {} = {}"</span>,
             <span class="self">self</span>.gc_release_live_pages,
             <span class="self">self</span>.gc_end_live_pages,
             <span class="self">self</span>.collection_pages
@@ -967,13 +969,13 @@
         <span class="self">self</span>.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }
 
-    <span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_start ===&quot;</span>);
+    <span class="kw">fn </span>on_gc_start(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"=== on_gc_start ==="</span>);
         <span class="self">self</span>.access_stats(|stats| {
             stats.gc_start_time = Instant::now();
             stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
             <span class="macro">trace!</span>(
-                <span class="string">&quot;gc_start = {:?}, allocation_time = {}&quot;</span>,
+                <span class="string">"gc_start = {:?}, allocation_time = {}"</span>,
                 stats.gc_start_time,
                 stats.allocation_time
             );
@@ -986,8 +988,8 @@
         });
     }
 
-    <span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_release ===&quot;</span>);
+    <span class="kw">fn </span>on_gc_release(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"=== on_gc_release ==="</span>);
         <span class="self">self</span>.access_stats(|stats| {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(plan) = mmtk.get_plan().generational() {
                 stats.generational_mem_stats_on_gc_release(plan);
@@ -997,13 +999,13 @@
         });
     }
 
-    <span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;=== on_gc_end ===&quot;</span>);
+    <span class="kw">fn </span>on_gc_end(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"=== on_gc_end ==="</span>);
         <span class="self">self</span>.access_stats(|stats| {
             stats.gc_end_time = Instant::now();
             stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
             <span class="macro">trace!</span>(
-                <span class="string">&quot;gc_end = {:?}, collection_time = {}&quot;</span>,
+                <span class="string">"gc_end = {:?}, collection_time = {}"</span>,
                 stats.gc_end_time,
                 stats.collection_time
             );
@@ -1075,7 +1077,7 @@
         extra_reserve: usize,
         stats: <span class="kw-2">&amp;mut </span>MemBalancerStats,
     ) {
-        <span class="macro">trace!</span>(<span class="string">&quot;compute new heap limit: {:?}&quot;</span>, stats);
+        <span class="macro">trace!</span>(<span class="string">"compute new heap limit: {:?}"</span>, stats);
 
         <span class="comment">// Constants from the original paper
         </span><span class="kw">const </span>ALLOCATION_SMOOTH_FACTOR: f64 = <span class="number">0.95</span>;
@@ -1108,12 +1110,12 @@
             COLLECTION_SMOOTH_FACTOR,
         );
         <span class="macro">trace!</span>(
-            <span class="string">&quot;after smoothing, alloc mem = {}, alloc_time = {}&quot;</span>,
+            <span class="string">"after smoothing, alloc mem = {}, alloc_time = {}"</span>,
             alloc_mem,
             alloc_time
         );
         <span class="macro">trace!</span>(
-            <span class="string">&quot;after smoothing, gc mem    = {}, gc_time    = {}&quot;</span>,
+            <span class="string">"after smoothing, gc mem    = {}, gc_time    = {}"</span>,
             gc_mem,
             gc_time
         );
@@ -1147,7 +1149,7 @@
         <span class="comment">// This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
         </span><span class="kw">let </span>optimal_heap = live + e <span class="kw">as </span>usize + extra_reserve + pending_pages;
         <span class="macro">trace!</span>(
-            <span class="string">&quot;optimal = live {} + sqrt(live) {} + extra {}&quot;</span>,
+            <span class="string">"optimal = live {} + sqrt(live) {} + extra {}"</span>,
             live,
             e,
             extra_reserve
@@ -1156,7 +1158,7 @@
         <span class="comment">// The new heap size must be within min/max.
         </span><span class="kw">let </span>new_heap = optimal_heap.clamp(<span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages);
         <span class="macro">debug!</span>(
-            <span class="string">&quot;MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])&quot;</span>,
+            <span class="string">"MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])"</span>,
             new_heap, optimal_heap, <span class="self">self</span>.min_heap_pages, <span class="self">self</span>.max_heap_pages
         );
         <span class="self">self</span>.current_heap_pages.store(new_heap, Ordering::Relaxed);

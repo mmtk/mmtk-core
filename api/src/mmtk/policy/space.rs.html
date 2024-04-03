@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/space.rs`."><title>space.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/space.rs`."><title>space.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -673,9 +675,9 @@
 
 <span class="kw">use </span>downcast_rs::Downcast;
 
-<span class="kw">pub trait </span>Space&lt;VM: VMBinding&gt;: <span class="lifetime">&#39;static </span>+ SFT + Sync + Downcast {
+<span class="kw">pub trait </span>Space&lt;VM: VMBinding&gt;: <span class="lifetime">'static </span>+ SFT + Sync + Downcast {
     <span class="kw">fn </span>as_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;;
-    <span class="kw">fn </span>as_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>);
+    <span class="kw">fn </span>as_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">'static</span>);
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>PageResource&lt;VM&gt;;
 
     <span class="doccomment">/// Initialize entires in SFT map for the space. This is called when the Space object
@@ -712,11 +714,11 @@
     </span>}
 
     <span class="kw">fn </span>acquire(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, pages: usize) -&gt; Address {
-        <span class="macro">trace!</span>(<span class="string">&quot;Space.acquire, tls={:?}&quot;</span>, tls);
+        <span class="macro">trace!</span>(<span class="string">"Space.acquire, tls={:?}"</span>, tls);
 
         <span class="macro">debug_assert!</span>(
             !<span class="self">self</span>.will_oom_on_acquire(tls, pages &lt;&lt; LOG_BYTES_IN_PAGE),
-            <span class="string">&quot;The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?&quot;
+            <span class="string">"The requested pages is larger than the max heap size. Is will_go_oom_on_acquire used before acquring memory?"
         </span>);
 
         <span class="comment">// Should we poll to attempt to GC?
@@ -728,15 +730,15 @@
         // initialize_collection() has to be called so we know GC is initialized.
         </span><span class="kw">let </span>allow_gc = should_poll &amp;&amp; <span class="self">self</span>.common().global_state.is_initialized();
 
-        <span class="macro">trace!</span>(<span class="string">&quot;Reserving pages&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"Reserving pages"</span>);
         <span class="kw">let </span>pr = <span class="self">self</span>.get_page_resource();
         <span class="kw">let </span>pages_reserved = pr.reserve_pages(pages);
-        <span class="macro">trace!</span>(<span class="string">&quot;Pages reserved&quot;</span>);
-        <span class="macro">trace!</span>(<span class="string">&quot;Polling ..&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"Pages reserved"</span>);
+        <span class="macro">trace!</span>(<span class="string">"Polling .."</span>);
 
         <span class="kw">if </span>should_poll &amp;&amp; <span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.as_space())) {
-            <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
-            <span class="macro">assert!</span>(allow_gc, <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">"Collection required"</span>);
+            <span class="macro">assert!</span>(allow_gc, <span class="string">"GC is not allowed here: collection is not initialized (did you call initialize_collection()?)."</span>);
 
             <span class="comment">// Clear the request, and inform GC trigger about the pending allocation.
             </span>pr.clear_request(pages_reserved);
@@ -747,11 +749,11 @@
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); <span class="comment">// We have checked that this is mutator
             </span><span class="kw">unsafe </span>{ Address::zero() }
         } <span class="kw">else </span>{
-            <span class="macro">debug!</span>(<span class="string">&quot;Collection not required&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">"Collection not required"</span>);
 
             <span class="comment">// We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
             // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
-            // a new chunk so grow_space() won&#39;t be called on it. The second thread could return a result in the chunk before
+            // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
             // its SFT is properly set.
             // We need to minimize the scope of this lock for performance when we have many threads (mutator threads, or GC threads with copying allocators).
             // See: https://github.com/mmtk/mmtk-core/issues/610
@@ -760,7 +762,7 @@
             <span class="kw">match </span>pr.get_new_pages(<span class="self">self</span>.common().descriptor, pages_reserved, pages, tls) {
                 <span class="prelude-val">Ok</span>(res) =&gt; {
                     <span class="macro">debug!</span>(
-                        <span class="string">&quot;Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}&quot;</span>,
+                        <span class="string">"Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}"</span>,
                         res.start,
                         res.pages,
                         <span class="self">self</span>.get_name(),
@@ -836,7 +838,7 @@
                         );
                     }
 
-                    <span class="macro">debug!</span>(<span class="string">&quot;Space.acquire(), returned = {}&quot;</span>, res.start);
+                    <span class="macro">debug!</span>(<span class="string">"Space.acquire(), returned = {}"</span>, res.start);
                     res.start
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
@@ -845,11 +847,11 @@
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                     </span><span class="macro">assert!</span>(
                         allow_gc,
-                        <span class="string">&quot;Physical allocation failed when GC is not allowed!&quot;
+                        <span class="string">"Physical allocation failed when GC is not allowed!"
                     </span>);
 
                     <span class="kw">let </span>gc_performed = <span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">true</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.as_space()));
-                    <span class="macro">debug_assert!</span>(gc_performed, <span class="string">&quot;GC not performed when forced.&quot;</span>);
+                    <span class="macro">debug_assert!</span>(gc_performed, <span class="string">"GC not performed when forced."</span>);
 
                     <span class="comment">// Clear the request, and inform GC trigger about the pending allocation.
                     </span>pr.clear_request(pages_reserved);
@@ -879,7 +881,7 @@
     <span class="doccomment">/**
      * This is called after we get result from page resources.  The space may
      * tap into the hook to monitor heap growth.  The call is made from within the
-     * page resources&#39; critical region, immediately before yielding the lock.
+     * page resources' critical region, immediately before yielding the lock.
      *
      * @param start The start of the newly allocated space
      * @param bytes The size of the newly allocated space
@@ -887,7 +889,7 @@
      */
     </span><span class="kw">fn </span>grow_space(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, bytes: usize, new_chunk: bool) {
         <span class="macro">trace!</span>(
-            <span class="string">&quot;Grow space from {} for {} bytes (new chunk = {})&quot;</span>,
+            <span class="string">"Grow space from {} for {} bytes (new chunk = {})"</span>,
             start,
             bytes,
             new_chunk
@@ -898,7 +900,7 @@
         </span><span class="kw">if </span>!new_chunk {
             <span class="macro">debug_assert!</span>(
                 SFT_MAP.get_checked(start).name() != EMPTY_SFT_NAME,
-                <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})&quot;</span>,
+                <span class="string">"In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})"</span>,
                 start,
                 bytes,
                 new_chunk,
@@ -907,7 +909,7 @@
             );
             <span class="macro">debug_assert!</span>(
                 SFT_MAP.get_checked(start + bytes - <span class="number">1</span>).name() != EMPTY_SFT_NAME,
-                <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})&quot;</span>,
+                <span class="string">"In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})"</span>,
                 start,
                 bytes,
                 new_chunk,
@@ -931,7 +933,7 @@
             .is_err()
         {
             <span class="comment">// TODO(Javad): handle meta space allocation failure
-            </span><span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+            </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory"</span>);
         }
 
         <span class="self">self</span>.common()
@@ -950,7 +952,7 @@
         <span class="self">self</span>.get_page_resource().get_available_physical_pages()
     }
 
-    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
         <span class="self">self</span>.common().name
     }
 
@@ -964,10 +966,10 @@
     <span class="doccomment">/// What copy semantic we should use for this space if we copy objects from this space.
     /// This is only needed for plans that use SFTProcessEdges
     </span><span class="kw">fn </span>set_copy_for_sft_trace(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _semantics: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;) {
-        <span class="macro">panic!</span>(<span class="string">&quot;A copying space should override this method&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"A copying space should override this method"</span>)
     }
 
-    <span class="doccomment">/// Ensure that the current space&#39;s metadata context does not have any issues.
+    <span class="doccomment">/// Ensure that the current space's metadata context does not have any issues.
     /// Panics with a suitable message if any issue is detected.
     /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
     /// Internally this calls verify_metadata_context() from `util::metadata::sanity`
@@ -991,31 +993,31 @@
     out: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>std::fmt::Write,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), std::fmt::Error&gt; {
     <span class="kw">let </span>common = space.common();
-    <span class="macro">write!</span>(out, <span class="string">&quot;{} &quot;</span>, common.name)<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(out, <span class="string">"{} "</span>, common.name)<span class="question-mark">?</span>;
     <span class="kw">if </span>common.immortal {
-        <span class="macro">write!</span>(out, <span class="string">&quot;I&quot;</span>)<span class="question-mark">?</span>;
+        <span class="macro">write!</span>(out, <span class="string">"I"</span>)<span class="question-mark">?</span>;
     } <span class="kw">else </span>{
-        <span class="macro">write!</span>(out, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+        <span class="macro">write!</span>(out, <span class="string">" "</span>)<span class="question-mark">?</span>;
     }
     <span class="kw">if </span>common.movable {
-        <span class="macro">write!</span>(out, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+        <span class="macro">write!</span>(out, <span class="string">" "</span>)<span class="question-mark">?</span>;
     } <span class="kw">else </span>{
-        <span class="macro">write!</span>(out, <span class="string">&quot;N&quot;</span>)<span class="question-mark">?</span>;
+        <span class="macro">write!</span>(out, <span class="string">"N"</span>)<span class="question-mark">?</span>;
     }
-    <span class="macro">write!</span>(out, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    <span class="macro">write!</span>(out, <span class="string">" "</span>)<span class="question-mark">?</span>;
     <span class="kw">if </span>common.contiguous {
         <span class="macro">write!</span>(
             out,
-            <span class="string">&quot;{}-&gt;{}&quot;</span>,
+            <span class="string">"{}-&gt;{}"</span>,
             common.start,
             common.start + common.extent - <span class="number">1
         </span>)<span class="question-mark">?</span>;
         <span class="kw">match </span>common.vmrequest {
             VMRequest::Extent { extent, .. } =&gt; {
-                <span class="macro">write!</span>(out, <span class="string">&quot; E {}&quot;</span>, extent)<span class="question-mark">?</span>;
+                <span class="macro">write!</span>(out, <span class="string">" E {}"</span>, extent)<span class="question-mark">?</span>;
             }
             VMRequest::Fraction { frac, .. } =&gt; {
-                <span class="macro">write!</span>(out, <span class="string">&quot; F {}&quot;</span>, frac)<span class="question-mark">?</span>;
+                <span class="macro">write!</span>(out, <span class="string">" F {}"</span>, frac)<span class="question-mark">?</span>;
             }
             <span class="kw">_ </span>=&gt; {}
         }
@@ -1027,13 +1029,13 @@
         <span class="kw">while </span>!a.is_zero() {
             <span class="macro">write!</span>(
                 out,
-                <span class="string">&quot;{}-&gt;{}&quot;</span>,
+                <span class="string">"{}-&gt;{}"</span>,
                 a,
                 a + space.common().vm_map().get_contiguous_region_size(a) - <span class="number">1
             </span>)<span class="question-mark">?</span>;
             a = space.common().vm_map().get_next_contiguous_region(a);
             <span class="kw">if </span>!a.is_zero() {
-                <span class="macro">write!</span>(out, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+                <span class="macro">write!</span>(out, <span class="string">" "</span>)<span class="question-mark">?</span>;
             }
         }
     }
@@ -1045,7 +1047,7 @@
 <span class="macro">impl_downcast!</span>(Space&lt;VM&gt; <span class="kw">where </span>VM: VMBinding);
 
 <span class="kw">pub struct </span>CommonSpace&lt;VM: VMBinding&gt; {
-    <span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+    <span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
     <span class="kw">pub </span>descriptor: SpaceDescriptor,
     <span class="kw">pub </span>vmrequest: VMRequest,
 
@@ -1061,8 +1063,8 @@
     <span class="kw">pub </span>start: Address,
     <span class="kw">pub </span>extent: usize,
 
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
-    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap,
+    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Mmapper,
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) metadata: SideMetadataContext,
 
@@ -1080,37 +1082,37 @@
 }
 
 <span class="doccomment">/// Arguments passed from a policy to create a space. This includes policy specific args.
-</span><span class="kw">pub struct </span>PolicyCreateSpaceArgs&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
-    <span class="kw">pub </span>plan_args: PlanCreateSpaceArgs&lt;<span class="lifetime">&#39;a</span>, VM&gt;,
+</span><span class="kw">pub struct </span>PolicyCreateSpaceArgs&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; {
+    <span class="kw">pub </span>plan_args: PlanCreateSpaceArgs&lt;<span class="lifetime">'a</span>, VM&gt;,
     <span class="kw">pub </span>movable: bool,
     <span class="kw">pub </span>immortal: bool,
     <span class="kw">pub </span>local_side_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
 }
 
 <span class="doccomment">/// Arguments passed from a plan to create a space.
-</span><span class="kw">pub struct </span>PlanCreateSpaceArgs&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; {
-    <span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+</span><span class="kw">pub struct </span>PlanCreateSpaceArgs&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; {
+    <span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
     <span class="kw">pub </span>zeroed: bool,
     <span class="kw">pub </span>vmrequest: VMRequest,
     <span class="kw">pub </span>global_side_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
-    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap,
-    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Mmapper,
-    <span class="kw">pub </span>heap: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>HeapMeta,
-    <span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>PlanConstraints,
+    <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap,
+    <span class="kw">pub </span>mmapper: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Mmapper,
+    <span class="kw">pub </span>heap: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>HeapMeta,
+    <span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>PlanConstraints,
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-    <span class="kw">pub </span>options: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Options,
+    <span class="kw">pub </span>options: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>Options,
     <span class="kw">pub </span>global_state: Arc&lt;GlobalState&gt;,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, VM: VMBinding&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; PlanCreateSpaceArgs&lt;<span class="lifetime">'a</span>, VM&gt; {
     <span class="doccomment">/// Turning PlanCreateSpaceArgs into a PolicyCreateSpaceArgs
     </span><span class="kw">pub fn </span>into_policy_args(
         <span class="self">self</span>,
         movable: bool,
         immortal: bool,
         policy_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
-    ) -&gt; PolicyCreateSpaceArgs&lt;<span class="lifetime">&#39;a</span>, VM&gt; {
+    ) -&gt; PolicyCreateSpaceArgs&lt;<span class="lifetime">'a</span>, VM&gt; {
         PolicyCreateSpaceArgs {
             movable,
             immortal,
@@ -1169,7 +1171,7 @@
 
         <span class="macro">assert!</span>(
             extent == raw_align_up(extent, BYTES_IN_CHUNK),
-            <span class="string">&quot;{} requested non-aligned extent: {} bytes&quot;</span>,
+            <span class="string">"{} requested non-aligned extent: {} bytes"</span>,
             rtn.name,
             extent
         );
@@ -1178,12 +1180,12 @@
             _start
         } <span class="kw">else </span>{
             <span class="comment">// FIXME
-            //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail(&quot;heap is narrowed after regionMap is finalized: &quot; + name);
+            //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
             </span>args.plan_args.heap.reserve(extent, top)
         };
         <span class="macro">assert!</span>(
             start == chunk_align_up(start),
-            <span class="string">&quot;{} starting on non-aligned boundary: {}&quot;</span>,
+            <span class="string">"{} starting on non-aligned boundary: {}"</span>,
             rtn.name,
             start
         );
@@ -1218,11 +1220,11 @@
             .is_err()
         {
             <span class="comment">// TODO(Javad): handle meta space allocation failure
-            </span><span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+            </span><span class="macro">panic!</span>(<span class="string">"failed to mmap meta memory"</span>);
         }
 
         <span class="macro">debug!</span>(
-            <span class="string">&quot;Created space {} [{}, {}) for {} bytes&quot;</span>,
+            <span class="string">"Created space {} [{}, {}) for {} bytes"</span>,
             rtn.name,
             start,
             start + extent,
@@ -1234,7 +1236,7 @@
 
     <span class="kw">pub fn </span>initialize_sft(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        sft: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>),
+        sft: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">'static</span>),
         sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap,
     ) {
         <span class="comment">// We have to keep this for now: if a space is contiguous, our page resource will NOT consider newly allocated chunks
@@ -1248,21 +1250,21 @@
         }
     }
 
-    <span class="kw">pub fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>VMMap {
+    <span class="kw">pub fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap {
         <span class="self">self</span>.vm_map
     }
 }
 
 <span class="kw">fn </span>get_frac_available(frac: f32) -&gt; usize {
-    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_START={}&quot;</span>, vm_layout().available_start());
-    <span class="macro">trace!</span>(<span class="string">&quot;AVAILABLE_END={}&quot;</span>, vm_layout().available_end());
+    <span class="macro">trace!</span>(<span class="string">"AVAILABLE_START={}"</span>, vm_layout().available_start());
+    <span class="macro">trace!</span>(<span class="string">"AVAILABLE_END={}"</span>, vm_layout().available_end());
     <span class="kw">let </span>bytes = (frac * vm_layout().available_bytes() <span class="kw">as </span>f32) <span class="kw">as </span>usize;
-    <span class="macro">trace!</span>(<span class="string">&quot;bytes={}*{}={}&quot;</span>, frac, vm_layout().available_bytes(), bytes);
+    <span class="macro">trace!</span>(<span class="string">"bytes={}*{}={}"</span>, frac, vm_layout().available_bytes(), bytes);
     <span class="kw">let </span>mb = bytes &gt;&gt; LOG_BYTES_IN_MBYTE;
     <span class="kw">let </span>rtn = mb &lt;&lt; LOG_BYTES_IN_MBYTE;
-    <span class="macro">trace!</span>(<span class="string">&quot;rtn={}&quot;</span>, rtn);
+    <span class="macro">trace!</span>(<span class="string">"rtn={}"</span>, rtn);
     <span class="kw">let </span>aligned_rtn = raw_align_up(rtn, BYTES_IN_CHUNK);
-    <span class="macro">trace!</span>(<span class="string">&quot;aligned_rtn={}&quot;</span>, aligned_rtn);
+    <span class="macro">trace!</span>(<span class="string">"aligned_rtn={}"</span>, aligned_rtn);
     aligned_rtn
 }
 

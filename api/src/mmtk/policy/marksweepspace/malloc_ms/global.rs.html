@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/marksweepspace/malloc_ms/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../../source-files.js"></script><script defer src="../../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../../mmtk/index.html"><img class="rust-logo" src="../../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/marksweepspace/malloc_ms/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../../" data-static-root-path="../../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../../src-files.js"></script><script defer src="../../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -888,17 +890,17 @@
         is_marked::&lt;VM&gt;(object, Ordering::SeqCst)
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
     </span><span class="kw">fn </span>pin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">false
     </span>}
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
     </span><span class="kw">fn </span>unpin_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">false
     </span>}
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"object_pinning"</span>)]
     </span><span class="kw">fn </span>is_object_pinned(<span class="kw-2">&amp;</span><span class="self">self</span>, _object: ObjectReference) -&gt; bool {
         <span class="bool-val">false
     </span>}
@@ -907,7 +909,7 @@
         <span class="bool-val">false
     </span>}
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
     </span><span class="kw">fn </span>is_sane(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="bool-val">true
     </span>}
@@ -918,7 +920,7 @@
     }
 
     <span class="doccomment">/// For malloc space, we just use the side metadata.
-    </span><span class="attr">#[cfg(feature = <span class="string">&quot;is_mmtk_object&quot;</span>)]
+    </span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
     </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
         <span class="macro">debug_assert!</span>(!addr.is_zero());
         <span class="comment">// `addr` cannot be mapped by us. It should be mapped by the malloc library.
@@ -927,7 +929,7 @@
     }
 
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
-        <span class="macro">trace!</span>(<span class="string">&quot;initialize_object_metadata for object {}&quot;</span>, object);
+        <span class="macro">trace!</span>(<span class="string">"initialize_object_metadata for object {}"</span>, object);
         set_vo_bit::&lt;VM&gt;(object);
     }
 
@@ -946,7 +948,7 @@
         <span class="self">self
     </span>}
 
-    <span class="kw">fn </span>as_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">&#39;static</span>) {
+    <span class="kw">fn </span>as_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">'static</span>) {
         <span class="self">self
     </span>}
 
@@ -983,7 +985,7 @@
                 <span class="comment">// The VO bit tells that the object is in space.
                 </span><span class="macro">debug_assert!</span>(
                     <span class="kw-2">*</span>active_mem.get(<span class="kw-2">&amp;</span>addr).unwrap() != <span class="number">0</span>,
-                    <span class="string">&quot;active mem check failed for {} (object {}) - was freed&quot;</span>,
+                    <span class="string">"active mem check failed for {} (object {}) - was freed"</span>,
                     addr,
                     object
                 );
@@ -992,7 +994,7 @@
                 </span><span class="macro">debug_assert!</span>(
                     (!active_mem.contains_key(<span class="kw-2">&amp;</span>addr))
                         || (active_mem.contains_key(<span class="kw-2">&amp;</span>addr) &amp;&amp; <span class="kw-2">*</span>active_mem.get(<span class="kw-2">&amp;</span>addr).unwrap() == <span class="number">0</span>),
-                    <span class="string">&quot;mem check failed for {} (object {}): allocated = {}, size = {:?}&quot;</span>,
+                    <span class="string">"mem check failed for {} (object {}): allocated = {}, size = {:?}"</span>,
                     addr,
                     object,
                     active_mem.contains_key(<span class="kw-2">&amp;</span>addr),
@@ -1008,11 +1010,11 @@
     }
 
     <span class="kw">fn </span>address_in_space(<span class="kw-2">&amp;</span><span class="self">self</span>, _start: Address) -&gt; bool {
-        <span class="macro">unreachable!</span>(<span class="string">&quot;We do not know if an address is in malloc space. Use in_space() to check if an object is in malloc space.&quot;</span>)
+        <span class="macro">unreachable!</span>(<span class="string">"We do not know if an address is in malloc space. Use in_space() to check if an object is in malloc space."</span>)
     }
 
-    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
-        <span class="string">&quot;MallocSpace&quot;
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
+        <span class="string">"MallocSpace"
     </span>}
 
     <span class="attr">#[allow(clippy::assertions_on_constants)]
@@ -1059,11 +1061,11 @@
     <span class="kw">pub fn </span>extend_global_side_metadata_specs(specs: <span class="kw-2">&amp;mut </span>Vec&lt;SideMetadataSpec&gt;) {
         <span class="comment">// MallocSpace needs to use VO bit. If the feature is turned on, the VO bit spec is in the global specs.
         // Otherwise, we manually add it.
-        </span><span class="kw">if </span>!<span class="macro">cfg!</span>(feature = <span class="string">&quot;vo_bit&quot;</span>) {
+        </span><span class="kw">if </span>!<span class="macro">cfg!</span>(feature = <span class="string">"vo_bit"</span>) {
             specs.push(<span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC);
         }
         <span class="comment">// MallocSpace also need a global chunk metadata.
-        // TODO: I don&#39;t know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
+        // TODO: I don't know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
         // One reason could be that the address range in this space is not in our control, and it could be anywhere in the heap, thus we have
         // to make it a global spec. I am not too sure about this.
         </span>specs.push(ACTIVE_CHUNK_METADATA_SPEC);
@@ -1147,7 +1149,7 @@
     <span class="kw">pub fn </span>alloc(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, size: usize, align: usize, offset: usize) -&gt; Address {
         <span class="comment">// TODO: Should refactor this and Space.acquire()
         </span><span class="kw">if </span><span class="self">self</span>.get_gc_trigger().poll(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>)) {
-            <span class="macro">assert!</span>(VM::VMActivePlan::is_mutator(tls), <span class="string">&quot;Polling in GC worker&quot;</span>);
+            <span class="macro">assert!</span>(VM::VMActivePlan::is_mutator(tls), <span class="string">"Polling in GC worker"</span>);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             <span class="kw">return unsafe </span>{ Address::zero() };
         }
@@ -1193,12 +1195,12 @@
     // indirect call instructions in the generated assembly
     </span><span class="kw">fn </span>free_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address, bytes: usize, offset_malloc_bit: bool) {
         <span class="kw">if </span>offset_malloc_bit {
-            <span class="macro">trace!</span>(<span class="string">&quot;Free memory {:x}&quot;</span>, addr);
+            <span class="macro">trace!</span>(<span class="string">"Free memory {:x}"</span>, addr);
             offset_free(addr);
             <span class="kw">unsafe </span>{ unset_offset_malloc_bit_unsafe(addr) };
         } <span class="kw">else </span>{
             <span class="kw">let </span>ptr = addr.to_mut_ptr();
-            <span class="macro">trace!</span>(<span class="string">&quot;Free memory {:?}&quot;</span>, ptr);
+            <span class="macro">trace!</span>(<span class="string">"Free memory {:?}"</span>, ptr);
             <span class="kw">unsafe </span>{
                 free(ptr);
             }
@@ -1221,7 +1223,7 @@
 
         <span class="macro">assert!</span>(
             <span class="self">self</span>.in_space(object),
-            <span class="string">&quot;Cannot mark an object {} that was not alloced by malloc.&quot;</span>,
+            <span class="string">"Cannot mark an object {} that was not alloced by malloc."</span>,
             object,
         );
 
@@ -1297,7 +1299,7 @@
             chunk += BYTES_IN_CHUNK;
         }
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Generated {} sweep work packets&quot;</span>, work_packets.len());
+        <span class="macro">debug!</span>(<span class="string">"Generated {} sweep work packets"</span>, work_packets.len());
         <span class="attr">#[cfg(debug_assertions)]
         </span>{
             <span class="self">self</span>.total_work_packets
@@ -1331,7 +1333,7 @@
 
     <span class="doccomment">/// Clean up for an empty chunk
     </span><span class="kw">fn </span>clean_up_empty_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk_start: Address) {
-        <span class="comment">// Since the chunk mark metadata is a byte, we don&#39;t need synchronization
+        <span class="comment">// Since the chunk mark metadata is a byte, we don't need synchronization
         </span><span class="kw">unsafe </span>{ unset_chunk_mark_unsafe(chunk_start) };
         <span class="comment">// Clear the SFT entry
         </span><span class="kw">unsafe </span>{ <span class="kw">crate</span>::mmtk::SFT_MAP.clear(chunk_start) };
@@ -1347,11 +1349,11 @@
         <span class="comment">// We are the only thread that is dealing with the object. We can use non-atomic methods for the metadata.
         </span><span class="kw">if </span>!<span class="kw">unsafe </span>{ is_marked_unsafe::&lt;VM&gt;(object) } {
             <span class="comment">// Dead object
-            </span><span class="macro">trace!</span>(<span class="string">&quot;Object {} has been allocated but not marked&quot;</span>, object);
+            </span><span class="macro">trace!</span>(<span class="string">"Object {} has been allocated but not marked"</span>, object);
 
             <span class="comment">// Free object
             </span><span class="self">self</span>.free_internal(obj_start, bytes, offset_malloc);
-            <span class="macro">trace!</span>(<span class="string">&quot;free object {}&quot;</span>, object);
+            <span class="macro">trace!</span>(<span class="string">"free object {}"</span>, object);
             <span class="kw">unsafe </span>{ unset_vo_bit_unsafe::&lt;VM&gt;(object) };
 
             <span class="bool-val">true
@@ -1383,7 +1385,7 @@
     </span><span class="attr">#[cfg(debug_assertions)]
     </span><span class="kw">fn </span>debug_sweep_chunk_done(<span class="kw-2">&amp;</span><span class="self">self</span>, live_bytes_in_the_chunk: usize) {
         <span class="macro">debug!</span>(
-            <span class="string">&quot;Used bytes after releasing: {}&quot;</span>,
+            <span class="string">"Used bytes after releasing: {}"</span>,
             <span class="self">self</span>.active_bytes.load(Ordering::SeqCst)
         );
 
@@ -1393,7 +1395,7 @@
 
         <span class="kw">if </span>completed_packets == <span class="self">self</span>.total_work_packets.load(Ordering::Relaxed) {
             <span class="macro">trace!</span>(
-                <span class="string">&quot;work_live_bytes = {}, live_bytes = {}, active_bytes = {}&quot;</span>,
+                <span class="string">"work_live_bytes = {}, live_bytes = {}, active_bytes = {}"</span>,
                 <span class="self">self</span>.work_live_bytes.load(Ordering::Relaxed),
                 live_bytes_in_the_chunk,
                 <span class="self">self</span>.active_bytes.load(Ordering::Relaxed)
@@ -1424,17 +1426,17 @@
             <span class="attr">#[cfg(debug_assertions)]
             </span><span class="kw">let </span><span class="kw-2">mut </span>live_bytes = <span class="number">0</span>;
 
-            <span class="macro">debug!</span>(<span class="string">&quot;Check active chunk {:?}&quot;</span>, chunk_start);
+            <span class="macro">debug!</span>(<span class="string">"Check active chunk {:?}"</span>, chunk_start);
             <span class="kw">let </span><span class="kw-2">mut </span>address = chunk_start;
             <span class="kw">let </span>chunk_end = chunk_start + BYTES_IN_CHUNK;
 
             <span class="macro">debug_assert!</span>(
                 <span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
                     == mark_bit_spec.log_bytes_in_region,
-                <span class="string">&quot;VO-bit and mark-bit metadata have different minimum object sizes!&quot;
+                <span class="string">"VO-bit and mark-bit metadata have different minimum object sizes!"
             </span>);
 
-            <span class="comment">// For bulk xor&#39;ing 128-bit vectors on architectures with vector instructions
+            <span class="comment">// For bulk xor'ing 128-bit vectors on architectures with vector instructions
             // Each bit represents an object of LOG_MIN_OBJ_SIZE size
             </span><span class="kw">let </span>bulk_load_size: usize = <span class="number">128
                 </span>* (<span class="number">1 </span>&lt;&lt; <span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC
@@ -1443,7 +1445,7 @@
             <span class="comment">// The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
             </span><span class="kw">let </span><span class="kw-2">mut </span>empty_page_start = Address::ZERO;
 
-            <span class="comment">// Scan the chunk by every &#39;bulk_load_size&#39; region.
+            <span class="comment">// Scan the chunk by every 'bulk_load_size' region.
             </span><span class="kw">while </span>address &lt; chunk_end {
                 <span class="kw">let </span>alloc_128: u128 = <span class="kw">unsafe </span>{
                     load128(
@@ -1468,8 +1470,8 @@
                         <span class="self">self</span>.sweep_object(object, <span class="kw-2">&amp;mut </span>empty_page_start);
                     }
                 } <span class="kw">else </span>{
-                    <span class="comment">// TODO we aren&#39;t actually accounting for the case where an object is alive and spans
-                    // a page boundary as we don&#39;t know what the object sizes are/what is alive in the bulk region
+                    <span class="comment">// TODO we aren't actually accounting for the case where an object is alive and spans
+                    // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
                     </span><span class="kw">if </span>alloc_128 != <span class="number">0 </span>{
                         empty_page_start = address + bulk_load_size;
                     }
@@ -1495,20 +1497,20 @@
                     <span class="kw">if </span>ASSERT_ALLOCATION {
                         <span class="macro">debug_assert!</span>(
                             <span class="self">self</span>.active_mem.lock().unwrap().contains_key(<span class="kw-2">&amp;</span>obj_start),
-                            <span class="string">&quot;Address {} with VO bit is not in active_mem&quot;</span>,
+                            <span class="string">"Address {} with VO bit is not in active_mem"</span>,
                             obj_start
                         );
                         <span class="macro">debug_assert_eq!</span>(
                             <span class="self">self</span>.active_mem.lock().unwrap().get(<span class="kw-2">&amp;</span>obj_start),
                             <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>bytes),
-                            <span class="string">&quot;Address {} size in active_mem does not match the size from malloc_usable_size&quot;</span>,
+                            <span class="string">"Address {} size in active_mem does not match the size from malloc_usable_size"</span>,
                             obj_start
                         );
                     }
 
                     <span class="macro">debug_assert!</span>(
                         <span class="kw">unsafe </span>{ is_marked_unsafe::&lt;VM&gt;(object) },
-                        <span class="string">&quot;Dead object = {} found after sweep&quot;</span>,
+                        <span class="string">"Dead object = {} found after sweep"</span>,
                         object
                     );
 
@@ -1544,7 +1546,7 @@
         <span class="attr">#[cfg(debug_assertions)]
         </span><span class="kw">let </span><span class="kw-2">mut </span>live_bytes = <span class="number">0</span>;
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Check active chunk {:?}&quot;</span>, chunk_start);
+        <span class="macro">debug!</span>(<span class="string">"Check active chunk {:?}"</span>, chunk_start);
 
         <span class="comment">// The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
         </span><span class="kw">let </span><span class="kw-2">mut </span>empty_page_start = Address::ZERO;
@@ -1561,13 +1563,13 @@
                 <span class="kw">let </span>(obj_start, <span class="kw">_</span>, bytes) = <span class="self">Self</span>::get_malloc_addr_size(object);
                 <span class="macro">debug_assert!</span>(
                     <span class="self">self</span>.active_mem.lock().unwrap().contains_key(<span class="kw-2">&amp;</span>obj_start),
-                    <span class="string">&quot;Address {} with VO bit is not in active_mem&quot;</span>,
+                    <span class="string">"Address {} with VO bit is not in active_mem"</span>,
                     obj_start
                 );
                 <span class="macro">debug_assert_eq!</span>(
                     <span class="self">self</span>.active_mem.lock().unwrap().get(<span class="kw-2">&amp;</span>obj_start),
                     <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>bytes),
-                    <span class="string">&quot;Address {} size in active_mem does not match the size from malloc_usable_size&quot;</span>,
+                    <span class="string">"Address {} size in active_mem does not match the size from malloc_usable_size"</span>,
                     obj_start
                 );
             }
@@ -1622,13 +1624,13 @@
 
 <span class="doccomment">/// Simple work packet that just sweeps a single chunk
 </span><span class="kw">pub struct </span>MSSweepChunk&lt;VM: VMBinding&gt; {
-    ms: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MallocSpace&lt;VM&gt;,
+    ms: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MallocSpace&lt;VM&gt;,
     <span class="comment">// starting address of a chunk
     </span>chunk: Address,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>MSSweepChunk&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="self">self</span>.ms.sweep_chunk(<span class="self">self</span>.chunk);
     }
 }

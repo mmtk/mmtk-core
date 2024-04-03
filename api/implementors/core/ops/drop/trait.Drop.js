@@ -1,3 +1,0 @@
-(function() {var implementors = {
-"mmtk":[["impl&lt;'a, E: <a class=\"trait\" href=\"mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html\" title=\"trait mmtk::scheduler::gc_work::ProcessEdgesWork\">ProcessEdgesWork</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.71.1/core/ops/drop/trait.Drop.html\" title=\"trait core::ops::drop::Drop\">Drop</a> for <a class=\"struct\" href=\"mmtk/plan/tracing/struct.ObjectsClosure.html\" title=\"struct mmtk::plan::tracing::ObjectsClosure\">ObjectsClosure</a>&lt;'a, E&gt;"]]
-};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

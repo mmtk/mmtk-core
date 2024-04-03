@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/gc_work.rs`."><title>gc_work.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/scheduler/gc_work.rs`."><title>gc_work.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1202,7 +1204,7 @@
 <span class="kw">pub struct </span>ScheduleCollection;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ScheduleCollection {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="comment">// Tell GC trigger that GC started.
         </span>mmtk.gc_trigger.policy.on_gc_start(mmtk);
 
@@ -1242,8 +1244,8 @@
 }
 
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Prepare&lt;C&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Prepare Global&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"Prepare Global"</span>);
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
         plan_mut.prepare(worker.tls);
@@ -1265,18 +1267,18 @@
 </span><span class="kw">pub struct </span>PrepareMutator&lt;VM: VMBinding&gt; {
     <span class="comment">// The mutator reference has static lifetime.
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; PrepareMutator&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ mutator }
     }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareMutator&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Prepare Mutator&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"Prepare Mutator"</span>);
         <span class="self">self</span>.mutator.prepare(worker.tls);
     }
 }
@@ -1286,8 +1288,8 @@
 </span><span class="kw">pub struct </span>PrepareCollector;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareCollector {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Prepare Collector&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"Prepare Collector"</span>);
         worker.get_copy_context_mut().prepare();
         mmtk.get_plan().prepare_worker(worker);
     }
@@ -1312,9 +1314,9 @@
 
 <span class="kw">unsafe impl</span>&lt;C: GCWorkContext&gt; Send <span class="kw">for </span>Release&lt;C&gt; {}
 
-<span class="kw">impl</span>&lt;C: GCWorkContext + <span class="lifetime">&#39;static</span>&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Release&lt;C&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Release Global&quot;</span>);
+<span class="kw">impl</span>&lt;C: GCWorkContext + <span class="lifetime">'static</span>&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>Release&lt;C&gt; {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"Release Global"</span>);
 
         mmtk.gc_trigger.policy.on_gc_release(mmtk);
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution
@@ -1331,7 +1333,7 @@
             <span class="macro">debug_assert!</span>(result.is_ok());
         }
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
         </span>{
             <span class="kw">let </span>live_bytes = mmtk
                 .scheduler
@@ -1346,18 +1348,18 @@
 </span><span class="kw">pub struct </span>ReleaseMutator&lt;VM: VMBinding&gt; {
     <span class="comment">// The mutator reference has static lifetime.
     // It is safe because the actual lifetime of this work-packet will not exceed the lifetime of a GC.
-    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
+    </span><span class="kw">pub </span>mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;,
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; ReleaseMutator&lt;VM&gt; {
-    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(mutator: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ mutator }
     }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ReleaseMutator&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Release Mutator&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"Release Mutator"</span>);
         <span class="self">self</span>.mutator.release(worker.tls);
     }
 }
@@ -1367,8 +1369,8 @@
 </span><span class="kw">pub struct </span>ReleaseCollector;
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>ReleaseCollector {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Release Collector&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"Release Collector"</span>);
         worker.get_copy_context_mut().release();
     }
 }
@@ -1386,16 +1388,16 @@
 }
 
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>StopMutators&lt;C&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators start&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators start"</span>);
         mmtk.state.prepare_for_stack_scanning();
         &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-            <span class="comment">// TODO: The stack scanning work won&#39;t start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
+            <span class="comment">// TODO: The stack scanning work won't start immediately, as the `Prepare` bucket is not opened yet (the bucket is opened in notify_mutators_paused).
             // Should we push to Unconstrained instead?
             </span>mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanMutatorRoots::&lt;C&gt;(mutator));
         });
-        <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators end&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"stop_all_mutators end"</span>);
         mmtk.scheduler.notify_mutators_paused(mmtk);
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::&lt;C&gt;::new());
     }
@@ -1407,26 +1409,26 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>EndOfGC {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="macro">info!</span>(
-            <span class="string">&quot;End of GC ({}/{} pages, took {} ms)&quot;</span>,
+            <span class="string">"End of GC ({}/{} pages, took {} ms)"</span>,
             mmtk.get_plan().get_reserved_pages(),
             mmtk.get_plan().get_total_pages(),
             <span class="self">self</span>.elapsed.as_millis()
         );
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
         </span>{
             <span class="kw">let </span>live_bytes = mmtk.state.get_live_bytes_in_last_gc();
             <span class="kw">let </span>used_bytes =
                 mmtk.get_plan().get_used_pages() &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
             <span class="macro">debug_assert!</span>(
                 live_bytes &lt;= used_bytes,
-                <span class="string">&quot;Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.&quot;</span>,
+                <span class="string">"Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong."</span>,
                 live_bytes, used_bytes
             );
             <span class="macro">info!</span>(
-                <span class="string">&quot;Live objects = {} bytes ({:04.1}% of {} used pages)&quot;</span>,
+                <span class="string">"Live objects = {} bytes ({:04.1}% of {} used pages)"</span>,
                 live_bytes,
                 live_bytes <span class="kw">as </span>f64 * <span class="number">100.0 </span>/ used_bytes <span class="kw">as </span>f64,
                 mmtk.get_plan().get_used_pages()
@@ -1437,7 +1439,7 @@
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ mmtk.get_plan_mut() };
         plan_mut.end_of_gc(worker.tls);
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             <span class="comment">// reset the logging info at the end of each GC
             </span>mmtk.edge_logger.reset();
@@ -1558,8 +1560,8 @@
 }
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>VMProcessWeakRefs&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;VMProcessWeakRefs&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"VMProcessWeakRefs"</span>);
 
         <span class="kw">let </span>stage = WorkBucketStage::VMRefClosure;
 
@@ -1572,7 +1574,7 @@
         };
 
         <span class="kw">if </span>need_to_repeat {
-            <span class="comment">// Schedule Self as the new sentinel so we&#39;ll call `process_weak_refs` again after the
+            <span class="comment">// Schedule Self as the new sentinel so we'll call `process_weak_refs` again after the
             // current transitive closure.
             </span><span class="kw">let </span>new_self = Box::new(<span class="self">Self</span>::new());
 
@@ -1601,8 +1603,8 @@
 }
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>VMForwardWeakRefs&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;VMForwardWeakRefs&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"VMForwardWeakRefs"</span>);
 
         <span class="kw">let </span>stage = WorkBucketStage::VMRefForwarding;
 
@@ -1626,18 +1628,18 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>VMPostForwarding&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;VMPostForwarding start&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"VMPostForwarding start"</span>);
         &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::post_forwarding(worker.tls);
-        <span class="macro">trace!</span>(<span class="string">&quot;VMPostForwarding end&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"VMPostForwarding end"</span>);
     }
 }
 
-<span class="kw">pub struct </span>ScanMutatorRoots&lt;C: GCWorkContext&gt;(<span class="kw">pub </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>Mutator&lt;C::VM&gt;);
+<span class="kw">pub struct </span>ScanMutatorRoots&lt;C: GCWorkContext&gt;(<span class="kw">pub </span><span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Mutator&lt;C::VM&gt;);
 
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanMutatorRoots&lt;C&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;ScanMutatorRoots for mutator {:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"ScanMutatorRoots for mutator {:?}"</span>, <span class="self">self</span>.<span class="number">0</span>.get_tls());
         <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;
             C::VM,
@@ -1670,8 +1672,8 @@
 }
 
 <span class="kw">impl</span>&lt;C: GCWorkContext&gt; GCWork&lt;C::VM&gt; <span class="kw">for </span>ScanVMSpecificRoots&lt;C&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;C::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;ScanStaticRoots&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;C::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;C::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"ScanStaticRoots"</span>);
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;
             C::VM,
             C::ProcessEdgesWorkType,
@@ -1684,8 +1686,8 @@
 <span class="kw">pub struct </span>ProcessEdgesBase&lt;VM: VMBinding&gt; {
     <span class="kw">pub </span>edges: Vec&lt;VM::VMEdge&gt;,
     <span class="kw">pub </span>nodes: VectorObjectQueue,
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
-    <span class="comment">// Use raw pointer for fast pointer dereferencing, instead of using `Option&lt;&amp;&#39;static mut GCWorker&lt;E::VM&gt;&gt;`.
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+    <span class="comment">// Use raw pointer for fast pointer dereferencing, instead of using `Option&lt;&amp;'static mut GCWorker&lt;E::VM&gt;&gt;`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     </span>worker: <span class="kw-2">*mut </span>GCWorker&lt;VM&gt;,
     <span class="kw">pub </span>roots: bool,
@@ -1700,10 +1702,10 @@
     </span><span class="kw">pub fn </span>new(
         edges: Vec&lt;VM::VMEdge&gt;,
         roots: bool,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self </span>{
-        <span class="attr">#[cfg(feature = <span class="string">&quot;extreme_assertions&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
         </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             <span class="kw">for </span>edge <span class="kw">in </span><span class="kw-2">&amp;</span>edges {
                 <span class="comment">// log edge, panic if already logged
@@ -1723,15 +1725,15 @@
         <span class="self">self</span>.worker = worker;
     }
 
-    <span class="kw">pub fn </span>worker(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>GCWorker&lt;VM&gt; {
+    <span class="kw">pub fn </span>worker(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>GCWorker&lt;VM&gt; {
         <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span><span class="self">self</span>.worker }
     }
 
-    <span class="kw">pub fn </span>mmtk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt; {
+    <span class="kw">pub fn </span>mmtk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt; {
         <span class="self">self</span>.mmtk
     }
 
-    <span class="kw">pub fn </span>plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+    <span class="kw">pub fn </span>plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
         <span class="self">self</span>.mmtk.get_plan()
     }
 
@@ -1757,7 +1759,7 @@
 // FIXME: We possibly want to enforce Drop on this trait, and require calling
 // flush() in Drop.
 </span><span class="kw">pub trait </span>ProcessEdgesWork:
-    Send + <span class="lifetime">&#39;static </span>+ Sized + DerefMut + Deref&lt;Target = ProcessEdgesBase&lt;<span class="self">Self</span>::VM&gt;&gt;
+    Send + <span class="lifetime">'static </span>+ Sized + DerefMut + Deref&lt;Target = ProcessEdgesBase&lt;<span class="self">Self</span>::VM&gt;&gt;
 {
     <span class="doccomment">/// The associate type for the VM.
     </span><span class="kw">type </span>VM: VMBinding;
@@ -1788,7 +1790,7 @@
     </span><span class="kw">fn </span>new(
         edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
         roots: bool,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;<span class="self">Self</span>::VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;<span class="self">Self</span>::VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self</span>;
 
@@ -1800,7 +1802,7 @@
 
     <span class="doccomment">/// If the work includes roots, we will store the roots somewhere so for sanity GC, we can do another
     /// transitive closure from the roots.
-    </span><span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+    </span><span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
     </span><span class="kw">fn </span>cache_roots_for_sanity_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="macro">assert!</span>(<span class="self">self</span>.roots);
         <span class="self">self</span>.mmtk()
@@ -1816,7 +1818,7 @@
         <span class="kw">if </span><span class="self">Self</span>::SCAN_OBJECTS_IMMEDIATELY {
             <span class="comment">// We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
-            // say for _pmd_ with 200M heap, we&#39;re likely to have 50000~60000 `ScanObjects` work packets
+            // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
             // Executing these work packets now can remarkably reduce the global synchronization time.
             </span>work_packet.do_work(<span class="self">self</span>.worker(), <span class="self">self</span>.mmtk);
@@ -1865,17 +1867,17 @@
 }
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>E {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
         <span class="self">self</span>.set_worker(worker);
         <span class="self">self</span>.process_edges();
         <span class="kw">if </span>!<span class="self">self</span>.nodes.is_empty() {
             <span class="self">self</span>.flush();
         }
-        <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
         </span><span class="kw">if </span><span class="self">self</span>.roots &amp;&amp; !_mmtk.is_in_sanity() {
             <span class="self">self</span>.cache_roots_for_sanity_gc();
         }
-        <span class="macro">trace!</span>(<span class="string">&quot;ProcessEdgesWork End&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"ProcessEdgesWork End"</span>);
     }
 }
 
@@ -1897,7 +1899,7 @@
     <span class="kw">fn </span>new(
         edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
         roots: bool,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
@@ -1926,7 +1928,7 @@
     E: ProcessEdgesWork&lt;VM = VM&gt;,
     I: ProcessEdgesWork&lt;VM = VM&gt;,
 &gt; {
-    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+    mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     phantom: PhantomData&lt;(E, I)&gt;,
 }
 
@@ -1974,7 +1976,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding, E: ProcessEdgesWork&lt;VM = VM&gt;, I: ProcessEdgesWork&lt;VM = VM&gt;&gt;
     ProcessEdgesWorkRootsWorkFactory&lt;VM, E, I&gt;
 {
-    <span class="kw">fn </span>new(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
+    <span class="kw">fn </span>new(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             mmtk,
             phantom: PhantomData,
@@ -2014,7 +2016,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         buffer: <span class="kw-2">&amp;</span>[ObjectReference],
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;&lt;<span class="self">Self</span>::E <span class="kw">as </span>ProcessEdgesWork&gt;::VM&gt;,
-        _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;&lt;<span class="self">Self</span>::E <span class="kw">as </span>ProcessEdgesWork&gt;::VM&gt;,
+        _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;&lt;<span class="self">Self</span>::E <span class="kw">as </span>ProcessEdgesWork&gt;::VM&gt;,
     ) {
         <span class="kw">let </span>tls = worker.tls;
 
@@ -2027,14 +2029,14 @@
             <span class="kw">let </span><span class="kw-2">mut </span>closure = ObjectsClosure::&lt;<span class="self">Self</span>::E&gt;::new(worker, <span class="self">self</span>.get_bucket());
             <span class="kw">for </span>object <span class="kw">in </span>objects_to_scan.iter().copied() {
                 <span class="comment">// For any object we need to scan, we count its liv bytes
-                </span><span class="attr">#[cfg(feature = <span class="string">&quot;count_live_bytes_in_gc&quot;</span>)]
+                </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
                 </span>closure
                     .worker
                     .shared
                     .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
 
                 <span class="kw">if </span>&lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::support_edge_enqueuing(tls, object) {
-                    <span class="macro">trace!</span>(<span class="string">&quot;Scan object (edge) {}&quot;</span>, object);
+                    <span class="macro">trace!</span>(<span class="string">"Scan object (edge) {}"</span>, object);
                     <span class="comment">// If an object supports edge-enqueuing, we enqueue its edges.
                     </span>&lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_object(tls, object, <span class="kw-2">&amp;mut </span>closure);
                     <span class="self">self</span>.post_scan_object(object);
@@ -2060,7 +2062,7 @@
             object_tracer_context.with_tracer(worker, |object_tracer| {
                 <span class="comment">// Scan objects and trace their edges at the same time.
                 </span><span class="kw">for </span>object <span class="kw">in </span>scan_later.iter().copied() {
-                    <span class="macro">trace!</span>(<span class="string">&quot;Scan object (node) {}&quot;</span>, object);
+                    <span class="macro">trace!</span>(<span class="string">"Scan object (node) {}"</span>, object);
                     &lt;VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_object_and_trace_edges(
                         tls,
                         object,
@@ -2077,7 +2079,7 @@
 /// edge-enqueuing, this work packet also processes the edges.
 ///
 /// This work packet does not execute policy-specific post-scanning hooks
-/// (it won&#39;t call `post_scan_object()` in [`policy::gc_work::PolicyTraceObject`]).
+/// (it won't call `post_scan_object()` in [`policy::gc_work::PolicyTraceObject`]).
 /// It should be used only for policies that do not perform policy-specific actions when scanning
 /// an object.
 </span><span class="kw">pub struct </span>ScanObjects&lt;Edges: ProcessEdgesWork&gt; {
@@ -2116,10 +2118,10 @@
 }
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>ScanObjects&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;ScanObjects&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"ScanObjects"</span>);
         <span class="self">self</span>.do_work_common(<span class="kw-2">&amp;</span><span class="self">self</span>.buffer, worker, mmtk);
-        <span class="macro">trace!</span>(<span class="string">&quot;ScanObjects End&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"ScanObjects End"</span>);
     }
 }
 
@@ -2135,7 +2137,7 @@
     P: Plan&lt;VM = VM&gt; + PlanTraceObject&lt;VM&gt;,
     <span class="kw">const </span>KIND: TraceKind,
 &gt; {
-    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>P,
+    plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>P,
     base: ProcessEdgesBase&lt;VM&gt;,
 }
 
@@ -2148,7 +2150,7 @@
     <span class="kw">fn </span>new(
         edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
         roots: bool,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
@@ -2202,7 +2204,7 @@
 <span class="doccomment">/// This is an alternative to `ScanObjects` that calls the `post_scan_object` of the policy
 /// selected by the plan.  It is applicable to plans that derive `PlanTraceObject`.
 </span><span class="kw">pub struct </span>PlanScanObjects&lt;E: ProcessEdgesWork, P: Plan&lt;VM = E::VM&gt; + PlanTraceObject&lt;E::VM&gt;&gt; {
-    plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>P,
+    plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>P,
     buffer: Vec&lt;ObjectReference&gt;,
     <span class="attr">#[allow(dead_code)]
     </span>concurrent: bool,
@@ -2212,7 +2214,7 @@
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork, P: Plan&lt;VM = E::VM&gt; + PlanTraceObject&lt;E::VM&gt;&gt; PlanScanObjects&lt;E, P&gt; {
     <span class="kw">pub fn </span>new(
-        plan: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>P,
+        plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>P,
         buffer: Vec&lt;ObjectReference&gt;,
         concurrent: bool,
         bucket: WorkBucketStage,
@@ -2248,10 +2250,10 @@
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork, P: Plan&lt;VM = E::VM&gt; + PlanTraceObject&lt;E::VM&gt;&gt; GCWork&lt;E::VM&gt;
     <span class="kw">for </span>PlanScanObjects&lt;E, P&gt;
 {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;E::VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;PlanScanObjects&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"PlanScanObjects"</span>);
         <span class="self">self</span>.do_work_common(<span class="kw-2">&amp;</span><span class="self">self</span>.buffer, worker, mmtk);
-        <span class="macro">trace!</span>(<span class="string">&quot;PlanScanObjects End&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"PlanScanObjects End"</span>);
     }
 }
 
@@ -2284,10 +2286,10 @@
 <span class="kw">impl</span>&lt;VM: VMBinding, I: ProcessEdgesWork&lt;VM = VM&gt;, E: ProcessEdgesWork&lt;VM = VM&gt;&gt; GCWork&lt;VM&gt;
     <span class="kw">for </span>ProcessRootNode&lt;VM, I, E&gt;
 {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;VM&gt;) {
-        <span class="macro">trace!</span>(<span class="string">&quot;ProcessRootNode&quot;</span>);
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="macro">trace!</span>(<span class="string">"ProcessRootNode"</span>);
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;sanity&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
         </span>{
             <span class="kw">if </span>!mmtk.is_in_sanity() {
                 mmtk.sanity_checker
@@ -2302,7 +2304,7 @@
         // This step conceptually traces the edges from root slots to the objects they point to.
         // However, VMs that deliver root objects instead of root edges are incapable of updating
         // root slots.  Like processing an edge, we call `trace_object` on those objects, and
-        // assert the GC doesn&#39;t move those objects because we cannot store back to the slots.
+        // assert the GC doesn't move those objects because we cannot store back to the slots.
         //
         // The `scanned_root_objects` variable will hold those root
         // objects which are traced for the first time and we create work for scanning those roots.
@@ -2316,7 +2318,7 @@
                 <span class="kw">let </span>new_object = process_edges_work.trace_object(object);
                 <span class="macro">debug_assert_eq!</span>(
                     object, new_object,
-                    <span class="string">&quot;Object moved while tracing root unmovable root object: {} -&gt; {}&quot;</span>,
+                    <span class="string">"Object moved while tracing root unmovable root object: {} -&gt; {}"</span>,
                     object, new_object
                 );
             }
@@ -2330,7 +2332,7 @@
         <span class="kw">let </span>work = process_edges_work.create_scan_work(scanned_root_objects);
         <span class="kw">crate</span>::memory_manager::add_work_packet(mmtk, <span class="self">self</span>.bucket, work);
 
-        <span class="macro">trace!</span>(<span class="string">&quot;ProcessRootNode End&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">"ProcessRootNode End"</span>);
     }
 }
 
@@ -2344,13 +2346,13 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; Deref <span class="kw">for </span>UnsupportedProcessEdges&lt;VM&gt; {
     <span class="kw">type </span>Target = ProcessEdgesBase&lt;VM&gt;;
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
-        <span class="macro">panic!</span>(<span class="string">&quot;unsupported!&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"unsupported!"</span>)
     }
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; DerefMut <span class="kw">for </span>UnsupportedProcessEdges&lt;VM&gt; {
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
-        <span class="macro">panic!</span>(<span class="string">&quot;unsupported!&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"unsupported!"</span>)
     }
 }
 
@@ -2362,18 +2364,18 @@
     <span class="kw">fn </span>new(
         _edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
         _roots: bool,
-        _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MMTK&lt;<span class="self">Self</span>::VM&gt;,
+        _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;<span class="self">Self</span>::VM&gt;,
         _bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self </span>{
-        <span class="macro">panic!</span>(<span class="string">&quot;unsupported!&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"unsupported!"</span>)
     }
 
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _object: ObjectReference) -&gt; ObjectReference {
-        <span class="macro">panic!</span>(<span class="string">&quot;unsupported!&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"unsupported!"</span>)
     }
 
     <span class="kw">fn </span>create_scan_work(<span class="kw-2">&amp;</span><span class="self">self</span>, _nodes: Vec&lt;ObjectReference&gt;) -&gt; <span class="self">Self</span>::ScanObjectsWorkType {
-        <span class="macro">panic!</span>(<span class="string">&quot;unsupported!&quot;</span>)
+        <span class="macro">panic!</span>(<span class="string">"unsupported!"</span>)
     }
 }
 </code></pre></div></section></main></body></html>

@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/generational/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../../source-files.js"></script><script defer src="../../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/plan/generational/global.rs`."><title>global.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../../src-files.js"></script><script defer src="../../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -384,7 +386,7 @@
     <span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>nursery = CopySpace::new(
             args.get_space_args(
-                <span class="string">&quot;nursery&quot;</span>,
+                <span class="string">"nursery"</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), <span class="bool-val">false</span>),
             ),
@@ -393,7 +395,7 @@
         <span class="kw">let </span>full_heap_gc_count = args
             .global_args
             .stats
-            .new_event_counter(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
+            .new_event_counter(<span class="string">"majorGC"</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
         <span class="kw">let </span>common = CommonPlan::new(args);
 
         CommonGenPlan {
@@ -426,7 +428,7 @@
 
     <span class="doccomment">/// Independent of how many pages remain in the page budget (a function of heap size), we must
     /// ensure we never exhaust virtual memory. Therefore we must never let the nursery grow to the
-    /// extent that it can&#39;t be copied into the mature space.
+    /// extent that it can't be copied into the mature space.
     ///
     /// Returns `true` if the nursery has grown to the extent that it may not be able to be copied
     /// into the mature space.
@@ -448,7 +450,7 @@
         <span class="kw">let </span>max_nursery = <span class="self">self</span>.common.base.options.get_max_nursery_pages();
         <span class="kw">let </span>nursery_full = cur_nursery &gt;= max_nursery;
         <span class="macro">trace!</span>(
-            <span class="string">&quot;nursery_full = {:?} (nursery = {}, max_nursery = {})&quot;</span>,
+            <span class="string">"nursery_full = {:?} (nursery = {}, max_nursery = {})"</span>,
             nursery_full,
             cur_nursery,
             max_nursery,
@@ -485,11 +487,11 @@
     <span class="doccomment">/// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
     /// It also sets gc_full_heap based on the result.
     </span><span class="kw">pub fn </span>requires_full_heap_collection&lt;P: Plan&lt;VM = VM&gt;&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span>P) -&gt; bool {
-        <span class="comment">// Allow the same &#39;true&#39; block for if-else.
+        <span class="comment">// Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
         </span><span class="attr">#[allow(clippy::if_same_then_else, clippy::needless_bool)]
         </span><span class="kw">let </span>is_full_heap = <span class="kw">if </span><span class="kw">crate</span>::plan::generational::FULL_NURSERY_GC {
-            <span class="macro">trace!</span>(<span class="string">&quot;full heap: forced full heap&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"full heap: forced full heap"</span>);
             <span class="comment">// For barrier overhead measurements, we always do full gc in nursery collections.
             </span><span class="bool-val">true
         </span>} <span class="kw">else if </span><span class="self">self
@@ -500,7 +502,7 @@
             .load(Ordering::SeqCst)
             &amp;&amp; <span class="kw-2">*</span><span class="self">self</span>.common.base.options.full_heap_system_gc
         {
-            <span class="macro">trace!</span>(<span class="string">&quot;full heap: user triggered&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"full heap: user triggered"</span>);
             <span class="comment">// User triggered collection, and we force full heap for user triggered collection
             </span><span class="bool-val">true
         </span>} <span class="kw">else if </span><span class="self">self</span>.next_gc_full_heap.load(Ordering::SeqCst)
@@ -513,7 +515,7 @@
                 &gt; <span class="number">1
         </span>{
             <span class="macro">trace!</span>(
-                <span class="string">&quot;full heap: next_gc_full_heap = {}, cur_collection_attempts = {}&quot;</span>,
+                <span class="string">"full heap: next_gc_full_heap = {}, cur_collection_attempts = {}"</span>,
                 <span class="self">self</span>.next_gc_full_heap.load(Ordering::SeqCst),
                 <span class="self">self</span>.common
                     .base
@@ -524,10 +526,10 @@
             <span class="comment">// Forces full heap collection
             </span><span class="bool-val">true
         </span>} <span class="kw">else if </span><span class="self">Self</span>::virtual_memory_exhausted(plan.generational().unwrap()) {
-            <span class="macro">trace!</span>(<span class="string">&quot;full heap: virtual memory exhausted&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">"full heap: virtual memory exhausted"</span>);
             <span class="bool-val">true
         </span>} <span class="kw">else </span>{
-            <span class="comment">// We use an Appel-style nursery. The default GC (even for a &quot;heap-full&quot; collection)
+            <span class="comment">// We use an Appel-style nursery. The default GC (even for a "heap-full" collection)
             // for generational GCs should be a nursery GC. A full-heap GC should only happen if
             // there is not enough memory available for allocating into the nursery (i.e. the
             // available pages in the nursery are less than the minimum nursery pages), if the
@@ -538,11 +540,11 @@
         <span class="self">self</span>.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
         <span class="macro">info!</span>(
-            <span class="string">&quot;{}&quot;</span>,
+            <span class="string">"{}"</span>,
             <span class="kw">if </span>is_full_heap {
-                <span class="string">&quot;Full heap GC&quot;
+                <span class="string">"Full heap GC"
             </span>} <span class="kw">else </span>{
-                <span class="string">&quot;Nursery GC&quot;
+                <span class="string">"Nursery GC"
             </span>}
         );
 
@@ -607,7 +609,7 @@
         <span class="kw">let </span>min_nursery = plan.base().options.get_min_nursery_pages();
         <span class="kw">let </span>next_gc_full_heap = available &lt; min_nursery;
         <span class="macro">trace!</span>(
-            <span class="string">&quot;next gc will be full heap? {}, available pages = {}, min nursery = {}&quot;</span>,
+            <span class="string">"next gc will be full heap? {}, available pages = {}, min nursery = {}"</span>,
             next_gc_full_heap,
             available,
             min_nursery
@@ -664,7 +666,7 @@
     </span><span class="kw">fn </span>force_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>);
 }
 
-<span class="doccomment">/// This trait is the extension trait for [`GenerationalPlan`] (see Rust&#39;s extension trait pattern).
+<span class="doccomment">/// This trait is the extension trait for [`GenerationalPlan`] (see Rust's extension trait pattern).
 /// Generally any method should be put to [`GenerationalPlan`] if possible while keeping [`GenerationalPlan`]
 /// object safe. In this case, generic methods will be put to this extension trait.
 </span><span class="kw">pub trait </span>GenerationalPlanExt&lt;VM: VMBinding&gt;: GenerationalPlan&lt;VM = VM&gt; {

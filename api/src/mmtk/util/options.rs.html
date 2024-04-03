@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/options.rs`."><title>options.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-f3501f0f5ae15dfb.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.1 (eb26296b5 2023-08-03)" data-search-js="search-4926e5fc22a5646a.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f0540c1d82cde29b.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mmtk/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/util/options.rs`."><title>options.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+            <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1251,8 +1253,8 @@
 ///
 /// The format is
 /// ```
-/// &lt;event&gt; ::= &lt;event-name&gt; &quot;,&quot; &lt;pid&gt; &quot;,&quot; &lt;cpu&gt;
-/// &lt;events&gt; ::= &lt;event&gt; &quot;;&quot; &lt;events&gt; | &lt;event&gt; | &quot;&quot;
+/// &lt;event&gt; ::= &lt;event-name&gt; "," &lt;pid&gt; "," &lt;cpu&gt;
+/// &lt;events&gt; ::= &lt;event&gt; ";" &lt;events&gt; | &lt;event&gt; | ""
 /// ```
 </span><span class="attr">#[derive(Debug, Clone, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>PerfEventOptions {
@@ -1263,20 +1265,20 @@
 <span class="kw">impl </span>PerfEventOptions {
     <span class="kw">fn </span>parse_perf_events(events: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;(String, i32, i32)&gt;, String&gt; {
         events
-            .split(<span class="string">&#39;;&#39;</span>)
+            .split(<span class="string">';'</span>)
             .filter(|e| !e.is_empty())
             .map(|e| {
-                <span class="kw">let </span>e: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = e.split(<span class="string">&#39;,&#39;</span>).collect();
+                <span class="kw">let </span>e: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = e.split(<span class="string">','</span>).collect();
                 <span class="kw">if </span>e.len() != <span class="number">3 </span>{
-                    <span class="prelude-val">Err</span>(<span class="string">&quot;Please supply (event name, pid, cpu)&quot;</span>.into())
+                    <span class="prelude-val">Err</span>(<span class="string">"Please supply (event name, pid, cpu)"</span>.into())
                 } <span class="kw">else </span>{
                     <span class="kw">let </span>event_name = e[<span class="number">0</span>].into();
                     <span class="kw">let </span>pid = e[<span class="number">1</span>]
                         .parse()
-                        .map_err(|<span class="kw">_</span>| String::from(<span class="string">&quot;Failed to parse cpu&quot;</span>))<span class="question-mark">?</span>;
+                        .map_err(|<span class="kw">_</span>| String::from(<span class="string">"Failed to parse cpu"</span>))<span class="question-mark">?</span>;
                     <span class="kw">let </span>cpu = e[<span class="number">2</span>]
                         .parse()
-                        .map_err(|<span class="kw">_</span>| String::from(<span class="string">&quot;Failed to parse cpu&quot;</span>))<span class="question-mark">?</span>;
+                        .map_err(|<span class="kw">_</span>| String::from(<span class="string">"Failed to parse cpu"</span>))<span class="question-mark">?</span>;
                     <span class="prelude-val">Ok</span>((event_name, pid, cpu))
                 }
             })
@@ -1293,28 +1295,28 @@
 }
 
 <span class="doccomment">/// The default nursery space size.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
 </span><span class="kw">pub const </span>NURSERY_SIZE: usize = (<span class="number">1 </span>&lt;&lt; <span class="number">20</span>) &lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="doccomment">/// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
 </span><span class="kw">pub const </span>DEFAULT_MIN_NURSERY: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="doccomment">/// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
 </span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY: usize = (<span class="number">1 </span>&lt;&lt; <span class="number">20</span>) &lt;&lt; LOG_BYTES_IN_MBYTE;
 
 <span class="doccomment">/// The default nursery space size.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">pub const </span>NURSERY_SIZE: usize = <span class="number">32 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="doccomment">/// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">pub const </span>DEFAULT_MIN_NURSERY: usize = <span class="number">2 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="kw">const </span>DEFAULT_MAX_NURSERY_32: usize = <span class="number">32 </span>&lt;&lt; LOG_BYTES_IN_MBYTE;
 <span class="doccomment">/// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-</span><span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+</span><span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">pub const </span>DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
 <span class="kw">fn </span>always_valid&lt;T&gt;(<span class="kw">_</span>: <span class="kw-2">&amp;</span>T) -&gt; bool {
@@ -1353,7 +1355,7 @@
         // let is_valid = validator(&amp;value);
         // assert!(
         //     is_valid,
-        //     &quot;Unable to create MMTKOption: initial value {:?} is invalid&quot;,
+        //     "Unable to create MMTKOption: initial value {:?} is invalid",
         //     value
         // );
         </span>MMTKOption {
@@ -1387,8 +1389,8 @@
     <span class="comment">// Verify whether we can set an option through env var or command line.
     </span>(@verify_set_from(<span class="macro-nonterminal">$self</span>: expr, <span class="macro-nonterminal">$key</span>: expr, <span class="macro-nonterminal">$verify_field</span>: ident, $(<span class="macro-nonterminal">$name</span>: ident),<span class="kw-2">*</span>)) =&gt; {
         <span class="kw">match </span><span class="macro-nonterminal">$key </span>{
-            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; { <span class="macro">assert!</span>(<span class="macro-nonterminal">$self</span>.<span class="macro-nonterminal">$name</span>.<span class="macro-nonterminal">$verify_field</span>, <span class="string">&quot;cannot set option {} (not {})&quot;</span>, <span class="macro-nonterminal">$key</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$verify_field</span>)) }),*
-            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Options key: {}&quot;</span>, <span class="macro-nonterminal">$key</span>)
+            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; { <span class="macro">assert!</span>(<span class="macro-nonterminal">$self</span>.<span class="macro-nonterminal">$name</span>.<span class="macro-nonterminal">$verify_field</span>, <span class="string">"cannot set option {} (not {})"</span>, <span class="macro-nonterminal">$key</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$verify_field</span>)) }),*
+            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">"Invalid Options key: {}"</span>, <span class="macro-nonterminal">$key</span>)
         }
     };
 
@@ -1421,8 +1423,8 @@
             /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
             /// or `threads=1,stress_factor=4096`
             </span><span class="kw">pub fn </span>set_bulk_from_command_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
-                <span class="kw">for </span>opt <span class="kw">in </span>options.replace(<span class="string">&quot;,&quot;</span>, <span class="string">&quot; &quot;</span>).split_ascii_whitespace() {
-                    <span class="kw">let </span>kv_pair: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = opt.split(<span class="string">&#39;=&#39;</span>).collect();
+                <span class="kw">for </span>opt <span class="kw">in </span>options.replace(<span class="string">","</span>, <span class="string">" "</span>).split_ascii_whitespace() {
+                    <span class="kw">let </span>kv_pair: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = opt.split(<span class="string">'='</span>).collect();
                     <span class="kw">if </span>kv_pair.len() != <span class="number">2 </span>{
                         <span class="kw">return </span><span class="bool-val">false</span>;
                     }
@@ -1444,14 +1446,14 @@
                     </span>$(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$name</span>) =&gt; <span class="kw">if let </span><span class="prelude-val">Ok</span>(typed_val) = val.parse::&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt;() {
                         <span class="kw">let </span><span class="macro-nonterminal">is_set </span>= <span class="self">self</span>.<span class="macro-nonterminal">$name</span>.set(typed_val);
                         <span class="kw">if </span>!is_set {
-                            <span class="macro">eprintln!</span>(<span class="string">&quot;Warn: unable to set {}={:?}. Invalid value. Default value will be used.&quot;</span>, s, val);
+                            <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Invalid value. Default value will be used."</span>, s, val);
                         }
                         is_set
                     } <span class="kw">else </span>{
-                        <span class="macro">eprintln!</span>(<span class="string">&quot;Warn: unable to set {}={:?}. Can&#39;t parse value. Default value will be used.&quot;</span>, s, val);
+                        <span class="macro">eprintln!</span>(<span class="string">"Warn: unable to set {}={:?}. Can't parse value. Default value will be used."</span>, s, val);
                         <span class="bool-val">false
                     </span>})*
-                    <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Options key: {}&quot;</span>, s)
+                    <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">"Invalid Options key: {}"</span>, s)
                 }
             }
 
@@ -1467,7 +1469,7 @@
             /// If we have environment variables that start with `MMTK_` and match any option (such
             /// as `MMTK_STRESS_FACTOR`), we set the option to its value (if it is a valid value).
             </span><span class="kw">pub fn </span>read_env_var_settings(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-                <span class="kw">const </span>PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">&quot;MMTK_&quot;</span>;
+                <span class="kw">const </span>PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">"MMTK_"</span>;
                 <span class="kw">for </span>(key, val) <span class="kw">in </span>std::env::vars() {
                     <span class="comment">// strip the prefix, and get the lower case string
                     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(rest_of_key) = key.strip_prefix(PREFIX) {
@@ -1516,9 +1518,9 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(AffinityKind::OsDefault);
         }
 
-        <span class="comment">// Split on &#39;,&#39; first and then split on &#39;-&#39; if there is a range
-        </span><span class="kw">for </span>split <span class="kw">in </span>cpulist.split(<span class="string">&#39;,&#39;</span>) {
-            <span class="kw">if </span>!split.contains(<span class="string">&#39;-&#39;</span>) {
+        <span class="comment">// Split on ',' first and then split on '-' if there is a range
+        </span><span class="kw">for </span>split <span class="kw">in </span>cpulist.split(<span class="string">','</span>) {
+            <span class="kw">if </span>!split.contains(<span class="string">'-'</span>) {
                 <span class="kw">if </span>!split.is_empty() {
                     <span class="kw">if let </span><span class="prelude-val">Ok</span>(core) = split.parse::&lt;u16&gt;() {
                         cpuset.push(core);
@@ -1529,13 +1531,13 @@
                 }
             } <span class="kw">else </span>{
                 <span class="comment">// Contains a range
-                </span><span class="kw">let </span>range: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = split.split(<span class="string">&#39;-&#39;</span>).collect();
+                </span><span class="kw">let </span>range: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = split.split(<span class="string">'-'</span>).collect();
                 <span class="kw">if </span>range.len() == <span class="number">2 </span>{
                     <span class="kw">if let </span><span class="prelude-val">Ok</span>(start) = range[<span class="number">0</span>].parse::&lt;u16&gt;() {
                         <span class="kw">if let </span><span class="prelude-val">Ok</span>(end) = range[<span class="number">1</span>].parse::&lt;u16&gt;() {
                             <span class="kw">if </span>start &gt;= end {
                                 <span class="kw">return </span><span class="prelude-val">Err</span>(
-                                    <span class="string">&quot;Starting core id in range should be less than the end&quot;
+                                    <span class="string">"Starting core id in range should be less than the end"
                                         </span>.to_string(),
                                 );
                             }
@@ -1552,7 +1554,7 @@
                 }
             }
 
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Core ids have been incorrectly specified&quot;</span>.to_string());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"Core ids have been incorrectly specified"</span>.to_string());
         }
 
         <span class="prelude-val">Ok</span>(AffinityKind::RoundRobin(cpuset))
@@ -1588,7 +1590,7 @@
 </span><span class="doccomment">/// Different nursery types.
 </span><span class="kw">pub enum </span>NurseryKind {
     <span class="doccomment">/// A Bounded nursery has different upper and lower bounds. The size only controls the upper
-    /// bound. Hence, it is considered to be a &quot;variable size&quot; nursery. By default, a Bounded
+    /// bound. Hence, it is considered to be a "variable size" nursery. By default, a Bounded
     /// nursery has a lower bound of 2 MB and an upper bound of 32 MB for 32-bit systems and 1 TB
     /// for 64-bit systems.
     </span>Bounded,
@@ -1632,13 +1634,13 @@
     /// `&lt;NurseryKind&gt;:&lt;size in bytes&gt;`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
     /// 8192 bytes.
     </span><span class="kw">pub fn </span>parse(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;NurserySize, String&gt; {
-        <span class="kw">let </span>ns: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = s.split(<span class="string">&#39;:&#39;</span>).collect();
+        <span class="kw">let </span>ns: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = s.split(<span class="string">':'</span>).collect();
         <span class="kw">let </span>kind = ns[<span class="number">0</span>].parse::&lt;NurseryKind&gt;().map_err(|<span class="kw">_</span>| {
-            String::from(<span class="string">&quot;Please specify one of \&quot;Bounded\&quot; or \&quot;Fixed\&quot; nursery type&quot;</span>)
+            String::from(<span class="string">"Please specify one of \"Bounded\" or \"Fixed\" nursery type"</span>)
         })<span class="question-mark">?</span>;
         <span class="kw">let </span>value = ns[<span class="number">1</span>]
             .parse()
-            .map_err(|<span class="kw">_</span>| String::from(<span class="string">&quot;Failed to parse size&quot;</span>))<span class="question-mark">?</span>;
+            .map_err(|<span class="kw">_</span>| String::from(<span class="string">"Failed to parse size"</span>))<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(NurserySize::new(kind, <span class="prelude-val">Some</span>(value)))
     }
 }
@@ -1709,7 +1711,7 @@
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::FixedHeapSize(s) =&gt; <span class="kw-2">*</span>s,
             <span class="self">Self</span>::DynamicHeapSize(<span class="kw">_</span>, s) =&gt; <span class="kw-2">*</span>s,
-            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;Cannot get max heap size&quot;</span>),
+            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">"Cannot get max heap size"</span>),
         }
     }
 
@@ -1722,26 +1724,26 @@
             <span class="kw">let </span>num = s[<span class="number">0</span>..s.len() - <span class="number">1</span>]
                 .parse::&lt;u64&gt;()
                 .map_err(|e| e.to_string())<span class="question-mark">?</span>;
-            <span class="kw">let </span>size = <span class="kw">if </span>s.ends_with(<span class="string">&#39;k&#39;</span>) {
+            <span class="kw">let </span>size = <span class="kw">if </span>s.ends_with(<span class="string">'k'</span>) {
                 num.checked_mul(<span class="self">Self</span>::K)
-            } <span class="kw">else if </span>s.ends_with(<span class="string">&#39;m&#39;</span>) {
+            } <span class="kw">else if </span>s.ends_with(<span class="string">'m'</span>) {
                 num.checked_mul(<span class="self">Self</span>::M)
-            } <span class="kw">else if </span>s.ends_with(<span class="string">&#39;g&#39;</span>) {
+            } <span class="kw">else if </span>s.ends_with(<span class="string">'g'</span>) {
                 num.checked_mul(<span class="self">Self</span>::G)
-            } <span class="kw">else if </span>s.ends_with(<span class="string">&#39;t&#39;</span>) {
+            } <span class="kw">else if </span>s.ends_with(<span class="string">'t'</span>) {
                 num.checked_mul(<span class="self">Self</span>::T)
             } <span class="kw">else </span>{
                 <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">format!</span>(
-                    <span class="string">&quot;Unknown size descriptor: {:?}&quot;</span>,
+                    <span class="string">"Unknown size descriptor: {:?}"</span>,
                     <span class="kw-2">&amp;</span>s[(s.len() - <span class="number">1</span>)..]
                 ));
             };
 
             <span class="kw">if let </span><span class="prelude-val">Some</span>(size) = size {
                 size.try_into()
-                    .map_err(|<span class="kw">_</span>| <span class="macro">format!</span>(<span class="string">&quot;size overflow: {}&quot;</span>, size))
+                    .map_err(|<span class="kw">_</span>| <span class="macro">format!</span>(<span class="string">"size overflow: {}"</span>, size))
             } <span class="kw">else </span>{
-                <span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;size overflow: {}&quot;</span>, s))
+                <span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"size overflow: {}"</span>, s))
             }
         } <span class="kw">else </span>{
             s.parse::&lt;usize&gt;().map_err(|e| e.to_string())
@@ -1765,27 +1767,27 @@
         <span class="kw">use </span>regex::Regex;
         <span class="macro">lazy_static! </span>{
             <span class="kw">static </span><span class="kw-2">ref </span>FIXED_HEAP_REGEX: Regex =
-                Regex::new(<span class="string">r&quot;^FixedHeapSize:(?P&lt;size&gt;\d+[kKmMgGtT]?)$&quot;</span>).unwrap();
+                Regex::new(<span class="string">r"^FixedHeapSize:(?P&lt;size&gt;\d+[kKmMgGtT]?)$"</span>).unwrap();
             <span class="kw">static </span><span class="kw-2">ref </span>DYNAMIC_HEAP_REGEX: Regex =
-                Regex::new(<span class="string">r&quot;^DynamicHeapSize:(?P&lt;min&gt;\d+[kKmMgGtT]?),(?P&lt;max&gt;\d+[kKmMgGtT]?)$&quot;</span>)
+                Regex::new(<span class="string">r"^DynamicHeapSize:(?P&lt;min&gt;\d+[kKmMgGtT]?),(?P&lt;max&gt;\d+[kKmMgGtT]?)$"</span>)
                     .unwrap();
         }
 
         <span class="kw">if </span>s.is_empty() {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No GC trigger policy is supplied&quot;</span>.to_string());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">"No GC trigger policy is supplied"</span>.to_string());
         }
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(captures) = FIXED_HEAP_REGEX.captures(s) {
-            <span class="kw">return </span><span class="self">Self</span>::parse_size(<span class="kw-2">&amp;</span>captures[<span class="string">&quot;size&quot;</span>]).map(<span class="self">Self</span>::FixedHeapSize);
+            <span class="kw">return </span><span class="self">Self</span>::parse_size(<span class="kw-2">&amp;</span>captures[<span class="string">"size"</span>]).map(<span class="self">Self</span>::FixedHeapSize);
         } <span class="kw">else if let </span><span class="prelude-val">Some</span>(captures) = DYNAMIC_HEAP_REGEX.captures(s) {
-            <span class="kw">let </span>min = <span class="self">Self</span>::parse_size(<span class="kw-2">&amp;</span>captures[<span class="string">&quot;min&quot;</span>])<span class="question-mark">?</span>;
-            <span class="kw">let </span>max = <span class="self">Self</span>::parse_size(<span class="kw-2">&amp;</span>captures[<span class="string">&quot;max&quot;</span>])<span class="question-mark">?</span>;
+            <span class="kw">let </span>min = <span class="self">Self</span>::parse_size(<span class="kw-2">&amp;</span>captures[<span class="string">"min"</span>])<span class="question-mark">?</span>;
+            <span class="kw">let </span>max = <span class="self">Self</span>::parse_size(<span class="kw-2">&amp;</span>captures[<span class="string">"max"</span>])<span class="question-mark">?</span>;
             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::DynamicHeapSize(min, max));
-        } <span class="kw">else if </span>s.starts_with(<span class="string">&quot;Delegated&quot;</span>) {
+        } <span class="kw">else if </span>s.starts_with(<span class="string">"Delegated"</span>) {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Delegated);
         }
 
-        <span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Failed to parse the GC trigger option: {:?}&quot;</span>, s))
+        <span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">"Failed to parse the GC trigger option: {:?}"</span>, s))
     }
 }
 
@@ -1796,84 +1798,84 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_parse_size() {
         <span class="comment">// correct cases
-        </span><span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;0&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">0</span>));
-        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;1K&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">1024</span>));
-        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;1k&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">1024</span>));
-        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;2M&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024</span>));
-        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;2m&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024</span>));
+        </span><span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">"0"</span>), <span class="prelude-val">Ok</span>(<span class="number">0</span>));
+        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">"1K"</span>), <span class="prelude-val">Ok</span>(<span class="number">1024</span>));
+        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">"1k"</span>), <span class="prelude-val">Ok</span>(<span class="number">1024</span>));
+        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">"2M"</span>), <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024</span>));
+        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">"2m"</span>), <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024</span>));
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::parse_size(<span class="string">&quot;2G&quot;</span>),
+            GCTriggerSelector::parse_size(<span class="string">"2G"</span>),
             <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024</span>)
         );
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::parse_size(<span class="string">&quot;2g&quot;</span>),
+            GCTriggerSelector::parse_size(<span class="string">"2g"</span>),
             <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024</span>)
         );
-        <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+        <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
         </span><span class="macro">assert_eq!</span>(
-            GCTriggerSelector::parse_size(<span class="string">&quot;2T&quot;</span>),
+            GCTriggerSelector::parse_size(<span class="string">"2T"</span>),
             <span class="prelude-val">Ok</span>(<span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024</span>)
         );
 
         <span class="comment">// empty
         </span><span class="macro">assert_eq!</span>(
-            GCTriggerSelector::parse_size(<span class="string">&quot;&quot;</span>),
-            <span class="prelude-val">Err</span>(<span class="string">&quot;cannot parse integer from empty string&quot;</span>.to_string())
+            GCTriggerSelector::parse_size(<span class="string">""</span>),
+            <span class="prelude-val">Err</span>(<span class="string">"cannot parse integer from empty string"</span>.to_string())
         );
 
         <span class="comment">// negative number - we dont care about actual error message
-        </span><span class="macro">assert!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;-1&quot;</span>).is_err());
+        </span><span class="macro">assert!</span>(GCTriggerSelector::parse_size(<span class="string">"-1"</span>).is_err());
 
         <span class="comment">// no number
-        </span><span class="macro">assert!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;k&quot;</span>).is_err());
+        </span><span class="macro">assert!</span>(GCTriggerSelector::parse_size(<span class="string">"k"</span>).is_err());
     }
 
     <span class="attr">#[test]
-    #[cfg(target_pointer_width = <span class="string">&quot;32&quot;</span>)]
+    #[cfg(target_pointer_width = <span class="string">"32"</span>)]
     </span><span class="kw">fn </span>test_parse_overflow_size() {
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::parse_size(<span class="string">&quot;4G&quot;</span>),
-            <span class="prelude-val">Err</span>(<span class="string">&quot;size overflow: 4294967296&quot;</span>.to_string())
+            GCTriggerSelector::parse_size(<span class="string">"4G"</span>),
+            <span class="prelude-val">Err</span>(<span class="string">"size overflow: 4294967296"</span>.to_string())
         );
-        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">&quot;4294967295&quot;</span>), <span class="prelude-val">Ok</span>(<span class="number">4294967295</span>));
+        <span class="macro">assert_eq!</span>(GCTriggerSelector::parse_size(<span class="string">"4294967295"</span>), <span class="prelude-val">Ok</span>(<span class="number">4294967295</span>));
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_parse_fixed_heap() {
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::from_str(<span class="string">&quot;FixedHeapSize:1024&quot;</span>),
+            GCTriggerSelector::from_str(<span class="string">"FixedHeapSize:1024"</span>),
             <span class="prelude-val">Ok</span>(GCTriggerSelector::FixedHeapSize(<span class="number">1024</span>))
         );
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::from_str(<span class="string">&quot;FixedHeapSize:4m&quot;</span>),
+            GCTriggerSelector::from_str(<span class="string">"FixedHeapSize:4m"</span>),
             <span class="prelude-val">Ok</span>(GCTriggerSelector::FixedHeapSize(<span class="number">4 </span>* <span class="number">1024 </span>* <span class="number">1024</span>))
         );
-        <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+        <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
         </span><span class="macro">assert_eq!</span>(
-            GCTriggerSelector::from_str(<span class="string">&quot;FixedHeapSize:4t&quot;</span>),
+            GCTriggerSelector::from_str(<span class="string">"FixedHeapSize:4t"</span>),
             <span class="prelude-val">Ok</span>(GCTriggerSelector::FixedHeapSize(
                 <span class="number">4 </span>* <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024 </span>* <span class="number">1024
             </span>))
         );
 
         <span class="comment">// incorrect
-        </span><span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">&quot;FixedHeapSize&quot;</span>).is_err());
-        <span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">&quot;FixedHeapSize:&quot;</span>).is_err());
-        <span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">&quot;FixedHeapSize:-1&quot;</span>).is_err());
+        </span><span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">"FixedHeapSize"</span>).is_err());
+        <span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">"FixedHeapSize:"</span>).is_err());
+        <span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">"FixedHeapSize:-1"</span>).is_err());
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_parse_dynamic_heap() {
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::from_str(<span class="string">&quot;DynamicHeapSize:1024,2048&quot;</span>),
+            GCTriggerSelector::from_str(<span class="string">"DynamicHeapSize:1024,2048"</span>),
             <span class="prelude-val">Ok</span>(GCTriggerSelector::DynamicHeapSize(<span class="number">1024</span>, <span class="number">2048</span>))
         );
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::from_str(<span class="string">&quot;DynamicHeapSize:1024,1024&quot;</span>),
+            GCTriggerSelector::from_str(<span class="string">"DynamicHeapSize:1024,1024"</span>),
             <span class="prelude-val">Ok</span>(GCTriggerSelector::DynamicHeapSize(<span class="number">1024</span>, <span class="number">1024</span>))
         );
         <span class="macro">assert_eq!</span>(
-            GCTriggerSelector::from_str(<span class="string">&quot;DynamicHeapSize:1m,2m&quot;</span>),
+            GCTriggerSelector::from_str(<span class="string">"DynamicHeapSize:1m,2m"</span>),
             <span class="prelude-val">Ok</span>(GCTriggerSelector::DynamicHeapSize(
                 <span class="number">1024 </span>* <span class="number">1024</span>,
                 <span class="number">2 </span>* <span class="number">1024 </span>* <span class="number">1024
@@ -1881,7 +1883,7 @@
         );
 
         <span class="comment">// incorrect
-        </span><span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">&quot;DynamicHeapSize:1024,1024,&quot;</span>).is_err());
+        </span><span class="macro">assert!</span>(GCTriggerSelector::from_str(<span class="string">"DynamicHeapSize:1024,1024,"</span>).is_err());
     }
 
     <span class="attr">#[test]
@@ -1915,7 +1917,7 @@
     </span>ignore_system_gc:      bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
     <span class="doccomment">/// The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
     /// Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
-    /// both the upper and lower bounds. The nursery size can be set like &#39;Fixed:8192&#39;, for example,
+    /// both the upper and lower bounds. The nursery size can be set like 'Fixed:8192', for example,
     /// to have a Fixed nursery size of 8192 bytes
     </span><span class="comment">// FIXME: This is not a good way to have conflicting options -- we should refactor this
     </span>nursery:               NurserySize          [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>NurserySize| v.min &gt; <span class="number">0 </span>&amp;&amp; v.max.map(|max| max &gt; <span class="number">0 </span>&amp;&amp; max &gt;= v.min).unwrap_or(<span class="bool-val">true</span>)]
@@ -1951,14 +1953,14 @@
     /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
     /// For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
     /// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
-    </span><span class="comment">// TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; and &#39;work_packet_stats&#39; are enabled. The current macro does not allow us to do this.
-    </span>work_perf_events:       PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(all(feature = <span class="string">&quot;perf_counter&quot;</span>, feature = <span class="string">&quot;work_packet_stats&quot;</span>))] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
+    </span><span class="comment">// TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
+    </span>work_perf_events:       PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(all(feature = <span class="string">"perf_counter"</span>, feature = <span class="string">"work_packet_stats"</span>))] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
     <span class="doccomment">/// Measuring perf events for GC and mutators
-    </span><span class="comment">// TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; are enabled. The current macro does not allow us to do this.
-    </span>phase_perf_events:      PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">&quot;perf_counter&quot;</span>)] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
+    </span><span class="comment">// TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
+    </span>phase_perf_events:      PerfEventOptions     [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">"perf_counter"</span>)] = PerfEventOptions {events: <span class="macro">vec!</span>[]},
     <span class="doccomment">/// Should we exclude perf events occurring in kernel space. By default we include the kernel.
     /// Only set this option if you know the implications of excluding the kernel!
-    </span>perf_exclude_kernel:    bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">&quot;perf_counter&quot;</span>)] = <span class="bool-val">false</span>,
+    </span>perf_exclude_kernel:    bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|<span class="kw">_</span>| <span class="macro">cfg!</span>(feature = <span class="string">"perf_counter"</span>)] = <span class="bool-val">false</span>,
     <span class="doccomment">/// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
     /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
     /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
@@ -1967,9 +1969,9 @@
     /// Note that in the case the program has only been allocated a certain number of cores using
     /// `taskset`, the core ids in the list should be specified by their perceived index as using
     /// `taskset` will essentially re-label the core ids. For example, running the program with
-    /// `MMTK_THREAD_AFFINITY=&quot;0-4&quot; taskset -c 6-12 &lt;program&gt;` means that the cores 6,7,8,9,10 will
-    /// be used to pin threads even though we specified the core ids &quot;0,1,2,3,4&quot;.
-    /// `MMTK_THREAD_AFFINITY=&quot;12&quot; taskset -c 6-12 &lt;program&gt;` will not work, on the other hand, as
+    /// `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 &lt;program&gt;` means that the cores 6,7,8,9,10 will
+    /// be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 &lt;program&gt;` will not work, on the other hand, as
     /// there is no core with (perceived) id 12.
     </span><span class="comment">// XXX: This option is currently only supported on Linux.
     </span>thread_affinity:        AffinityKind         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>AffinityKind| v.validate()] = AffinityKind::OsDefault,
@@ -1977,7 +1979,7 @@
     /// Default to a fixed heap size of 0.5x physical memory.
     </span>gc_trigger:             GCTriggerSelector    [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
     <span class="doccomment">/// Enable transparent hugepage support via madvise (only Linux is supported)
-    </span>transparent_hugepages: bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">&quot;linux&quot;</span>)] = <span class="bool-val">false
+    </span>transparent_hugepages: bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">"linux"</span>)] = <span class="bool-val">false
 </span>}
 
 <span class="attr">#[cfg(test)]
@@ -2001,14 +2003,14 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;4096&quot;</span>);
+                    std::env::set_var(<span class="string">"MMTK_STRESS_FACTOR"</span>, <span class="string">"4096"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">4096</span>);
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_STRESS_FACTOR"</span>);
                 },
             )
         })
@@ -2019,8 +2021,8 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;4096&quot;</span>);
-                    std::env::set_var(<span class="string">&quot;MMTK_NO_FINALIZER&quot;</span>, <span class="string">&quot;true&quot;</span>);
+                    std::env::set_var(<span class="string">"MMTK_STRESS_FACTOR"</span>, <span class="string">"4096"</span>);
+                    std::env::set_var(<span class="string">"MMTK_NO_FINALIZER"</span>, <span class="string">"true"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
@@ -2028,8 +2030,8 @@
                     <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
-                    std::env::remove_var(<span class="string">&quot;MMTK_NO_FINALIZER&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_STRESS_FACTOR"</span>);
+                    std::env::remove_var(<span class="string">"MMTK_NO_FINALIZER"</span>);
                 },
             )
         })
@@ -2041,14 +2043,14 @@
             with_cleanup(
                 || {
                     <span class="comment">// invalid value, we cannot parse the value, so use the default value
-                    </span>std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;abc&quot;</span>);
+                    </span>std::env::set_var(<span class="string">"MMTK_STRESS_FACTOR"</span>, <span class="string">"abc"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_STRESS_FACTOR"</span>);
                 },
             )
         })
@@ -2060,14 +2062,14 @@
             with_cleanup(
                 || {
                     <span class="comment">// invalid value, we cannot parse the value, so use the default value
-                    </span>std::env::set_var(<span class="string">&quot;MMTK_ABC&quot;</span>, <span class="string">&quot;42&quot;</span>);
+                    </span>std::env::set_var(<span class="string">"MMTK_ABC"</span>, <span class="string">"42"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_ABC&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_ABC"</span>);
                 },
             )
         })
@@ -2078,14 +2080,14 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;42&quot;</span>);
+                    std::env::set_var(<span class="string">"MMTK_STRESS_FACTOR"</span>, <span class="string">"42"</span>);
 
                     <span class="kw">let </span>options = Options::default();
                     <span class="comment">// Not calling read_env_var_settings here.
                     </span><span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_STRESS_FACTOR"</span>);
                 },
             )
         })
@@ -2103,37 +2105,37 @@
     }
 
     <span class="attr">#[test]
-    #[cfg(all(feature = <span class="string">&quot;perf_counter&quot;</span>, feature = <span class="string">&quot;work_packet_stats&quot;</span>))]
+    #[cfg(all(feature = <span class="string">"perf_counter"</span>, feature = <span class="string">"work_packet_stats"</span>))]
     </span><span class="kw">fn </span>test_work_perf_events_option_from_env_var() {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var(<span class="string">&quot;MMTK_WORK_PERF_EVENTS&quot;</span>, <span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES,0,-1&quot;</span>);
+                    std::env::set_var(<span class="string">"MMTK_WORK_PERF_EVENTS"</span>, <span class="string">"PERF_COUNT_HW_CPU_CYCLES,0,-1"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(
                         <span class="kw-2">*</span>options.work_perf_events,
                         PerfEventOptions {
-                            events: <span class="macro">vec!</span>[(<span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES&quot;</span>.into(), <span class="number">0</span>, -<span class="number">1</span>)]
+                            events: <span class="macro">vec!</span>[(<span class="string">"PERF_COUNT_HW_CPU_CYCLES"</span>.into(), <span class="number">0</span>, -<span class="number">1</span>)]
                         }
                     );
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_WORK_PERF_EVENTS&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_WORK_PERF_EVENTS"</span>);
                 },
             )
         })
     }
 
     <span class="attr">#[test]
-    #[cfg(all(feature = <span class="string">&quot;perf_counter&quot;</span>, feature = <span class="string">&quot;work_packet_stats&quot;</span>))]
+    #[cfg(all(feature = <span class="string">"perf_counter"</span>, feature = <span class="string">"work_packet_stats"</span>))]
     </span><span class="kw">fn </span>test_invalid_work_perf_events_option_from_env_var() {
         serial_test(|| {
             with_cleanup(
                 || {
-                    <span class="comment">// The option needs to start with &quot;hello&quot;, otherwise it is invalid.
-                    </span>std::env::set_var(<span class="string">&quot;MMTK_WORK_PERF_EVENTS&quot;</span>, <span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES&quot;</span>);
+                    <span class="comment">// The option needs to start with "hello", otherwise it is invalid.
+                    </span>std::env::set_var(<span class="string">"MMTK_WORK_PERF_EVENTS"</span>, <span class="string">"PERF_COUNT_HW_CPU_CYCLES"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
@@ -2144,20 +2146,20 @@
                     );
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_WORK_PERF_EVENTS&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_WORK_PERF_EVENTS"</span>);
                 },
             )
         })
     }
 
     <span class="attr">#[test]
-    #[cfg(not(feature = <span class="string">&quot;perf_counter&quot;</span>))]
+    #[cfg(not(feature = <span class="string">"perf_counter"</span>))]
     </span><span class="kw">fn </span>test_phase_perf_events_option_without_feature() {
         serial_test(|| {
             with_cleanup(
                 || {
                     <span class="comment">// We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
-                    </span>std::env::set_var(<span class="string">&quot;MMTK_PHASE_PERF_EVENTS&quot;</span>, <span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES,0,-1&quot;</span>);
+                    </span>std::env::set_var(<span class="string">"MMTK_PHASE_PERF_EVENTS"</span>, <span class="string">"PERF_COUNT_HW_CPU_CYCLES,0,-1"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
@@ -2168,7 +2170,7 @@
                     );
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_PHASE_PERF_EVENTS&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_PHASE_PERF_EVENTS"</span>);
                 },
             )
         })
@@ -2179,7 +2181,7 @@
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>, <span class="string">&quot;0-&quot;</span>);
+                    std::env::set_var(<span class="string">"MMTK_THREAD_AFFINITY"</span>, <span class="string">"0-"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
@@ -2187,19 +2189,19 @@
                     </span><span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.thread_affinity, AffinityKind::OsDefault);
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_THREAD_AFFINITY"</span>);
                 },
             )
         })
     }
 
-    <span class="attr">#[cfg(target_os = <span class="string">&quot;linux&quot;</span>)]
+    <span class="attr">#[cfg(target_os = <span class="string">"linux"</span>)]
     #[test]
     </span><span class="kw">fn </span>test_thread_affinity_single_core() {
         serial_test(|| {
             with_cleanup(
                 || {
-                    std::env::set_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>, <span class="string">&quot;0&quot;</span>);
+                    std::env::set_var(<span class="string">"MMTK_THREAD_AFFINITY"</span>, <span class="string">"0"</span>);
 
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
@@ -2209,13 +2211,13 @@
                     );
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_THREAD_AFFINITY"</span>);
                 },
             )
         })
     }
 
-    <span class="attr">#[cfg(target_os = <span class="string">&quot;linux&quot;</span>)]
+    <span class="attr">#[cfg(target_os = <span class="string">"linux"</span>)]
     #[test]
     </span><span class="kw">fn </span>test_thread_affinity_generate_core_list() {
         serial_test(|| {
@@ -2225,19 +2227,19 @@
                     <span class="kw">let </span><span class="kw-2">mut </span>cpu_list = String::new();
                     <span class="kw">let </span>num_cpus = get_total_num_cpus();
 
-                    cpu_list.push(<span class="string">&#39;0&#39;</span>);
+                    cpu_list.push(<span class="string">'0'</span>);
                     <span class="kw">for </span>cpu <span class="kw">in </span><span class="number">1</span>..num_cpus {
-                        cpu_list.push_str(<span class="macro">format!</span>(<span class="string">&quot;,{}&quot;</span>, cpu).as_str());
+                        cpu_list.push_str(<span class="macro">format!</span>(<span class="string">",{}"</span>, cpu).as_str());
                         vec.push(cpu);
                     }
 
-                    std::env::set_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>, cpu_list);
+                    std::env::set_var(<span class="string">"MMTK_THREAD_AFFINITY"</span>, cpu_list);
                     <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
                     options.read_env_var_settings();
                     <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.thread_affinity, AffinityKind::RoundRobin(vec));
                 },
                 || {
-                    std::env::remove_var(<span class="string">&quot;MMTK_THREAD_AFFINITY&quot;</span>);
+                    std::env::remove_var(<span class="string">"MMTK_THREAD_AFFINITY"</span>);
                 },
             )
         })
@@ -2246,7 +2248,7 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_thread_affinity_single_range() {
         serial_test(|| {
-            <span class="kw">let </span>affinity = <span class="string">&quot;0-1&quot;</span>.parse::&lt;AffinityKind&gt;();
+            <span class="kw">let </span>affinity = <span class="string">"0-1"</span>.parse::&lt;AffinityKind&gt;();
             <span class="macro">assert_eq!</span>(affinity, <span class="prelude-val">Ok</span>(AffinityKind::RoundRobin(<span class="macro">vec!</span>[<span class="number">0_u16</span>, <span class="number">1_u16</span>])));
         })
     }
@@ -2254,7 +2256,7 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_thread_affinity_complex_core_list() {
         serial_test(|| {
-            <span class="kw">let </span>affinity = <span class="string">&quot;0,1-2,4&quot;</span>.parse::&lt;AffinityKind&gt;();
+            <span class="kw">let </span>affinity = <span class="string">"0,1-2,4"</span>.parse::&lt;AffinityKind&gt;();
             <span class="macro">assert_eq!</span>(
                 affinity,
                 <span class="prelude-val">Ok</span>(AffinityKind::RoundRobin(<span class="macro">vec!</span>[<span class="number">0_u16</span>, <span class="number">1_u16</span>, <span class="number">2_u16</span>, <span class="number">4_u16</span>]))
@@ -2265,10 +2267,10 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_thread_affinity_space_in_core_list() {
         serial_test(|| {
-            <span class="kw">let </span>affinity = <span class="string">&quot;0,1-2,4, 6&quot;</span>.parse::&lt;AffinityKind&gt;();
+            <span class="kw">let </span>affinity = <span class="string">"0,1-2,4, 6"</span>.parse::&lt;AffinityKind&gt;();
             <span class="macro">assert_eq!</span>(
                 affinity,
-                <span class="prelude-val">Err</span>(<span class="string">&quot;Core ids have been incorrectly specified&quot;</span>.to_string())
+                <span class="prelude-val">Err</span>(<span class="string">"Core ids have been incorrectly specified"</span>.to_string())
             );
         })
     }
@@ -2276,10 +2278,10 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_thread_affinity_bad_core_list() {
         serial_test(|| {
-            <span class="kw">let </span>affinity = <span class="string">&quot;0,1-2,4,&quot;</span>.parse::&lt;AffinityKind&gt;();
+            <span class="kw">let </span>affinity = <span class="string">"0,1-2,4,"</span>.parse::&lt;AffinityKind&gt;();
             <span class="macro">assert_eq!</span>(
                 affinity,
-                <span class="prelude-val">Err</span>(<span class="string">&quot;Core ids have been incorrectly specified&quot;</span>.to_string())
+                <span class="prelude-val">Err</span>(<span class="string">"Core ids have been incorrectly specified"</span>.to_string())
             );
         })
     }
@@ -2287,10 +2289,10 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_thread_affinity_range_start_greater_than_end() {
         serial_test(|| {
-            <span class="kw">let </span>affinity = <span class="string">&quot;1-0&quot;</span>.parse::&lt;AffinityKind&gt;();
+            <span class="kw">let </span>affinity = <span class="string">"1-0"</span>.parse::&lt;AffinityKind&gt;();
             <span class="macro">assert_eq!</span>(
                 affinity,
-                <span class="prelude-val">Err</span>(<span class="string">&quot;Starting core id in range should be less than the end&quot;</span>.to_string())
+                <span class="prelude-val">Err</span>(<span class="string">"Starting core id in range should be less than the end"</span>.to_string())
             );
         })
     }
@@ -2298,10 +2300,10 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_thread_affinity_bad_range_option() {
         serial_test(|| {
-            <span class="kw">let </span>affinity = <span class="string">&quot;0-1-4&quot;</span>.parse::&lt;AffinityKind&gt;();
+            <span class="kw">let </span>affinity = <span class="string">"0-1-4"</span>.parse::&lt;AffinityKind&gt;();
             <span class="macro">assert_eq!</span>(
                 affinity,
-                <span class="prelude-val">Err</span>(<span class="string">&quot;Core ids have been incorrectly specified&quot;</span>.to_string())
+                <span class="prelude-val">Err</span>(<span class="string">"Core ids have been incorrectly specified"</span>.to_string())
             );
         })
     }
@@ -2310,7 +2312,7 @@
     </span><span class="kw">fn </span>test_process_valid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_from_command_line(<span class="string">&quot;no_finalizer&quot;</span>, <span class="string">&quot;true&quot;</span>);
+            <span class="kw">let </span>success = options.set_from_command_line(<span class="string">"no_finalizer"</span>, <span class="string">"true"</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
         })
@@ -2321,7 +2323,7 @@
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
             <span class="kw">let </span>default_no_finalizer = <span class="kw-2">*</span>options.no_finalizer;
-            <span class="kw">let </span>success = options.set_from_command_line(<span class="string">&quot;no_finalizer&quot;</span>, <span class="string">&quot;100&quot;</span>);
+            <span class="kw">let </span>success = options.set_from_command_line(<span class="string">"no_finalizer"</span>, <span class="string">"100"</span>);
             <span class="macro">assert!</span>(!success);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.no_finalizer, default_no_finalizer);
         })
@@ -2331,7 +2333,7 @@
     </span><span class="kw">fn </span>test_process_bulk_empty() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">&quot;&quot;</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">""</span>);
             <span class="macro">assert!</span>(success);
         })
     }
@@ -2340,7 +2342,7 @@
     </span><span class="kw">fn </span>test_process_bulk_valid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">&quot;no_finalizer=true stress_factor=42&quot;</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">"no_finalizer=true stress_factor=42"</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">42</span>);
@@ -2351,7 +2353,7 @@
     </span><span class="kw">fn </span>test_process_bulk_comma_separated_valid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">&quot;no_finalizer=true,stress_factor=42&quot;</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">"no_finalizer=true,stress_factor=42"</span>);
             <span class="macro">assert!</span>(success);
             <span class="macro">assert!</span>(<span class="kw-2">*</span>options.no_finalizer);
             <span class="macro">assert_eq!</span>(<span class="kw-2">*</span>options.stress_factor, <span class="number">42</span>);
@@ -2362,7 +2364,7 @@
     </span><span class="kw">fn </span>test_process_bulk_invalid() {
         serial_test(|| {
             <span class="kw">let </span><span class="kw-2">mut </span>options = Options::default();
-            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">&quot;no_finalizer=true stress_factor=a&quot;</span>);
+            <span class="kw">let </span>success = options.set_bulk_from_command_line(<span class="string">"no_finalizer=true stress_factor=a"</span>);
             <span class="macro">assert!</span>(!success);
         })
     }
