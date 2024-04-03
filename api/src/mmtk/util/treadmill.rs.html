@@ -144,11 +144,11 @@
 
     <span class="kw">pub fn </span>add_to_treadmill(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, nursery: bool) {
         <span class="kw">if </span>nursery {
-            <span class="comment">// println!("+ an {}", cell);
-            </span><span class="self">self</span>.alloc_nursery.lock().unwrap().insert(object);
+            <span class="macro">trace!</span>(<span class="string">"Adding {} to nursery"</span>, object);
+            <span class="self">self</span>.alloc_nursery.lock().unwrap().insert(object);
         } <span class="kw">else </span>{
-            <span class="comment">// println!("+ ts {}", cell);
-            </span><span class="self">self</span>.to_space.lock().unwrap().insert(object);
+            <span class="macro">trace!</span>(<span class="string">"Adding {} to to_space"</span>, object);
+            <span class="self">self</span>.to_space.lock().unwrap().insert(object);
         }
     }
 
@@ -203,11 +203,11 @@
 
     <span class="kw">pub fn </span>flip(<span class="kw-2">&amp;mut </span><span class="self">self</span>, full_heap: bool) {
         swap(<span class="kw-2">&amp;mut </span><span class="self">self</span>.alloc_nursery, <span class="kw-2">&amp;mut </span><span class="self">self</span>.collect_nursery);
-        <span class="comment">// println!("an &lt;-&gt; cn");
-        </span><span class="kw">if </span>full_heap {
+        <span class="macro">trace!</span>(<span class="string">"Flipped alloc_nursery and collect_nursery"</span>);
+        <span class="kw">if </span>full_heap {
             swap(<span class="kw-2">&amp;mut </span><span class="self">self</span>.from_space, <span class="kw-2">&amp;mut </span><span class="self">self</span>.to_space);
-            <span class="comment">// println!("fs &lt;-&gt; ts");
-        </span>}
+            <span class="macro">trace!</span>(<span class="string">"Flipped from_space and to_space"</span>);
+        }
     }
 }
 
