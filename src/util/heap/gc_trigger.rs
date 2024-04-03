@@ -106,8 +106,7 @@ impl<VM: VMBinding> GCTrigger<VM> {
 
     /// Check if the heap is full
     pub fn is_heap_full(&self) -> bool {
-        let plan = unsafe { self.plan.assume_init() };
-        self.policy.is_heap_full(plan)
+        self.policy.is_heap_full(self.plan())
     }
 
     /// Return upper bound of the nursery size (in number of bytes)
@@ -117,10 +116,9 @@ impl<VM: VMBinding> GCTrigger<VM> {
         match *self.options.nursery {
             NurserySize::Bounded { min: _, max } => max,
             NurserySize::ProportionalBounded { min: _, max } => {
-                let max_bytes =
-                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages())
-                        as f64
-                        * max;
+                let heap_size_bytes =
+                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages());
+                let max_bytes = heap_size_bytes as f64 * max;
                 let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
                 if max_bytes > DEFAULT_MAX_NURSERY {
                     warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);

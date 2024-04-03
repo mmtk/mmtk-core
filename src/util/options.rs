@@ -404,17 +404,14 @@ impl FromStr for AffinityKind {
 /// user/VM.
 pub enum NurserySize {
     /// A Bounded nursery has different upper and lower bounds. The size only controls the upper
-    /// bound. Hence, it is considered to be a "variable size" nursery. By default, a Bounded
-    /// nursery has a lower bound of 2 MB and an upper bound of 32 MB for 32-bit systems and 1 TB
-    /// for 64-bit systems.
+    /// bound. Hence, it is considered to be a "variable size" nursery.
     Bounded {
         /// The lower bound of the nursery size in bytes. Default to [`DEFAULT_MIN_NURSERY`].
         min: usize,
         /// The upper bound of the nursery size in bytes. Default to [`DEFAULT_MAX_NURSERY`].
         max: usize,
     },
-    /// A bounded nursery that is porportional to the current heap size. By default, a proportional bounded
-    // nursery has a lower bound of 20% of the heap size, and has an upper bound of 100% of the heap size.
+    /// A bounded nursery that is porportional to the current heap size.
     ProportionalBounded {
         /// The lower bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MIN_NURSERY`].
         min: f64,
@@ -448,8 +445,10 @@ impl NurserySize {
     /// Return true if the values are valid.
     fn validate(&self) -> bool {
         match *self {
-            NurserySize::Bounded { min, max } => min < max,
-            NurserySize::ProportionalBounded { min, max } => min < max && max <= 1.0f64,
+            NurserySize::Bounded { min, max } => min <= max,
+            NurserySize::ProportionalBounded { min, max } => {
+                0.0f64 < min && min <= max && max <= 1.0f64
+            }
             NurserySize::Fixed(_) => true,
         }
     }
@@ -826,7 +825,7 @@ options! {
     /// The nursery size can be set like 'Fixed:8192', for example,
     /// to have a Fixed nursery size of 8192 bytes, or 'ProportionalBounded:0.2,1.0' to have a nursery size
     /// between 20% and 100% of the heap size. You can omit lower bound and upper bound to use the default
-    /// value for bounded nurseryby by using '_'. For example, 'ProportionalBounded:0.1,_' sets the min nursery
+    /// value for bounded nursery by using '_'. For example, 'ProportionalBounded:0.1,_' sets the min nursery
     /// to 10% of the heap size while using the default value for max nursery.
     nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.validate()]
         = NurserySize::ProportionalBounded { min: DEFAULT_PROPORTIONAL_MIN_NURSERY, max: DEFAULT_PROPORTIONAL_MAX_NURSERY },
