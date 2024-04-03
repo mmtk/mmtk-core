@@ -119,7 +119,7 @@ pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
 
 /// The default min nursery size proportional to the current heap size
-pub const DEFAULT_PROPORTIONAL_MIN_NURSERY: f64 = 0.2;
+pub const DEFAULT_PROPORTIONAL_MIN_NURSERY: f64 = 0.25;
 /// The default max nursery size proportional to the current heap size
 pub const DEFAULT_PROPORTIONAL_MAX_NURSERY: f64 = 1.0;
 
