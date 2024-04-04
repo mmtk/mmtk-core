@@ -147,7 +147,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.queue.push(Box::new(work));
     }
 
-    /// Like `add_no_notify`, but the work is boxed.
+    /// Like [`WorkBucket::add_no_notify`], but the work is boxed.
     pub(crate) fn add_boxed_no_notify(&self, work: Box<dyn GCWork<VM>>) {
         self.queue.push(work);
     }
