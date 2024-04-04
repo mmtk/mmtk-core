@@ -5,6 +5,7 @@ use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
@@ -39,6 +40,12 @@ pub struct CommonGenPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
+        let max_heap_bytes = args
+            .global_args
+            .gc_trigger
+            .policy
+            .get_max_heap_size_in_pages()
+            << LOG_BYTES_IN_PAGE;
         let nursery = CopySpace::new(
             args.get_space_args(
                 "nursery",
@@ -47,7 +54,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
                     args.global_args
                         .options
                         .nursery
-                        .estimate_virtual_memory_in_bytes(),
+                        .estimate_virtual_memory_in_bytes(max_heap_bytes),
                     false,
                 ),
             ),
