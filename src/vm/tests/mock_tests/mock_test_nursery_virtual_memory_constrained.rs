@@ -6,6 +6,7 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::options::*;
 
 #[test]
+#[should_panic(expected = "may not be satisfied")]
 pub fn constrained() {
     with_mockvm(
         default_setup,

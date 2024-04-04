@@ -427,41 +427,42 @@ pub enum NurserySize {
 impl NurserySize {
     /// Estimate the virtual memory needed for the nursery space. This is used during space creation.
     pub fn estimate_virtual_memory_in_bytes(&self, max_heap_size_bytes: usize) -> usize {
-        let virtual_memory_bytes = match *self {
+        use crate::util::heap::vm_layout::vm_layout;
+
+        // Calculate the vm bytes based on the nursery option
+        let nursery_vm_bytes = match *self {
             NurserySize::Bounded { min: _, max } => max,
             // Just use the default max nursery size -- the nursery won't get larger than that.
             NurserySize::ProportionalBounded { min: _, max } => {
-                use crate::util::heap::vm_layout::vm_layout;
-                let max_nursery_size_bytes = (max_heap_size_bytes as f64 * max) as usize;
-                if vm_layout().force_use_contiguous_spaces {
-                    // This is the normal 64 bits settings. We should not need to worry about virtual memory.
-                    // So just return whatever is needed.
-                    max_nursery_size_bytes
-                } else {
-                    // We may not have enough virtual memory in a setting with constrained virtual memory.
-                    if vm_layout().available_bytes() > max_heap_size_bytes + max_nursery_size_bytes
-                    {
-                        // This check is just an estimate to see if we may run out of virtual memory address.
-                        // This only works if all the other spaces do not reserve virtual memory more than
-                        // what they really use (e.g. they use `VMRequest::discontiguous`). Otherwise, we
-                        // may still run out of virtual memory address.
-                        // TODO: What we really want here is to satisfy other vm requests first, and to allow
-                        // the nursery to use whatever is left. But this is not possible right now.
-                        // Changes like https://github.com/mmtk/mmtk-core/pull/1004 would allow this.
-                        max_nursery_size_bytes
-                    } else {
-                        warn!(
-                            "We are running with constrained virtual memory, {:?} may not be satisfied with the heap size {}. \
-                            We only allow the nursery space to use {} bytes virtual memory.",
-                            self, max_heap_size_bytes, DEFAULT_MAX_NURSERY_32,
-                        );
-                        DEFAULT_MAX_NURSERY_32
-                    }
-                }
+                (max_heap_size_bytes as f64 * max) as usize
             }
             NurserySize::Fixed(sz) => sz,
         };
-        conversions::raw_align_up(virtual_memory_bytes, BYTES_IN_CHUNK)
+
+        // Check roughly if we may have enough virtual memory.
+        let nursery_vm_bytes = if vm_layout().force_use_contiguous_spaces {
+            // This is the normal 64 bits settings. We should not need to worry about virtual memory.
+            // So just return whatever is needed.
+            nursery_vm_bytes
+        } else {
+            // We may not have enough virtual memory in a setting with constrained virtual memory.
+            if vm_layout().available_bytes() > max_heap_size_bytes + nursery_vm_bytes {
+                // This check is just an estimate to see if we may run out of virtual memory address.
+                // This only works if all the other spaces do not reserve virtual memory more than
+                // what they really use (e.g. they use `VMRequest::discontiguous`). Otherwise, we
+                // may still run out of virtual memory address.
+                // TODO: What we really want here is to satisfy other vm requests first, and to allow
+                // the nursery to use whatever is left. But this is not possible right now.
+                // Changes like https://github.com/mmtk/mmtk-core/pull/1004 would allow this.
+                nursery_vm_bytes
+            } else {
+                panic!(
+                    "We are running with constrained virtual memory, {:?} may not be satisfied with the heap size {}.",
+                    self, max_heap_size_bytes,
+                )
+            }
+        };
+        conversions::raw_align_up(nursery_vm_bytes, BYTES_IN_CHUNK)
     }
 
     /// Return true if the values are valid.
