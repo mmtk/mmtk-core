@@ -139,7 +139,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.notify_one_worker();
     }
 
-    /// Add a work packet ot this bucket, but do not notify any workers.
+    /// Add a work packet to this bucket, but do not notify any workers.
     /// This is useful when the current thread is holding the mutex of `WorkerMonitor` which is
     /// used for notifying workers.  This usually happens if the current thread is the last worker
     /// parked.
