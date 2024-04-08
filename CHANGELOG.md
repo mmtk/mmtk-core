@@ -1,3 +1,18 @@
+0.24.0 (2024-04-08)
+===
+
+## What's Changed
+
+### Misc
+* Check and fix broken links in docs by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1085
+* Allow binding to implement GC trigger by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1083
+* Resolve issues for unit tests on 32 bits by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1095
+* Use SFTDenseChunkMap on 64bits when vm_space is enabled by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1094
+* Fix warnings with the stable Rust toolchain by @wks in https://github.com/mmtk/mmtk-core/pull/1099
+* Use proper logging for the treadmill by @wks in https://github.com/mmtk/mmtk-core/pull/1101
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.23.0...v0.24.0
+
 0.23.0 (2024-02-09)
 ===
 
