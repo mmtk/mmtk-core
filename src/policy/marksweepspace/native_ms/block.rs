@@ -136,35 +136,35 @@ impl Block {
             .is_ok()
     }
 
-    pub fn load_prev_block(&self) -> Option<Block> {
+    pub(in crate::policy::marksweepspace::native_ms) fn load_prev_block(&self) -> Option<Block> {
         let prev = unsafe { Block::PREV_BLOCK_TABLE.load::<usize>(self.start()) };
         NonZeroUsize::new(prev).map(Block)
     }
 
-    pub fn load_next_block(&self) -> Option<Block> {
+    pub(in crate::policy::marksweepspace::native_ms) fn load_next_block(&self) -> Option<Block> {
         let next = unsafe { Block::NEXT_BLOCK_TABLE.load::<usize>(self.start()) };
         NonZeroUsize::new(next).map(Block)
     }
 
-    pub fn store_next_block(&self, next: Block) {
+    pub(in crate::policy::marksweepspace::native_ms) fn store_next_block(&self, next: Block) {
         unsafe {
             Block::NEXT_BLOCK_TABLE.store::<usize>(self.start(), next.start().as_usize());
         }
     }
 
-    pub fn clear_next_block(&self) {
+    pub(in crate::policy::marksweepspace::native_ms) fn clear_next_block(&self) {
         unsafe {
             Block::NEXT_BLOCK_TABLE.store::<usize>(self.start(), 0);
         }
     }
 
-    pub fn store_prev_block(&self, prev: Block) {
+    pub(in crate::policy::marksweepspace::native_ms) fn store_prev_block(&self, prev: Block) {
         unsafe {
             Block::PREV_BLOCK_TABLE.store::<usize>(self.start(), prev.start().as_usize());
         }
     }
 
-    pub fn clear_prev_block(&self) {
+    pub(in crate::policy::marksweepspace::native_ms) fn clear_prev_block(&self) {
         unsafe {
             Block::PREV_BLOCK_TABLE.store::<usize>(self.start(), 0);
         }

@@ -4,19 +4,23 @@ use crate::util::linear_scan::Region;
 use crate::vm::VMBinding;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+#[cfg(feature = "ms_block_list_sanity")]
+use std::sync::Mutex;
 
 /// List of blocks owned by the allocator
 #[repr(C)]
 pub struct BlockList {
-    pub first: Option<Block>,
-    pub last: Option<Block>,
-    pub size: usize,
-    pub lock: AtomicBool,
+    first: Option<Block>,
+    last: Option<Block>,
+    size: usize,
+    lock: AtomicBool,
+    #[cfg(feature = "ms_block_list_sanity")]
+    sanity_list: Mutex<Vec<Block>>,
 }
 
 impl std::fmt::Debug for BlockList {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "BlockList {:?}", self.iter().collect::<Vec<Block>>())
+        write!(f, "{:?}", self.iter().collect::<Vec<Block>>())
     }
 }
 
@@ -27,12 +31,52 @@ impl BlockList {
             last: None,
             size,
             lock: AtomicBool::new(false),
+            #[cfg(feature = "ms_block_list_sanity")]
+            sanity_list: Mutex::new(vec![]),
+        }
+    }
+
+    // fn access_block_list<R: Copy, F: FnOnce() -> R>(&self, access_func: F) -> R {
+    //     #[cfg(feature = "ms_block_list_sanity")]
+    //     let mut sanity_list = self.sanity_list.lock().unwrap();
+
+    //     let ret = access_func();
+
+    //     // Verify the block list is the same as the sanity list
+    //     #[cfg(feature = "ms_block_list_sanity")]
+    //     {
+    //         if !sanity_list.iter().map(|b| *b).eq(BlockListIterator { cursor: self.first }) {
+    //             eprintln!("Sanity block list: {:?}", &mut sanity_list as &mut Vec<Block>);
+    //             eprintln!("Actual block list: {:?}", self);
+    //             panic!("Incorrect block list");
+    //         }
+    //     }
+
+    //     ret
+    // }
+    #[cfg(feature = "ms_block_list_sanity")]
+    fn verify_block_list(&self, sanity_list: &mut Vec<Block>) {
+        if !sanity_list.iter().map(|b| *b).eq(BlockListIterator { cursor: self.first }) {
+            eprintln!("Sanity block list: {:?}", sanity_list);
+            eprintln!("First {:?}", sanity_list.get(0));
+            eprintln!("Actual block list: {:?}", self);
+            eprintln!("First {:?}", self.first);
+            panic!("Incorrect block list");
         }
     }
 
     /// List has no blocks
     pub fn is_empty(&self) -> bool {
-        self.first.is_none()
+        let ret = self.first.is_none();
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            self.verify_block_list(&mut sanity_list);
+            assert_eq!(sanity_list.is_empty(), ret);
+        }
+
+        ret
     }
 
     /// Remove a block from the list
@@ -57,11 +101,22 @@ impl BlockList {
                 next.store_prev_block(prev);
             }
         }
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            if let Some((index, _)) = sanity_list.iter().enumerate().find(|&(_, &val)| val == block) {
+                sanity_list.remove(index);
+            } else {
+                panic!("Cannot find {:?} in the block list", block);
+            }
+            self.verify_block_list(&mut sanity_list);
+        }
     }
 
     /// Pop the first block in the list
     pub fn pop(&mut self) -> Option<Block> {
-        if let Some(head) = self.first {
+        let ret = if let Some(head) = self.first {
             if let Some(next) = head.load_next_block() {
                 self.first = Some(next);
                 next.clear_prev_block();
@@ -75,7 +130,21 @@ impl BlockList {
             Some(head)
         } else {
             None
+        };
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            let sanity_ret = if sanity_list.is_empty() {
+                None
+            } else {
+                Some(sanity_list.remove(0)) // pop first
+            };
+            self.verify_block_list(&mut sanity_list);
+            assert_eq!(sanity_ret, ret);
         }
+
+        ret
     }
 
     /// Push block to the front of the list
@@ -93,10 +162,28 @@ impl BlockList {
             self.first = Some(block);
         }
         block.store_block_list(self);
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            sanity_list.insert(0, block); // push front
+            self.verify_block_list(&mut sanity_list);
+        }
     }
 
     /// Moves all the blocks of `other` into `self`, leaving `other` empty.
     pub fn append(&mut self, other: &mut BlockList) {
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            // Check before merging
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            self.verify_block_list(&mut sanity_list);
+            let mut sanity_list_other = other.sanity_list.lock().unwrap();
+            other.verify_block_list(&mut sanity_list_other);
+        }
+        #[cfg(feature = "ms_block_list_sanity")]
+        let mut sanity_list_in_other = other.sanity_list.lock().unwrap().clone();
+
         debug_assert_eq!(self.size, other.size);
         if !other.is_empty() {
             debug_assert!(
@@ -128,12 +215,25 @@ impl BlockList {
             }
             other.reset();
         }
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            sanity_list.append(&mut sanity_list_in_other);
+            self.verify_block_list(&mut sanity_list);
+        }
     }
 
     /// Remove all blocks
     fn reset(&mut self) {
         self.first = None;
         self.last = None;
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            sanity_list.clear();
+        }
     }
 
     /// Lock the list. The MiMalloc allocator mostly uses thread-local block lists, and those operations on the list
@@ -171,6 +271,24 @@ impl BlockList {
                 block.sweep::<VM>();
             }
         }
+    }
+
+    /// Get the size of this block list.
+    pub fn size(&self) -> usize {
+        let ret = self.size;
+
+        #[cfg(feature = "ms_block_list_sanity")]
+        {
+            let mut sanity_list = self.sanity_list.lock().unwrap();
+            self.verify_block_list(&mut sanity_list);
+        }
+
+        ret
+    }
+
+    /// Get the first block in the list.
+    pub fn first(&self) -> Option<Block> {
+        self.first
     }
 }
 
