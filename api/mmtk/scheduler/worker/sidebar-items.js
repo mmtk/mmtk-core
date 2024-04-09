@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["STAT_BORROWED_MSG","WORKER_ORDINAL"],"enum":["WorkerGroupState"],"fn":["current_worker_ordinal"],"struct":["GCWorker","GCWorkerShared","WorkerGroup","WorkerMonitor","WorkerMonitorSync"],"type":["ThreadId"]};
+window.SIDEBAR_ITEMS = {"constant":["STAT_BORROWED_MSG","WORKER_ORDINAL"],"enum":["WorkerCreationState"],"fn":["current_worker_ordinal"],"struct":["GCWorker","GCWorkerShared","WorkerGroup","WorkerShouldExit"],"type":["PollResult","ThreadId"]};

@@ -439,32 +439,6 @@
 <a href="#437" id="437">437</a>
 <a href="#438" id="438">438</a>
 <a href="#439" id="439">439</a>
-<a href="#440" id="440">440</a>
-<a href="#441" id="441">441</a>
-<a href="#442" id="442">442</a>
-<a href="#443" id="443">443</a>
-<a href="#444" id="444">444</a>
-<a href="#445" id="445">445</a>
-<a href="#446" id="446">446</a>
-<a href="#447" id="447">447</a>
-<a href="#448" id="448">448</a>
-<a href="#449" id="449">449</a>
-<a href="#450" id="450">450</a>
-<a href="#451" id="451">451</a>
-<a href="#452" id="452">452</a>
-<a href="#453" id="453">453</a>
-<a href="#454" id="454">454</a>
-<a href="#455" id="455">455</a>
-<a href="#456" id="456">456</a>
-<a href="#457" id="457">457</a>
-<a href="#458" id="458">458</a>
-<a href="#459" id="459">459</a>
-<a href="#460" id="460">460</a>
-<a href="#461" id="461">461</a>
-<a href="#462" id="462">462</a>
-<a href="#463" id="463">463</a>
-<a href="#464" id="464">464</a>
-<a href="#465" id="465">465</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::WorkerLocalStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -479,7 +453,7 @@
 <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
 </span><span class="kw">use </span>std::sync::atomic::AtomicUsize;
 <span class="kw">use </span>std::sync::atomic::Ordering;
-<span class="kw">use </span>std::sync::{Arc, Condvar, Mutex};
+<span class="kw">use </span>std::sync::{Arc, Mutex};
 
 <span class="doccomment">/// Represents the ID of a GC worker thread.
 </span><span class="kw">pub type </span>ThreadId = usize;
@@ -500,8 +474,9 @@
     ordinal
 }
 
-<span class="doccomment">/// The part shared between a GCWorker and the scheduler.
-/// This structure is used for communication, e.g. adding new work packets.
+<span class="doccomment">/// The struct has one instance per worker, but is shared between workers via the scheduler
+/// instance.  This structure is used for communication between workers, e.g. adding designated
+/// work packets, stealing work packets from other workers, and collecting per-worker statistics.
 </span><span class="kw">pub struct </span>GCWorkerShared&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Worker-local statistics data.
     </span>stat: AtomicRefCell&lt;WorkerLocalStat&lt;VM&gt;&gt;,
@@ -511,10 +486,6 @@
     </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
     </span>live_bytes: AtomicUsize,
     <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.
-    ///
-    /// Note: Currently, designated work cannot be added from the GC controller thread, or
-    /// there will be synchronization problems.  If it is necessary to do so, we need to
-    /// update the code in `GCWorkScheduler::poll_slow` for proper synchornization.
     </span><span class="kw">pub </span>designated_work: ArrayQueue&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
     <span class="doccomment">/// Handle for stealing packets from the current worker
     </span><span class="kw">pub </span>stealer: <span class="prelude-ty">Option</span>&lt;Stealer&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
@@ -542,181 +513,11 @@
     }
 }
 
-<span class="doccomment">/// Used to synchronize mutually exclusive operations between workers and controller,
-/// and also waking up workers when more work packets are available.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerMonitor {
-    <span class="doccomment">/// The synchronized part.
-    </span>sync: Mutex&lt;WorkerMonitorSync&gt;,
-    <span class="doccomment">/// This is notified when new work is made available for the workers.
-    /// Particularly, it is notified when
-    /// -   `sync.worker_group_state` is transitioned to `Working` because
-    ///     -   some workers still have designated work, or
-    ///     -   some sentinel work packets are added to their drained buckets, or
-    ///     -   some work buckets are opened, or
-    /// -   any work packet is added to any open bucket.
-    /// Workers wait on this condvar.
-    </span>work_available: Condvar,
-    <span class="doccomment">/// This is notified when all workers parked.
-    /// The coordinator waits on this condvar.
-    </span>all_workers_parked: Condvar,
-}
-
-<span class="doccomment">/// The state of the worker group.
-///
-/// The worker group alternates between the `Sleeping` and the `Working` state.  Workers are
-/// allowed to execute work packets in the `Working` state.  However, once workers entered the
-/// `Sleeping` state, they will not be allowed to packets from buckets until the coordinator
-/// explicitly transitions the state back to `Working` after it found more work for workers to do.
-</span><span class="attr">#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-</span><span class="kw">enum </span>WorkerGroupState {
-    <span class="doccomment">/// In this state, the coordinator can open new buckets and close buckets,
-    /// but workers cannot execute any packets or get any work packets from any buckets.
-    /// Workers cannot unpark in this state.
-    </span>Sleeping,
-    <span class="doccomment">/// In this state, workers can get work packets from open buckets,
-    /// but no buckets can be opened or closed.
-    </span>Working,
-}
-
-<span class="doccomment">/// The synchronized part of `WorkerMonitor`.
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerMonitorSync {
-    <span class="doccomment">/// The total number of workers.
-    </span>worker_count: usize,
-    <span class="doccomment">/// Number of parked workers.
-    </span>parked_workers: usize,
-    <span class="doccomment">/// The worker group state.
-    </span>worker_group_state: WorkerGroupState,
-}
-
-<span class="kw">impl </span>WorkerMonitor {
-    <span class="kw">pub fn </span>new(worker_count: usize) -&gt; <span class="self">Self </span>{
-        <span class="self">Self </span>{
-            sync: Mutex::new(WorkerMonitorSync {
-                worker_count,
-                parked_workers: <span class="number">0</span>,
-                worker_group_state: WorkerGroupState::Sleeping,
-            }),
-            work_available: Default::default(),
-            all_workers_parked: Default::default(),
-        }
-    }
-
-    <span class="doccomment">/// Wake up workers when more work packets are made available for workers.
-    /// This function is called when adding work packets to buckets.
-    /// This function doesn't change the `work_group_state` variable.
-    /// If workers are in the `Sleeping` state, use `resume_and_wait` to resume workers.
-    </span><span class="kw">pub fn </span>notify_work_available(<span class="kw-2">&amp;</span><span class="self">self</span>, all: bool) {
-        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-
-        <span class="comment">// Don't notify workers if we are adding packets when workers are sleeping.
-        // This could happen when we add `ScheduleCollection` or schedule sentinels.
-        </span><span class="kw">if </span>sync.worker_group_state == WorkerGroupState::Sleeping {
-            <span class="kw">return</span>;
-        }
-
-        <span class="kw">if </span>all {
-            <span class="self">self</span>.work_available.notify_all();
-        } <span class="kw">else </span>{
-            <span class="self">self</span>.work_available.notify_one();
-        }
-    }
-
-    <span class="doccomment">/// Wake up workers and wait until they transition to `Sleeping` state again.
-    /// This is called by the coordinator.
-    /// If `all` is true, notify all workers; otherwise only notify one worker.
-    </span><span class="kw">pub fn </span>resume_and_wait(<span class="kw-2">&amp;</span><span class="self">self</span>, all: bool) {
-        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        sync.worker_group_state = WorkerGroupState::Working;
-        <span class="kw">if </span>all {
-            <span class="self">self</span>.work_available.notify_all();
-        } <span class="kw">else </span>{
-            <span class="self">self</span>.work_available.notify_one();
-        }
-        <span class="kw">let </span>_sync = <span class="self">self
-            </span>.all_workers_parked
-            .wait_while(sync, |sync| {
-                sync.worker_group_state == WorkerGroupState::Working
-            })
-            .unwrap();
-    }
-
-    <span class="doccomment">/// Test if the worker group is in the `Sleeping` state.
-    </span><span class="kw">pub fn </span>debug_is_sleeping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">let </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-        sync.worker_group_state == WorkerGroupState::Sleeping
-    }
-
-    <span class="doccomment">/// Park until more work is available.
-    /// The argument `worker` indicates this function can only be called by workers.
-    </span><span class="kw">pub fn </span>park_and_wait&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) {
-        <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
-
-        <span class="comment">// Park this worker
-        </span><span class="kw">let </span>all_parked = sync.inc_parked_workers();
-        <span class="macro">trace!</span>(<span class="string">"Worker {} parked."</span>, worker.ordinal);
-
-        <span class="kw">if </span>all_parked {
-            <span class="comment">// If all workers are parked, enter "Sleeping" state and notify controller.
-            </span>sync.worker_group_state = WorkerGroupState::Sleeping;
-            <span class="macro">debug!</span>(
-                <span class="string">"Worker {} notifies the coordinator that all workerer parked."</span>,
-                worker.ordinal
-            );
-            <span class="self">self</span>.all_workers_parked.notify_one();
-        } <span class="kw">else </span>{
-            <span class="comment">// Otherwise wait until notified.
-            // Note: The condition for this `cond.wait` is "more work is available".
-            // If this worker spuriously wakes up, then in the next loop iteration, the
-            // `poll_schedulable_work` invocation above will fail, and the worker will reach
-            // here and wait again.
-            </span>sync = <span class="self">self</span>.work_available.wait(sync).unwrap();
-        }
-
-        <span class="comment">// If we are in the `Sleeping` state, wait until leaving that state.
-        </span>sync = <span class="self">self
-            </span>.work_available
-            .wait_while(sync, |sync| {
-                sync.worker_group_state == WorkerGroupState::Sleeping
-            })
-            .unwrap();
-
-        <span class="comment">// Unpark this worker.
-        </span>sync.dec_parked_workers();
-        <span class="macro">trace!</span>(<span class="string">"Worker {} unparked."</span>, worker.ordinal);
-    }
-}
-
-<span class="kw">impl </span>WorkerMonitorSync {
-    <span class="doccomment">/// Increase the packed-workers counter.
-    /// Called before a worker is parked.
-    ///
-    /// Return true if all the workers are parked.
-    </span><span class="kw">fn </span>inc_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers;
-        <span class="macro">debug_assert!</span>(old &lt; <span class="self">self</span>.worker_count);
-        <span class="kw">let </span>new = old + <span class="number">1</span>;
-        <span class="self">self</span>.parked_workers = new;
-        new == <span class="self">self</span>.worker_count
-    }
-
-    <span class="doccomment">/// Decrease the packed-workers counter.
-    /// Called after a worker is resumed from the parked state.
-    </span><span class="kw">fn </span>dec_parked_workers(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="kw">let </span>old = <span class="self">self</span>.parked_workers;
-        <span class="macro">debug_assert!</span>(old &lt;= <span class="self">self</span>.worker_count);
-        <span class="macro">debug_assert!</span>(old &gt; <span class="number">0</span>);
-        <span class="kw">let </span>new = old - <span class="number">1</span>;
-        <span class="self">self</span>.parked_workers = new;
-    }
-}
-
 <span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.
-/// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
 </span><span class="kw">pub struct </span>GCWorker&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// The VM-specific thread-local state of the GC thread.
     </span><span class="kw">pub </span>tls: VMWorkerThread,
-    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal
-    /// is usize::MAX if it is the embedded worker of the GC controller thread.
+    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one.
     </span><span class="kw">pub </span>ordinal: ThreadId,
     <span class="doccomment">/// The reference to the scheduler.
     </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
@@ -724,9 +525,6 @@
     </span>copy: GCWorkerCopyContext&lt;VM&gt;,
     <span class="doccomment">/// The reference to the MMTk instance.
     </span><span class="kw">pub </span>mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
-    <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.
-    /// False if this struct belongs to a standalone GCWorker thread.
-    </span>is_coordinator: bool,
     <span class="doccomment">/// Reference to the shared part of the GC worker.  It is used for synchronization.
     </span><span class="kw">pub </span>shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
     <span class="doccomment">/// Local work packet queue.
@@ -750,12 +548,22 @@
     }
 }
 
+<span class="doccomment">/// A special error type that indicate a worker should exit.
+/// This may happen if the VM needs to fork and asks workers to exit.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerShouldExit;
+
+<span class="doccomment">/// The result type of `GCWorker::pool`.
+/// Too many functions return `Option&lt;Box&lt;dyn GCWork&lt;VM&gt;&gt;&gt;`.  In most cases, when `None` is
+/// returned, the caller should try getting work packets from another place.  To avoid confusion,
+/// we use `Err(WorkerShouldExit)` to clearly indicate that the worker should exit immediately.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>PollResult&lt;VM&gt; = <span class="prelude-ty">Result</span>&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;, WorkerShouldExit&gt;;
+
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWorker&lt;VM&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         ordinal: ThreadId,
         scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-        is_coordinator: bool,
         shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
         local_work_buffer: deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;,
     ) -&gt; <span class="self">Self </span>{
@@ -766,7 +574,6 @@
             </span>copy: GCWorkerCopyContext::new_non_copy(),
             scheduler,
             mmtk,
-            is_coordinator,
             shared,
             local_work_buffer,
         }
@@ -800,11 +607,6 @@
         <span class="self">self</span>.local_work_buffer.push(Box::new(work));
     }
 
-    <span class="doccomment">/// Is this worker a coordinator or a normal GC worker?
-    </span><span class="kw">pub fn </span>is_coordinator(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.is_coordinator
-    }
-
     <span class="doccomment">/// Get the scheduler. There is only one scheduler per MMTk instance.
     </span><span class="kw">pub fn </span>scheduler(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.scheduler
@@ -821,18 +623,36 @@
     /// 2. Poll from the local work queue.
     /// 3. Poll from activated global work-buckets
     /// 4. Steal from other workers
-    </span><span class="kw">fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
-        <span class="self">self</span>.shared
-            .designated_work
-            .pop()
-            .or_else(|| <span class="self">self</span>.local_work_buffer.pop())
-            .unwrap_or_else(|| <span class="self">self</span>.scheduler().poll(<span class="self">self</span>))
+    </span><span class="kw">fn </span>poll(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; PollResult&lt;VM&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.shared.designated_work.pop() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
+        }
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.local_work_buffer.pop() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
+        }
+
+        <span class="self">self</span>.scheduler().poll(<span class="self">self</span>)
     }
 
-    <span class="doccomment">/// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
-    /// Each worker will keep polling and executing work packets in a loop.
-    </span><span class="kw">pub fn </span>run(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+    <span class="doccomment">/// Entry point of the worker thread.
+    ///
+    /// This function will resolve thread affinity, if it has been specified by the user.
+    ///
+    /// Each worker will keep polling and executing work packets in a loop.  It runs until the
+    /// worker is requested to exit.  Currently a worker may exit after
+    /// [`crate::mmtk::MMTK::prepare_to_fork`] is called.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for this GC worker thread.
+    /// * `mmtk`: A reference to an MMTk instance.
+    </span><span class="kw">pub fn </span>run(<span class="kw-2">mut </span><span class="self">self</span>: Box&lt;<span class="self">Self</span>&gt;, tls: VMWorkerThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="macro">probe!</span>(mmtk, gcworker_run);
+        <span class="macro">debug!</span>(
+            <span class="string">"Worker started. ordinal: {}, {}"</span>,
+            <span class="self">self</span>.ordinal,
+            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+        );
         WORKER_ORDINAL.with(|x| x.store(<span class="self">self</span>.ordinal, Ordering::SeqCst));
         <span class="self">self</span>.scheduler.resolve_affinity(<span class="self">self</span>.ordinal);
         <span class="self">self</span>.tls = tls;
@@ -847,7 +667,10 @@
             // If we have work_start and work_end, we cannot measure the first
             // poll.
             </span><span class="macro">probe!</span>(mmtk, work_poll);
-            <span class="kw">let </span><span class="kw-2">mut </span>work = <span class="self">self</span>.poll();
+            <span class="kw">let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>work) = <span class="self">self</span>.poll() <span class="kw">else </span>{
+                <span class="comment">// The worker is asked to exit.  Break from the loop.
+                </span><span class="kw">break</span>;
+            };
             <span class="comment">// probe! expands to an empty block on unsupported platforms
             </span><span class="attr">#[allow(unused_variables)]
             </span><span class="kw">let </span>typename = work.get_type_name();
@@ -859,55 +682,180 @@
             </span>std::hint::black_box(<span class="kw">unsafe </span>{ <span class="kw-2">*</span>(typename.as_ptr()) });
 
             <span class="macro">probe!</span>(mmtk, work, typename.as_ptr(), typename.len());
-            work.do_work_with_stat(<span class="self">self</span>, mmtk);
+            work.do_work_with_stat(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mmtk);
         }
+        <span class="macro">debug!</span>(
+            <span class="string">"Worker exiting. ordinal: {}, {}"</span>,
+            <span class="self">self</span>.ordinal,
+            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+        );
+        <span class="macro">probe!</span>(mmtk, gcworker_exit);
+
+        mmtk.scheduler.surrender_gc_worker(<span class="self">self</span>);
     }
 }
 
-<span class="doccomment">/// A worker group to manage all the GC workers (except the coordinator worker).
+<span class="doccomment">/// Stateful part of [`WorkerGroup`].
+</span><span class="kw">enum </span>WorkerCreationState&lt;VM: VMBinding&gt; {
+    <span class="doccomment">/// The initial state.  `GCWorker` structs have not been created and GC worker threads have not
+    /// been spawn.
+    </span>Initial {
+        <span class="doccomment">/// The local work queues for to-be-created workers.
+        </span>local_work_queues: Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
+    },
+    <span class="doccomment">/// All worker threads are spawn and running.  `GCWorker` structs have been transferred to
+    /// worker threads.
+    </span>Spawned,
+    <span class="doccomment">/// Worker threads are stopping, or have already stopped, for forking. Instances of `GCWorker`
+    /// structs are collected here to be reused when GC workers are respawn.
+    </span>Surrendered {
+        <span class="doccomment">/// `GCWorker` instances not currently owned by active GC worker threads.  Once GC workers
+        /// are respawn, they will take ownership of these `GCWorker` instances.
+        </span><span class="comment">// Note: Clippy warns about `Vec&lt;Box&lt;T&gt;&gt;` because `Vec&lt;T&gt;` is already in the heap.
+        // However, the purpose of this `Vec` is allowing GC worker threads to give their
+        // `Box&lt;GCWorker&lt;VM&gt;&gt;` instances back to this pool.  Therefore, the `Box` is necessary.
+        </span><span class="attr">#[allow(clippy::vec_box)]
+        </span>workers: Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt;,
+    },
+}
+
+<span class="doccomment">/// A worker group to manage all the GC workers.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkerGroup&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Shared worker data
     </span><span class="kw">pub </span>workers_shared: Vec&lt;Arc&lt;GCWorkerShared&lt;VM&gt;&gt;&gt;,
-    unspawned_local_work_queues: Mutex&lt;Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;&gt;,
+    <span class="doccomment">/// The stateful part.  `None` means state transition is underway.
+    </span>state: Mutex&lt;<span class="prelude-ty">Option</span>&lt;WorkerCreationState&lt;VM&gt;&gt;&gt;,
 }
+
+<span class="doccomment">/// We have to persuade Rust that `WorkerGroup` is safe to share because the compiler thinks one
+/// worker can refer to another worker via the path "worker -&gt; scheduler -&gt; worker_group -&gt;
+/// `Surrendered::workers` -&gt; worker" which is cyclic reference and unsafe.
+</span><span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>WorkerGroup&lt;VM&gt; {}
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; WorkerGroup&lt;VM&gt; {
     <span class="doccomment">/// Create a WorkerGroup
     </span><span class="kw">pub fn </span>new(num_workers: usize) -&gt; Arc&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>unspawned_local_work_queues = (<span class="number">0</span>..num_workers)
+        <span class="kw">let </span>local_work_queues = (<span class="number">0</span>..num_workers)
             .map(|<span class="kw">_</span>| deque::Worker::new_fifo())
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="kw">let </span>workers_shared = (<span class="number">0</span>..num_workers)
             .map(|i| {
                 Arc::new(GCWorkerShared::&lt;VM&gt;::new(<span class="prelude-val">Some</span>(
-                    unspawned_local_work_queues[i].stealer(),
+                    local_work_queues[i].stealer(),
                 )))
             })
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         Arc::new(<span class="self">Self </span>{
             workers_shared,
-            unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
+            state: Mutex::new(<span class="prelude-val">Some</span>(WorkerCreationState::Initial { local_work_queues })),
         })
     }
 
+    <span class="doccomment">/// Spawn GC worker threads for the first time.
+    </span><span class="kw">pub fn </span>initial_spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+
+        <span class="kw">let </span>WorkerCreationState::Initial { local_work_queues } = state.take().unwrap() <span class="kw">else </span>{
+            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have already been created"</span>);
+        };
+
+        <span class="kw">let </span>workers = <span class="self">self</span>.create_workers(local_work_queues, mmtk);
+        <span class="self">self</span>.spawn(workers, tls);
+
+        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Spawned);
+    }
+
+    <span class="doccomment">/// Respawn GC threads after stopping for forking.
+    </span><span class="kw">pub fn </span>respawn(<span class="kw-2">&amp;</span><span class="self">self</span>, tls: VMThread) {
+        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+
+        <span class="kw">let </span>WorkerCreationState::Surrendered { workers } = state.take().unwrap() <span class="kw">else </span>{
+            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have not been created, yet."</span>);
+        };
+
+        <span class="self">self</span>.spawn(workers, tls);
+
+        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Spawned)
+    }
+
+    <span class="doccomment">/// Create `GCWorker` instances.
+    </span><span class="attr">#[allow(clippy::vec_box)] </span><span class="comment">// See `WorkerCreationState::Surrendered`.
+    </span><span class="kw">fn </span>create_workers(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        local_work_queues: Vec&lt;deque::Worker&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;&gt;,
+        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
+    ) -&gt; Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt; {
+        <span class="macro">debug!</span>(<span class="string">"Creating GCWorker instances..."</span>);
+
+        <span class="macro">assert_eq!</span>(<span class="self">self</span>.workers_shared.len(), local_work_queues.len());
+
+        <span class="comment">// Each `GCWorker` instance corresponds to a `GCWorkerShared` at the same index.
+        </span><span class="kw">let </span>workers = (local_work_queues.into_iter())
+            .zip(<span class="self">self</span>.workers_shared.iter())
+            .enumerate()
+            .map(|(ordinal, (queue, shared))| {
+                Box::new(GCWorker::new(
+                    mmtk,
+                    ordinal,
+                    mmtk.scheduler.clone(),
+                    shared.clone(),
+                    queue,
+                ))
+            })
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+
+        <span class="macro">debug!</span>(<span class="string">"Created {} GCWorker instances."</span>, workers.len());
+        workers
+    }
+
     <span class="doccomment">/// Spawn all the worker threads
-    </span><span class="kw">pub fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMThread) {
-        <span class="kw">let </span><span class="kw-2">mut </span>unspawned_local_work_queues = <span class="self">self</span>.unspawned_local_work_queues.lock().unwrap();
-        <span class="comment">// Spawn each worker thread.
-        </span><span class="kw">for </span>(ordinal, shared) <span class="kw">in </span><span class="self">self</span>.workers_shared.iter().enumerate() {
-            <span class="kw">let </span>worker = Box::new(GCWorker::new(
-                mmtk,
-                ordinal,
-                mmtk.scheduler.clone(),
-                <span class="bool-val">false</span>,
-                shared.clone(),
-                unspawned_local_work_queues.pop().unwrap(),
-            ));
+    </span><span class="attr">#[allow(clippy::vec_box)] </span><span class="comment">// See `WorkerCreationState::Surrendered`.
+    </span><span class="kw">fn </span>spawn(<span class="kw-2">&amp;</span><span class="self">self</span>, workers: Vec&lt;Box&lt;GCWorker&lt;VM&gt;&gt;&gt;, tls: VMThread) {
+        <span class="macro">debug!</span>(
+            <span class="string">"Spawning GC workers.  {}"</span>,
+            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+        );
+
+        <span class="comment">// We transfer the ownership of each `GCWorker` instance to a GC thread.
+        </span><span class="kw">for </span>worker <span class="kw">in </span>workers {
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::&lt;VM&gt;::Worker(worker));
         }
-        <span class="macro">debug_assert!</span>(unspawned_local_work_queues.is_empty());
+
+        <span class="macro">debug!</span>(
+            <span class="string">"Spawned {} worker threads.  {}"</span>,
+            <span class="self">self</span>.worker_count(),
+            <span class="kw">crate</span>::util::rust_util::debug_process_thread_id(),
+        );
+    }
+
+    <span class="doccomment">/// Prepare the buffer for workers to surrender their `GCWorker` structs.
+    </span><span class="kw">pub fn </span>prepare_surrender_buffer(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+        <span class="macro">assert!</span>(<span class="macro">matches!</span>(<span class="kw-2">*</span>state, <span class="prelude-val">Some</span>(WorkerCreationState::Spawned)));
+
+        <span class="kw-2">*</span>state = <span class="prelude-val">Some</span>(WorkerCreationState::Surrendered {
+            workers: Vec::with_capacity(<span class="self">self</span>.worker_count()),
+        })
+    }
+
+    <span class="doccomment">/// Return the `GCWorker` struct to the worker group.
+    /// This function returns `true` if all workers returned their `GCWorker` structs.
+    </span><span class="kw">pub fn </span>surrender_gc_worker(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: Box&lt;GCWorker&lt;VM&gt;&gt;) -&gt; bool {
+        <span class="kw">let </span><span class="kw-2">mut </span>state = <span class="self">self</span>.state.lock().unwrap();
+        <span class="kw">let </span>WorkerCreationState::Surrendered { <span class="kw-2">ref mut </span>workers } = state.as_mut().unwrap() <span class="kw">else </span>{
+            <span class="macro">panic!</span>(<span class="string">"GCWorker structs have not been created, yet."</span>);
+        };
+        <span class="kw">let </span>ordinal = worker.ordinal;
+        workers.push(worker);
+        <span class="macro">trace!</span>(
+            <span class="string">"Worker {} surrendered. ({}/{})"</span>,
+            ordinal,
+            workers.len(),
+            <span class="self">self</span>.worker_count()
+        );
+        workers.len() == <span class="self">self</span>.worker_count()
     }
 
     <span class="doccomment">/// Get the number of workers in the group

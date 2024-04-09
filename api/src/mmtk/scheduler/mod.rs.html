@@ -26,7 +26,6 @@
 <a href="#24" id="24">24</a>
 <a href="#25" id="25">25</a>
 <a href="#26" id="26">26</a>
-<a href="#27" id="27">27</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>affinity;
@@ -46,11 +45,10 @@
 <span class="kw">pub use </span>work_bucket::WorkBucketStage;
 
 <span class="kw">mod </span>worker;
+<span class="kw">mod </span>worker_goals;
+<span class="kw">mod </span>worker_monitor;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>worker::current_worker_ordinal;
 <span class="kw">pub use </span>worker::GCWorker;
-
-<span class="kw">mod </span>controller;
-<span class="kw">pub use </span>controller::GCController;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>gc_work;
 <span class="kw">pub use </span>gc_work::ProcessEdgesWork;

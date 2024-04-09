@@ -221,8 +221,17 @@
 <a href="#219" id="219">219</a>
 <a href="#220" id="220">220</a>
 <a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::Mutex;
+<span class="kw">use </span>std::time::Instant;
+
+<span class="kw">use </span>atomic_refcell::AtomicRefCell;
 
 <span class="doccomment">/// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -238,6 +247,8 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) initialized: AtomicBool,
     <span class="doccomment">/// The current GC status.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) gc_status: Mutex&lt;GcStatus&gt;,
+    <span class="doccomment">/// When did the last GC start? Only accessed by the last parked worker.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) gc_start_time: AtomicRefCell&lt;<span class="prelude-ty">Option</span>&lt;Instant&gt;&gt;,
     <span class="doccomment">/// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) emergency_collection: AtomicBool,
@@ -418,6 +429,7 @@
         <span class="self">Self </span>{
             initialized: AtomicBool::new(<span class="bool-val">false</span>),
             gc_status: Mutex::new(GcStatus::NotInGC),
+            gc_start_time: AtomicRefCell::new(<span class="prelude-val">None</span>),
             stacks_prepared: AtomicBool::new(<span class="bool-val">false</span>),
             emergency_collection: AtomicBool::new(<span class="bool-val">false</span>),
             user_triggered_collection: AtomicBool::new(<span class="bool-val">false</span>),

@@ -292,7 +292,19 @@
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::WorkerMonitor;
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker_monitor::WorkerMonitor;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span>crossbeam::deque::{Injector, Steal, Worker};
@@ -433,6 +445,19 @@
         <span class="self">self</span>.notify_one_worker();
     }
 
+    <span class="doccomment">/// Add a work packet to this bucket, but do not notify any workers.
+    /// This is useful when the current thread is holding the mutex of `WorkerMonitor` which is
+    /// used for notifying workers.  This usually happens if the current thread is the last worker
+    /// parked.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>add_no_notify&lt;W: GCWork&lt;VM&gt;&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, work: W) {
+        <span class="self">self</span>.queue.push(Box::new(work));
+    }
+
+    <span class="doccomment">/// Like [`WorkBucket::add_no_notify`], but the work is boxed.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>add_boxed_no_notify(<span class="kw-2">&amp;</span><span class="self">self</span>, work: Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;) {
+        <span class="self">self</span>.queue.push(work);
+    }
+
     <span class="doccomment">/// Add multiple packets with a higher priority.
     /// Panic if this bucket cannot receive prioritized packets.
     </span><span class="kw">pub fn </span>bulk_add_prioritized(<span class="kw-2">&amp;</span><span class="self">self</span>, work_vec: Vec&lt;Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt;&gt;) {
@@ -504,11 +529,10 @@
             sentinel.take()
         };
         <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = maybe_sentinel {
-            <span class="comment">// We don't need to call `self.add` because this function is called by the coordinator
-            // when workers are stopped.  We don't need to notify the workers because the
-            // coordinator will do that later.
-            // We can just "sneak" the sentinel work packet into the current bucket.
-            </span><span class="self">self</span>.queue.push(work);
+            <span class="comment">// We don't need to notify other workers because this function is called by the last
+            // parked worker.  After this function returns, the caller will notify workers because
+            // more work packets become available.
+            </span><span class="self">self</span>.add_boxed_no_notify(work);
             <span class="bool-val">true
         </span>} <span class="kw">else </span>{
             <span class="bool-val">false

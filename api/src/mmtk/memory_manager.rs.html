@@ -871,39 +871,6 @@
 <a href="#869" id="869">869</a>
 <a href="#870" id="870">870</a>
 <a href="#871" id="871">871</a>
-<a href="#872" id="872">872</a>
-<a href="#873" id="873">873</a>
-<a href="#874" id="874">874</a>
-<a href="#875" id="875">875</a>
-<a href="#876" id="876">876</a>
-<a href="#877" id="877">877</a>
-<a href="#878" id="878">878</a>
-<a href="#879" id="879">879</a>
-<a href="#880" id="880">880</a>
-<a href="#881" id="881">881</a>
-<a href="#882" id="882">882</a>
-<a href="#883" id="883">883</a>
-<a href="#884" id="884">884</a>
-<a href="#885" id="885">885</a>
-<a href="#886" id="886">886</a>
-<a href="#887" id="887">887</a>
-<a href="#888" id="888">888</a>
-<a href="#889" id="889">889</a>
-<a href="#890" id="890">890</a>
-<a href="#891" id="891">891</a>
-<a href="#892" id="892">892</a>
-<a href="#893" id="893">893</a>
-<a href="#894" id="894">894</a>
-<a href="#895" id="895">895</a>
-<a href="#896" id="896">896</a>
-<a href="#897" id="897">897</a>
-<a href="#898" id="898">898</a>
-<a href="#899" id="899">899</a>
-<a href="#900" id="900">900</a>
-<a href="#901" id="901">901</a>
-<a href="#902" id="902">902</a>
-<a href="#903" id="903">903</a>
-<a href="#904" id="904">904</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -922,7 +889,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::plan::AllocationSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{Mutator, MutatorContext};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
-<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCController, GCWork, GCWorker};
+<span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
@@ -931,7 +898,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::MemorySlice;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ReferenceGlue;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
-<span class="kw">use </span>std::sync::atomic::Ordering;
+
 <span class="doccomment">/// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
 ///
@@ -1344,6 +1311,7 @@
 <span class="doccomment">/// Get the current active malloc'd bytes. Here MMTk only accounts for bytes that are done through those 'counted malloc' functions.
 </span><span class="attr">#[cfg(feature = <span class="string">"malloc_counted_size"</span>)]
 </span><span class="kw">pub fn </span>get_malloc_bytes&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
+    <span class="kw">use </span>std::sync::atomic::Ordering;
     mmtk.state.malloc_bytes.load(Ordering::SeqCst)
 }
 
@@ -1366,53 +1334,18 @@
     }
 }
 
-<span class="doccomment">/// Run the main loop for the GC controller thread. This method does not return.
-///
-/// Arguments:
-/// * `tls`: The thread that will be used as the GC controller.
-/// * `gc_controller`: The execution context of the GC controller threa.
-///   It is the `GCController` passed to `Collection::spawn_gc_thread`.
-/// * `mmtk`: A reference to an MMTk instance.
-</span><span class="kw">pub fn </span>start_control_collector&lt;VM: VMBinding&gt;(
-    _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
-    tls: VMWorkerThread,
-    gc_controller: <span class="kw-2">&amp;mut </span>GCController&lt;VM&gt;,
-) {
-    gc_controller.run(tls);
-}
-
-<span class="doccomment">/// Run the main loop of a GC worker. This method does not return.
-///
-/// Arguments:
-/// * `tls`: The thread that will be used as the GC worker.
-/// * `worker`: The execution context of the GC worker thread.
-///   It is the `GCWorker` passed to `Collection::spawn_gc_thread`.
-/// * `mmtk`: A reference to an MMTk instance.
+<span class="doccomment">/// Wrapper for [`crate::scheduler::GCWorker::run`].
 </span><span class="kw">pub fn </span>start_worker&lt;VM: VMBinding&gt;(
     mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
     tls: VMWorkerThread,
-    worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
+    worker: Box&lt;GCWorker&lt;VM&gt;&gt;,
 ) {
     worker.run(tls, mmtk);
 }
 
-<span class="doccomment">/// Initialize the scheduler and GC workers that are required for doing garbage collections.
-/// This is a mandatory call for a VM during its boot process once its thread system
-/// is ready. This should only be called once. This call will invoke Collection::spawn_gc_thread()
-/// to create GC threads.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-/// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
-///   Collection::spawn_gc_thread() so that the VM knows the context.
+<span class="doccomment">/// Wrapper for [`crate::mmtk::MMTK::initialize_collection`].
 </span><span class="kw">pub fn </span>initialize_collection&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMThread) {
-    <span class="macro">assert!</span>(
-        !mmtk.state.is_initialized(),
-        <span class="string">"MMTk collection has been initialized (was initialize_collection() already called before?)"
-    </span>);
-    mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.state.initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
-    <span class="macro">probe!</span>(mmtk, collection_initialized);
+    mmtk.initialize_collection(tls);
 }
 
 <span class="doccomment">/// Process MMTk run-time options. Returns true if the option is processed successfully.
@@ -1460,6 +1393,7 @@
 /// to call this method is at the end of a GC (e.g. when the runtime is about to resume threads).
 </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
 </span><span class="kw">pub fn </span>live_bytes_in_last_gc&lt;VM: VMBinding&gt;(mmtk: <span class="kw-2">&amp;</span>MMTK&lt;VM&gt;) -&gt; usize {
+    <span class="kw">use </span>std::sync::atomic::Ordering;
     mmtk.state.live_bytes_in_last_gc.load(Ordering::SeqCst)
 }
 

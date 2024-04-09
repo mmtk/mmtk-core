@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["GCRequester","RequestSync"]};
+window.SIDEBAR_ITEMS = {"struct":["GCRequester"]};

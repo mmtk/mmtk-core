@@ -412,29 +412,240 @@
 <a href="#410" id="410">410</a>
 <a href="#411" id="411">411</a>
 <a href="#412" id="412">412</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
+<a href="#459" id="459">459</a>
+<a href="#460" id="460">460</a>
+<a href="#461" id="461">461</a>
+<a href="#462" id="462">462</a>
+<a href="#463" id="463">463</a>
+<a href="#464" id="464">464</a>
+<a href="#465" id="465">465</a>
+<a href="#466" id="466">466</a>
+<a href="#467" id="467">467</a>
+<a href="#468" id="468">468</a>
+<a href="#469" id="469">469</a>
+<a href="#470" id="470">470</a>
+<a href="#471" id="471">471</a>
+<a href="#472" id="472">472</a>
+<a href="#473" id="473">473</a>
+<a href="#474" id="474">474</a>
+<a href="#475" id="475">475</a>
+<a href="#476" id="476">476</a>
+<a href="#477" id="477">477</a>
+<a href="#478" id="478">478</a>
+<a href="#479" id="479">479</a>
+<a href="#480" id="480">480</a>
+<a href="#481" id="481">481</a>
+<a href="#482" id="482">482</a>
+<a href="#483" id="483">483</a>
+<a href="#484" id="484">484</a>
+<a href="#485" id="485">485</a>
+<a href="#486" id="486">486</a>
+<a href="#487" id="487">487</a>
+<a href="#488" id="488">488</a>
+<a href="#489" id="489">489</a>
+<a href="#490" id="490">490</a>
+<a href="#491" id="491">491</a>
+<a href="#492" id="492">492</a>
+<a href="#493" id="493">493</a>
+<a href="#494" id="494">494</a>
+<a href="#495" id="495">495</a>
+<a href="#496" id="496">496</a>
+<a href="#497" id="497">497</a>
+<a href="#498" id="498">498</a>
+<a href="#499" id="499">499</a>
+<a href="#500" id="500">500</a>
+<a href="#501" id="501">501</a>
+<a href="#502" id="502">502</a>
+<a href="#503" id="503">503</a>
+<a href="#504" id="504">504</a>
+<a href="#505" id="505">505</a>
+<a href="#506" id="506">506</a>
+<a href="#507" id="507">507</a>
+<a href="#508" id="508">508</a>
+<a href="#509" id="509">509</a>
+<a href="#510" id="510">510</a>
+<a href="#511" id="511">511</a>
+<a href="#512" id="512">512</a>
+<a href="#513" id="513">513</a>
+<a href="#514" id="514">514</a>
+<a href="#515" id="515">515</a>
+<a href="#516" id="516">516</a>
+<a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
+
+<span class="kw">use </span><span class="kw">super</span>::gc_work::ScheduleCollection;
+<span class="kw">use </span><span class="kw">super</span>::stat::SchedulerStat;
 <span class="kw">use </span><span class="kw">super</span>::work_bucket::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
+<span class="kw">use </span><span class="kw">super</span>::worker::{GCWorker, ThreadId, WorkerGroup};
+<span class="kw">use </span><span class="kw">super</span>::worker_goals::{WorkerGoal, WorkerGoals};
+<span class="kw">use </span><span class="kw">super</span>::worker_monitor::{LastParkedResult, WorkerMonitor};
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::options::AffinityKind;
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::array_from_fn;
 <span class="kw">use </span><span class="kw">crate</span>::vm::Collection;
-<span class="kw">use </span><span class="kw">crate</span>::vm::{GCThreadContext, VMBinding};
-<span class="kw">use </span>crossbeam::deque::{<span class="self">self</span>, Steal};
+<span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
+<span class="kw">use </span><span class="kw">crate</span>::Plan;
+<span class="kw">use </span>crossbeam::deque::Steal;
 <span class="kw">use </span>enum_map::{Enum, EnumMap};
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::sync::Arc;
+<span class="kw">use </span>std::time::Instant;
 
 <span class="kw">pub struct </span>GCWorkScheduler&lt;VM: VMBinding&gt; {
     <span class="doccomment">/// Work buckets
     </span><span class="kw">pub </span>work_buckets: EnumMap&lt;WorkBucketStage, WorkBucket&lt;VM&gt;&gt;,
     <span class="doccomment">/// Workers
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) worker_group: Arc&lt;WorkerGroup&lt;VM&gt;&gt;,
-    <span class="doccomment">/// The shared part of the GC worker object of the controller thread
-    </span>coordinator_worker_shared: Arc&lt;GCWorkerShared&lt;VM&gt;&gt;,
-    <span class="doccomment">/// Condition Variable for worker synchronization
+    <span class="doccomment">/// For synchronized communication between workers and with mutators.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) worker_monitor: Arc&lt;WorkerMonitor&gt;,
     <span class="doccomment">/// How to assign the affinity of each GC thread. Specified by the user.
     </span>affinity: AffinityKind,
@@ -460,15 +671,17 @@
 
         <span class="comment">// Set the open condition of each bucket.
         </span>{
-            <span class="comment">// Unconstrained is always open. Prepare will be opened at the beginning of a GC.
-            // This vec will grow for each stage we call with open_next()
-            </span><span class="kw">let </span>first_stw_stage = WorkBucketStage::first_stw_stage();
+            <span class="kw">let </span>first_stw_stage = WorkBucketStage::first_stw_stage();
             <span class="kw">let </span><span class="kw-2">mut </span>open_stages: Vec&lt;WorkBucketStage&gt; = <span class="macro">vec!</span>[first_stw_stage];
-            <span class="comment">// The rest will open after the previous stage is done.
-            </span><span class="kw">let </span>stages = (<span class="number">0</span>..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
+            <span class="kw">let </span>stages = (<span class="number">0</span>..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             <span class="kw">for </span>stage <span class="kw">in </span>stages {
-                <span class="kw">if </span>stage != WorkBucketStage::Unconstrained &amp;&amp; stage != first_stw_stage {
-                    <span class="kw">let </span>cur_stages = open_stages.clone();
+                <span class="comment">// Unconstrained is always open.
+                // The first STW stage (Prepare) will be opened when the world stopped
+                // (i.e. when all mutators are suspended).
+                </span><span class="kw">if </span>stage != WorkBucketStage::Unconstrained &amp;&amp; stage != first_stw_stage {
+                    <span class="comment">// Other work packets will be opened after previous stages are done
+                    // (i.e their buckets are drained and all workers parked).
+                    </span><span class="kw">let </span>cur_stages = open_stages.clone();
                     work_buckets[stage].set_open_condition(
                         <span class="kw">move </span>|scheduler: <span class="kw-2">&amp;</span>GCWorkScheduler&lt;VM&gt;| {
                             scheduler.are_buckets_drained(<span class="kw-2">&amp;</span>cur_stages)
@@ -479,12 +692,9 @@
             }
         }
 
-        <span class="kw">let </span>coordinator_worker_shared = Arc::new(GCWorkerShared::&lt;VM&gt;::new(<span class="prelude-val">None</span>));
-
         Arc::new(<span class="self">Self </span>{
             work_buckets,
             worker_group,
-            coordinator_worker_shared,
             worker_monitor,
             affinity,
         })
@@ -494,26 +704,40 @@
         <span class="self">self</span>.worker_group.as_ref().worker_count()
     }
 
-    <span class="doccomment">/// Create GC threads, including the controller thread and all workers.
+    <span class="doccomment">/// Create GC threads for the first time.  It will also create the `GCWorker` instances.
+    ///
+    /// Currently GC threads only include worker threads, and we currently have only one worker
+    /// group.  We may add more worker groups in the future.
     </span><span class="kw">pub fn </span>spawn_gc_threads(<span class="self">self</span>: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;, tls: VMThread) {
-        <span class="comment">// Spawn the controller thread.
-        </span><span class="kw">let </span>coordinator_worker = GCWorker::new(
-            mmtk,
-            usize::MAX,
-            <span class="self">self</span>.clone(),
-            <span class="bool-val">true</span>,
-            <span class="self">self</span>.coordinator_worker_shared.clone(),
-            deque::Worker::new_fifo(),
-        );
-        <span class="kw">let </span>gc_controller = GCController::new(
-            mmtk,
-            mmtk.gc_requester.clone(),
-            <span class="self">self</span>.clone(),
-            coordinator_worker,
-        );
-        VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::&lt;VM&gt;::Controller(gc_controller));
+        <span class="self">self</span>.worker_group.initial_spawn(tls, mmtk);
+    }
 
-        <span class="self">self</span>.worker_group.spawn(mmtk, tls)
+    <span class="doccomment">/// Ask all GC workers to exit for forking.
+    </span><span class="kw">pub fn </span>stop_gc_threads_for_forking(<span class="self">self</span>: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;) {
+        <span class="self">self</span>.worker_group.prepare_surrender_buffer();
+
+        <span class="macro">debug!</span>(<span class="string">"A mutator is requesting GC threads to stop for forking..."</span>);
+        <span class="self">self</span>.worker_monitor.make_request(WorkerGoal::StopForFork);
+    }
+
+    <span class="doccomment">/// Surrender the `GCWorker` struct of a GC worker when it exits.
+    </span><span class="kw">pub fn </span>surrender_gc_worker(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: Box&lt;GCWorker&lt;VM&gt;&gt;) {
+        <span class="kw">let </span>all_surrendered = <span class="self">self</span>.worker_group.surrender_gc_worker(worker);
+
+        <span class="kw">if </span>all_surrendered {
+            <span class="macro">debug!</span>(
+                <span class="string">"All {} workers surrendered."</span>,
+                <span class="self">self</span>.worker_group.worker_count()
+            );
+            <span class="self">self</span>.worker_monitor.on_all_workers_exited();
+        }
+    }
+
+    <span class="doccomment">/// Respawn GC threads after forking.  This will reuse the `GCWorker` instances of stopped
+    /// workers.  `tls` is the VM thread that requests GC threads to be re-spawn, and will be
+    /// passed down to [`crate::vm::Collection::spawn_gc_thread`].
+    </span><span class="kw">pub fn </span>respawn_gc_threads_after_forking(<span class="self">self</span>: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;, tls: VMThread) {
+        <span class="self">self</span>.worker_group.respawn(tls)
     }
 
     <span class="doccomment">/// Resolve the affinity of a thread.
@@ -521,9 +745,20 @@
         <span class="self">self</span>.affinity.resolve_affinity(thread);
     }
 
+    <span class="doccomment">/// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>request_schedule_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="macro">debug!</span>(<span class="string">"A mutator is sending GC-scheduling request to workers..."</span>);
+        <span class="self">self</span>.worker_monitor.make_request(WorkerGoal::Gc);
+    }
+
+    <span class="doccomment">/// Add the `ScheduleCollection` packet.  Called by the last parked worker.
+    </span><span class="kw">fn </span>add_schedule_collection_packet(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
+        </span><span class="self">self</span>.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
+    }
+
     <span class="doccomment">/// Schedule all the common work packets
     </span><span class="kw">pub fn </span>schedule_common_work&lt;C: GCWorkContext&lt;VM = VM&gt;&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, plan: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>C::PlanType) {
-        <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
         <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
         <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)
         </span><span class="self">self</span>.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::&lt;C&gt;::new());
@@ -772,20 +1007,200 @@
 
     <span class="doccomment">/// Called by workers to get a schedulable work packet.
     /// Park the worker if there're no available packets.
-    </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
-        <span class="self">self</span>.poll_schedulable_work(worker)
-            .unwrap_or_else(|| <span class="self">self</span>.poll_slow(worker))
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; PollResult&lt;VM&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.poll_schedulable_work(worker) {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
+        }
+        <span class="self">self</span>.poll_slow(worker)
     }
 
-    <span class="kw">fn </span>poll_slow(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; Box&lt;<span class="kw">dyn </span>GCWork&lt;VM&gt;&gt; {
+    <span class="kw">fn </span>poll_slow(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) -&gt; PollResult&lt;VM&gt; {
         <span class="kw">loop </span>{
             <span class="comment">// Retry polling
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(work) = <span class="self">self</span>.poll_schedulable_work(worker) {
-                <span class="kw">return </span>work;
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(work);
             }
 
-            <span class="self">self</span>.worker_monitor.park_and_wait(worker);
+            <span class="kw">let </span>ordinal = worker.ordinal;
+            <span class="self">self</span>.worker_monitor
+                .park_and_wait(ordinal, |goals| <span class="self">self</span>.on_last_parked(worker, goals))<span class="question-mark">?</span>;
         }
+    }
+
+    <span class="doccomment">/// Called when the last worker parked.  `goal` allows this function to inspect and change the
+    /// current goal.
+    </span><span class="kw">fn </span>on_last_parked(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;, goals: <span class="kw-2">&amp;mut </span>WorkerGoals) -&gt; LastParkedResult {
+        <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>current_goal) = goals.current() <span class="kw">else </span>{
+            <span class="comment">// There is no goal.  Find a request to respond to.
+            </span><span class="kw">return </span><span class="self">self</span>.respond_to_requests(worker, goals);
+        };
+
+        <span class="kw">match </span>current_goal {
+            WorkerGoal::Gc =&gt; {
+                <span class="comment">// We are in the progress of GC.
+
+                // In stop-the-world GC, mutators cannot request for GC while GC is in progress.
+                // When we support concurrent GC, we should remove this assertion.
+                </span><span class="macro">assert!</span>(
+                    !goals.debug_is_requested(WorkerGoal::Gc),
+                    <span class="string">"GC request sent to WorkerMonitor while GC is still in progress."
+                </span>);
+
+                <span class="comment">// We are in the middle of GC, and the last GC worker parked.
+                </span><span class="macro">trace!</span>(<span class="string">"The last worker parked during GC.  Try to find more work to do..."</span>);
+
+                <span class="comment">// During GC, if all workers parked, all open buckets must have been drained.
+                </span><span class="self">self</span>.assert_all_activated_buckets_are_empty();
+
+                <span class="comment">// Find more work for workers to do.
+                </span><span class="kw">let </span>found_more_work = <span class="self">self</span>.find_more_work_for_workers();
+
+                <span class="kw">if </span>found_more_work {
+                    LastParkedResult::WakeAll
+                } <span class="kw">else </span>{
+                    <span class="comment">// GC finished.
+                    </span><span class="self">self</span>.on_gc_finished(worker);
+
+                    <span class="comment">// Clear the current goal
+                    </span>goals.on_current_goal_completed();
+                    <span class="self">self</span>.respond_to_requests(worker, goals)
+                }
+            }
+            WorkerGoal::StopForFork =&gt; {
+                <span class="macro">panic!</span>(
+                    <span class="string">"Worker {} parked again when it is asked to exit."</span>,
+                    worker.ordinal
+                )
+            }
+        }
+    }
+
+    <span class="doccomment">/// Respond to a worker reqeust.
+    </span><span class="kw">fn </span>respond_to_requests(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;,
+        goals: <span class="kw-2">&amp;mut </span>WorkerGoals,
+    ) -&gt; LastParkedResult {
+        <span class="macro">assert!</span>(goals.current().is_none());
+
+        <span class="kw">let </span><span class="prelude-val">Some</span>(goal) = goals.poll_next_goal() <span class="kw">else </span>{
+            <span class="comment">// No requests.  Park this worker, too.
+            </span><span class="kw">return </span>LastParkedResult::ParkSelf;
+        };
+
+        <span class="kw">match </span>goal {
+            WorkerGoal::Gc =&gt; {
+                <span class="macro">trace!</span>(<span class="string">"A mutator requested a GC to be scheduled."</span>);
+
+                <span class="comment">// We set the eBPF trace point here so that bpftrace scripts can start recording
+                // work packet events before the `ScheduleCollection` work packet starts.
+                </span><span class="macro">probe!</span>(mmtk, gc_start);
+
+                {
+                    <span class="kw">let </span><span class="kw-2">mut </span>gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+                    <span class="macro">assert!</span>(gc_start_time.is_none(), <span class="string">"GC already started?"</span>);
+                    <span class="kw-2">*</span>gc_start_time = <span class="prelude-val">Some</span>(Instant::now());
+                }
+
+                <span class="self">self</span>.add_schedule_collection_packet();
+                LastParkedResult::WakeSelf
+            }
+            WorkerGoal::StopForFork =&gt; {
+                <span class="macro">trace!</span>(<span class="string">"A mutator wanted to fork."</span>);
+                LastParkedResult::WakeAll
+            }
+        }
+    }
+
+    <span class="doccomment">/// Find more work for workers to do.  Return true if more work is available.
+    </span><span class="kw">fn </span>find_more_work_for_workers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.worker_group.has_designated_work() {
+            <span class="macro">trace!</span>(<span class="string">"Some workers have designated work."</span>);
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// See if any bucket has a sentinel.
+        </span><span class="kw">if </span><span class="self">self</span>.schedule_sentinels() {
+            <span class="macro">trace!</span>(<span class="string">"Some sentinels are scheduled."</span>);
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// Try to open new buckets.
+        </span><span class="kw">if </span><span class="self">self</span>.update_buckets() {
+            <span class="macro">trace!</span>(<span class="string">"Some buckets are opened."</span>);
+            <span class="kw">return </span><span class="bool-val">true</span>;
+        }
+
+        <span class="comment">// If all of the above failed, it means GC has finished.
+        </span><span class="bool-val">false
+    </span>}
+
+    <span class="doccomment">/// Called when GC has finished, i.e. when all work packets have been executed.
+    </span><span class="kw">fn </span>on_gc_finished(<span class="kw-2">&amp;</span><span class="self">self</span>, worker: <span class="kw-2">&amp;</span>GCWorker&lt;VM&gt;) {
+        <span class="comment">// All GC workers must have parked by now.
+        </span><span class="macro">debug_assert!</span>(!<span class="self">self</span>.worker_group.has_designated_work());
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.all_buckets_empty());
+
+        <span class="comment">// Deactivate all work buckets to prepare for the next GC.
+        </span><span class="self">self</span>.deactivate_all();
+        <span class="self">self</span>.debug_assert_all_buckets_deactivated();
+
+        <span class="kw">let </span>mmtk = worker.mmtk;
+
+        <span class="comment">// Tell GC trigger that GC ended - this happens before we resume mutators.
+        </span>mmtk.gc_trigger.policy.on_gc_end(mmtk);
+
+        <span class="comment">// Compute the elapsed time of the GC.
+        </span><span class="kw">let </span>start_time = {
+            <span class="kw">let </span><span class="kw-2">mut </span>gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+            gc_start_time.take().expect(<span class="string">"GC not started yet?"</span>)
+        };
+        <span class="kw">let </span>elapsed = start_time.elapsed();
+
+        <span class="macro">info!</span>(
+            <span class="string">"End of GC ({}/{} pages, took {} ms)"</span>,
+            mmtk.get_plan().get_reserved_pages(),
+            mmtk.get_plan().get_total_pages(),
+            elapsed.as_millis()
+        );
+
+        <span class="comment">// USDT tracepoint for the end of GC.
+        </span><span class="macro">probe!</span>(mmtk, gc_end);
+
+        <span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]
+        </span>{
+            <span class="kw">let </span>live_bytes = mmtk.state.get_live_bytes_in_last_gc();
+            <span class="kw">let </span>used_bytes =
+                mmtk.get_plan().get_used_pages() &lt;&lt; <span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
+            <span class="macro">debug_assert!</span>(
+                live_bytes &lt;= used_bytes,
+                <span class="string">"Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong."</span>,
+                live_bytes, used_bytes
+            );
+            <span class="macro">info!</span>(
+                <span class="string">"Live objects = {} bytes ({:04.1}% of {} used pages)"</span>,
+                live_bytes,
+                live_bytes <span class="kw">as </span>f64 * <span class="number">100.0 </span>/ used_bytes <span class="kw">as </span>f64,
+                mmtk.get_plan().get_used_pages()
+            );
+        }
+
+        <span class="comment">// All other workers are parked, so it is safe to access the Plan instance mutably.
+        </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; = <span class="kw">unsafe </span>{ mmtk.get_plan_mut() };
+        plan_mut.end_of_gc(worker.tls);
+
+        <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+        </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
+            <span class="comment">// reset the logging info at the end of each GC
+            </span>mmtk.edge_logger.reset();
+        }
+
+        <span class="comment">// Reset the triggering information.
+        </span>mmtk.state.reset_collection_trigger();
+
+        <span class="comment">// Set to NotInGC after everything, and right before resuming mutators.
+        </span>mmtk.set_gc_status(GcStatus::NotInGC);
+        &lt;VM <span class="kw">as </span>VMBinding&gt;::VMCollection::resume_mutators(worker.tls);
     }
 
     <span class="kw">pub fn </span>enable_stat(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -793,8 +1208,6 @@
             <span class="kw">let </span>worker_stat = worker.borrow_stat();
             worker_stat.enable();
         }
-        <span class="kw">let </span>coordinator_worker_stat = <span class="self">self</span>.coordinator_worker_shared.borrow_stat();
-        coordinator_worker_stat.enable();
     }
 
     <span class="kw">pub fn </span>statistics(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashMap&lt;String, String&gt; {
@@ -803,8 +1216,6 @@
             <span class="kw">let </span>worker_stat = worker.borrow_stat();
             summary.merge(<span class="kw-2">&amp;</span>worker_stat);
         }
-        <span class="kw">let </span>coordinator_worker_stat = <span class="self">self</span>.coordinator_worker_shared.borrow_stat();
-        summary.merge(<span class="kw-2">&amp;</span>coordinator_worker_stat);
         summary.harness_stat()
     }
 
@@ -812,14 +1223,13 @@
         mmtk.gc_requester.clear_request();
         <span class="kw">let </span>first_stw_bucket = <span class="kw-2">&amp;</span><span class="self">self</span>.work_buckets[WorkBucketStage::first_stw_stage()];
         <span class="macro">debug_assert!</span>(!first_stw_bucket.is_activated());
-        <span class="comment">// Note: This is the only place where a non-coordinator thread opens a bucket.
-        // If the `StopMutators` is executed by the coordinator thread, it will open
-        // the `Prepare` bucket and let workers start executing packets while the coordinator
-        // can still add more work packets to `Prepare`.  However, since `Prepare` is the first STW
-        // bucket and only the coordinator can open any subsequent buckets, workers cannot execute
-        // work packets out of order.  This is not generally true if we are not opening the first
-        // STW bucket.  In the future, we should redesign the opening condition of work buckets to
-        // make the synchronization more robust,
+        <span class="comment">// Note: This is the only place where a bucket is opened without having all workers parked.
+        // We usually require all workers to park before opening new buckets because otherwise
+        // packets will be executed out of order.  However, since `Prepare` is the first STW
+        // bucket, and all subsequent buckets require all workers to park before opening, workers
+        // cannot execute work packets out of order.  This is not generally true if we are not
+        // opening the first STW bucket.  In the future, we should redesign the opening condition
+        // of work buckets to make the synchronization more robust,
         </span>first_stw_bucket.activate();
         <span class="self">self</span>.worker_monitor.notify_work_available(<span class="bool-val">true</span>);
     }

@@ -374,6 +374,95 @@
 <a href="#372" id="372">372</a>
 <a href="#373" id="373">373</a>
 <a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
+<a href="#457" id="457">457</a>
+<a href="#458" id="458">458</a>
+<a href="#459" id="459">459</a>
+<a href="#460" id="460">460</a>
+<a href="#461" id="461">461</a>
+<a href="#462" id="462">462</a>
+<a href="#463" id="463">463</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk instance.
 </span><span class="kw">use </span><span class="kw">crate</span>::global_state::{GcStatus, GlobalState};
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
@@ -524,7 +613,7 @@
 
         <span class="kw">let </span>state = Arc::new(GlobalState::default());
 
-        <span class="kw">let </span>gc_requester = Arc::new(GCRequester::new());
+        <span class="kw">let </span>gc_requester = Arc::new(GCRequester::new(scheduler.clone()));
 
         <span class="kw">let </span>gc_trigger = Arc::new(GCTrigger::new(
             options.clone(),
@@ -594,6 +683,93 @@
             gc_requester,
             stats,
         }
+    }
+
+    <span class="doccomment">/// Initialize the GC worker threads that are required for doing garbage collections.
+    /// This is a mandatory call for a VM during its boot process once its thread system
+    /// is ready.
+    ///
+    /// Internally, this function will invoke [`Collection::spawn_gc_thread()`] to spawn GC worker
+    /// threads.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
+    ///     to the VM in [`Collection::spawn_gc_thread()`] so that the VM knows the context.
+    ///
+    /// [`Collection::spawn_gc_thread()`]: crate::vm::Collection::spawn_gc_thread()
+    </span><span class="kw">pub fn </span>initialize_collection(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, tls: VMThread) {
+        <span class="macro">assert!</span>(
+            !<span class="self">self</span>.state.is_initialized(),
+            <span class="string">"MMTk collection has been initialized (was initialize_collection() already called before?)"
+        </span>);
+        <span class="self">self</span>.scheduler.spawn_gc_threads(<span class="self">self</span>, tls);
+        <span class="self">self</span>.state.initialized.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+        <span class="macro">probe!</span>(mmtk, collection_initialized);
+    }
+
+    <span class="doccomment">/// Prepare an MMTk instance for calling the `fork()` system call.
+    ///
+    /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
+    /// on other platforms by libraries such as Cygwin.  The properties of the `fork()` system call
+    /// requires the users to do some preparation before calling it.
+    ///
+    /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
+    /// will only duplicate the current thread into the child process, and the child process can
+    /// only call async-signal-safe functions, notably `exec()`.  For VMs that that use
+    /// multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
+    /// exist in the process.
+    ///
+    /// -   **File descriptors**: The child process inherits copies of the parent's set of open
+    /// file descriptors.  This may or may not be desired depending on use cases.
+    ///
+    /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
+    /// GC threads to save their contexts and return from their entry-point functions.  Currently,
+    /// such threads only include GC workers, and the entry point is
+    /// [`crate::memory_manager::start_worker`].  A subsequent call to `MMTK::after_fork()` will
+    /// re-spawn the threads using their saved contexts.  The VM must not allocate objects in the
+    /// MMTk heap before calling `MMTK::after_fork()`.
+    ///
+    /// TODO: Currently, the MMTk core does not keep any files open for a long time.  In the
+    /// future, this function and the `after_fork` function may be used for handling open file
+    /// descriptors across invocations of `fork()`.  One possible use case is logging GC activities
+    /// and statistics to files, such as performing heap dumps across multiple GCs.
+    ///
+    /// If a VM intends to execute another program by calling `fork()` and immediately calling
+    /// `exec`, it may skip this function because the state of the MMTk instance will be irrelevant
+    /// in that case.
+    ///
+    /// # Caution!
+    ///
+    /// This function sends an asynchronous message to GC threads and returns immediately, but it
+    /// is only safe for the VM to call `fork()` after the underlying **native threads** of the GC
+    /// threads have exited.  After calling this function, the VM should wait for their underlying
+    /// native threads to exit in VM-specific manner before calling `fork()`.
+    </span><span class="kw">pub fn </span>prepare_to_fork(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>) {
+        <span class="macro">assert!</span>(
+            <span class="self">self</span>.state.is_initialized(),
+            <span class="string">"MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        </span>);
+        <span class="macro">probe!</span>(mmtk, prepare_to_fork);
+        <span class="self">self</span>.scheduler.stop_gc_threads_for_forking();
+    }
+
+    <span class="doccomment">/// Call this function after the VM called the `fork()` system call.
+    ///
+    /// This function will re-spawn MMTk threads from saved contexts.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
+    ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
+    ///     context.
+    </span><span class="kw">pub fn </span>after_fork(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, tls: VMThread) {
+        <span class="macro">assert!</span>(
+            <span class="self">self</span>.state.is_initialized(),
+            <span class="string">"MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        </span>);
+        <span class="macro">probe!</span>(mmtk, after_fork);
+        <span class="self">self</span>.scheduler.respawn_gc_threads_after_forking(tls);
     }
 
     <span class="doccomment">/// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
@@ -725,7 +901,9 @@
         <span class="self">self</span>.state
             .internal_triggered_collection
             .store(<span class="bool-val">true</span>, Ordering::Relaxed);
-        <span class="self">self</span>.gc_requester.request();
+        <span class="comment">// TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
+        // Consider removing functions related to "internal triggered collection".
+        </span><span class="self">self</span>.gc_requester.request();
     }
 
     <span class="doccomment">/// Get a reference to the plan.

@@ -163,6 +163,23 @@
 <a href="#161" id="161">161</a>
 <a href="#162" id="162">162</a>
 <a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module works around limitations of the Rust programming language, and provides missing
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
@@ -288,6 +305,23 @@
         }
     }
     <span class="kw">unsafe </span>{ result_array.assume_init() }
+}
+
+<span class="doccomment">/// Create a formatted string that makes the best effort idenfying the current process and thread.
+</span><span class="kw">pub fn </span>debug_process_thread_id() -&gt; String {
+    <span class="kw">let </span>pid = <span class="kw">unsafe </span>{ libc::getpid() };
+    <span class="attr">#[cfg(target_os = <span class="string">"linux"</span>)]
+    </span>{
+        <span class="comment">// `gettid()` is Linux-specific.
+        </span><span class="kw">let </span>tid = <span class="kw">unsafe </span>{ libc::gettid() };
+        <span class="macro">format!</span>(<span class="string">"PID: {}, TID: {}"</span>, pid, tid)
+    }
+    <span class="attr">#[cfg(not(target_os = <span class="string">"linux"</span>))]
+    </span>{
+        <span class="comment">// TODO: When we support other platforms, use platform-specific methods to get thread
+        // identifiers.
+        </span><span class="macro">format!</span>(<span class="string">"PID: {}"</span>, pid)
+    }
 }
 
 <span class="attr">#[cfg(test)]

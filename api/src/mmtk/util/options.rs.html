@@ -1192,9 +1192,6 @@
 <a href="#1190" id="1190">1190</a>
 <a href="#1191" id="1191">1191</a>
 <a href="#1192" id="1192">1192</a>
-<a href="#1193" id="1193">1193</a>
-<a href="#1194" id="1194">1194</a>
-<a href="#1195" id="1195">1195</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -1902,10 +1899,7 @@
 </span><span class="macro">options! </span>{
     <span class="doccomment">/// The GC plan to use.
     </span>plan:                  PlanSelector         [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [always_valid] = PlanSelector::GenImmix,
-    <span class="doccomment">/// Number of GC worker threads. (There is always one GC controller thread besides the GC workers)
-    </span><span class="comment">// FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
-    // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
-    // See: https://github.com/mmtk/mmtk-core/issues/532
+    <span class="doccomment">/// Number of GC worker threads.
     </span>threads:               usize                [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>usize| <span class="kw-2">*</span>v &gt; <span class="number">0</span>]    = num_cpus::get(),
     <span class="doccomment">/// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     </span>use_short_stack_scans: bool                 [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [always_valid] = <span class="bool-val">false</span>,
