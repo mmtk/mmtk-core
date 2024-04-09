@@ -56,11 +56,16 @@ impl BlockList {
     // }
     #[cfg(feature = "ms_block_list_sanity")]
     fn verify_block_list(&self, sanity_list: &mut Vec<Block>) {
-        if !sanity_list.iter().map(|b| *b).eq(BlockListIterator { cursor: self.first }) {
+        if !sanity_list
+            .iter()
+            .map(|b| *b)
+            .eq(BlockListIterator { cursor: self.first })
+        {
             eprintln!("Sanity block list: {:?}", sanity_list);
             eprintln!("First {:?}", sanity_list.get(0));
             eprintln!("Actual block list: {:?}", self);
             eprintln!("First {:?}", self.first);
+            eprintln!("Block list {:?}", self as *const _);
             panic!("Incorrect block list");
         }
     }
@@ -81,6 +86,7 @@ impl BlockList {
 
     /// Remove a block from the list
     pub fn remove(&mut self, block: Block) {
+        trace!("Blocklist {:?}: Remove {:?}", self as *const _, block);
         match (block.load_prev_block(), block.load_next_block()) {
             (None, None) => {
                 self.first = None;
@@ -89,12 +95,14 @@ impl BlockList {
             (None, Some(next)) => {
                 next.clear_prev_block();
                 self.first = Some(next);
-                next.store_block_list(self);
+                // next.store_block_list(self);
+                debug_assert_eq!(next.load_block_list(), self as *mut _);
             }
             (Some(prev), None) => {
                 prev.clear_next_block();
                 self.last = Some(prev);
-                prev.store_block_list(self);
+                // prev.store_block_list(self);
+                debug_assert_eq!(prev.load_block_list(), self as *mut _);
             }
             (Some(prev), Some(next)) => {
                 prev.store_next_block(next);
@@ -105,7 +113,11 @@ impl BlockList {
         #[cfg(feature = "ms_block_list_sanity")]
         {
             let mut sanity_list = self.sanity_list.lock().unwrap();
-            if let Some((index, _)) = sanity_list.iter().enumerate().find(|&(_, &val)| val == block) {
+            if let Some((index, _)) = sanity_list
+                .iter()
+                .enumerate()
+                .find(|&(_, &val)| val == block)
+            {
                 sanity_list.remove(index);
             } else {
                 panic!("Cannot find {:?} in the block list", block);
@@ -144,11 +156,13 @@ impl BlockList {
             assert_eq!(sanity_ret, ret);
         }
 
+        trace!("Blocklist {:?}: Pop = {:?}", self as *const _, ret);
         ret
     }
 
     /// Push block to the front of the list
     pub fn push(&mut self, block: Block) {
+        trace!("Blocklist {:?}: Push {:?}", self as *const _, block);
         if self.is_empty() {
             block.clear_next_block();
             block.clear_prev_block();
@@ -173,6 +187,11 @@ impl BlockList {
 
     /// Moves all the blocks of `other` into `self`, leaving `other` empty.
     pub fn append(&mut self, other: &mut BlockList) {
+        trace!(
+            "Blocklist {:?}: Append Blocklist {:?}",
+            self as *const _,
+            other as *const _
+        );
         #[cfg(feature = "ms_block_list_sanity")]
         {
             // Check before merging
@@ -226,6 +245,7 @@ impl BlockList {
 
     /// Remove all blocks
     fn reset(&mut self) {
+        trace!("Blocklist {:?}: Reset", self as *const _);
         self.first = None;
         self.last = None;
 
@@ -252,10 +272,12 @@ impl BlockList {
                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok();
         }
+        trace!("Blocklist {:?}: locked", self as *const _);
     }
 
     /// Unlock list. See the comments on the lock method.
     pub fn unlock(&mut self) {
+        trace!("Blocklist {:?}: unlock", self as *const _);
         self.lock.store(false, Ordering::SeqCst);
     }
 
