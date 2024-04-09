@@ -1,5 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
+
+use atomic_refcell::AtomicRefCell;
 
 /// This stores some global states for an MMTK instance.
 /// Some MMTK components like plans and allocators may keep an reference to the struct, and can access it.
@@ -15,6 +18,8 @@ pub struct GlobalState {
     pub(crate) initialized: AtomicBool,
     /// The current GC status.
     pub(crate) gc_status: Mutex<GcStatus>,
+    /// When did the last GC start? Only accessed by the last parked worker.
+    pub(crate) gc_start_time: AtomicRefCell<Option<Instant>>,
     /// Is the current GC an emergency collection? Emergency means we may run out of memory soon, and we should
     /// attempt to collect as much as we can.
     pub(crate) emergency_collection: AtomicBool,
@@ -195,6 +200,7 @@ impl Default for GlobalState {
         Self {
             initialized: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
+            gc_start_time: AtomicRefCell::new(None),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),

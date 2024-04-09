@@ -148,7 +148,7 @@ impl<VM: VMBinding> MMTK<VM> {
 
         let state = Arc::new(GlobalState::default());
 
-        let gc_requester = Arc::new(GCRequester::new());
+        let gc_requester = Arc::new(GCRequester::new(scheduler.clone()));
 
         let gc_trigger = Arc::new(GCTrigger::new(
             options.clone(),
@@ -218,6 +218,93 @@ impl<VM: VMBinding> MMTK<VM> {
             gc_requester,
             stats,
         }
+    }
+
+    /// Initialize the GC worker threads that are required for doing garbage collections.
+    /// This is a mandatory call for a VM during its boot process once its thread system
+    /// is ready.
+    ///
+    /// Internally, this function will invoke [`Collection::spawn_gc_thread()`] to spawn GC worker
+    /// threads.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to enable the collection. This value will be passed back
+    ///     to the VM in [`Collection::spawn_gc_thread()`] so that the VM knows the context.
+    ///
+    /// [`Collection::spawn_gc_thread()`]: crate::vm::Collection::spawn_gc_thread()
+    pub fn initialize_collection(&'static self, tls: VMThread) {
+        assert!(
+            !self.state.is_initialized(),
+            "MMTk collection has been initialized (was initialize_collection() already called before?)"
+        );
+        self.scheduler.spawn_gc_threads(self, tls);
+        self.state.initialized.store(true, Ordering::SeqCst);
+        probe!(mmtk, collection_initialized);
+    }
+
+    /// Prepare an MMTk instance for calling the `fork()` system call.
+    ///
+    /// The `fork()` system call is available on Linux and some UNIX variants, and may be emulated
+    /// on other platforms by libraries such as Cygwin.  The properties of the `fork()` system call
+    /// requires the users to do some preparation before calling it.
+    ///
+    /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
+    /// will only duplicate the current thread into the child process, and the child process can
+    /// only call async-signal-safe functions, notably `exec()`.  For VMs that that use
+    /// multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
+    /// exist in the process.
+    ///
+    /// -   **File descriptors**: The child process inherits copies of the parent's set of open
+    /// file descriptors.  This may or may not be desired depending on use cases.
+    ///
+    /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
+    /// GC threads to save their contexts and return from their entry-point functions.  Currently,
+    /// such threads only include GC workers, and the entry point is
+    /// [`crate::memory_manager::start_worker`].  A subsequent call to `MMTK::after_fork()` will
+    /// re-spawn the threads using their saved contexts.  The VM must not allocate objects in the
+    /// MMTk heap before calling `MMTK::after_fork()`.
+    ///
+    /// TODO: Currently, the MMTk core does not keep any files open for a long time.  In the
+    /// future, this function and the `after_fork` function may be used for handling open file
+    /// descriptors across invocations of `fork()`.  One possible use case is logging GC activities
+    /// and statistics to files, such as performing heap dumps across multiple GCs.
+    ///
+    /// If a VM intends to execute another program by calling `fork()` and immediately calling
+    /// `exec`, it may skip this function because the state of the MMTk instance will be irrelevant
+    /// in that case.
+    ///
+    /// # Caution!
+    ///
+    /// This function sends an asynchronous message to GC threads and returns immediately, but it
+    /// is only safe for the VM to call `fork()` after the underlying **native threads** of the GC
+    /// threads have exited.  After calling this function, the VM should wait for their underlying
+    /// native threads to exit in VM-specific manner before calling `fork()`.
+    pub fn prepare_to_fork(&'static self) {
+        assert!(
+            self.state.is_initialized(),
+            "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        );
+        probe!(mmtk, prepare_to_fork);
+        self.scheduler.stop_gc_threads_for_forking();
+    }
+
+    /// Call this function after the VM called the `fork()` system call.
+    ///
+    /// This function will re-spawn MMTk threads from saved contexts.
+    ///
+    /// # Arguments
+    ///
+    /// *   `tls`: The thread that wants to respawn MMTk threads after forking. This value will be
+    ///     passed back to the VM in `Collection::spawn_gc_thread()` so that the VM knows the
+    ///     context.
+    pub fn after_fork(&'static self, tls: VMThread) {
+        assert!(
+            self.state.is_initialized(),
+            "MMTk collection has not been initialized, yet (was initialize_collection() called before?)"
+        );
+        probe!(mmtk, after_fork);
+        self.scheduler.respawn_gc_threads_after_forking(tls);
     }
 
     /// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
@@ -349,6 +436,8 @@ impl<VM: VMBinding> MMTK<VM> {
         self.state
             .internal_triggered_collection
             .store(true, Ordering::Relaxed);
+        // TODO: The current `GCRequester::request()` is probably incorrect for internally triggered GC.
+        // Consider removing functions related to "internal triggered collection".
         self.gc_requester.request();
     }
 
