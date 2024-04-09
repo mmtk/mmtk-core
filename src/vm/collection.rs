@@ -4,10 +4,9 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
 
-/// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
+/// Thread context for the spawned GC thread.  It is used by `spawn_gc_thread`.
+/// Currently, `GCWorker` is the only kind of thread that mmtk-core will create.
 pub enum GCThreadContext<VM: VMBinding> {
-    /// The GC thread to spawn is a controller thread. There is only one controller thread.
-    Controller(Box<GCController<VM>>),
     /// The GC thread to spawn is a worker thread. There can be multiple worker threads.
     Worker(Box<GCWorker<VM>>),
 }
@@ -32,8 +31,7 @@ pub trait Collection<VM: VMBinding> {
     /// This method may not be called by the same GC thread that called `stop_all_mutators`.
     ///
     /// Arguments:
-    /// * `tls`: The thread pointer for the GC worker.  Currently it is the tls of the embedded `GCWorker` instance
-    /// of the coordinator thread, but it is subject to change, and should not be depended on.
+    /// * `tls`: The thread pointer for the GC worker.
     fn resume_mutators(tls: VMWorkerThread);
 
     /// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC
@@ -48,17 +46,16 @@ pub trait Collection<VM: VMBinding> {
     /// Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
     /// have assumptions that those calls needs to be within VM internal threads.
     /// As a result, MMTk does not spawn GC threads itself to avoid breaking this kind of assumptions.
-    /// MMTk calls this method to spawn GC threads during [`initialize_collection()`](../memory_manager/fn.initialize_collection.html).
+    /// MMTk calls this method to spawn GC threads during [`crate::mmtk::MMTK::initialize_collection`]
+    /// and [`crate::mmtk::MMTK::after_fork`].
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
     ///   calls `initialize_collection()` and passes as an argument.
     /// * `ctx`: The context for the GC thread.
-    ///   * If `Controller` is passed, it means spawning a thread to run as the GC controller.
-    ///     The spawned thread shall call `memory_manager::start_control_collector`.
-    ///   * If `Worker` is passed, it means spawning a thread to run as a GC worker.
-    ///     The spawned thread shall call `memory_manager::start_worker`.
-    ///   In either case, the `Box` inside should be passed back to the called function.
+    ///   * If [`GCThreadContext::Worker`] is passed, it means spawning a thread to run as a GC worker.
+    ///     The spawned thread shall call the entry point function `GCWorker::run`.
+    ///     Currently `Worker` is the only kind of thread which mmtk-core will create.
     fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
 
     /// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
