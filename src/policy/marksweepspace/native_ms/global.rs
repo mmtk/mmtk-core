@@ -65,9 +65,13 @@ impl AbandonedBlockLists {
     fn move_consumed_to_unswept(&mut self) {
         let mut i = 0;
         while i < MI_BIN_FULL {
+            self.consumed[i].lock();
+            self.unswept[i].lock();
             if !self.consumed[i].is_empty() {
                 self.unswept[i].append(&mut self.consumed[i]);
             }
+            self.unswept[i].unlock();
+            self.consumed[i].unlock();
             i += 1;
         }
     }
