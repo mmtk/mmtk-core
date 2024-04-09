@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout mmtk-core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # Full git history needed
           fetch-depth: 0

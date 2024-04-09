@@ -14,7 +14,7 @@ jobs:
       - name: 'Wait for status checks'
         id: waitforstatuschecks
         timeout-minutes: 120
-        uses: "WyriHaximus/github-action-wait-for-status@v1.7.0"
+        uses: "WyriHaximus/github-action-wait-for-status@v1.8.0"
         with:
           # Ignore some actions (based on what merge_group triggers):
           # - this action
@@ -27,7 +27,7 @@ jobs:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       - name: Check result
         if: ${{ steps.waitforstatuschecks.outputs.status != 'success' }}
-        uses: actions/github-script@v3
+        uses: actions/github-script@v7
         with:
           script: |
             core.setFailed('Status checks failed')

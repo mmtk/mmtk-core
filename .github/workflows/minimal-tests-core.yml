@@ -20,7 +20,7 @@ jobs:
     outputs:
       rust: ${{ steps.rust.outputs.array }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       # Get rust version
       - id: rust
         run: |
@@ -43,7 +43,7 @@ jobs:
     runs-on: ${{ matrix.target.os }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
