@@ -45,12 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}-${{ matrix.target.triple }}
-          components: rustfmt, clippy
-          # This overwrites the default toolchain with the toolchain specified above.
-          override: true
+        run: |
+          rustup toolchain install ${{ matrix.rust }}-${{ matrix.target.triple }}
+          rustup override set ${{ matrix.rust }}-${{ matrix.target.triple }}
+          rustup component add rustfmt clippy
 
       # Setup Environments
       - name: Setup Environments

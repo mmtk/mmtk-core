@@ -15,13 +15,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          target: i686-unknown-linux-gnu
-          # This overwrites the default toolchain with the toolchain specified above.
-          override: true
       - name: Cargo login
         run: cargo login ${{ secrets.CI_CARGO_LOGIN }}
       - name: Publish sub crates

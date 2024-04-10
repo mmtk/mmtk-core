@@ -11,13 +11,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          target: i686-unknown-linux-gnu
-          # This overwrites the default toolchain with the toolchain specified above.
-          override: true
       - name: Append sha to crate version
         run: |
           sed -i 's/^version = "[0-9]\+.[0-9]\+.[0-9]\+/&-'${GITHUB_SHA}'/' Cargo.toml
