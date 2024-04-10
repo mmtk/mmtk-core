@@ -50,6 +50,10 @@ jobs:
           rustup override set ${{ matrix.rust }}-${{ matrix.target.triple }}
           rustup component add rustfmt clippy
 
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
+      - run: cargo --version
+
       # Setup Environments
       - name: Setup Environments
         run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh

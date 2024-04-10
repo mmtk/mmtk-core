@@ -29,6 +29,8 @@ jobs:
       - name: Install nightly Rust toolchain
         run: rustup toolchain install nightly
 
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
       - run: cargo --version
       - run: cargo +nightly --version
 

@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
+      - run: cargo --version
+
       - name: Append sha to crate version
         run: |
           sed -i 's/^version = "[0-9]\+.[0-9]\+.[0-9]\+/&-'${GITHUB_SHA}'/' Cargo.toml
