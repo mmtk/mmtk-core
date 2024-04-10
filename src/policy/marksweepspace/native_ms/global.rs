@@ -65,11 +65,15 @@ impl AbandonedBlockLists {
     fn move_consumed_to_unswept(&mut self) {
         let mut i = 0;
         while i < MI_BIN_FULL {
+            // This is executed during release. We also execute SweepChunk which will access blocks and block lists during release.
+            // We have to acquire locks before we modify these block lists.
             self.consumed[i].lock();
             self.unswept[i].lock();
+
             if !self.consumed[i].is_empty() {
                 self.unswept[i].append(&mut self.consumed[i]);
             }
+
             self.unswept[i].unlock();
             self.consumed[i].unlock();
             i += 1;
@@ -78,6 +82,12 @@ impl AbandonedBlockLists {
 
     fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
         for i in 0..MI_BIN_FULL {
+            // This is executed during release. We also execute SweepChunk which will access blocks and block lists during release.
+            // We have to acquire locks before we modify these block lists.
+            self.available[i].lock();
+            self.consumed[i].lock();
+            self.unswept[i].lock();
+
             self.available[i].sweep_blocks(space);
             self.consumed[i].sweep_blocks(space);
             self.unswept[i].sweep_blocks(space);
@@ -90,6 +100,10 @@ impl AbandonedBlockLists {
                     self.consumed[i].push(block);
                 }
             }
+
+            self.unswept[i].unlock();
+            self.consumed[i].unlock();
+            self.available[i].unlock();
         }
     }
 }

@@ -141,7 +141,7 @@ nogc_no_zeroing = ["nogc_lock_free"]
 single_worker = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
-extreme_assertions = []
+extreme_assertions = ["ms_block_list_sanity"]
 
 # Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
 nogc_multi_space = []

@@ -36,33 +36,15 @@ impl BlockList {
         }
     }
 
-    // fn access_block_list<R: Copy, F: FnOnce() -> R>(&self, access_func: F) -> R {
-    //     #[cfg(feature = "ms_block_list_sanity")]
-    //     let mut sanity_list = self.sanity_list.lock().unwrap();
-
-    //     let ret = access_func();
-
-    //     // Verify the block list is the same as the sanity list
-    //     #[cfg(feature = "ms_block_list_sanity")]
-    //     {
-    //         if !sanity_list.iter().map(|b| *b).eq(BlockListIterator { cursor: self.first }) {
-    //             eprintln!("Sanity block list: {:?}", &mut sanity_list as &mut Vec<Block>);
-    //             eprintln!("Actual block list: {:?}", self);
-    //             panic!("Incorrect block list");
-    //         }
-    //     }
-
-    //     ret
-    // }
     #[cfg(feature = "ms_block_list_sanity")]
     fn verify_block_list(&self, sanity_list: &mut Vec<Block>) {
         if !sanity_list
             .iter()
-            .map(|b| *b)
+            .cloned()
             .eq(BlockListIterator { cursor: self.first })
         {
             eprintln!("Sanity block list: {:?}", sanity_list);
-            eprintln!("First {:?}", sanity_list.get(0));
+            eprintln!("First {:?}", sanity_list.first());
             eprintln!("Actual block list: {:?}", self);
             eprintln!("First {:?}", self.first);
             eprintln!("Block list {:?}", self as *const _);
@@ -71,6 +53,7 @@ impl BlockList {
     }
 
     /// List has no blocks
+    #[allow(clippy::let_and_return)]
     pub fn is_empty(&self) -> bool {
         let ret = self.first.is_none();
 
@@ -296,6 +279,7 @@ impl BlockList {
     }
 
     /// Get the size of this block list.
+    #[allow(clippy::let_and_return)]
     pub fn size(&self) -> usize {
         let ret = self.size;
 
