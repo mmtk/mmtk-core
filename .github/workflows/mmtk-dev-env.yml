@@ -16,7 +16,7 @@ jobs:
   check-mmtk-dev-env:
     runs-on: ubuntu-22.04
     steps:
-      - uses: convictional/trigger-workflow-and-wait@v1.3.0
+      - uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
           owner: mmtk
           repo: mmtk-dev-env
@@ -24,7 +24,7 @@ jobs:
           workflow_file_name: ci.yml
           ref: main
           wait_interval: 30
-          inputs: '{}'
+          client_payload: '{}'
           propagate_failure: true
           trigger_workflow: true
           wait_workflow: true
