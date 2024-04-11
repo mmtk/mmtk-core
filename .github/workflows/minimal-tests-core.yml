@@ -62,9 +62,10 @@ jobs:
 
           rustup component add rustfmt clippy
 
-      # Show the Rust toolchain we are actually using
+      # Show the Rust toolchain and target we are actually using
       - run: rustup show
       - run: cargo --version
+      - run: cargo rustc -- --print cfg
 
       # Setup Environments
       - name: Setup Environments
