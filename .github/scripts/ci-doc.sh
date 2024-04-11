@@ -22,6 +22,7 @@ if ! cat $project_root/src/plan/mod.rs | grep -q "pub mod mygc;"; then
 fi
 cargo build
 
-# Install mdbook using the stable toolchain
+# Install mdbook using the stable toolchain and the default target
+unset CARGO_BUILD_TARGET
 cargo +stable install mdbook
 mdbook build $project_root/docs/userguide
