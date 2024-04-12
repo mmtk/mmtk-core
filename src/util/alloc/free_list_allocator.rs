@@ -123,7 +123,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn on_mutator_destroy(&mut self) {
-        self.abandon_blocks();
+        let mut global = self.space.get_abandoned_block_lists().lock().unwrap();
+        self.abandon_blocks(&mut global);
     }
 }
 
@@ -333,6 +334,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn init_block(&self, block: Block, cell_size: usize) {
+        debug_assert_ne!(cell_size, 0);
         self.space.record_new_block(block);
 
         // construct free list
@@ -407,18 +409,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_tls(self.tls);
     }
 
-    pub(crate) fn prepare(&mut self) {
-        // For lazy sweeping, it doesn't matter whether we do it in prepare or release.
-        // However, in the release phase, we will do block-level sweeping. And that will cause
-        // race if we also reset the allocator in release (which will mutate on the block lists).
-        // So we just move reset to the prepare phase.
-        #[cfg(not(feature = "eager_sweeping"))]
-        self.reset();
-    }
+    pub(crate) fn prepare(&mut self) {}
 
     pub(crate) fn release(&mut self) {
-        // For eager sweeping, we have to do this in the release phase when we know the liveness of the blocks
-        #[cfg(feature = "eager_sweeping")]
         self.reset();
     }
 
@@ -428,6 +421,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     /// for mark sweep.
     const ABANDON_BLOCKS_IN_RESET: bool = true;
 
+    /// Lazy sweeping. We just move all the blocks to the unswept block list.
     #[cfg(not(feature = "eager_sweeping"))]
     fn reset(&mut self) {
         trace!("reset");
@@ -450,10 +444,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
 
         if Self::ABANDON_BLOCKS_IN_RESET {
-            self.abandon_blocks();
+            let mut global = self.space.get_abandoned_block_lists_in_gc().lock().unwrap();
+            self.abandon_blocks(&mut global);
         }
     }
 
+    /// Eager sweeping. We sweep all the block lists, and move them to available block lists.
     #[cfg(feature = "eager_sweeping")]
     fn reset(&mut self) {
         debug!("reset");
@@ -479,31 +475,31 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
 
         if Self::ABANDON_BLOCKS_IN_RESET {
-            self.abandon_blocks();
+            let mut global = self.space.get_abandoned_block_lists_in_gc().lock().unwrap();
+            self.abandon_blocks(&mut global);
         }
     }
 
-    fn abandon_blocks(&mut self) {
-        let mut abandoned = self.space.abandoned.lock().unwrap();
+    fn abandon_blocks(&mut self, global: &mut AbandonedBlockLists) {
         for i in 0..MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
             if !available.is_empty() {
-                abandoned.available[i].append(available);
+                global.available[i].append(available);
             }
 
             let available_stress = self.available_blocks_stress.get_mut(i).unwrap();
             if !available_stress.is_empty() {
-                abandoned.available[i].append(available_stress);
+                global.available[i].append(available_stress);
             }
 
             let consumed = self.consumed_blocks.get_mut(i).unwrap();
             if !consumed.is_empty() {
-                abandoned.consumed[i].append(consumed);
+                global.consumed[i].append(consumed);
             }
 
             let unswept = self.unswept_blocks.get_mut(i).unwrap();
             if !unswept.is_empty() {
-                abandoned.unswept[i].append(unswept);
+                global.unswept[i].append(unswept);
             }
         }
     }
