@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 1440
     steps:
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-jikesrvm
           path: mmtk-jikesrvm
@@ -38,11 +38,11 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.7.5"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -61,13 +61,13 @@ jobs:
           export FROM_DATE=2020-07-10
           JAVA_HOME=/opt/jdk1.6.0_45/ PATH=/opt/apache-ant-1.9.16/bin/:/opt/jdk1.6.0_45/bin/:$PATH ./ci-perf-kit/scripts/jikesrvm-stock.sh ./mmtk-jikesrvm/repos/jikesrvm
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jikesrvm-baseline-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jikesrvm-baseline-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 2880
     steps:
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
@@ -90,11 +90,11 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.7.5"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -113,13 +113,13 @@ jobs:
           export FROM_DATE=2020-07-10
           ./ci-perf-kit/scripts/openjdk-stock.sh ./mmtk-openjdk/repos/openjdk
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openjdk-baseline-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openjdk-baseline-logs
           path: ${{ env.CI_PERF_KIT_LOG }}

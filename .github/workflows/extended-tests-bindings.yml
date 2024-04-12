@@ -25,11 +25,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout V8 Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
           path: mmtk-v8
@@ -71,11 +71,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
           path: mmtk-jikesrvm
@@ -106,11 +106,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-extended-testing')
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout Julia Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.julia_binding_repo }}
           path: mmtk-julia
@@ -154,12 +154,12 @@ jobs:
       DEBUG_LEVEL: ${{ matrix.debug-level }}
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
 
       - name: Checkout MMTk Ruby binding
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.binding-refs.outputs.ruby_binding_repo }}
           path: mmtk-ruby
@@ -175,7 +175,7 @@ jobs:
         working-directory: mmtk-ruby
 
       - name: Checkout Ruby
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ steps.extract-ruby-revision.outputs.ruby_repo }}
           ref: ${{ steps.extract-ruby-revision.outputs.ruby_rev }}

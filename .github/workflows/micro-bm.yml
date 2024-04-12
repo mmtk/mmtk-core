@@ -24,14 +24,14 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Check Revisions
-        uses: qinsoon/comment-env-vars@1.0.3
+        uses: qinsoon/comment-env-vars@1.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
       # Trunk
       # - binding
       - name: Checkout OpenJDK Binding Trunk
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -40,14 +40,14 @@ jobs:
           ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
       # -core
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.MMTK_CORE_TRUNK_REF }}
           path: mmtk-core-trunk
       # Branch
       # - binding
       - name: Checkout OpenJDK Binding Branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -56,17 +56,17 @@ jobs:
           ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
       # - core
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: ${{ env.MMTK_CORE_BRANCH_REF }}
           path: mmtk-core-branch
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.7.4"
+          ref: "0.7.5"
           path: ci-perf-kit
           submodules: true
       # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
@@ -83,11 +83,11 @@ jobs:
         with:
           path: openjdk-rebench-report.md
       # upload run results
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: openjdk-rebench-data
           path: ci-perf-kit/microbm/ci.data
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: openjdk-rebench-report.md
           path: openjdk-rebench-report.md

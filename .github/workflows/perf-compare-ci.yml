@@ -36,7 +36,7 @@ jobs:
         mmtk-ref: ${{ steps.print.outputs.mmtk_ref }}
       steps:
         - name: Get mmtk-core repo from pull_request
-          uses: actions/github-script@v6
+          uses: actions/github-script@v7
           id: core-repo
           with:
             result-encoding: string
@@ -48,7 +48,7 @@ jobs:
               }))
               return res.data.head.repo.full_name
         - name: Get mmtk-core refs from pull_request
-          uses: actions/github-script@v6
+          uses: actions/github-script@v7
           id: core-ref
           with:
             result-encoding: string
@@ -73,7 +73,7 @@ jobs:
           # Trunk - we always use master from the mmtk org
           # - binding
           - name: Checkout JikesRVM Binding Trunk
-            uses: actions/checkout@v2
+            uses: actions/checkout@v4
             with:
               repository: mmtk/mmtk-jikesrvm
               ref: master
@@ -83,7 +83,7 @@ jobs:
             run: ./.github/scripts/ci-checkout.sh
           # - core
           - name: Checkout MMTk Core
-            uses: actions/checkout@v2
+            uses: actions/checkout@v4
             with:
               repository: mmtk/mmtk-core
               ref: master
@@ -91,14 +91,14 @@ jobs:
           # Branch
           # - binding
           - name: Checkout JikesRVM Binding Branch
-            uses: actions/checkout@v2
+            uses: actions/checkout@v4
             with:
               repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
               ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
               path: mmtk-jikesrvm-branch
           # - core
           - name: Checkout MMTk Core
-            uses: actions/checkout@v2
+            uses: actions/checkout@v4
             with:
               repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
               ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
@@ -108,11 +108,11 @@ jobs:
             run: ./.github/scripts/ci-checkout.sh
           # Checkout perf-kit
           - name: Checkout Perf Kit
-            uses: actions/checkout@v2
+            uses: actions/checkout@v4
             with:
               repository: mmtk/ci-perf-kit
               token: ${{ secrets.CI_ACCESS_TOKEN }}
-              ref: "0.7.4"
+              ref: "0.7.5"
               path: ci-perf-kit
               submodules: true
           # setup
@@ -120,7 +120,7 @@ jobs:
           - name: Setup Rust Toolchain
             run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
           # run compare
-          - uses: hasura/comment-progress@v2.1.0
+          - uses: hasura/comment-progress@v2.3.0
             with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
@@ -139,23 +139,23 @@ jobs:
               path: jikesrvm-compare-report.md
           # upload run results
           - name: Upload build as artifacts
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v4
             with:
               name: jikesrvm-compare-build
               path: ${{ env.CI_PERF_KIT_BUILD }}
               if-no-files-found: error
           - name: Upload logs as artifacts
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v4
             with:
               name: jikesrvm-compare-logs
               path: ${{ env.CI_PERF_KIT_LOG }}
               if-no-files-found: error
-          - uses: actions/upload-artifact@v2
+          - uses: actions/upload-artifact@v4
             with:
               name: jikesrvm-compare-report.md
               path: jikesrvm-compare-report.md
           # report
-          - uses: hasura/comment-progress@v2.1.0
+          - uses: hasura/comment-progress@v2.3.0
             if: always()
             with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
@@ -180,7 +180,7 @@ jobs:
             # Trunk - we always use master from the mmtk org
             # - binding
             - name: Checkout OpenJDK Binding Trunk
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
               with:
                 repository: mmtk/mmtk-openjdk
                 ref: master
@@ -190,7 +190,7 @@ jobs:
               run: ./.github/scripts/ci-checkout.sh
             # -core
             - name: Checkout MMTk Core
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
               with:
                 repository: mmtk/mmtk-core
                 ref: master
@@ -198,7 +198,7 @@ jobs:
             # Branch
             # - binding
             - name: Checkout OpenJDK Binding Branch
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
               with:
                 repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
                 ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
@@ -208,18 +208,18 @@ jobs:
               run: ./.github/scripts/ci-checkout.sh
             # - core
             - name: Checkout MMTk Core
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
               with:
                 repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
                 ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
                 path: mmtk-core-branch
             # checkout perf-kit
             - name: Checkout Perf Kit
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
               with:
                 repository: mmtk/ci-perf-kit
                 token: ${{ secrets.CI_ACCESS_TOKEN }}
-                ref: "0.7.4"
+                ref: "0.7.5"
                 path: ci-perf-kit
                 submodules: true
             # setup
@@ -227,7 +227,7 @@ jobs:
             - name: Setup Rust Toolchain
               run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
             # run compare
-            - uses: hasura/comment-progress@v2.1.0
+            - uses: hasura/comment-progress@v2.3.0
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
@@ -246,23 +246,23 @@ jobs:
                 path: openjdk-compare-report.md
             # upload run results
             - name: Upload build as artifacts
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                 name: openjdk-compare-build
                 path: ${{ env.CI_PERF_KIT_BUILD }}
                 if-no-files-found: error
             - name: Upload logs as artifacts
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                 name: openjdk-compare-logs
                 path: ${{ env.CI_PERF_KIT_LOG }}
                 if-no-files-found: error
-            - uses: actions/upload-artifact@v2
+            - uses: actions/upload-artifact@v4
               with:
                 name: openjdk-compare-report.md
                 path: openjdk-compare-report.md
             # report
-            - uses: hasura/comment-progress@v2.1.0
+            - uses: hasura/comment-progress@v2.3.0
               if: always()
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}

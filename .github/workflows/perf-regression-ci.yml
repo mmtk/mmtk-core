@@ -28,11 +28,11 @@ jobs:
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-jikesrvm
           path: mmtk-jikesrvm
@@ -42,10 +42,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.7.5"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -73,7 +73,7 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
@@ -81,13 +81,13 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jikesrvm-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jikesrvm-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
@@ -99,11 +99,11 @@ jobs:
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
@@ -113,10 +113,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.7.5"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -149,7 +149,7 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
@@ -157,13 +157,13 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openjdk-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openjdk-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
@@ -174,11 +174,11 @@ jobs:
     timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
@@ -188,10 +188,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.7.4"
+          ref: "0.7.5"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -225,7 +225,7 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
@@ -233,13 +233,13 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
       - name: Upload build as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mutator-regression-build
           path: ${{ env.CI_PERF_KIT_BUILD }}
           if-no-files-found: error
       - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mutator-regression-logs
           path: ${{ env.CI_PERF_KIT_LOG }}
