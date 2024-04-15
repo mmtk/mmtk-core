@@ -503,7 +503,14 @@ impl ObjectReference {
         NonZeroUsize::new(addr.0).map(ObjectReference)
     }
 
-    /// Like `from_raw_address`, but assume `addr` is not zero.
+    /// Like `from_raw_address`, but assume `addr` is not zero.  This can be used to elide a check
+    /// against zero for performance-critical code.
+    ///
+    /// # Safety
+    ///
+    /// This method assumes `addr` is not zero.  It should only be used in cases where we know at
+    /// compile time that the input cannot be zero.  For example, if we compute the address by
+    /// adding a positive offset to a non-zero address, we know the result must not be zero.
     pub unsafe fn from_raw_address_unchecked(addr: Address) -> ObjectReference {
         debug_assert!(!addr.is_zero());
         ObjectReference(NonZeroUsize::new_unchecked(addr.0))
