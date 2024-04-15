@@ -292,7 +292,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         #[cfg(debug_assertions)]
         self.abandoned_in_gc.lock().unwrap().assert_empty();
 
-        // # Safety: ImmixSpace reference is always valid within this collection cycle.
+        // # Safety: MarkSweepSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self
             .chunk_map
@@ -315,9 +315,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn end_of_gc(&mut self) {
-        let mut from = self.abandoned_in_gc.lock().unwrap();
-        let mut to = self.abandoned.lock().unwrap();
-        to.merge(&mut from);
+        let from = self.abandoned_in_gc.get_mut().unwrap();
+        let to = self.abandoned.get_mut().unwrap();
+        to.merge(from);
 
         #[cfg(debug_assertions)]
         from.assert_empty();
@@ -390,12 +390,17 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
         // number of allocated blocks.
-        let occupied_blocks = self
-            .chunk
+        let mut n_occupied_blocks = 0;
+        self.chunk
             .iter_region::<Block>()
             .filter(|block| block.get_state() != BlockState::Unallocated)
-            .count();
-        if occupied_blocks == 0 {
+            .for_each(|block| {
+                // Clear block mark
+                block.set_state(BlockState::Unmarked);
+                // Count occupied blocks
+                n_occupied_blocks += 1
+            });
+        if n_occupied_blocks == 0 {
             // Set this chunk as free if there is no live blocks.
             self.space.chunk_map.set(self.chunk, ChunkState::Free)
         } else {
