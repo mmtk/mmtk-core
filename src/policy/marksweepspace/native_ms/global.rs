@@ -87,9 +87,9 @@ impl AbandonedBlockLists {
 
     fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
         for i in 0..MI_BIN_FULL {
-            self.available[i].sweep_blocks(space);
-            self.consumed[i].sweep_blocks(space);
-            self.unswept[i].sweep_blocks(space);
+            self.available[i].release_and_sweep_blocks(space);
+            self.consumed[i].release_and_sweep_blocks(space);
+            self.unswept[i].release_and_sweep_blocks(space);
 
             // As we have swept blocks, move blocks in the unswept list to available or consumed list.
             while let Some(block) = self.unswept[i].pop() {

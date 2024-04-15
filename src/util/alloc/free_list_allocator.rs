@@ -298,11 +298,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         loop {
             match self.space.acquire_block(self.tls, size, align) {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
+                    debug!("Acquire global block: None");
                     // GC
                     return None;
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Fresh(block) => {
+                    debug!("Acquire global block: Fresh {:?}", block);
                     self.add_to_available_blocks(bin, block, stress_test);
                     self.init_block(block, self.available_blocks[bin].size);
 
@@ -310,6 +312,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedAvailable(block) => {
+                    debug!("Acquire global block: AbandonedAvailable {:?}", block);
                     block.store_tls(self.tls);
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
@@ -320,6 +323,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedUnswept(block) => {
+                    debug!("Acquire global block: AbandonedUnswep {:?}", block);
                     block.store_tls(self.tls);
                     block.sweep::<VM>();
                     if block.has_free_cells() {
@@ -428,19 +432,18 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // consumed and available are now unswept
         for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
-            unswept.lock();
+
+            // We should have no unswept blocks here. Blocks should be either in avialable, or consumed.
+            debug_assert!(unswept.is_empty());
 
             let mut sweep_later = |list: &mut BlockList| {
-                list.lock();
+                list.release_blocks(self.space);
                 unswept.append(list);
-                list.unlock();
             };
 
             sweep_later(&mut self.available_blocks[bin]);
             sweep_later(&mut self.available_blocks_stress[bin]);
             sweep_later(&mut self.consumed_blocks[bin]);
-
-            unswept.unlock();
         }
 
         if Self::ABANDON_BLOCKS_IN_RESET {
@@ -456,11 +459,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // sweep all blocks and push consumed onto available list
         for bin in 0..MI_BIN_FULL {
             // Sweep available blocks
-            self.available_blocks[bin].sweep_blocks(self.space);
-            self.available_blocks_stress[bin].sweep_blocks(self.space);
+            self.available_blocks[bin].release_and_sweep_blocks(self.space);
+            self.available_blocks_stress[bin].release_and_sweep_blocks(self.space);
 
             // Sweep consumed blocks, and also push the blocks back to the available list.
-            self.consumed_blocks[bin].sweep_blocks(self.space);
+            self.consumed_blocks[bin].release_and_sweep_blocks(self.space);
             if *self.context.options.precise_stress
                 && self.context.options.is_stress_test_gc_enabled()
             {

@@ -164,12 +164,19 @@ impl BlockList {
         BlockListIterator { cursor: self.first }
     }
 
-    /// Sweep all the blocks in the block list.
-    pub fn sweep_blocks<VM: VMBinding>(&self, space: &super::MarkSweepSpace<VM>) {
+    /// Release unmarked blocks, and sweep other blocks in the block list. Used by eager sweeping.
+    pub fn release_and_sweep_blocks<VM: VMBinding>(&self, space: &super::MarkSweepSpace<VM>) {
         for block in self.iter() {
             if !block.attempt_release(space) {
                 block.sweep::<VM>();
             }
+        }
+    }
+
+    /// Release unmarked blocks, and do not sweep any blocks. Used by lazy sweeping
+    pub fn release_blocks<VM: VMBinding>(&self, space: &super::MarkSweepSpace<VM>) {
+        for block in self.iter() {
+            block.attempt_release(space);
         }
     }
 }
