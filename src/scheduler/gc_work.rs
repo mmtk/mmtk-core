@@ -683,15 +683,15 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 }
 pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
     VM: VMBinding,
-    E: ProcessEdgesWork<VM = VM>,
-    I: ProcessEdgesWork<VM = VM>,
+    NPE: ProcessEdgesWork<VM = VM>,
+    PPE: ProcessEdgesWork<VM = VM>,
 > {
     mmtk: &'static MMTK<VM>,
-    phantom: PhantomData<(E, I)>,
+    phantom: PhantomData<(NPE, PPE)>,
 }
 
-impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>> Clone
-    for ProcessEdgesWorkRootsWorkFactory<VM, E, I>
+impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>> Clone
+    for ProcessEdgesWorkRootsWorkFactory<VM, NPE, PPE>
 {
     fn clone(&self) -> Self {
         Self {
@@ -701,14 +701,14 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>> 
     }
 }
 
-impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
-    RootsWorkFactory<EdgeOf<E>> for ProcessEdgesWorkRootsWorkFactory<VM, E, I>
+impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
+    RootsWorkFactory<VM::VMEdge> for ProcessEdgesWorkRootsWorkFactory<VM, NPE, PPE>
 {
-    fn create_process_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
+    fn create_process_edge_roots_work(&mut self, edges: Vec<VM::VMEdge>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            E::new(edges, true, self.mmtk, WorkBucketStage::Closure),
+            NPE::new(edges, true, self.mmtk, WorkBucketStage::Closure),
         );
     }
 
@@ -718,7 +718,7 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::PinningRootsTrace,
-            ProcessRootNode::<VM, I, E>::new(nodes, WorkBucketStage::Closure),
+            ProcessRootNode::<VM, PPE, NPE>::new(nodes, WorkBucketStage::Closure),
         );
     }
 
@@ -726,13 +726,13 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::TPinningClosure,
-            ProcessRootNode::<VM, I, I>::new(nodes, WorkBucketStage::TPinningClosure),
+            ProcessRootNode::<VM, PPE, PPE>::new(nodes, WorkBucketStage::TPinningClosure),
         );
     }
 }
 
-impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>, I: ProcessEdgesWork<VM = VM>>
-    ProcessEdgesWorkRootsWorkFactory<VM, E, I>
+impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
+    ProcessEdgesWorkRootsWorkFactory<VM, NPE, PPE>
 {
     fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
@@ -1015,22 +1015,37 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
     }
 }
 
-/// This creates work for processing pinning roots. In particular it traces the objects in these roots using I,
-/// but creates the work to scan these objects using E. This is necessary to guarantee that these objects do not move
-/// (`I` should trace them without moving) as we do not have the information about the edges pointing to them.
-
+/// This work packet processes pinning roots.
+///
+/// The `roots` member holds a list of `ObjectReference` to objects directly pointed by roots.
+/// These objects will be traced using `R2OPE` (Root-to-Object Process Edges).
+///
+/// After that, it will create work packets for tracing their children.  Those work packets (and
+/// the work packets further created by them) will use `O2OPE` (Object-to-Object Process Edges) as
+/// their `ProcessEdgesWork` implementations.
+///
+/// Because `roots` are pinning roots, `R2OPE` must be a `ProcessEdgesWork` that never moves any
+/// object.
+///
+/// The choice of `O2OPE` determines whether the `roots` are transitively pinning or not.
+///
+/// -   If `O2OPE` is set to a `ProcessEdgesWork` that never moves objects, all descendents of
+///     `roots` will not be moved in this GC.  That implements transitive pinning roots.
+/// -   If `O2OPE` may move objects, then this `ProcessRootsNode<VM, R2OPE, O2OPE>` work packet
+///     will only pin the objects in `roots` (because `R2OPE` must not move objects anyway), but
+///     not their descendents.
 pub(crate) struct ProcessRootNode<
     VM: VMBinding,
-    I: ProcessEdgesWork<VM = VM>,
-    E: ProcessEdgesWork<VM = VM>,
+    R2OPE: ProcessEdgesWork<VM = VM>,
+    O2OPE: ProcessEdgesWork<VM = VM>,
 > {
-    phantom: PhantomData<(VM, I, E)>,
+    phantom: PhantomData<(VM, R2OPE, O2OPE)>,
     roots: Vec<ObjectReference>,
     bucket: WorkBucketStage,
 }
 
-impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>>
-    ProcessRootNode<VM, I, E>
+impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM = VM>>
+    ProcessRootNode<VM, R2OPE, O2OPE>
 {
     pub fn new(nodes: Vec<ObjectReference>, bucket: WorkBucketStage) -> Self {
         Self {
@@ -1041,8 +1056,8 @@ impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>>
     }
 }
 
-impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> GCWork<VM>
-    for ProcessRootNode<VM, I, E>
+impl<VM: VMBinding, R2OPE: ProcessEdgesWork<VM = VM>, O2OPE: ProcessEdgesWork<VM = VM>> GCWork<VM>
+    for ProcessRootNode<VM, R2OPE, O2OPE>
 {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("ProcessRootNode");
@@ -1069,7 +1084,7 @@ impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> 
         let scanned_root_objects = {
             // We create an instance of E to use its `trace_object` method and its object queue.
             let mut process_edges_work =
-                I::new(vec![], true, mmtk, WorkBucketStage::PinningRootsTrace);
+                R2OPE::new(vec![], true, mmtk, WorkBucketStage::PinningRootsTrace);
             process_edges_work.set_worker(worker);
 
             for object in self.roots.iter().copied() {
@@ -1086,7 +1101,7 @@ impl<VM: VMBinding, I: ProcessEdgesWork<VM = VM>, E: ProcessEdgesWork<VM = VM>> 
             process_edges_work.nodes.take()
         };
 
-        let process_edges_work = E::new(vec![], false, mmtk, self.bucket);
+        let process_edges_work = O2OPE::new(vec![], false, mmtk, self.bucket);
         let work = process_edges_work.create_scan_work(scanned_root_objects);
         crate::memory_manager::add_work_packet(mmtk, self.bucket, work);
 
