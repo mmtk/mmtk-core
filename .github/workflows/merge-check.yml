@@ -24,6 +24,7 @@ env:
       "extended-tests-v8",
       "extended-tests-jikesrvm",
       "extended-tests-julia",
+      "extended-tests-openjdk",
       "extended-tests-ruby (release)",
       "extended-tests-ruby (debug)"
     ]
