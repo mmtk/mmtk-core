@@ -684,8 +684,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
 /// An implementation of `RootsWorkFactory` that creates work packets based on `ProcessEdgesWork`
 /// for handling roots.  The `DPE` and the `PPE` type parameters correspond to the
-/// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the
-/// [`GCWorkContext`](crate::scheduler::work::GCWorkContext) trait.
+/// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the [`GCWorkContext`] trait.
 pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
     VM: VMBinding,
     DPE: ProcessEdgesWork<VM = VM>,
