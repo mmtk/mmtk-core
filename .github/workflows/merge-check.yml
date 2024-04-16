@@ -21,20 +21,17 @@ env:
       "minimal-tests-core/x86_64-unknown-linux-gnu/stable",
       "minimal-tests-core/i686-unknown-linux-gnu/stable",
       "minimal-tests-core/x86_64-apple-darwin/stable",
-      "extended-test-v8",
-      "extended-test-jikesrvm",
-      "extended-test-julia",
-      "extended-test-ruby (release)",
-      "extended-test-ruby (debug)"
+      "extended-tests-v8",
+      "extended-tests-jikesrvm",
+      "extended-tests-julia",
+      "extended-tests-ruby (release)",
+      "extended-tests-ruby (debug)"
     ]
 
 jobs:
   ready-to-merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Print ignored actions
-        run: |
-          echo "Ignored actions: ${{ join(fromJson(env.IGNORED_ACTIONS)) }}"
       - name: 'Wait for status checks'
         id: waitforstatuschecks
         timeout-minutes: 120
