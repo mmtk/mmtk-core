@@ -9,7 +9,7 @@ pub struct StickyImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomDa
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for StickyImmixNurseryGCWorkContext<VM> {
     type VM = VM;
     type PlanType = StickyImmix<VM>;
-    type NormalProcessEdges = GenNurseryProcessEdges<VM, Self::PlanType>;
+    type DefaultProcessEdges = GenNurseryProcessEdges<VM, Self::PlanType>;
     type PinningProcessEdges = GenNurseryProcessEdges<VM, Self::PlanType>;
 }
 
@@ -21,6 +21,6 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = StickyImmix<VM>;
-    type NormalProcessEdges = PlanProcessEdges<VM, Self::PlanType, KIND>;
+    type DefaultProcessEdges = PlanProcessEdges<VM, Self::PlanType, KIND>;
     type PinningProcessEdges = PlanProcessEdges<VM, Self::PlanType, TRACE_KIND_TRANSITIVE_PIN>;
 }

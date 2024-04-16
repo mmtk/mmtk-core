@@ -401,7 +401,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanMutatorRoots<C> {
         let mutators = <C::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
-            C::NormalProcessEdges,
+            C::DefaultProcessEdges,
             C::PinningProcessEdges,
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_roots_in_mutator_thread(
@@ -434,7 +434,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
         trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<
             C::VM,
-            C::NormalProcessEdges,
+            C::DefaultProcessEdges,
             C::PinningProcessEdges,
         >::new(mmtk);
         <C::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
@@ -681,17 +681,22 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         ScanObjects::<Self>::new(nodes, false, self.bucket)
     }
 }
+
+/// An implementation of `RootsWorkFactory` that creates work packets based on `ProcessEdgesWork`
+/// for handling roots.  The `DPE` and the `PPE` type parameters correspond to the
+/// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the
+/// [`GCWorkContext`](crate::scheduler::work::GCWorkContext) trait.
 pub(crate) struct ProcessEdgesWorkRootsWorkFactory<
     VM: VMBinding,
-    NPE: ProcessEdgesWork<VM = VM>,
+    DPE: ProcessEdgesWork<VM = VM>,
     PPE: ProcessEdgesWork<VM = VM>,
 > {
     mmtk: &'static MMTK<VM>,
-    phantom: PhantomData<(NPE, PPE)>,
+    phantom: PhantomData<(DPE, PPE)>,
 }
 
-impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>> Clone
-    for ProcessEdgesWorkRootsWorkFactory<VM, NPE, PPE>
+impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>> Clone
+    for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
     fn clone(&self) -> Self {
         Self {
@@ -701,14 +706,14 @@ impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 }
 
-impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
-    RootsWorkFactory<VM::VMEdge> for ProcessEdgesWorkRootsWorkFactory<VM, NPE, PPE>
+impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
+    RootsWorkFactory<VM::VMEdge> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
     fn create_process_edge_roots_work(&mut self, edges: Vec<VM::VMEdge>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            NPE::new(edges, true, self.mmtk, WorkBucketStage::Closure),
+            DPE::new(edges, true, self.mmtk, WorkBucketStage::Closure),
         );
     }
 
@@ -718,7 +723,7 @@ impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::PinningRootsTrace,
-            ProcessRootNode::<VM, PPE, NPE>::new(nodes, WorkBucketStage::Closure),
+            ProcessRootNode::<VM, PPE, DPE>::new(nodes, WorkBucketStage::Closure),
         );
     }
 
@@ -731,8 +736,8 @@ impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 }
 
-impl<VM: VMBinding, NPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
-    ProcessEdgesWorkRootsWorkFactory<VM, NPE, PPE>
+impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
+    ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
     fn new(mmtk: &'static MMTK<VM>) -> Self {
         Self {
