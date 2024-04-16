@@ -964,8 +964,8 @@ We will discuss about this later, and discuss the alternatives.</p>
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type ProcessEdgesWorkType = SFTProcessEdges&lt;Self::VM&gt;;
-    type TPProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultProcessEdges = SFTProcessEdges&lt;Self::VM&gt;;
+    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
@@ -1139,7 +1139,7 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
     pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
-<p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>ProcessEdgesWorkType</code> in your GC work context:</p>
+<p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>DefaultProcessEdges</code> in your GC work context:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use crate::policy::gc_work::DEFAULT_TRACE;
@@ -1148,8 +1148,8 @@ pub struct MyGCWorkContext2&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext2&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type ProcessEdgesWorkType = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
-    type TPProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultProcessEdges = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="approach-3-implement-your-own-processedgeswork"><a class="header" href="#approach-3-implement-your-own-processedgeswork">Approach 3: Implement your own <code>ProcessEdgesWork</code></a></h3>
@@ -1235,15 +1235,15 @@ impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
     }
 }
 <span class="boring">}</span></code></pre></pre>
-<p>In the end, use <code>MyGCProcessEdges</code> as <code>ProcessEdgesWorkType</code> in the <code>GCWorkContext</code>:</p>
+<p>In the end, use <code>MyGCProcessEdges</code> as <code>DefaultProcessEdges</code> in the <code>GCWorkContext</code>:</p>
 <pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext3&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type ProcessEdgesWorkType = MyGCProcessEdges&lt;Self::VM&gt;;
-    type TPProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
+    type DefaultProcessEdges = MyGCProcessEdges&lt;Self::VM&gt;;
+    type PinningProcessEdges = UnsupportedProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>

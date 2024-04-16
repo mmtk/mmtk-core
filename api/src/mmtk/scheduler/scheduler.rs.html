@@ -790,16 +790,16 @@
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             <span class="self">self</span>.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::&lt;C::ProcessEdgesWorkType&gt;::new());
+                .add(SoftRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
             <span class="self">self</span>.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::&lt;C::ProcessEdgesWorkType&gt;::new());
+                .add(WeakRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
             <span class="self">self</span>.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::&lt;C::ProcessEdgesWorkType&gt;::new());
+                .add(PhantomRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
 
             <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefForwarding;
             <span class="kw">if </span>plan.constraints().needs_forward_after_liveness {
                 <span class="self">self</span>.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(RefForwarding::&lt;C::ProcessEdgesWorkType&gt;::new());
+                    .add(RefForwarding::&lt;C::DefaultProcessEdges&gt;::new());
             }
 
             <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefEnqueue;
@@ -811,11 +811,11 @@
             <span class="kw">use </span><span class="kw">crate</span>::util::finalizable_processor::{Finalization, ForwardFinalization};
             <span class="comment">// finalization
             </span><span class="self">self</span>.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::&lt;C::ProcessEdgesWorkType&gt;::new());
+                .add(Finalization::&lt;C::DefaultProcessEdges&gt;::new());
             <span class="comment">// forward refs
             </span><span class="kw">if </span>plan.constraints().needs_forward_after_liveness {
                 <span class="self">self</span>.work_buckets[WorkBucketStage::FinalizableForwarding]
-                    .add(ForwardFinalization::&lt;C::ProcessEdgesWorkType&gt;::new());
+                    .add(ForwardFinalization::&lt;C::DefaultProcessEdges&gt;::new());
             }
         }
 
@@ -841,12 +841,12 @@
         // because there are no other packets in the bucket.  We set it as sentinel for
         // consistency.
         </span><span class="self">self</span>.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::&lt;C::ProcessEdgesWorkType&gt;::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::&lt;C::DefaultProcessEdges&gt;::new()));
 
         <span class="kw">if </span>plan.constraints().needs_forward_after_liveness {
             <span class="comment">// VM-specific weak ref forwarding
             </span><span class="self">self</span>.work_buckets[WorkBucketStage::VMRefForwarding]
-                .add(VMForwardWeakRefs::&lt;C::ProcessEdgesWorkType&gt;::new());
+                .add(VMForwardWeakRefs::&lt;C::DefaultProcessEdges&gt;::new());
         }
 
         <span class="self">self</span>.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::&lt;VM&gt;::default());

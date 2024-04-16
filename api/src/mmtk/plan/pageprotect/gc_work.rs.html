@@ -21,7 +21,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::scheduler::GCWorkContext <span class="kw">for </span>PPGCWorkContext&lt;VM&gt; {
     <span class="kw">type </span>VM = VM;
     <span class="kw">type </span>PlanType = PageProtect&lt;VM&gt;;
-    <span class="kw">type </span>ProcessEdgesWorkType = PlanProcessEdges&lt;<span class="self">Self</span>::VM, PageProtect&lt;VM&gt;, DEFAULT_TRACE&gt;;
-    <span class="kw">type </span>TPProcessEdges = PlanProcessEdges&lt;<span class="self">Self</span>::VM, PageProtect&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    <span class="kw">type </span>DefaultProcessEdges = PlanProcessEdges&lt;<span class="self">Self</span>::VM, PageProtect&lt;VM&gt;, DEFAULT_TRACE&gt;;
+    <span class="kw">type </span>PinningProcessEdges = PlanProcessEdges&lt;<span class="self">Self</span>::VM, PageProtect&lt;VM&gt;, DEFAULT_TRACE&gt;;
 }
 </code></pre></div></section></main></body></html>

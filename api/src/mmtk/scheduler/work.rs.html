@@ -81,6 +81,26 @@
 <a href="#79" id="79">79</a>
 <a href="#80" id="80">80</a>
 <a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::worker::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::MMTK;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -157,9 +177,29 @@
 </span><span class="kw">pub trait </span>GCWorkContext: Send + <span class="lifetime">'static </span>{
     <span class="kw">type </span>VM: VMBinding;
     <span class="kw">type </span>PlanType: Plan&lt;VM = <span class="self">Self</span>::VM&gt;;
-    <span class="comment">// We should use SFTProcessEdges as the default value for this associate type. However, this requires
+
+    <span class="comment">// FIXME: We should use `SFTProcessEdges` as the default value for `DefaultProcessEdges`, and
+    // `UnsupportedProcessEdges` for `PinningProcessEdges`.  However, this requires
     // `associated_type_defaults` which has not yet been stablized.
-    </span><span class="kw">type </span>ProcessEdgesWorkType: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
-    <span class="kw">type </span>TPProcessEdges: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
+    // See: https://github.com/rust-lang/rust/issues/29661
+
+    </span><span class="doccomment">/// The `ProcessEdgesWork` implementation to use for tracing edges that do not have special
+    /// pinning requirements.  Concrete plans and spaces may choose to move or not to move the
+    /// objects the traced edges point to.
+    </span><span class="kw">type </span>DefaultProcessEdges: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
+
+    <span class="doccomment">/// The `ProcessEdgesWork` implementation to use for tracing edges that must not be updated
+    /// (i.e. the objects the traced edges pointed to must not be moved).  This is used for
+    /// implementing pinning roots and transitive pinning roots.
+    ///
+    /// -   For non-transitive pinning roots, `PinningProcessEdges` will be used to trace the edges
+    ///     from roots to objects, but their descendents will be traced using `DefaultProcessEdges`.
+    /// -   For transitive pinning roots, `PinningProcessEdges` will be used to trace the edges
+    ///     from roots to objects, and will also be used to trace the outgoing edges of all objects
+    ///     reachable from transitive pinning roots.
+    ///
+    /// If a plan does not support object pinning, it should use `UnsupportedProcessEdges` for this
+    /// type member.
+    </span><span class="kw">type </span>PinningProcessEdges: ProcessEdgesWork&lt;VM = <span class="self">Self</span>::VM&gt;;
 }
 </code></pre></div></section></main></body></html>

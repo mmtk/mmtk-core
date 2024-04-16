@@ -1138,6 +1138,25 @@
 <a href="#1136" id="1136">1136</a>
 <a href="#1137" id="1137">1137</a>
 <a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
+<a href="#1149" id="1149">1149</a>
+<a href="#1150" id="1150">1150</a>
+<a href="#1151" id="1151">1151</a>
+<a href="#1152" id="1152">1152</a>
+<a href="#1153" id="1153">1153</a>
+<a href="#1154" id="1154">1154</a>
+<a href="#1155" id="1155">1155</a>
+<a href="#1156" id="1156">1156</a>
+<a href="#1157" id="1157">1157</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
@@ -1541,8 +1560,8 @@
         <span class="kw">let </span>mutators = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators();
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;
             C::VM,
-            C::ProcessEdgesWorkType,
-            C::TPProcessEdges,
+            C::DefaultProcessEdges,
+            C::PinningProcessEdges,
         &gt;::new(mmtk);
         &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_roots_in_mutator_thread(
             worker.tls,
@@ -1574,8 +1593,8 @@
         <span class="macro">trace!</span>(<span class="string">"ScanStaticRoots"</span>);
         <span class="kw">let </span>factory = ProcessEdgesWorkRootsWorkFactory::&lt;
             C::VM,
-            C::ProcessEdgesWorkType,
-            C::TPProcessEdges,
+            C::DefaultProcessEdges,
+            C::PinningProcessEdges,
         &gt;::new(mmtk);
         &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
@@ -1821,17 +1840,21 @@
         ScanObjects::&lt;<span class="self">Self</span>&gt;::new(nodes, <span class="bool-val">false</span>, <span class="self">self</span>.bucket)
     }
 }
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessEdgesWorkRootsWorkFactory&lt;
+
+<span class="doccomment">/// An implementation of `RootsWorkFactory` that creates work packets based on `ProcessEdgesWork`
+/// for handling roots.  The `DPE` and the `PPE` type parameters correspond to the
+/// `DefaultProcessEdge` and the `PinningProcessEdges` type members of the [`GCWorkContext`] trait.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessEdgesWorkRootsWorkFactory&lt;
     VM: VMBinding,
-    E: ProcessEdgesWork&lt;VM = VM&gt;,
-    I: ProcessEdgesWork&lt;VM = VM&gt;,
+    DPE: ProcessEdgesWork&lt;VM = VM&gt;,
+    PPE: ProcessEdgesWork&lt;VM = VM&gt;,
 &gt; {
     mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
-    phantom: PhantomData&lt;(E, I)&gt;,
+    phantom: PhantomData&lt;(DPE, PPE)&gt;,
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, E: ProcessEdgesWork&lt;VM = VM&gt;, I: ProcessEdgesWork&lt;VM = VM&gt;&gt; Clone
-    <span class="kw">for </span>ProcessEdgesWorkRootsWorkFactory&lt;VM, E, I&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, DPE: ProcessEdgesWork&lt;VM = VM&gt;, PPE: ProcessEdgesWork&lt;VM = VM&gt;&gt; Clone
+    <span class="kw">for </span>ProcessEdgesWorkRootsWorkFactory&lt;VM, DPE, PPE&gt;
 {
     <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
@@ -1841,14 +1864,14 @@
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, E: ProcessEdgesWork&lt;VM = VM&gt;, I: ProcessEdgesWork&lt;VM = VM&gt;&gt;
-    RootsWorkFactory&lt;EdgeOf&lt;E&gt;&gt; <span class="kw">for </span>ProcessEdgesWorkRootsWorkFactory&lt;VM, E, I&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, DPE: ProcessEdgesWork&lt;VM = VM&gt;, PPE: ProcessEdgesWork&lt;VM = VM&gt;&gt;
+    RootsWorkFactory&lt;VM::VMEdge&gt; <span class="kw">for </span>ProcessEdgesWorkRootsWorkFactory&lt;VM, DPE, PPE&gt;
 {
-    <span class="kw">fn </span>create_process_edge_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, edges: Vec&lt;EdgeOf&lt;E&gt;&gt;) {
+    <span class="kw">fn </span>create_process_edge_roots_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, edges: Vec&lt;VM::VMEdge&gt;) {
         <span class="kw">crate</span>::memory_manager::add_work_packet(
             <span class="self">self</span>.mmtk,
             WorkBucketStage::Closure,
-            E::new(edges, <span class="bool-val">true</span>, <span class="self">self</span>.mmtk, WorkBucketStage::Closure),
+            DPE::new(edges, <span class="bool-val">true</span>, <span class="self">self</span>.mmtk, WorkBucketStage::Closure),
         );
     }
 
@@ -1858,7 +1881,7 @@
         </span><span class="kw">crate</span>::memory_manager::add_work_packet(
             <span class="self">self</span>.mmtk,
             WorkBucketStage::PinningRootsTrace,
-            ProcessRootNode::&lt;VM, I, E&gt;::new(nodes, WorkBucketStage::Closure),
+            ProcessRootNode::&lt;VM, PPE, DPE&gt;::new(nodes, WorkBucketStage::Closure),
         );
     }
 
@@ -1866,13 +1889,13 @@
         <span class="kw">crate</span>::memory_manager::add_work_packet(
             <span class="self">self</span>.mmtk,
             WorkBucketStage::TPinningClosure,
-            ProcessRootNode::&lt;VM, I, I&gt;::new(nodes, WorkBucketStage::TPinningClosure),
+            ProcessRootNode::&lt;VM, PPE, PPE&gt;::new(nodes, WorkBucketStage::TPinningClosure),
         );
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, E: ProcessEdgesWork&lt;VM = VM&gt;, I: ProcessEdgesWork&lt;VM = VM&gt;&gt;
-    ProcessEdgesWorkRootsWorkFactory&lt;VM, E, I&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, DPE: ProcessEdgesWork&lt;VM = VM&gt;, PPE: ProcessEdgesWork&lt;VM = VM&gt;&gt;
+    ProcessEdgesWorkRootsWorkFactory&lt;VM, DPE, PPE&gt;
 {
     <span class="kw">fn </span>new(mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
@@ -2155,22 +2178,37 @@
     }
 }
 
-<span class="doccomment">/// This creates work for processing pinning roots. In particular it traces the objects in these roots using I,
-/// but creates the work to scan these objects using E. This is necessary to guarantee that these objects do not move
-/// (`I` should trace them without moving) as we do not have the information about the edges pointing to them.
-
+<span class="doccomment">/// This work packet processes pinning roots.
+///
+/// The `roots` member holds a list of `ObjectReference` to objects directly pointed by roots.
+/// These objects will be traced using `R2OPE` (Root-to-Object Process Edges).
+///
+/// After that, it will create work packets for tracing their children.  Those work packets (and
+/// the work packets further created by them) will use `O2OPE` (Object-to-Object Process Edges) as
+/// their `ProcessEdgesWork` implementations.
+///
+/// Because `roots` are pinning roots, `R2OPE` must be a `ProcessEdgesWork` that never moves any
+/// object.
+///
+/// The choice of `O2OPE` determines whether the `roots` are transitively pinning or not.
+///
+/// -   If `O2OPE` is set to a `ProcessEdgesWork` that never moves objects, all descendents of
+///     `roots` will not be moved in this GC.  That implements transitive pinning roots.
+/// -   If `O2OPE` may move objects, then this `ProcessRootsNode&lt;VM, R2OPE, O2OPE&gt;` work packet
+///     will only pin the objects in `roots` (because `R2OPE` must not move objects anyway), but
+///     not their descendents.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ProcessRootNode&lt;
     VM: VMBinding,
-    I: ProcessEdgesWork&lt;VM = VM&gt;,
-    E: ProcessEdgesWork&lt;VM = VM&gt;,
+    R2OPE: ProcessEdgesWork&lt;VM = VM&gt;,
+    O2OPE: ProcessEdgesWork&lt;VM = VM&gt;,
 &gt; {
-    phantom: PhantomData&lt;(VM, I, E)&gt;,
+    phantom: PhantomData&lt;(VM, R2OPE, O2OPE)&gt;,
     roots: Vec&lt;ObjectReference&gt;,
     bucket: WorkBucketStage,
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, I: ProcessEdgesWork&lt;VM = VM&gt;, E: ProcessEdgesWork&lt;VM = VM&gt;&gt;
-    ProcessRootNode&lt;VM, I, E&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, R2OPE: ProcessEdgesWork&lt;VM = VM&gt;, O2OPE: ProcessEdgesWork&lt;VM = VM&gt;&gt;
+    ProcessRootNode&lt;VM, R2OPE, O2OPE&gt;
 {
     <span class="kw">pub fn </span>new(nodes: Vec&lt;ObjectReference&gt;, bucket: WorkBucketStage) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
@@ -2181,8 +2219,8 @@
     }
 }
 
-<span class="kw">impl</span>&lt;VM: VMBinding, I: ProcessEdgesWork&lt;VM = VM&gt;, E: ProcessEdgesWork&lt;VM = VM&gt;&gt; GCWork&lt;VM&gt;
-    <span class="kw">for </span>ProcessRootNode&lt;VM, I, E&gt;
+<span class="kw">impl</span>&lt;VM: VMBinding, R2OPE: ProcessEdgesWork&lt;VM = VM&gt;, O2OPE: ProcessEdgesWork&lt;VM = VM&gt;&gt; GCWork&lt;VM&gt;
+    <span class="kw">for </span>ProcessRootNode&lt;VM, R2OPE, O2OPE&gt;
 {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="macro">trace!</span>(<span class="string">"ProcessRootNode"</span>);
@@ -2209,7 +2247,7 @@
         </span><span class="kw">let </span>scanned_root_objects = {
             <span class="comment">// We create an instance of E to use its `trace_object` method and its object queue.
             </span><span class="kw">let </span><span class="kw-2">mut </span>process_edges_work =
-                I::new(<span class="macro">vec!</span>[], <span class="bool-val">true</span>, mmtk, WorkBucketStage::PinningRootsTrace);
+                R2OPE::new(<span class="macro">vec!</span>[], <span class="bool-val">true</span>, mmtk, WorkBucketStage::PinningRootsTrace);
             process_edges_work.set_worker(worker);
 
             <span class="kw">for </span>object <span class="kw">in </span><span class="self">self</span>.roots.iter().copied() {
@@ -2226,7 +2264,7 @@
             </span>process_edges_work.nodes.take()
         };
 
-        <span class="kw">let </span>process_edges_work = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, <span class="self">self</span>.bucket);
+        <span class="kw">let </span>process_edges_work = O2OPE::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, <span class="self">self</span>.bucket);
         <span class="kw">let </span>work = process_edges_work.create_scan_work(scanned_root_objects);
         <span class="kw">crate</span>::memory_manager::add_work_packet(mmtk, <span class="self">self</span>.bucket, work);
 
