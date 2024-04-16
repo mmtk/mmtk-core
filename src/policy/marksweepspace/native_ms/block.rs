@@ -225,18 +225,8 @@ impl Block {
         match self.get_state() {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
-                unsafe {
-                    let block_list = loop {
-                        let list = self.load_block_list();
-                        (*list).lock();
-                        if list == self.load_block_list() {
-                            break list;
-                        }
-                        (*list).unlock();
-                    };
-                    (*block_list).remove(self);
-                    (*block_list).unlock();
-                }
+                let block_list = self.load_block_list();
+                unsafe { &mut *block_list }.remove(self);
                 space.release_block(self);
                 true
             }

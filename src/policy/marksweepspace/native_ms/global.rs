@@ -42,6 +42,26 @@ pub enum BlockAcquireResult {
 }
 
 /// A mark sweep space.
+/// 
+/// The space and each free list allocator own some block lists.
+/// A block that is in use belongs to exactly one of the block lists. In this case,
+/// whoever owns a block list has exclusive access on the blocks in the list.
+/// There should be no data race to access blocks. A thread should NOT access a block list
+/// if it does not own the block list.
+/// 
+/// The table below roughly describes what we do in each phase.
+/// 
+/// | Phase          | Allocator local block lists                     | Global abandoned block lists                 | Chunk map |
+/// |----------------|-------------------------------------------------|----------------------------------------------|-----------|
+/// | Allocation     | Alloc from local                                | Move blocks from global to local block lists | -         |
+/// |                | Lazy: sweep local blocks                        |                                              |           |
+/// | GC - Prepare   | -                                               | -                                            | Find used chunks, reset block mark, bzero mark bit |
+/// | GC - Trace     | Trace object and mark blocks.                   | Trace object and mark blocks.                | -         |
+/// |                | No block list access.                           | No block list access.                        |           |
+/// | GC - Release   | Lazy: Move blocks to local unswept list         | Lazy: Move blocks to global unswept list     | _         |
+/// |                | Eager: Sweep local blocks                       | Eager: Sweep global blocks                   |           |
+/// |                | Both: Return local blocks to a temp global list |                                              |           |
+/// | GC - End of GC | -                                               | Merge the temp global lists                  | -         |
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
@@ -75,13 +95,16 @@ impl AbandonedBlockLists {
         }
     }
 
-    fn move_consumed_to_unswept(&mut self) {
-        let mut i = 0;
-        while i < MI_BIN_FULL {
-            if !self.consumed[i].is_empty() {
-                self.unswept[i].append(&mut self.consumed[i]);
-            }
-            i += 1;
+    fn sweep_later<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
+        for i in 0..MI_BIN_FULL {
+            // Release free blocks
+            self.available[i].release_blocks(space);
+            self.consumed[i].release_blocks(space);
+            self.unswept[i].release_blocks(space);
+
+            // Move remaining blocks to unswept
+            self.unswept[i].append(&mut self.available[i]);
+            self.unswept[i].append(&mut self.consumed[i]);
         }
     }
 
@@ -310,7 +333,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             // For lazy sweeping, we just move blocks from consumed to unswept. When an allocator tries
             // to use them, they will sweep the block.
             let mut abandoned = self.abandoned.lock().unwrap();
-            abandoned.move_consumed_to_unswept();
+            abandoned.sweep_later(self);
         }
     }
 
