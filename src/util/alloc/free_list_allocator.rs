@@ -433,8 +433,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
 
-            // We should have no unswept blocks here. Blocks should be either in avialable, or consumed.
-            debug_assert!(unswept.is_empty());
+            // If we abandon all the local blocks, we should have no unswept blocks here. Blocks should be either in available, or consumed.
+            debug_assert!(!Self::ABANDON_BLOCKS_IN_RESET || unswept.is_empty());
 
             let mut sweep_later = |list: &mut BlockList| {
                 list.release_blocks(self.space);
