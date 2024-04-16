@@ -42,15 +42,15 @@ pub enum BlockAcquireResult {
 }
 
 /// A mark sweep space.
-/// 
+///
 /// The space and each free list allocator own some block lists.
 /// A block that is in use belongs to exactly one of the block lists. In this case,
 /// whoever owns a block list has exclusive access on the blocks in the list.
 /// There should be no data race to access blocks. A thread should NOT access a block list
 /// if it does not own the block list.
-/// 
+///
 /// The table below roughly describes what we do in each phase.
-/// 
+///
 /// | Phase          | Allocator local block lists                     | Global abandoned block lists                 | Chunk map |
 /// |----------------|-------------------------------------------------|----------------------------------------------|-----------|
 /// | Allocation     | Alloc from local                                | Move blocks from global to local block lists | -         |
