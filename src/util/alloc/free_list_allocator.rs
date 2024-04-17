@@ -218,10 +218,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         debug_assert!(bin <= MAX_BIN);
 
         let available = &mut available_blocks[bin];
-        debug_assert!(available.size() >= size);
+        debug_assert!(available.size >= size);
 
         if !available.is_empty() {
-            let mut cursor = available.first();
+            let mut cursor = available.first;
 
             while let Some(block) = cursor {
                 if block.has_free_cells() {
@@ -230,7 +230,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 available.pop();
                 consumed_blocks.get_mut(bin).unwrap().push(block);
 
-                cursor = available.first();
+                cursor = available.first;
             }
         }
 
@@ -303,7 +303,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Fresh(block) => {
                     self.add_to_available_blocks(bin, block, stress_test);
-                    self.init_block(block, self.available_blocks[bin].size());
+                    self.init_block(block, self.available_blocks[bin].size);
 
                     return Some(block);
                 }
