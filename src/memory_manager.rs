@@ -557,8 +557,8 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMut
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_live_object(object: ObjectReference) -> bool {
-    object.is_live()
+pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    object.is_live::<VM>()
 }
 
 /// Check if `addr` is the address of an object reference to an MMTk object.
