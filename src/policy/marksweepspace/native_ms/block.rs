@@ -220,10 +220,11 @@ impl Block {
         Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
-    /// Release this block if it is unmarked. Return true if the block is release.
+    /// Release this block if it is unmarked. Return true if the block is released.
     pub fn attempt_release<VM: VMBinding>(self, space: &MarkSweepSpace<VM>) -> bool {
         match self.get_state() {
-            BlockState::Unallocated => false,
+            // We should not have unallocated blocks in a block list
+            BlockState::Unallocated => unreachable!(),
             BlockState::Unmarked => {
                 let block_list = self.load_block_list();
                 unsafe { &mut *block_list }.remove(self);
