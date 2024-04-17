@@ -492,6 +492,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 
+    pub fn end_of_gc(&mut self) {}
+
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits
         match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {

@@ -14,14 +14,12 @@ jobs:
   cargo-publish:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt, clippy
-          target: i686-unknown-linux-gnu
-          # This overwrites the default toolchain with the toolchain specified above.
-          override: true
+      - uses: actions/checkout@v4
+
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
+      - run: cargo --version
+
       - name: Cargo login
         run: cargo login ${{ secrets.CI_CARGO_LOGIN }}
       - name: Publish sub crates

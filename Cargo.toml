@@ -21,14 +21,14 @@ doctest = false
 [dependencies]
 atomic = "0.6.0"
 atomic_refcell = "0.1.7"
-atomic-traits = "0.3.0"
+atomic-traits = "0.4.0"
 bytemuck = { version = "1.14.0", features = ["derive"] }
 cfg-if = "1.0"
 crossbeam = "0.8.1"
-delegate = "0.10.0"
+delegate = "0.12.0"
 downcast-rs = "1.1.1"
 enum-map = "2.4.2"
-env_logger = "0.10.0"
+env_logger = "0.11.3"
 is-terminal = "0.4.7"
 itertools = "0.12.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
@@ -47,9 +47,9 @@ probe = "0.5"
 regex = "1.7.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
-strum = "0.25"
-strum_macros = "0.25"
-sysinfo = "0.29"
+strum = "0.26.2"
+strum_macros = "0.26.2"
+sysinfo = "0.30.9"
 
 [dev-dependencies]
 paste = "1.0.8"

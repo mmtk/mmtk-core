@@ -19,11 +19,11 @@ jobs:
     timeout-minutes: 720
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-jikesrvm
           token: ${{ secrets.CI_ACCESS_TOKEN }}
@@ -103,11 +103,11 @@ jobs:
     timeout-minutes: 720
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           token: ${{ secrets.CI_ACCESS_TOKEN }}

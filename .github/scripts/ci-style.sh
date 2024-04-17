@@ -2,6 +2,15 @@
 
 export RUSTFLAGS="-D warnings -A unknown-lints"
 
+# --- Check format ---
+cargo fmt -- --check
+cargo fmt --manifest-path=macros/Cargo.toml -- --check
+
+# All versions of Clippy randomly crash on Darwin.  We disable Clippy tests for Darwin for now.
+if [[ $(uname) == "Darwin" ]]; then
+    exit 0
+fi
+
 # Workaround the clippy issue on Rust 1.72: https://github.com/mmtk/mmtk-core/issues/929.
 # If we are not testing with Rust 1.72, or there is no problem running the following clippy checks, we can remove this export.
 CLIPPY_VERSION=$(cargo clippy --version)

@@ -17,12 +17,12 @@ jobs:
   msrv:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: actions/checkout@v4
+
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
+      - run: cargo --version
+
       - name: Install cargo-msrv
         run: cargo install cargo-msrv
       # Verify the MSRV defined in Cargo.toml
