@@ -339,11 +339,18 @@
 <a href="#337" id="337">337</a>
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::copyspace::CopySpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopySemantics;
@@ -563,12 +570,17 @@
     }
 
     <span class="doccomment">/// Trace objects for spaces in generational and common plans for a nursery GC.
-    </span><span class="kw">pub fn </span>trace_object_nursery&lt;Q: ObjectQueue&gt;(
+    </span><span class="kw">pub fn </span>trace_object_nursery&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
+        <span class="macro">assert!</span>(
+            KIND != TRACE_KIND_TRANSITIVE_PIN,
+            <span class="string">"A copying nursery cannot pin objects"
+        </span>);
+
         <span class="comment">// Evacuate nursery objects
         </span><span class="kw">if </span><span class="self">self</span>.nursery.in_space(object) {
             <span class="kw">return </span><span class="self">self</span>.nursery.trace_object::&lt;Q&gt;(
@@ -664,7 +676,7 @@
 </span><span class="kw">pub trait </span>GenerationalPlanExt&lt;VM: VMBinding&gt;: GenerationalPlan&lt;VM = VM&gt; {
     <span class="doccomment">/// Trace an object in nursery collection. If the object is in nursery, we should call `trace_object`
     /// on the space. Otherwise, we can just return the object.
-    </span><span class="kw">fn </span>trace_object_nursery&lt;Q: ObjectQueue&gt;(
+    </span><span class="kw">fn </span>trace_object_nursery&lt;Q: ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,

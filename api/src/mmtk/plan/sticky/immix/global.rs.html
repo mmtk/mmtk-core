@@ -355,13 +355,27 @@
 <a href="#353" id="353">353</a>
 <a href="#354" id="354">354</a>
 <a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::immix;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
+<span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
+<span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::TRACE_KIND_FAST;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
 <span class="kw">use </span><span class="kw">crate</span>::util::copy::CopyConfig;
@@ -448,7 +462,7 @@
         } <span class="kw">else </span>{
             <span class="macro">info!</span>(<span class="string">"Full heap GC"</span>);
             <span class="kw">use </span><span class="kw">crate</span>::plan::immix::Immix;
-            <span class="kw">use </span><span class="kw">crate</span>::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
+            <span class="kw">use </span><span class="kw">crate</span>::policy::immix::TRACE_KIND_DEFRAG;
             Immix::schedule_immix_full_heap_collection::&lt;
                 StickyImmix&lt;VM&gt;,
                 StickyImmixMatureGCWorkContext&lt;VM, TRACE_KIND_FAST&gt;,
@@ -584,7 +598,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; <span class="kw">crate</span>::plan::generational::global::GenerationalPlanExt&lt;VM&gt; <span class="kw">for </span>StickyImmix&lt;VM&gt; {
-    <span class="kw">fn </span>trace_object_nursery&lt;Q: <span class="kw">crate</span>::ObjectQueue&gt;(
+    <span class="kw">fn </span>trace_object_nursery&lt;Q: <span class="kw">crate</span>::ObjectQueue, <span class="kw">const </span>KIND: TraceKind&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: <span class="kw">crate</span>::util::ObjectReference,
@@ -596,7 +610,15 @@
                 </span><span class="macro">trace!</span>(<span class="string">"Immix mature object {}, skip"</span>, object);
                 <span class="kw">return </span>object;
             } <span class="kw">else </span>{
-                <span class="kw">let </span>object = <span class="kw">if </span><span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                <span class="kw">let </span>object = <span class="kw">if </span>KIND == TRACE_KIND_TRANSITIVE_PIN || KIND == TRACE_KIND_FAST {
+                    <span class="macro">trace!</span>(
+                        <span class="string">"Immix nursery object {} is being traced without moving"</span>,
+                        object
+                    );
+                    <span class="self">self</span>.immix
+                        .immix_space
+                        .trace_object_without_moving(queue, object)
+                } <span class="kw">else if </span><span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC {
                     <span class="kw">let </span>ret = <span class="self">self</span>.immix.immix_space.trace_object_with_opportunistic_copy(
                         queue,
                         object,
@@ -612,7 +634,7 @@
                         <span class="kw">if </span>ret == object {
                             <span class="string">""</span>.to_string()
                         } <span class="kw">else </span>{
-                            <span class="macro">format!</span>(<span class="string">" -&gt; new object {}"</span>, ret)
+                            <span class="macro">format!</span>(<span class="string">"-&gt; new object {}"</span>, ret)
                         }
                     );
                     ret

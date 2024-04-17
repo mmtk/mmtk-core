@@ -110,11 +110,13 @@
 <a href="#108" id="108">108</a>
 <a href="#109" id="109">109</a>
 <a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Generational read/write barrier implementations.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSemantics;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
 <span class="kw">use </span><span class="kw">crate</span>::plan::VectorQueue;
+<span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::DEFAULT_TRACE;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_INT;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
@@ -157,7 +159,7 @@
         <span class="kw">let </span>buf = <span class="self">self</span>.modbuf.take();
         <span class="kw">if </span>!buf.is_empty() {
             <span class="self">self</span>.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessModBuf::&lt;GenNurseryProcessEdges&lt;VM, P&gt;&gt;::new(buf));
+                .add(ProcessModBuf::&lt;GenNurseryProcessEdges&lt;VM, P, DEFAULT_TRACE&gt;&gt;::new(buf));
         }
     }
 
@@ -166,7 +168,7 @@
         <span class="kw">if </span>!buf.is_empty() {
             <span class="macro">debug_assert!</span>(!buf.is_empty());
             <span class="self">self</span>.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRegionModBuf::&lt;
-                GenNurseryProcessEdges&lt;VM, P&gt;,
+                GenNurseryProcessEdges&lt;VM, P, DEFAULT_TRACE&gt;,
             &gt;::new(buf));
         }
     }
