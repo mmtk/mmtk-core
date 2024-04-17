@@ -339,10 +339,6 @@
 <a href="#337" id="337">337</a>
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
-<a href="#340" id="340">340</a>
-<a href="#341" id="341">341</a>
-<a href="#342" id="342">342</a>
-<a href="#343" id="343">343</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs;
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -385,11 +381,7 @@
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; CommonGenPlan&lt;VM&gt; {
     <span class="kw">pub fn </span>new(<span class="kw-2">mut </span>args: CreateSpecificPlanArgs&lt;VM&gt;) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span>nursery = CopySpace::new(
-            args.get_space_args(
-                <span class="string">"nursery"</span>,
-                <span class="bool-val">true</span>,
-                VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), <span class="bool-val">false</span>),
-            ),
+            args.get_space_args(<span class="string">"nursery"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
             <span class="bool-val">true</span>,
         );
         <span class="kw">let </span>full_heap_gc_count = args
@@ -447,7 +439,7 @@
         space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;VM&gt;&gt;,
     ) -&gt; bool {
         <span class="kw">let </span>cur_nursery = <span class="self">self</span>.nursery.reserved_pages();
-        <span class="kw">let </span>max_nursery = <span class="self">self</span>.common.base.options.get_max_nursery_pages();
+        <span class="kw">let </span>max_nursery = <span class="self">self</span>.common.base.gc_trigger.get_max_nursery_pages();
         <span class="kw">let </span>nursery_full = cur_nursery &gt;= max_nursery;
         <span class="macro">trace!</span>(
             <span class="string">"nursery_full = {:?} (nursery = {}, max_nursery = {})"</span>,
@@ -606,7 +598,7 @@
     /// whose value depends on which spaces have been released.
     </span><span class="kw">pub fn </span>should_next_gc_be_full_heap(plan: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt;) -&gt; bool {
         <span class="kw">let </span>available = plan.get_available_pages();
-        <span class="kw">let </span>min_nursery = plan.base().options.get_min_nursery_pages();
+        <span class="kw">let </span>min_nursery = plan.base().gc_trigger.get_min_nursery_pages();
         <span class="kw">let </span>next_gc_full_heap = available &lt; min_nursery;
         <span class="macro">trace!</span>(
             <span class="string">"next gc will be full heap? {}, available pages = {}, min nursery = {}"</span>,

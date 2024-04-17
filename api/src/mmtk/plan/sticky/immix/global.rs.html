@@ -497,8 +497,8 @@
     }
 
     <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
-        <span class="kw">let </span>nursery_full =
-            <span class="self">self</span>.immix.immix_space.get_pages_allocated() &gt; <span class="self">self</span>.options().get_max_nursery_pages();
+        <span class="kw">let </span>nursery_full = <span class="self">self</span>.immix.immix_space.get_pages_allocated()
+            &gt; <span class="self">self</span>.base().gc_trigger.get_max_nursery_pages();
         <span class="kw">if </span>space_full
             &amp;&amp; space.is_some()
             &amp;&amp; space.as_ref().unwrap().<span class="number">0</span>.name() != <span class="self">self</span>.immix.immix_space.name()

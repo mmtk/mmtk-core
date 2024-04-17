@@ -582,14 +582,74 @@
 <a href="#580" id="580">580</a>
 <a href="#581" id="581">581</a>
 <a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+<a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::gc_requester::GCRequester;
 <span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
-<span class="kw">use </span><span class="kw">crate</span>::util::options::{GCTriggerSelector, Options};
+<span class="kw">use </span><span class="kw">crate</span>::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>std::mem::MaybeUninit;
@@ -642,6 +702,10 @@
         <span class="self">self</span>.plan.write(plan);
     }
 
+    <span class="kw">fn </span>plan(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Plan&lt;VM = VM&gt; {
+        <span class="kw">unsafe </span>{ <span class="self">self</span>.plan.assume_init() }
+    }
+
     <span class="doccomment">/// This method is called periodically by the allocation subsystem
     /// (by default, each time a page is consumed), and provides the
     /// collector with an opportunity to collect.
@@ -685,8 +749,62 @@
 
     <span class="doccomment">/// Check if the heap is full
     </span><span class="kw">pub fn </span>is_heap_full(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">let </span>plan = <span class="kw">unsafe </span>{ <span class="self">self</span>.plan.assume_init() };
-        <span class="self">self</span>.policy.is_heap_full(plan)
+        <span class="self">self</span>.policy.is_heap_full(<span class="self">self</span>.plan())
+    }
+
+    <span class="doccomment">/// Return upper bound of the nursery size (in number of bytes)
+    </span><span class="kw">pub fn </span>get_max_nursery_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">use </span><span class="kw">crate</span>::util::options::NurserySize;
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.plan().generational().is_some());
+        <span class="kw">match </span><span class="kw-2">*</span><span class="self">self</span>.options.nursery {
+            NurserySize::Bounded { min: <span class="kw">_</span>, max } =&gt; max,
+            NurserySize::ProportionalBounded { min: <span class="kw">_</span>, max } =&gt; {
+                <span class="kw">let </span>heap_size_bytes =
+                    conversions::pages_to_bytes(<span class="self">self</span>.policy.get_current_heap_size_in_pages());
+                <span class="kw">let </span>max_bytes = heap_size_bytes <span class="kw">as </span>f64 * max;
+                <span class="kw">let </span>max_bytes = conversions::raw_align_up(max_bytes <span class="kw">as </span>usize, BYTES_IN_PAGE);
+                <span class="kw">if </span>max_bytes &gt; DEFAULT_MAX_NURSERY {
+                    <span class="macro">warn!</span>(<span class="string">"Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead."</span>, max, max_bytes, DEFAULT_MAX_NURSERY);
+                    DEFAULT_MAX_NURSERY
+                } <span class="kw">else </span>{
+                    max_bytes
+                }
+            }
+            NurserySize::Fixed(sz) =&gt; sz,
+        }
+    }
+
+    <span class="doccomment">/// Return lower bound of the nursery size (in number of bytes)
+    </span><span class="kw">pub fn </span>get_min_nursery_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">use </span><span class="kw">crate</span>::util::options::NurserySize;
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.plan().generational().is_some());
+        <span class="kw">match </span><span class="kw-2">*</span><span class="self">self</span>.options.nursery {
+            NurserySize::Bounded { min, max: <span class="kw">_ </span>} =&gt; min,
+            NurserySize::ProportionalBounded { min, max: <span class="kw">_ </span>} =&gt; {
+                <span class="kw">let </span>min_bytes =
+                    conversions::pages_to_bytes(<span class="self">self</span>.policy.get_current_heap_size_in_pages())
+                        <span class="kw">as </span>f64
+                        * min;
+                <span class="kw">let </span>min_bytes = conversions::raw_align_up(min_bytes <span class="kw">as </span>usize, BYTES_IN_PAGE);
+                <span class="kw">if </span>min_bytes &lt; DEFAULT_MIN_NURSERY {
+                    <span class="macro">warn!</span>(<span class="string">"Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead."</span>, min, min_bytes, DEFAULT_MIN_NURSERY);
+                    DEFAULT_MIN_NURSERY
+                } <span class="kw">else </span>{
+                    min_bytes
+                }
+            }
+            NurserySize::Fixed(sz) =&gt; sz,
+        }
+    }
+
+    <span class="doccomment">/// Return upper bound of the nursery size (in number of pages)
+    </span><span class="kw">pub fn </span>get_max_nursery_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(<span class="self">self</span>.get_max_nursery_bytes())
+    }
+
+    <span class="doccomment">/// Return lower bound of the nursery size (in number of pages)
+    </span><span class="kw">pub fn </span>get_min_nursery_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">crate</span>::util::conversions::bytes_to_pages_up(<span class="self">self</span>.get_min_nursery_bytes())
     }
 }
 
@@ -1017,7 +1135,7 @@
                         <span class="comment">// We reserve an extra of min nursery. This ensures that we will not trigger
                         // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
                         </span>mmtk.get_plan().get_collection_reserved_pages()
-                            + mmtk.options.get_min_nursery_pages(),
+                            + mmtk.gc_trigger.get_min_nursery_pages(),
                         stats,
                     );
                 }
