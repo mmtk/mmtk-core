@@ -140,8 +140,8 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
-        let nursery_full =
-            self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
+        let nursery_full = self.immix.immix_space.get_pages_allocated()
+            > self.base().gc_trigger.get_max_nursery_pages();
         if space_full
             && space.is_some()
             && space.as_ref().unwrap().0.name() != self.immix.immix_space.name()
