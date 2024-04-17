@@ -202,7 +202,7 @@ With the derive macro, your `MyGC` struct should look like this:
 {{#include ../../code/mygc_semispace/global.rs:plan_def}}
 ```
 
-Once this is done, you can specify `PlanProcessEdges` as the `ProcessEdgesWorkType` in your GC work context:
+Once this is done, you can specify `PlanProcessEdges` as the `DefaultProcessEdges` in your GC work context:
 ```rust
 {{#include ../../code/mygc_semispace/gc_work.rs:workcontext_plan}}
 ```
@@ -238,7 +238,7 @@ dereferenced as `ProcessEdgesBase`.
 {{#include ../../code/mygc_semispace/gc_work.rs:mygc_process_edges_deref}}
 ```
 
-In the end, use `MyGCProcessEdges` as `ProcessEdgesWorkType` in the `GCWorkContext`:
+In the end, use `MyGCProcessEdges` as `DefaultProcessEdges` in the `GCWorkContext`:
 ```rust
 {{#include ../../code/mygc_semispace/gc_work.rs:workcontext_mygc}}
 ```
