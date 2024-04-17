@@ -13,6 +13,7 @@ env:
   # - Public API check, doc broken link check: we allow them to fail.
   # - Minimal tests for stable Rust: we allow them to fail.
   # - Extended binding tests: it may take long to run. We don't want to wait for them.
+  #   Note: The action name for openjdk tests is different due to the reused workflow.
   IGNORED_ACTIONS: |
     [
       "ready-to-merge",
@@ -21,10 +22,10 @@ env:
       "minimal-tests-core/x86_64-unknown-linux-gnu/stable",
       "minimal-tests-core/i686-unknown-linux-gnu/stable",
       "minimal-tests-core/x86_64-apple-darwin/stable",
+      "extended-tests-openjdk / test",
       "extended-tests-v8",
       "extended-tests-jikesrvm",
       "extended-tests-julia",
-      "extended-tests-openjdk",
       "extended-tests-ruby (release)",
       "extended-tests-ruby (debug)"
     ]
