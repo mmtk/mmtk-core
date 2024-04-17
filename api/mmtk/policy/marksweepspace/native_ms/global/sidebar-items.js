@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["MAX_OBJECT_SIZE"],"enum":["BlockAcquireResult"],"struct":["AbandonedBlockLists","MarkSweepSpace","SweepChunk"]};
+window.SIDEBAR_ITEMS = {"constant":["MAX_OBJECT_SIZE"],"enum":["BlockAcquireResult"],"struct":["AbandonedBlockLists","MarkSweepSpace","PrepareChunkMap"]};

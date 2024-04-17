@@ -358,7 +358,18 @@
 <a href="#356" id="356">356</a>
 <a href="#357" id="357">357</a>
 <a href="#358" id="358">358</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::Block;
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+</pre></div><pre class="rust"><code><span class="kw">use super</span>::{Block, BlockState};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -524,12 +535,23 @@
         BlockListIterator { cursor: <span class="self">self</span>.first }
     }
 
-    <span class="doccomment">/// Sweep all the blocks in the block list.
-    </span><span class="kw">pub fn </span>sweep_blocks&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="kw">super</span>::MarkSweepSpace&lt;VM&gt;) {
+    <span class="doccomment">/// Release unmarked blocks, and sweep other blocks in the block list. Used by eager sweeping.
+    </span><span class="kw">pub fn </span>release_and_sweep_blocks&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="kw">super</span>::MarkSweepSpace&lt;VM&gt;) {
         <span class="kw">for </span>block <span class="kw">in </span><span class="self">self</span>.iter() {
+            <span class="comment">// We should not have unallocated blocks in a block list
+            </span><span class="macro">debug_assert_ne!</span>(block.get_state(), BlockState::Unallocated);
             <span class="kw">if </span>!block.attempt_release(space) {
                 block.sweep::&lt;VM&gt;();
             }
+        }
+    }
+
+    <span class="doccomment">/// Release unmarked blocks, and do not sweep any blocks. Used by lazy sweeping
+    </span><span class="kw">pub fn </span>release_blocks&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, space: <span class="kw-2">&amp;</span><span class="kw">super</span>::MarkSweepSpace&lt;VM&gt;) {
+        <span class="kw">for </span>block <span class="kw">in </span><span class="self">self</span>.iter() {
+            <span class="comment">// We should not have unallocated blocks in a block list
+            </span><span class="macro">debug_assert_ne!</span>(block.get_state(), BlockState::Unallocated);
+            block.attempt_release(space);
         }
     }
 }

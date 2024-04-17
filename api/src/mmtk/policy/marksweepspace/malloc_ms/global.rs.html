@@ -817,6 +817,8 @@
 <a href="#815" id="815">815</a>
 <a href="#816" id="816">816</a>
 <a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
@@ -1310,6 +1312,8 @@
 
         <span class="self">self</span>.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
+
+    <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {}
 
     <span class="kw">pub fn </span>sweep_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, chunk_start: Address) {
         <span class="comment">// Call the relevant sweep function depending on the location of the mark bits

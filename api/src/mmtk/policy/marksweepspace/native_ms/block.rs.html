@@ -428,13 +428,6 @@
 <a href="#426" id="426">426</a>
 <a href="#427" id="427">427</a>
 <a href="#428" id="428">428</a>
-<a href="#429" id="429">429</a>
-<a href="#430" id="430">430</a>
-<a href="#431" id="431">431</a>
-<a href="#432" id="432">432</a>
-<a href="#433" id="433">433</a>
-<a href="#434" id="434">434</a>
-<a href="#435" id="435">435</a>
 </pre></div><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -625,6 +618,7 @@
     }
 
     <span class="kw">pub fn </span>store_block_cell_size(<span class="kw-2">&amp;</span><span class="self">self</span>, size: usize) {
+        <span class="macro">debug_assert_ne!</span>(size, <span class="number">0</span>);
         <span class="kw">unsafe </span>{ Block::SIZE_TABLE.store::&lt;usize&gt;(<span class="self">self</span>.start(), size) }
     }
 
@@ -656,23 +650,14 @@
         <span class="self">Self</span>::MARK_TABLE.store_atomic::&lt;u8&gt;(<span class="self">self</span>.start(), state, Ordering::SeqCst);
     }
 
-    <span class="doccomment">/// Release this block if it is unmarked. Return true if the block is release.
+    <span class="doccomment">/// Release this block if it is unmarked. Return true if the block is released.
     </span><span class="kw">pub fn </span>attempt_release&lt;VM: VMBinding&gt;(<span class="self">self</span>, space: <span class="kw-2">&amp;</span>MarkSweepSpace&lt;VM&gt;) -&gt; bool {
         <span class="kw">match </span><span class="self">self</span>.get_state() {
-            BlockState::Unallocated =&gt; <span class="bool-val">false</span>,
+            <span class="comment">// We should not have unallocated blocks in a block list
+            </span>BlockState::Unallocated =&gt; <span class="macro">unreachable!</span>(),
             BlockState::Unmarked =&gt; {
-                <span class="kw">unsafe </span>{
-                    <span class="kw">let </span>block_list = <span class="kw">loop </span>{
-                        <span class="kw">let </span>list = <span class="self">self</span>.load_block_list();
-                        (<span class="kw-2">*</span>list).lock();
-                        <span class="kw">if </span>list == <span class="self">self</span>.load_block_list() {
-                            <span class="kw">break </span>list;
-                        }
-                        (<span class="kw-2">*</span>list).unlock();
-                    };
-                    (<span class="kw-2">*</span>block_list).remove(<span class="self">self</span>);
-                    (<span class="kw-2">*</span>block_list).unlock();
-                }
+                <span class="kw">let </span>block_list = <span class="self">self</span>.load_block_list();
+                <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>block_list }.remove(<span class="self">self</span>);
                 space.release_block(<span class="self">self</span>);
                 <span class="bool-val">true
             </span>}
@@ -719,6 +704,7 @@
     /// that we need to use this method correctly.
     </span><span class="kw">fn </span>simple_sweep&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let </span>cell_size = <span class="self">self</span>.load_block_cell_size();
+        <span class="macro">debug_assert_ne!</span>(cell_size, <span class="number">0</span>);
         <span class="kw">let </span><span class="kw-2">mut </span>cell = <span class="self">self</span>.start();
         <span class="kw">let </span><span class="kw-2">mut </span>last = <span class="kw">unsafe </span>{ Address::zero() };
         <span class="kw">while </span>cell + cell_size &lt;= <span class="self">self</span>.start() + Block::BYTES {
