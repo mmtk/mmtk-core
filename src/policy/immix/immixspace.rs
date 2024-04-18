@@ -841,10 +841,6 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
-        // If the forwarding bits are on the side, we need to clear them, too.
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-        }
     }
 }
 
@@ -919,6 +915,12 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         self.epilogue.finish_one_work_packet();
+
+        // If the forwarding bits are on the side, we clear them in the end of each GC, including
+        // both nursery GC and full-heap GC.
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+        }
     }
 }
 
