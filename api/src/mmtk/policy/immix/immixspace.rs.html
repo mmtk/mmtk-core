@@ -1744,7 +1744,7 @@
             );
 
             queue.enqueue(new_object);
-            <span class="macro">debug_assert!</span>(new_object.is_live());
+            <span class="macro">debug_assert!</span>(new_object.is_live::&lt;VM&gt;());
             <span class="self">self</span>.unlog_object_if_needed(new_object);
             new_object
         }

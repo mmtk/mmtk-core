@@ -814,11 +814,11 @@
             <span class="comment">// For references in the table, the reference needs to be valid, and if the referent is not null, it should be valid as well
             </span>sync.references.iter().for_each(|reff| {
                 <span class="macro">debug_assert!</span>(!reff.is_null());
-                <span class="macro">debug_assert!</span>(reff.is_in_any_space());
+                <span class="macro">debug_assert!</span>(reff.is_in_any_space::&lt;VM&gt;());
                 <span class="kw">let </span>referent = VM::VMReferenceGlue::get_referent(<span class="kw-2">*</span>reff);
                 <span class="kw">if </span>!VM::VMReferenceGlue::is_referent_cleared(referent) {
                     <span class="macro">debug_assert!</span>(
-                        referent.is_in_any_space(),
+                        referent.is_in_any_space::&lt;VM&gt;(),
                         <span class="string">"Referent {:?} (of reference {:?}) is not in any space"</span>,
                         referent,
                         reff
@@ -828,7 +828,7 @@
             <span class="comment">// For references that will be enqueue'd, the referent needs to be valid, and the referent needs to be null.
             </span>sync.enqueued_references.iter().for_each(|reff| {
                 <span class="macro">debug_assert!</span>(!reff.is_null());
-                <span class="macro">debug_assert!</span>(reff.is_in_any_space());
+                <span class="macro">debug_assert!</span>(reff.is_in_any_space::&lt;VM&gt;());
                 <span class="kw">let </span>referent = VM::VMReferenceGlue::get_referent(<span class="kw-2">*</span>reff);
                 <span class="macro">debug_assert!</span>(VM::VMReferenceGlue::is_referent_cleared(referent));
             });
@@ -965,7 +965,7 @@
 
             <span class="macro">trace!</span>(<span class="string">"Processing reference: {:?}"</span>, reference);
 
-            <span class="kw">if </span>!reference.is_live() {
+            <span class="kw">if </span>!reference.is_live::&lt;E::VM&gt;() {
                 <span class="comment">// Reference is currently unreachable but may get reachable by the
                 // following trace. We postpone the decision.
                 </span><span class="kw">continue</span>;
@@ -1001,7 +1001,7 @@
 
         <span class="comment">// If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
-        </span><span class="kw">if </span>!reference.is_live() {
+        </span><span class="kw">if </span>!reference.is_live::&lt;E::VM&gt;() {
             &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::clear_referent(reference);
             <span class="macro">trace!</span>(<span class="string">" UNREACHABLE reference: {}"</span>, reference);
             <span class="macro">trace!</span>(<span class="string">" (unreachable)"</span>);
@@ -1024,11 +1024,11 @@
 
         <span class="macro">trace!</span>(<span class="string">" =&gt; {}"</span>, new_reference);
 
-        <span class="kw">if </span>old_referent.is_live() {
+        <span class="kw">if </span>old_referent.is_live::&lt;E::VM&gt;() {
             <span class="comment">// Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
             </span><span class="kw">let </span>new_referent = <span class="self">Self</span>::get_forwarded_referent(trace, old_referent);
-            <span class="macro">debug_assert!</span>(new_referent.is_live());
+            <span class="macro">debug_assert!</span>(new_referent.is_live::&lt;E::VM&gt;());
             <span class="macro">trace!</span>(<span class="string">" ~&gt; {}"</span>, new_referent);
 
             <span class="comment">// The reference object stays on the waiting list, and the

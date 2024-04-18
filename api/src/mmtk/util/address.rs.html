@@ -616,11 +616,6 @@
 <a href="#614" id="614">614</a>
 <a href="#615" id="615">615</a>
 <a href="#616" id="616">616</a>
-<a href="#617" id="617">617</a>
-<a href="#618" id="618">618</a>
-<a href="#619" id="619">619</a>
-<a href="#620" id="620">620</a>
-<a href="#621" id="621">621</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
 <span class="kw">use </span>bytemuck::NoUninit;
 
@@ -1169,49 +1164,44 @@
         <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
     </span>}
 
-    <span class="doccomment">/// returns the ObjectReference
-    </span><span class="kw">pub fn </span>value(<span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.<span class="number">0
-    </span>}
-
     <span class="doccomment">/// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    </span><span class="kw">pub fn </span>is_reachable(<span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub fn </span>is_reachable&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
         <span class="kw">if </span><span class="self">self</span>.is_null() {
             <span class="bool-val">false
         </span>} <span class="kw">else </span>{
-            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_reachable(<span class="self">self</span>)
+            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_reachable(<span class="self">self</span>)
         }
     }
 
     <span class="doccomment">/// Is the object live, determined by the policy?
-    </span><span class="kw">pub fn </span>is_live(<span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub fn </span>is_live&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
         <span class="kw">if </span><span class="self">self</span>.<span class="number">0 </span>== <span class="number">0 </span>{
             <span class="bool-val">false
         </span>} <span class="kw">else </span>{
-            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_live(<span class="self">self</span>)
+            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_live(<span class="self">self</span>)
         }
     }
 
     <span class="doccomment">/// Can the object be moved?
-    </span><span class="kw">pub fn </span>is_movable(<span class="self">self</span>) -&gt; bool {
-        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_movable()
+    </span><span class="kw">pub fn </span>is_movable&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_movable()
     }
 
     <span class="doccomment">/// Get forwarding pointer if the object is forwarded.
-    </span><span class="kw">pub fn </span>get_forwarded_object(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.get_forwarded_object(<span class="self">self</span>)
+    </span><span class="kw">pub fn </span>get_forwarded_object&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.get_forwarded_object(<span class="self">self</span>)
     }
 
     <span class="doccomment">/// Is the object in any MMTk spaces?
-    </span><span class="kw">pub fn </span>is_in_any_space(<span class="self">self</span>) -&gt; bool {
-        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_in_space(<span class="self">self</span>)
+    </span><span class="kw">pub fn </span>is_in_any_space&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_in_space(<span class="self">self</span>)
     }
 
     <span class="doccomment">/// Is the object sane?
     </span><span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-    </span><span class="kw">pub fn </span>is_sane(<span class="self">self</span>) -&gt; bool {
-        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(Address(<span class="self">self</span>.<span class="number">0</span>)) }.is_sane()
+    </span><span class="kw">pub fn </span>is_sane&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_sane()
     }
 }
 

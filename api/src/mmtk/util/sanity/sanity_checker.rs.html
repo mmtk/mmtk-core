@@ -430,7 +430,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>sanity_checker = <span class="self">self</span>.mmtk().sanity_checker.lock().unwrap();
         <span class="kw">if </span>!sanity_checker.refs.contains(<span class="kw-2">&amp;</span>object) {
             <span class="comment">// FIXME steveb consider VM-specific integrity check on reference.
-            </span><span class="macro">assert!</span>(object.is_sane(), <span class="string">"Invalid reference {:?}"</span>, object);
+            </span><span class="macro">assert!</span>(object.is_sane::&lt;VM&gt;(), <span class="string">"Invalid reference {:?}"</span>, object);
 
             <span class="comment">// Let plan check object
             </span><span class="macro">assert!</span>(

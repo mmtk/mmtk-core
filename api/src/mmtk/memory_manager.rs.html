@@ -1430,8 +1430,8 @@
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-</span><span class="kw">pub fn </span>is_live_object(object: ObjectReference) -&gt; bool {
-    object.is_live()
+</span><span class="kw">pub fn </span>is_live_object&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
+    object.is_live::&lt;VM&gt;()
 }
 
 <span class="doccomment">/// Check if `addr` is the address of an object reference to an MMTk object.
