@@ -321,7 +321,11 @@ impl<VM: VMBinding> StickyImmix<VM> {
     fn requires_full_heap_collection(&self) -> bool {
         // Separate each condition so the code is clear
         #[allow(clippy::if_same_then_else, clippy::needless_bool)]
-        if self
+        if crate::plan::generational::FULL_NURSERY_GC {
+            trace!("full heap: forced full heap");
+            // For barrier overhead measurements, we always do full gc in nursery collections.
+            true
+        } else if self
             .immix
             .common
             .base
