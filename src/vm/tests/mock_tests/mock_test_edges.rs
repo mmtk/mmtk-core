@@ -27,7 +27,7 @@ mod simple_edges {
                     let edge = SimpleEdge::from_address(Address::from_ref(&slot));
                     let objref = edge.load();
 
-                    assert_eq!(objref, fixture.objref1);
+                    assert_eq!(objref, Some(fixture.objref1));
                 });
             },
             no_cleanup,
@@ -47,7 +47,7 @@ mod simple_edges {
                     assert_eq!(slot.load(Ordering::SeqCst), fixture.objref2);
 
                     let objref = edge.load();
-                    assert_eq!(objref, fixture.objref2);
+                    assert_eq!(objref, Some(fixture.objref2));
                 });
             },
             no_cleanup,
@@ -81,7 +81,7 @@ mod compressed_oop {
     }
 
     impl Edge for CompressedOopEdge {
-        fn load(&self) -> ObjectReference {
+        fn load(&self) -> Option<ObjectReference> {
             let compressed = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let expanded = (compressed as usize) << 3;
             ObjectReference::from_raw_address(unsafe { Address::from_usize(expanded) })
@@ -121,7 +121,8 @@ mod compressed_oop {
         let compressed1 = (COMPRESSABLE_ADDR1 >> 3) as u32;
         let compressed2 = (COMPRESSABLE_ADDR2 >> 3) as u32;
         let objref2 =
-            ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR2) });
+            ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR2) })
+                .unwrap();
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
@@ -130,7 +131,7 @@ mod compressed_oop {
         assert_eq!(slot.load(Ordering::SeqCst), compressed2);
 
         let objref = edge.load();
-        assert_eq!(objref, objref2);
+        assert_eq!(objref, Some(objref2));
     }
 }
 
@@ -173,7 +174,7 @@ mod offset_edge {
     }
 
     impl Edge for OffsetEdge {
-        fn load(&self) -> ObjectReference {
+        fn load(&self) -> Option<ObjectReference> {
             let middle = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let begin = middle - self.offset;
             ObjectReference::from_raw_address(begin)
@@ -200,7 +201,7 @@ mod offset_edge {
                     let edge = OffsetEdge::new_with_offset(Address::from_ref(&slot), OFFSET);
                     let objref = edge.load();
 
-                    assert_eq!(objref, fixture.objref1);
+                    assert_eq!(objref, Some(fixture.objref1));
                 });
             },
             no_cleanup,
@@ -222,7 +223,7 @@ mod offset_edge {
                     assert_eq!(slot.load(Ordering::SeqCst), addr2 + OFFSET);
 
                     let objref = edge.load();
-                    assert_eq!(objref, fixture.objref2);
+                    assert_eq!(objref, Some(fixture.objref2));
                 });
             },
             no_cleanup,
@@ -254,7 +255,7 @@ mod tagged_edge {
     }
 
     impl Edge for TaggedEdge {
-        fn load(&self) -> ObjectReference {
+        fn load(&self) -> Option<ObjectReference> {
             let tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let untagged = tagged & !Self::TAG_BITS_MASK;
             ObjectReference::from_raw_address(unsafe { Address::from_usize(untagged) })
@@ -288,8 +289,8 @@ mod tagged_edge {
                     let objref2 = edge2.load();
 
                     // Tags should not affect loaded values.
-                    assert_eq!(objref1, fixture.objref1);
-                    assert_eq!(objref2, fixture.objref1);
+                    assert_eq!(objref1, Some(fixture.objref1));
+                    assert_eq!(objref2, Some(fixture.objref1));
                 });
             },
             no_cleanup,
@@ -326,8 +327,8 @@ mod tagged_edge {
                     let objref2 = edge2.load();
 
                     // Tags should not affect loaded values.
-                    assert_eq!(objref1, fixture.objref2);
-                    assert_eq!(objref2, fixture.objref2);
+                    assert_eq!(objref1, Some(fixture.objref2));
+                    assert_eq!(objref2, Some(fixture.objref2));
                 });
             },
             no_cleanup,
@@ -358,7 +359,7 @@ mod mixed {
     unsafe impl Send for DummyVMEdge {}
 
     impl Edge for DummyVMEdge {
-        fn load(&self) -> ObjectReference {
+        fn load(&self) -> Option<ObjectReference> {
             match self {
                 DummyVMEdge::Simple(e) => e.load(),
                 #[cfg(target_pointer_width = "64")]
@@ -405,7 +406,12 @@ mod mixed {
                     let edges = [de1, de3, de4];
                     for (i, edge) in edges.iter().enumerate() {
                         let objref = edge.load();
-                        assert_eq!(objref, fixture.objref1, "Edge {} is not properly loaded", i);
+                        assert_eq!(
+                            objref,
+                            Some(fixture.objref1),
+                            "Edge {} is not properly loaded",
+                            i
+                        );
                     }
 
                     let mutable_edges = [de1, de3, de4];
@@ -413,7 +419,8 @@ mod mixed {
                         edge.store(fixture.objref2);
                         let objref = edge.load();
                         assert_eq!(
-                            objref, fixture.objref2,
+                            objref,
+                            Some(fixture.objref2),
                             "Edge {} is not properly loaded after store",
                             i
                         );
