@@ -366,6 +366,10 @@
 <a href="#364" id="364">364</a>
 <a href="#365" id="365">365</a>
 <a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -700,7 +704,11 @@
     <span class="kw">fn </span>requires_full_heap_collection(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="comment">// Separate each condition so the code is clear
         </span><span class="attr">#[allow(clippy::if_same_then_else, clippy::needless_bool)]
-        </span><span class="kw">if </span><span class="self">self
+        </span><span class="kw">if </span><span class="kw">crate</span>::plan::generational::FULL_NURSERY_GC {
+            <span class="macro">trace!</span>(<span class="string">"full heap: forced full heap"</span>);
+            <span class="comment">// For barrier overhead measurements, we always do full gc in nursery collections.
+            </span><span class="bool-val">true
+        </span>} <span class="kw">else if </span><span class="self">self
             </span>.immix
             .common
             .base
