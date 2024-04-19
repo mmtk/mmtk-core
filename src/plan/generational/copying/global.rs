@@ -12,6 +12,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -183,13 +184,14 @@ impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenerationalPlanExt<VM> for GenCopy<VM> {
-    fn trace_object_nursery<Q: ObjectQueue>(
+    fn trace_object_nursery<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.gen.trace_object_nursery(queue, object, worker)
+        self.gen
+            .trace_object_nursery::<Q, KIND>(queue, object, worker)
     }
 }
 

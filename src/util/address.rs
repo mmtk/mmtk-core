@@ -554,41 +554,36 @@ impl ObjectReference {
         obj
     }
 
-    /// returns the ObjectReference
-    pub fn value(self) -> usize {
-        self.0.get()
-    }
-
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    pub fn is_reachable(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_reachable(self)
+    pub fn is_reachable<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_reachable(self)
     }
 
     /// Is the object live, determined by the policy?
-    pub fn is_live(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_live(self)
+    pub fn is_live<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_live(self)
     }
 
     /// Can the object be moved?
-    pub fn is_movable(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_movable()
+    pub fn is_movable<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
-    pub fn get_forwarded_object(self) -> Option<Self> {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.get_forwarded_object(self)
+    pub fn get_forwarded_object<VM: VMBinding>(self) -> Option<Self> {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.get_forwarded_object(self)
     }
 
     /// Is the object in any MMTk spaces?
-    pub fn is_in_any_space(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_in_space(self)
+    pub fn is_in_any_space<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_in_space(self)
     }
 
     /// Is the object sane?
     #[cfg(feature = "sanity")]
-    pub fn is_sane(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
+    pub fn is_sane<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_sane()
     }
 }
 

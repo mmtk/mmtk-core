@@ -649,7 +649,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             );
 
             queue.enqueue(new_object);
-            debug_assert!(new_object.is_live());
+            debug_assert!(new_object.is_live::<VM>());
             self.unlog_object_if_needed(new_object);
             new_object
         }
