@@ -172,8 +172,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             };
             self.work_buckets[WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::<VM>::new());
+            self.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<VM>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<VM>::new());
 

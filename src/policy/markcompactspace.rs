@@ -252,7 +252,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         }
 
         let result = Self::get_header_forwarding_pointer(object);
-        assert!(!result.is_null(), "Object {object} does not have a forwarding pointer");
+        assert!(
+            !result.is_null(),
+            "Object {object} does not have a forwarding pointer"
+        );
         result
     }
 
