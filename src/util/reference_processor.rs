@@ -81,15 +81,12 @@ impl ReferenceProcessors {
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
 
+    pub fn retain_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
+        self.soft.retain::<E>(trace, is_nursery_gc(mmtk.get_plan()));
+    }
+
     /// Scan soft references.
     pub fn scan_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        // For soft refs, it is up to the VM to decide when to reclaim this.
-        // If this is not an emergency collection, we have no heap stress. We simply retain soft refs.
-        if !mmtk.state.is_emergency_collection() {
-            // This step only retains the referents (keep the referents alive), it does not update its addresses.
-            // We will call soft.scan() again with retain=false to update its addresses based on liveness.
-            self.soft.retain::<E>(trace, is_nursery_gc(mmtk.get_plan()));
-        }
         // This will update the references (and the referents).
         self.soft.scan::<E>(trace, is_nursery_gc(mmtk.get_plan()));
     }
@@ -489,12 +486,35 @@ use crate::MMTK;
 use std::marker::PhantomData;
 
 #[derive(Default)]
+pub(crate) struct ScanSoftReferences<E: ProcessEdgesWork>(PhantomData<E>);
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanSoftReferences<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        let mut w = E::new(vec![], false, mmtk, WorkBucketStage::SoftRefClosure);
+        w.set_worker(worker);
+        mmtk.reference_processors.scan_soft_refs(&mut w, mmtk);
+        w.flush();
+    }
+}
+
+#[derive(Default)]
 pub(crate) struct SoftRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::new(vec![], false, mmtk, WorkBucketStage::SoftRefClosure);
         w.set_worker(worker);
-        mmtk.reference_processors.scan_soft_refs(&mut w, mmtk);
+
+        if !mmtk.state.is_emergency_collection() {
+            // Postpone the scanning to the end of the transitive closure from strongly reachable
+            // soft references.
+            worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure]
+                .set_sentinel(Box::new(ScanSoftReferences::<E>(PhantomData)));
+
+            mmtk.reference_processors.retain_soft_refs(&mut w, mmtk);
+        } else {
+            // Scan soft references immediately without retaining.
+            mmtk.reference_processors.scan_soft_refs(&mut w, mmtk);
+        }
+
         w.flush();
     }
 }
