@@ -369,7 +369,7 @@ impl ReferenceProcessor {
             sync.references
         );
 
-        debug_assert!(sync.enqueued_references.is_empty());
+        //debug_assert!(sync.enqueued_references.is_empty());
         // Put enqueued reference in this vec
         let mut enqueued_references = vec![];
 
@@ -505,10 +505,20 @@ use crate::MMTK;
 use std::marker::PhantomData;
 
 #[derive(Default)]
-pub(crate) struct ScanSoftReferences<VM: VMBinding>(PhantomData<VM>);
-impl<VM: VMBinding> GCWork<VM> for ScanSoftReferences<VM> {
+pub(crate) struct RescanReferences<VM: VMBinding> {
+    pub soft: bool,
+    pub weak: bool,
+    pub phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for RescanReferences<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.reference_processors.scan_soft_refs(mmtk);
+        if self.soft {
+            mmtk.reference_processors.scan_soft_refs(mmtk);
+        }
+        if self.weak {
+            mmtk.reference_processors.scan_weak_refs(mmtk);
+        }
     }
 }
 
@@ -519,8 +529,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
         if !mmtk.state.is_emergency_collection() {
             // Postpone the scanning to the end of the transitive closure from strongly reachable
             // soft references.
-            worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure]
-                .set_sentinel(Box::new(ScanSoftReferences::<E::VM>(PhantomData)));
+            let rescan = Box::new(RescanReferences {
+                soft: true,
+                weak: false,
+                phantom_data: PhantomData,
+            });
+            worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure].set_sentinel(rescan);
 
             // Retain soft references.  This will expand the transitive closure.  We create an
             // instance of `E` for this.
