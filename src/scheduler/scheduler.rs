@@ -173,9 +173,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
             self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::<C::DefaultProcessEdges>::new());
+                .add(WeakRefProcessing::<VM>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<C::DefaultProcessEdges>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
