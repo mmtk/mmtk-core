@@ -72,6 +72,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         self.mc_space.release();
     }
 
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
+    }
+
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
         &ALLOCATOR_MAPPING
     }

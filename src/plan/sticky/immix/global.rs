@@ -135,11 +135,12 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         }
     }
 
-    fn end_of_gc(&mut self, _tls: crate::util::opaque_pointer::VMWorkerThread) {
+    fn end_of_gc(&mut self, tls: crate::util::opaque_pointer::VMWorkerThread) {
         let next_gc_full_heap =
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::Relaxed);
+        self.immix.common.end_of_gc(tls);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {

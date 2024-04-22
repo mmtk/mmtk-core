@@ -95,6 +95,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.fromspace().release();
     }
 
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
+    }
+
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }

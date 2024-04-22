@@ -96,6 +96,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             .store(self.immix_space.release(true), Ordering::Relaxed);
     }
 
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.immix_space.defrag_headroom_pages()
     }

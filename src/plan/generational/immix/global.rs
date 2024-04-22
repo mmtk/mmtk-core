@@ -146,9 +146,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .store(full_heap, Ordering::Relaxed);
     }
 
-    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
         self.gen
             .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
+        self.gen.common.end_of_gc(tls);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
