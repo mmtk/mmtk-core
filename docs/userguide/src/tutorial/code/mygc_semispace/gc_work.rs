@@ -10,8 +10,8 @@ pub struct MyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = SFTProcessEdges<Self::VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type DefaultProcessEdges = SFTProcessEdges<Self::VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR_END: workcontext_sft
 
@@ -22,8 +22,8 @@ pub struct MyGCWorkContext2<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
-    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type DefaultProcessEdges = PlanProcessEdges<Self::VM, MyGC<VM>, DEFAULT_TRACE>;
+    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR_END: workcontext_plan
 
@@ -104,7 +104,7 @@ pub struct MyGCWorkContext3<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext3<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = MyGCProcessEdges<Self::VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<Self::VM>;
+    type DefaultProcessEdges = MyGCProcessEdges<Self::VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<Self::VM>;
 }
 // ANCHOR: workcontext_mygc

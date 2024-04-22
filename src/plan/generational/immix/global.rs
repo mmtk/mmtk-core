@@ -9,6 +9,7 @@ use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
@@ -215,13 +216,14 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
 }
 
 impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> for GenImmix<VM> {
-    fn trace_object_nursery<Q: ObjectQueue>(
+    fn trace_object_nursery<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.gen.trace_object_nursery(queue, object, worker)
+        self.gen
+            .trace_object_nursery::<Q, KIND>(queue, object, worker)
     }
 }
 

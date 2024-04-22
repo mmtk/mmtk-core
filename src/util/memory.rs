@@ -40,7 +40,7 @@ pub fn set(start: Address, val: u8, len: usize) {
 /// may corrupt others' data.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub unsafe fn dzmmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    let prot = MMAP_PROT;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
     let ret = mmap_fixed(start, size, prot, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
@@ -57,6 +57,12 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 #[cfg(target_os = "macos")]
 // MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
+
+#[cfg(target_os = "linux")]
+const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
+#[cfg(target_os = "macos")]
+// PROT_EXEC cannot be used with PROT_READ on Apple Silicon
+const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE;
 
 /// Strategy for performing mmap
 ///
@@ -77,7 +83,7 @@ pub enum MmapStrategy {
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    let prot = MMAP_PROT;
     let flags = MMAP_FLAGS;
     let ret = mmap_fixed(start, size, prot, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
