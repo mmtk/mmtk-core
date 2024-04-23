@@ -141,14 +141,16 @@ pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        // Rescan soft and weak references at the end of the transitive closure from resurrected
-        // objects.  New soft and weak references may be discovered during this.
-        let rescan = Box::new(RescanReferences {
-            soft: true,
-            weak: true,
-            phantom_data: PhantomData,
-        });
-        worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure].set_sentinel(rescan);
+        if !*mmtk.options.no_reference_types {
+            // Rescan soft and weak references at the end of the transitive closure from resurrected
+            // objects.  New soft and weak references may be discovered during this.
+            let rescan = Box::new(RescanReferences {
+                soft: true,
+                weak: true,
+                phantom_data: PhantomData,
+            });
+            worker.scheduler().work_buckets[WorkBucketStage::FinalRefClosure].set_sentinel(rescan);
+        }
 
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         debug!(
