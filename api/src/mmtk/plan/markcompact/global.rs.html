@@ -326,9 +326,9 @@
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
+                .add(WeakRefProcessing::&lt;VM&gt;::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::&lt;MarkingProcessEdges&lt;VM&gt;&gt;::new());
+                .add(PhantomRefProcessing::&lt;VM&gt;::new());
 
             <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]

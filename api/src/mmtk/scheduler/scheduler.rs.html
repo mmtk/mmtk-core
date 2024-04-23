@@ -616,7 +616,6 @@
 <a href="#614" id="614">614</a>
 <a href="#615" id="615">615</a>
 <a href="#616" id="616">616</a>
-<a href="#617" id="617">617</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="self">self</span>::worker::PollResult;
 
 <span class="kw">use </span><span class="kw">super</span>::gc_work::ScheduleCollection;
@@ -791,10 +790,9 @@
             };
             <span class="self">self</span>.work_buckets[WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
-            <span class="self">self</span>.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
+            <span class="self">self</span>.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::&lt;VM&gt;::new());
             <span class="self">self</span>.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::&lt;C::DefaultProcessEdges&gt;::new());
+                .add(PhantomRefProcessing::&lt;VM&gt;::new());
 
             <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RefForwarding;
             <span class="kw">if </span>plan.constraints().needs_forward_after_liveness {

@@ -185,9 +185,22 @@
 <a href="#183" id="183">183</a>
 <a href="#184" id="184">184</a>
 <a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::is_nursery_gc;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{GCWork, GCWorker, WorkBucketStage};
+<span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::RescanReferences;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::util::VMWorkerThread;
 <span class="kw">use </span><span class="kw">crate</span>::vm::Finalizable;
@@ -327,6 +340,17 @@
 
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>Finalization&lt;E&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
+        <span class="kw">if </span>!<span class="kw-2">*</span>mmtk.options.no_reference_types {
+            <span class="comment">// Rescan soft and weak references at the end of the transitive closure from resurrected
+            // objects.  New soft and weak references may be discovered during this.
+            </span><span class="kw">let </span>rescan = Box::new(RescanReferences {
+                soft: <span class="bool-val">true</span>,
+                weak: <span class="bool-val">true</span>,
+                phantom_data: PhantomData,
+            });
+            worker.scheduler().work_buckets[WorkBucketStage::FinalRefClosure].set_sentinel(rescan);
+        }
+
         <span class="kw">let </span><span class="kw-2">mut </span>finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         <span class="macro">debug!</span>(
             <span class="string">"Finalization, {} objects in candidates, {} objects ready to finalize"</span>,

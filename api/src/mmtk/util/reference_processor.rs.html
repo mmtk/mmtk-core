@@ -566,6 +566,52 @@
 <a href="#564" id="564">564</a>
 <a href="#565" id="565">565</a>
 <a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::sync::atomic::AtomicBool;
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -649,32 +695,24 @@
 
     <span class="comment">// Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft &gt; weak &gt; phantom
 
-    </span><span class="doccomment">/// Scan soft references.
-    </span><span class="kw">pub fn </span>scan_soft_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
-        <span class="comment">// For soft refs, it is up to the VM to decide when to reclaim this.
-        // If this is not an emergency collection, we have no heap stress. We simply retain soft refs.
-        </span><span class="kw">if </span>!mmtk.state.is_emergency_collection() {
-            <span class="comment">// This step only retains the referents (keep the referents alive), it does not update its addresses.
-            // We will call soft.scan() again with retain=false to update its addresses based on liveness.
-            </span><span class="self">self</span>.soft.retain::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
-        }
+    </span><span class="kw">pub fn </span>retain_soft_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
+        <span class="self">self</span>.soft.retain::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
+    }
+
+    <span class="doccomment">/// Scan soft references.
+    </span><span class="kw">pub fn </span>scan_soft_refs&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="comment">// This will update the references (and the referents).
-        </span><span class="self">self</span>.soft.scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
+        </span><span class="self">self</span>.soft.scan::&lt;VM&gt;(is_nursery_gc(mmtk.get_plan()));
     }
 
     <span class="doccomment">/// Scan weak references.
-    </span><span class="kw">pub fn </span>scan_weak_refs&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
-        <span class="self">self</span>.weak.scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
+    </span><span class="kw">pub fn </span>scan_weak_refs&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.weak.scan::&lt;VM&gt;(is_nursery_gc(mmtk.get_plan()));
     }
 
     <span class="doccomment">/// Scan phantom references.
-    </span><span class="kw">pub fn </span>scan_phantom_refs&lt;E: ProcessEdgesWork&gt;(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        trace: <span class="kw-2">&amp;mut </span>E,
-        mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;,
-    ) {
-        <span class="self">self</span>.phantom
-            .scan::&lt;E&gt;(trace, is_nursery_gc(mmtk.get_plan()));
+    </span><span class="kw">pub fn </span>scan_phantom_refs&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="self">self</span>.phantom.scan::&lt;VM&gt;(is_nursery_gc(mmtk.get_plan()));
     }
 }
 
@@ -776,11 +814,41 @@
         <span class="self">self</span>.allow_new_candidate.store(<span class="bool-val">true</span>, Ordering::SeqCst);
     }
 
-    <span class="comment">// These funcions simply call `trace_object()`, which does two things: 1. to make sure the object is kept alive
-    // and 2. to get the new object reference if the object is copied. The functions are intended to make the code
-    // easier to understand.
+    <span class="comment">// These functions call `ObjectReference::get_forwarded_object`, not `trace_object()`.
+    // They are used by steps that do not expand the transitive closure.  Processing weak and
+    // phantom references never expand the transitive closure.  Soft references, when not retained,
+    // do not expand the transitive closure, either.
+    // These functions are intended to make the code easier to understand.
 
-    </span><span class="kw">fn </span>get_forwarded_referent&lt;E: ProcessEdgesWork&gt;(
+    </span><span class="doccomment">/// Return the new `ObjectReference` of a referent if it is already moved, or its current
+    /// `ObjectReference` otherwise.  The referent must be live when calling this function.
+    </span><span class="kw">fn </span>get_forwarded_referent&lt;VM: VMBinding&gt;(referent: ObjectReference) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(referent.is_live::&lt;VM&gt;());
+        <span class="macro">debug_assert!</span>(!referent.is_null());
+        referent.get_forwarded_object::&lt;VM&gt;().unwrap_or(referent)
+    }
+
+    <span class="doccomment">/// Return the new `ObjectReference` of a reference object if it is already moved, or its
+    /// current `ObjectReference` otherwise.  The reference object must be live when calling this
+    /// function.
+    </span><span class="kw">fn </span>get_forwarded_reference&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(object.is_live::&lt;VM&gt;());
+        <span class="macro">debug_assert!</span>(!object.is_null());
+        object.get_forwarded_object::&lt;VM&gt;().unwrap_or(object)
+    }
+
+    <span class="comment">// These funcions call `trace_object()`, which will ensure the object and its descendents will
+    // be traced.  They are only called in steps that expand the transitive closure.  That include
+    // retaining soft references, and (for MarkSweep) tracing objects for forwarding.
+    // Note that finalizers also expand the transitive closure.
+    // These functions are intended to make the code easier to understand.
+
+    </span><span class="doccomment">/// This function is called when retaining soft reference.  It
+    /// -   keeps the referent alive, and
+    /// -   adds the referent to the tracing queue if not yet reached, so that its children will be
+    ///     kept alive, too, and
+    /// -   gets the new object reference of the referent if it is moved.
+    </span><span class="kw">fn </span>keep_referent_alive&lt;E: ProcessEdgesWork&gt;(
         e: <span class="kw-2">&amp;mut </span>E,
         referent: ObjectReference,
     ) -&gt; ObjectReference {
@@ -788,15 +856,11 @@
         e.trace_object(referent)
     }
 
-    <span class="kw">fn </span>get_forwarded_reference&lt;E: ProcessEdgesWork&gt;(
-        e: <span class="kw-2">&amp;mut </span>E,
-        object: ObjectReference,
-    ) -&gt; ObjectReference {
-        <span class="macro">debug_assert!</span>(!object.is_null());
-        e.trace_object(object)
-    }
-
-    <span class="kw">fn </span>keep_referent_alive&lt;E: ProcessEdgesWork&gt;(
+    <span class="doccomment">/// This function is called when forwarding the references and referents (for MarkCompact). It
+    /// -   adds the reference or the referent to the tracing queue if not yet reached, so that
+    ///     the children of the reference or referent will be kept alive, too, and
+    /// -   gets the forwarded object reference of the object.
+    </span><span class="kw">fn </span>trace_forward_object&lt;E: ProcessEdgesWork&gt;(
         e: <span class="kw-2">&amp;mut </span>E,
         referent: ObjectReference,
     ) -&gt; ObjectReference {
@@ -866,7 +930,7 @@
             }
 
             <span class="kw">if </span>!&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::is_referent_cleared(old_referent) {
-                <span class="kw">let </span>new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
+                <span class="kw">let </span>new_referent = ReferenceProcessor::trace_forward_object(trace, old_referent);
                 &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::set_referent(reference, new_referent);
 
                 <span class="macro">trace!</span>(
@@ -876,7 +940,7 @@
                 );
             }
 
-            <span class="kw">let </span>new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
+            <span class="kw">let </span>new_reference = ReferenceProcessor::trace_forward_object(trace, reference);
             <span class="macro">trace!</span>(<span class="string">" reference: forwarded to {}"</span>, new_reference);
 
             <span class="macro">debug_assert!</span>(
@@ -906,10 +970,11 @@
     }
 
     <span class="doccomment">/// Scan the reference table, and update each reference/referent.
+    /// It doesn't keep the reference or the referent alive.
     </span><span class="comment">// TODO: nursery is currently ignored. We used to use Vec for the reference table, and use an int
     // to point to the reference that we last scanned. However, when we use HashSet for reference table,
     // we can no longer do that.
-    </span><span class="kw">fn </span>scan&lt;E: ProcessEdgesWork&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, trace: <span class="kw-2">&amp;mut </span>E, _nursery: bool) {
+    </span><span class="kw">fn </span>scan&lt;VM: VMBinding&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, _nursery: bool) {
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
 
         <span class="macro">debug!</span>(<span class="string">"Starting ReferenceProcessor.scan({:?})"</span>, <span class="self">self</span>.semantics);
@@ -920,15 +985,15 @@
             sync.references
         );
 
-        <span class="macro">debug_assert!</span>(sync.enqueued_references.is_empty());
-        <span class="comment">// Put enqueued reference in this vec
+        <span class="comment">//debug_assert!(sync.enqueued_references.is_empty());
+        // Put enqueued reference in this vec
         </span><span class="kw">let </span><span class="kw-2">mut </span>enqueued_references = <span class="macro">vec!</span>[];
 
         <span class="comment">// Determinine liveness for each reference and only keep the refs if `process_reference()` returns Some.
         </span><span class="kw">let </span>new_set: HashSet&lt;ObjectReference&gt; = sync
             .references
             .iter()
-            .filter_map(|reff| <span class="self">self</span>.process_reference(trace, <span class="kw-2">*</span>reff, <span class="kw-2">&amp;mut </span>enqueued_references))
+            .filter_map(|reff| <span class="self">self</span>.process_reference::&lt;VM&gt;(<span class="kw-2">*</span>reff, <span class="kw-2">&amp;mut </span>enqueued_references))
             .collect();
 
         <span class="macro">debug!</span>(
@@ -939,7 +1004,7 @@
             enqueued_references.len()
         );
         sync.references = new_set;
-        sync.enqueued_references = enqueued_references;
+        sync.enqueued_references.extend(enqueued_references);
 
         <span class="macro">debug!</span>(<span class="string">"Ending ReferenceProcessor.scan({:?})"</span>, <span class="self">self</span>.semantics);
     }
@@ -989,9 +1054,8 @@
     ///
     /// If a None value is returned, the reference can be removed from the reference table. Otherwise, the updated reference should be kept
     /// in the reference table.
-    </span><span class="kw">fn </span>process_reference&lt;E: ProcessEdgesWork&gt;(
+    </span><span class="kw">fn </span>process_reference&lt;VM: VMBinding&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        trace: <span class="kw-2">&amp;mut </span>E,
         reference: ObjectReference,
         enqueued_references: <span class="kw-2">&amp;mut </span>Vec&lt;ObjectReference&gt;,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
@@ -1001,34 +1065,34 @@
 
         <span class="comment">// If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
-        </span><span class="kw">if </span>!reference.is_live::&lt;E::VM&gt;() {
-            &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::clear_referent(reference);
+        </span><span class="kw">if </span>!reference.is_live::&lt;VM&gt;() {
+            VM::VMReferenceGlue::clear_referent(reference);
             <span class="macro">trace!</span>(<span class="string">" UNREACHABLE reference: {}"</span>, reference);
             <span class="macro">trace!</span>(<span class="string">" (unreachable)"</span>);
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
         <span class="comment">// The reference object is live
-        </span><span class="kw">let </span>new_reference = <span class="self">Self</span>::get_forwarded_reference(trace, reference);
-        <span class="kw">let </span>old_referent = &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::get_referent(reference);
+        </span><span class="kw">let </span>new_reference = <span class="self">Self</span>::get_forwarded_reference::&lt;VM&gt;(reference);
+        <span class="kw">let </span>old_referent = VM::VMReferenceGlue::get_referent(reference);
         <span class="macro">trace!</span>(<span class="string">" ~&gt; {}"</span>, old_referent);
 
         <span class="comment">// If the application has cleared the referent the Java spec says
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
-        </span><span class="kw">if </span>&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::is_referent_cleared(old_referent) {
+        </span><span class="kw">if </span>VM::VMReferenceGlue::is_referent_cleared(old_referent) {
             <span class="macro">trace!</span>(<span class="string">" (cleared referent) "</span>);
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
 
         <span class="macro">trace!</span>(<span class="string">" =&gt; {}"</span>, new_reference);
 
-        <span class="kw">if </span>old_referent.is_live::&lt;E::VM&gt;() {
+        <span class="kw">if </span>old_referent.is_live::&lt;VM&gt;() {
             <span class="comment">// Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
-            </span><span class="kw">let </span>new_referent = <span class="self">Self</span>::get_forwarded_referent(trace, old_referent);
-            <span class="macro">debug_assert!</span>(new_referent.is_live::&lt;E::VM&gt;());
+            </span><span class="kw">let </span>new_referent = <span class="self">Self</span>::get_forwarded_referent::&lt;VM&gt;(old_referent);
+            <span class="macro">debug_assert!</span>(new_referent.is_live::&lt;VM&gt;());
             <span class="macro">trace!</span>(<span class="string">" ~&gt; {}"</span>, new_referent);
 
             <span class="comment">// The reference object stays on the waiting list, and the
@@ -1038,13 +1102,13 @@
             // copying collector.
 
             // Update the referent
-            </span>&lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::set_referent(new_reference, new_referent);
+            </span>VM::VMReferenceGlue::set_referent(new_reference, new_referent);
             <span class="prelude-val">Some</span>(new_reference)
         } <span class="kw">else </span>{
             <span class="comment">// Referent is unreachable. Clear the referent and enqueue the reference object.
             </span><span class="macro">trace!</span>(<span class="string">" UNREACHABLE referent: {}"</span>, old_referent);
 
-            &lt;E::VM <span class="kw">as </span>VMBinding&gt;::VMReferenceGlue::clear_referent(new_reference);
+            VM::VMReferenceGlue::clear_referent(new_reference);
             enqueued_references.push(new_reference);
             <span class="prelude-val">None
         </span>}
@@ -1057,13 +1121,47 @@
 <span class="kw">use </span>std::marker::PhantomData;
 
 <span class="attr">#[derive(Default)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>RescanReferences&lt;VM: VMBinding&gt; {
+    <span class="kw">pub </span>soft: bool,
+    <span class="kw">pub </span>weak: bool,
+    <span class="kw">pub </span>phantom_data: PhantomData&lt;VM&gt;,
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>RescanReferences&lt;VM&gt; {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        <span class="kw">if </span><span class="self">self</span>.soft {
+            mmtk.reference_processors.scan_soft_refs(mmtk);
+        }
+        <span class="kw">if </span><span class="self">self</span>.weak {
+            mmtk.reference_processors.scan_weak_refs(mmtk);
+        }
+    }
+}
+
+<span class="attr">#[derive(Default)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>SoftRefProcessing&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>SoftRefProcessing&lt;E&gt; {
     <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
-        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::SoftRefClosure);
-        w.set_worker(worker);
-        mmtk.reference_processors.scan_soft_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
-        w.flush();
+        <span class="kw">if </span>!mmtk.state.is_emergency_collection() {
+            <span class="comment">// Postpone the scanning to the end of the transitive closure from strongly reachable
+            // soft references.
+            </span><span class="kw">let </span>rescan = Box::new(RescanReferences {
+                soft: <span class="bool-val">true</span>,
+                weak: <span class="bool-val">false</span>,
+                phantom_data: PhantomData,
+            });
+            worker.scheduler().work_buckets[WorkBucketStage::SoftRefClosure].set_sentinel(rescan);
+
+            <span class="comment">// Retain soft references.  This will expand the transitive closure.  We create an
+            // instance of `E` for this.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::SoftRefClosure);
+            w.set_worker(worker);
+            mmtk.reference_processors.retain_soft_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
+            w.flush();
+        } <span class="kw">else </span>{
+            <span class="comment">// Scan soft references immediately without retaining.
+            </span>mmtk.reference_processors.scan_soft_refs(mmtk);
+        }
     }
 }
 <span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; SoftRefProcessing&lt;E&gt; {
@@ -1073,32 +1171,26 @@
 }
 
 <span class="attr">#[derive(Default)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WeakRefProcessing&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
-<span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>WeakRefProcessing&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
-        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::WeakRefClosure);
-        w.set_worker(worker);
-        mmtk.reference_processors.scan_weak_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
-        w.flush();
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WeakRefProcessing&lt;VM: VMBinding&gt;(PhantomData&lt;VM&gt;);
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>WeakRefProcessing&lt;VM&gt; {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        mmtk.reference_processors.scan_weak_refs(mmtk);
     }
 }
-<span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; WeakRefProcessing&lt;E&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; WeakRefProcessing&lt;VM&gt; {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>(PhantomData)
     }
 }
 
 <span class="attr">#[derive(Default)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>PhantomRefProcessing&lt;E: ProcessEdgesWork&gt;(PhantomData&lt;E&gt;);
-<span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; GCWork&lt;E::VM&gt; <span class="kw">for </span>PhantomRefProcessing&lt;E&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;E::VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;E::VM&gt;) {
-        <span class="kw">let </span><span class="kw-2">mut </span>w = E::new(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, mmtk, WorkBucketStage::PhantomRefClosure);
-        w.set_worker(worker);
-        mmtk.reference_processors.scan_phantom_refs(<span class="kw-2">&amp;mut </span>w, mmtk);
-        w.flush();
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>PhantomRefProcessing&lt;VM: VMBinding&gt;(PhantomData&lt;VM&gt;);
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PhantomRefProcessing&lt;VM&gt; {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+        mmtk.reference_processors.scan_phantom_refs(mmtk);
     }
 }
-<span class="kw">impl</span>&lt;E: ProcessEdgesWork&gt; PhantomRefProcessing&lt;E&gt; {
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; PhantomRefProcessing&lt;VM&gt; {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>(PhantomData)
     }

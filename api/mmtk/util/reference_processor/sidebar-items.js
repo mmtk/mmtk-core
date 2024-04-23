@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["INITIAL_SIZE"],"enum":["Semantics"],"struct":["PhantomRefProcessing","RefEnqueue","RefForwarding","ReferenceProcessor","ReferenceProcessorSync","ReferenceProcessors","SoftRefProcessing","WeakRefProcessing"]};
+window.SIDEBAR_ITEMS = {"constant":["INITIAL_SIZE"],"enum":["Semantics"],"struct":["PhantomRefProcessing","RefEnqueue","RefForwarding","ReferenceProcessor","ReferenceProcessorSync","ReferenceProcessors","RescanReferences","SoftRefProcessing","WeakRefProcessing"]};
