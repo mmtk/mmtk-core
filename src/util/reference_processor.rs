@@ -206,16 +206,17 @@ impl ReferenceProcessor {
     // do not expand the transitive closure, either.
     // These functions are intended to make the code easier to understand.
 
-    /// Return the new object reference of a referent if it is already moved, or its current object
-    /// reference otherwise.  The referent must be live when calling this function.
+    /// Return the new `ObjectReference` of a referent if it is already moved, or its current
+    /// `ObjectReference` otherwise.  The referent must be live when calling this function.
     fn get_forwarded_referent<VM: VMBinding>(referent: ObjectReference) -> ObjectReference {
         debug_assert!(referent.is_live::<VM>());
         debug_assert!(!referent.is_null());
         referent.get_forwarded_object::<VM>().unwrap_or(referent)
     }
 
-    /// Return the new object reference of a reference object if it is already moved, or its current
-    /// object reference otherwise.  The reference object must be live when calling this function.
+    /// Return the new `ObjectReference` of a reference object if it is already moved, or its
+    /// current `ObjectReference` otherwise.  The reference object must be live when calling this
+    /// function.
     fn get_forwarded_reference<VM: VMBinding>(object: ObjectReference) -> ObjectReference {
         debug_assert!(object.is_live::<VM>());
         debug_assert!(!object.is_null());
@@ -230,8 +231,9 @@ impl ReferenceProcessor {
 
     /// This function is called when retaining soft reference.  It
     /// -   keeps the referent alive, and
-    /// -   enqueue the referent if not yet reached, so that its children will be kept alive, too, and
-    /// -   get the new object reference of the referent if it is moved.
+    /// -   adds the referent to the tracing queue if not yet reached, so that its children will be
+    ///     kept alive, too, and
+    /// -   gets the new object reference of the referent if it is moved.
     fn keep_referent_alive<E: ProcessEdgesWork>(
         e: &mut E,
         referent: ObjectReference,
@@ -241,9 +243,9 @@ impl ReferenceProcessor {
     }
 
     /// This function is called when forwarding the references and referents (for MarkCompact). It
-    /// -   enqueues the referent if not yet reached, so that its children will be visited and
-    ///     forwarded, too, and
-    /// -   get the forwarded object reference of the object.
+    /// -   adds the reference or the referent to the tracing queue if not yet reached, so that
+    ///     the children of the reference or referent will be kept alive, too, and
+    /// -   gets the forwarded object reference of the object.
     fn trace_forward_object<E: ProcessEdgesWork>(
         e: &mut E,
         referent: ObjectReference,
