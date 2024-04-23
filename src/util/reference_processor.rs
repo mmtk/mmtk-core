@@ -388,7 +388,7 @@ impl ReferenceProcessor {
             enqueued_references.len()
         );
         sync.references = new_set;
-        sync.enqueued_references = enqueued_references;
+        sync.enqueued_references.extend(enqueued_references);
 
         debug!("Ending ReferenceProcessor.scan({:?})", self.semantics);
     }
