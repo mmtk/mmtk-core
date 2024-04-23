@@ -251,7 +251,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             queue.enqueue(object);
         }
 
-        Self::get_header_forwarding_pointer(object)
+        let result = Self::get_header_forwarding_pointer(object);
+        debug_assert!(
+            !result.is_null(),
+            "Object {object} does not have a forwarding pointer"
+        );
+        result
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
