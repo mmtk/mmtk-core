@@ -326,7 +326,7 @@ impl ReferenceProcessor {
                 );
             }
 
-            let new_reference = ReferenceProcessor::get_forwarded_reference::<E::VM>(reference);
+            let new_reference = ReferenceProcessor::trace_forward_object(trace, reference);
             trace!(" reference: forwarded to {}", new_reference);
 
             debug_assert!(
