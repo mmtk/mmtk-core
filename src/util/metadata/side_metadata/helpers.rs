@@ -37,7 +37,7 @@ pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
 /// Returns the size in bytes that get munmapped.
 #[cfg(test)]
-pub(crate) fn ensure_munmap_contiguos_metadata_space(
+pub(crate) fn ensure_munmap_contiguous_metadata_space(
     start: Address,
     size: usize,
     spec: &SideMetadataSpec,

@@ -29,7 +29,7 @@ pub fn test_handle_mmap_conflict() {
             assert!(panic_res.is_err());
             let err = panic_res.err().unwrap();
             assert!(err.is::<&str>());
-            assert_eq!(err.downcast_ref::<&str>().unwrap(), &"Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?");
+            assert_eq!(err.downcast_ref::<&str>().unwrap(), &"Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
         },
         no_cleanup,
     )

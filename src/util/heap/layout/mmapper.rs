@@ -121,11 +121,11 @@ impl MapState {
             MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES, strategy),
             MapState::Quarantined => Ok(()),
             MapState::Mapped => {
-                // If a chunk is mapped by us and we try to quanrantine it, we simply don't do anything.
+                // If a chunk is mapped by us and we try to quarantine it, we simply don't do anything.
                 // We allow this as it is possible to have a situation like this:
-                // we have global side metdata S, and space A and B. We quanrantine memory X for S for A, then map
-                // X for A, and then we quanrantine memory Y for S for B. It is possible that X and Y is the same chunk,
-                // so the chunk is already mapped for A, and we try quanrantine it for B. We simply allow this transition.
+                // we have global side metadata S, and space A and B. We quarantine memory X for S for A, then map
+                // X for A, and then we quarantine memory Y for S for B. It is possible that X and Y is the same chunk,
+                // so the chunk is already mapped for A, and we try quarantine it for B. We simply allow this transition.
                 return Ok(());
             }
             MapState::Protected => panic!("Cannot quarantine protected memory"),

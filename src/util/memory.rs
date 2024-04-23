@@ -147,6 +147,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     match error.kind() {
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
+            info!("{}", get_process_memory_maps());
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
             trace!("Signal MmapOutOfMemory!");
             VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -159,6 +160,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
+                    info!("{}", get_process_memory_maps());
                     // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
                     trace!("Signal MmapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -166,7 +168,10 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
                 }
             }
         }
-        ErrorKind::AlreadyExists => panic!("Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?"),
+        ErrorKind::AlreadyExists => {
+            info!("{}", get_process_memory_maps());
+            panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
+        }
         _ => {}
     }
     panic!("Unexpected mmap failure: {:?}", error)
@@ -229,7 +234,6 @@ fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
 /// Get the memory maps for the process. The returned string is a multi-line string.
 /// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
 /// If we would need to parsable memory maps, I would suggest using a library instead which saves us the trouble to deal with portability.
-#[cfg(debug_assertions)]
 #[cfg(target_os = "linux")]
 pub fn get_process_memory_maps() -> String {
     // print map
