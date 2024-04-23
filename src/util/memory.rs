@@ -147,6 +147,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     match error.kind() {
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
+            #[cfg(target_os = "linux")]
             info!("{}", get_process_memory_maps());
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
             trace!("Signal MmapOutOfMemory!");
@@ -160,6 +161,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
+                    #[cfg(target_os = "linux")]
                     info!("{}", get_process_memory_maps());
                     // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
                     trace!("Signal MmapOutOfMemory!");
@@ -169,6 +171,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             }
         }
         ErrorKind::AlreadyExists => {
+            #[cfg(target_os = "linux")]
             info!("{}", get_process_memory_maps());
             panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
         }
