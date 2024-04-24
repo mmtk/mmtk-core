@@ -246,9 +246,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             queue.enqueue(object);
         }
 
-        Self::get_header_forwarding_pointer(object).unwrap_or_else(|| {
-            panic!("trace_forward_object called when an object is not forwarded, yet. object: {object}")
-        })
+        Self::get_header_forwarding_pointer(object)
+            .unwrap_or_else(|| panic!("Object {object} does not have a forwarding pointer"))
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
