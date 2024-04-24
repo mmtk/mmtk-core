@@ -425,6 +425,16 @@
 <a href="#423" id="423">423</a>
 <a href="#424" id="424">424</a>
 <a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::alloc::AllocationError;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -574,6 +584,7 @@
     <span class="kw">match </span>error.kind() {
         <span class="comment">// From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         </span>ErrorKind::OutOfMemory =&gt; {
+            <span class="macro">eprintln!</span>(<span class="string">"{}"</span>, get_process_memory_maps());
             <span class="comment">// Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
             </span><span class="macro">trace!</span>(<span class="string">"Signal MmapOutOfMemory!"</span>);
             VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -586,6 +597,7 @@
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(os_errno) = error.raw_os_error() {
                 <span class="comment">// If it is OOM, we invoke out_of_memory() through the VM interface.
                 </span><span class="kw">if </span>os_errno == libc::ENOMEM {
+                    <span class="macro">eprintln!</span>(<span class="string">"{}"</span>, get_process_memory_maps());
                     <span class="comment">// Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
                     </span><span class="macro">trace!</span>(<span class="string">"Signal MmapOutOfMemory!"</span>);
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -593,7 +605,10 @@
                 }
             }
         }
-        ErrorKind::AlreadyExists =&gt; <span class="macro">panic!</span>(<span class="string">"Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?"</span>),
+        ErrorKind::AlreadyExists =&gt; {
+            <span class="macro">eprintln!</span>(<span class="string">"{}"</span>, get_process_memory_maps());
+            <span class="macro">panic!</span>(<span class="string">"Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?"</span>);
+        }
         <span class="kw">_ </span>=&gt; {}
     }
     <span class="macro">panic!</span>(<span class="string">"Unexpected mmap failure: {:?}"</span>, error)
@@ -655,9 +670,7 @@
 
 <span class="doccomment">/// Get the memory maps for the process. The returned string is a multi-line string.
 /// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
-/// If we would need to parsable memory maps, I would suggest using a library instead which saves us the trouble to deal with portability.
-</span><span class="attr">#[cfg(debug_assertions)]
-#[cfg(target_os = <span class="string">"linux"</span>)]
+</span><span class="attr">#[cfg(any(target_os = <span class="string">"linux"</span>, target_os = <span class="string">"android"</span>))]
 </span><span class="kw">pub fn </span>get_process_memory_maps() -&gt; String {
     <span class="comment">// print map
     </span><span class="kw">use </span>std::fs::File;
@@ -666,6 +679,13 @@
     <span class="kw">let </span><span class="kw-2">mut </span>f = File::open(<span class="string">"/proc/self/maps"</span>).unwrap();
     f.read_to_string(<span class="kw-2">&amp;mut </span>data).unwrap();
     data
+}
+
+<span class="doccomment">/// Get the memory maps for the process. The returned string is a multi-line string.
+/// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
+</span><span class="attr">#[cfg(not(any(target_os = <span class="string">"linux"</span>, target_os = <span class="string">"android"</span>)))]
+</span><span class="kw">pub fn </span>get_process_memory_maps() -&gt; String {
+    <span class="string">"(process map unavailable)"</span>.to_string()
 }
 
 <span class="doccomment">/// Returns the total physical memory for the system in bytes.

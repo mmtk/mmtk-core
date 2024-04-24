@@ -1744,6 +1744,8 @@
 <a href="#1742" id="1742">1742</a>
 <a href="#1743" id="1743">1743</a>
 <a href="#1744" id="1744">1744</a>
+<a href="#1745" id="1745">1745</a>
+<a href="#1746" id="1746">1746</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
@@ -2870,7 +2872,7 @@
     /// # Arguments
     /// * `start` - The starting address of the source data.
     /// * `size` - The size of the source data (in bytes).
-    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quanrantine address range)
+    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quarantine address range)
     </span><span class="kw">fn </span>map_metadata_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, size: usize, no_reserve: bool) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.global.iter() {
             <span class="kw">match </span>try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
@@ -2883,15 +2885,17 @@
         </span><span class="kw">let </span><span class="kw-2">mut </span>lsize: usize = <span class="number">0</span>;
 
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.local.iter() {
-            <span class="comment">// For local side metadata, we always have to reserve address space for all
-            // local metadata required by all policies in MMTk to be able to calculate a constant offset for each local metadata at compile-time
-            // (it's like assigning an ID to each policy).
-            // As the plan is chosen at run-time, we will never know which subset of policies will be used during run-time.
-            // We can't afford this much address space in 32-bits.
+            <span class="comment">// For local side metadata, we always have to reserve address space for all local
+            // metadata required by all policies in MMTk to be able to calculate a constant offset
+            // for each local metadata at compile-time (it's like assigning an ID to each policy).
+            //
+            // As the plan is chosen at run-time, we will never know which subset of policies will
+            // be used during run-time. We can't afford this much address space in 32-bits.
             // So, we switch to the chunk-based approach for this specific case.
             //
-            // The global metadata is different in that for each plan, we can calculate its constant base addresses at compile-time.
-            // Using the chunk-based approach will need the same address space size as the current not-chunked approach.
+            // The global metadata is different in that for each plan, we can calculate its constant
+            // base addresses at compile-time. Using the chunk-based approach will need the same
+            // address space size as the current not-chunked approach.
             </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
             </span>{
                 <span class="kw">match </span>try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
@@ -2937,13 +2941,13 @@
         <span class="macro">debug_assert!</span>(size % BYTES_IN_PAGE == <span class="number">0</span>);
 
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.global.iter() {
-            ensure_munmap_contiguos_metadata_space(start, size, spec);
+            ensure_munmap_contiguous_metadata_space(start, size, spec);
         }
 
         <span class="kw">for </span>spec <span class="kw">in </span><span class="self">self</span>.local.iter() {
             <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
             </span>{
-                ensure_munmap_contiguos_metadata_space(start, size, spec);
+                ensure_munmap_contiguous_metadata_space(start, size, spec);
             }
             <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
             </span>{

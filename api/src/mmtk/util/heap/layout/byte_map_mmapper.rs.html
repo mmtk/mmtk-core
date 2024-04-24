@@ -482,7 +482,7 @@
         <span class="kw">let </span>start_chunk = <span class="self">Self</span>::address_to_mmap_chunks_down(start);
         <span class="kw">let </span>end_chunk = <span class="self">Self</span>::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         <span class="macro">trace!</span>(
-            <span class="string">"Calling quanrantine_address_range with start={:?} and {} pages, {}-{}"</span>,
+            <span class="string">"Calling quarantine_address_range with start={:?} and {} pages, {}-{}"</span>,
             start,
             pages,
             <span class="self">Self</span>::mmap_chunks_to_address(start_chunk),
