@@ -151,6 +151,14 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        if self.is_current_gc_nursery() {
+            true
+        } else {
+            self.immix_space.in_defrag()
+        }
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.gen.get_collection_reserved_pages() + self.immix_space.defrag_headroom_pages()
     }

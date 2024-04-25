@@ -171,6 +171,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     fn get_collection_reserved_pages(&self) -> usize {
         0
     }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {

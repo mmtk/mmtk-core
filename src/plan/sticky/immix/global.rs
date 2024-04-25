@@ -158,6 +158,14 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.gc_full_heap.load(Ordering::Relaxed) && self.immix.last_collection_was_exhaustive()
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        if self.is_current_gc_nursery() {
+            !cfg!(feature = "sticky_immix_non_moving_nursery")
+        } else {
+            return self.get_immix_space().in_defrag();
+        }
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.immix.get_collection_reserved_pages()
     }

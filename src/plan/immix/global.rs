@@ -97,6 +97,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             .store(self.immix_space.release(true), Ordering::Relaxed);
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        self.immix_space.in_defrag()
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.immix_space.defrag_headroom_pages()
     }
