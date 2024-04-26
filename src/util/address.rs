@@ -478,6 +478,16 @@ use crate::vm::VMBinding;
 /// their layout. We now only allow a binding to define their semantics through a set of
 /// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven't seen a use case for now.
+///
+/// Note that [`ObjectReference`] cannot be null.  For the cases where a non-null object reference
+/// may or may not exist, (such as the result of [`crate::vm::edge_shape::Edge::load`])
+/// `Option<ObjectReference>` should be used.  [`ObjectReference`] is backed by `NonZeroUsize`
+/// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
+/// optimization (NPO)][NPO], `Option<ObjectReference>` has the same size as `NonZeroUsize` and
+/// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
+/// programs, mmtk-core provides [`crate::util::apiutils::NullableObjectReference`].
+///
+/// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
 pub struct ObjectReference(NonZeroUsize);
