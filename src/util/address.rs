@@ -485,7 +485,7 @@ use crate::vm::VMBinding;
 /// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
 /// optimization (NPO)][NPO], `Option<ObjectReference>` has the same size as `NonZeroUsize` and
 /// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
-/// programs, mmtk-core provides [`crate::util::apiutils::NullableObjectReference`].
+/// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
 ///
 /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
