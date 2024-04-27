@@ -56,7 +56,6 @@ impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        debug_assert!(!object.is_null());
         let worker = self.worker();
         let queue = &mut self.base.nodes;
         if self.plan.tospace().in_space(object) {

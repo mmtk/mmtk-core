@@ -868,9 +868,6 @@
 <a href="#866" id="866">866</a>
 <a href="#867" id="867">867</a>
 <a href="#868" id="868">868</a>
-<a href="#869" id="869">869</a>
-<a href="#870" id="870">870</a>
-<a href="#871" id="871">871</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1511,9 +1508,6 @@
 /// * `object`: The object reference to query.
 </span><span class="kw">pub fn </span>is_in_mmtk_spaces&lt;VM: VMBinding&gt;(object: ObjectReference) -&gt; bool {
     <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
-    <span class="kw">if </span>object.is_null() {
-        <span class="kw">return </span><span class="bool-val">false</span>;
-    }
     SFT_MAP
         .get_checked(object.to_address::&lt;VM&gt;())
         .is_in_space(object)

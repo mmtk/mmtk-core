@@ -1091,7 +1091,6 @@
 <a href="#1089" id="1089">1089</a>
 <a href="#1090" id="1090">1090</a>
 <a href="#1091" id="1091">1091</a>
-<a href="#1092" id="1092">1092</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1278,7 +1277,6 @@
         copy: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;,
         worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
-        <span class="macro">debug_assert!</span>(!object.is_null());
         <span class="kw">if </span>KIND == TRACE_KIND_TRANSITIVE_PIN {
             <span class="self">self</span>.trace_object_without_moving(queue, object)
         } <span class="kw">else if </span>KIND == TRACE_KIND_DEFRAG {

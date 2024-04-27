@@ -215,6 +215,8 @@
 <a href="#213" id="213">213</a>
 <a href="#214" id="214">214</a>
 <a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::{constants, ObjectReference};
@@ -367,7 +369,9 @@
 
     <span class="comment">// We write the forwarding poiner. We know it is an object reference.
     </span><span class="kw">unsafe </span>{
-        ObjectReference::from_raw_address(<span class="kw">crate</span>::util::Address::from_usize(
+        <span class="comment">// We use "unchecked" convertion becasue we guarantee the forwarding pointer we stored
+        // previously is from a valid `ObjectReference` which is never zero.
+        </span>ObjectReference::from_raw_address_unchecked(<span class="kw">crate</span>::util::Address::from_usize(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::&lt;VM, usize&gt;(
                 object,
                 <span class="prelude-val">Some</span>(FORWARDING_POINTER_MASK),

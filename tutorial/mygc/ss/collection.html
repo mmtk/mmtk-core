@@ -466,7 +466,6 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
     }
 
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
-        debug_assert!(!object.is_null());
         let worker = self.worker();
         let queue = &amp;mut self.base.nodes;
         if self.plan.tospace().in_space(object) {

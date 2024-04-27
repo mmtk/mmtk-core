@@ -230,9 +230,6 @@
 <a href="#228" id="228">228</a>
 <a href="#229" id="229">229</a>
 <a href="#230" id="230">230</a>
-<a href="#231" id="231">231</a>
-<a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -424,9 +421,6 @@
     }
 
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
-        <span class="kw">if </span>object.is_null() {
-            <span class="kw">return </span>object;
-        }
         <span class="kw">let </span><span class="kw-2">mut </span>sanity_checker = <span class="self">self</span>.mmtk().sanity_checker.lock().unwrap();
         <span class="kw">if </span>!sanity_checker.refs.contains(<span class="kw-2">&amp;</span>object) {
             <span class="comment">// FIXME steveb consider VM-specific integrity check on reference.

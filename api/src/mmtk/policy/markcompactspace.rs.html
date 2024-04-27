@@ -419,14 +419,6 @@
 <a href="#417" id="417">417</a>
 <a href="#418" id="418">418</a>
 <a href="#419" id="419">419</a>
-<a href="#420" id="420">420</a>
-<a href="#421" id="421">421</a>
-<a href="#422" id="422">422</a>
-<a href="#423" id="423">423</a>
-<a href="#424" id="424">424</a>
-<a href="#425" id="425">425</a>
-<a href="#426" id="426">426</a>
-<a href="#427" id="427">427</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::ops::Range;
 
 <span class="kw">use </span><span class="kw">super</span>::sft::SFT;
@@ -466,12 +458,7 @@
     }
 
     <span class="kw">fn </span>get_forwarded_object(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-        <span class="kw">let </span>forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(object);
-        <span class="kw">if </span>forwarding_pointer.is_null() {
-            <span class="prelude-val">None
-        </span>} <span class="kw">else </span>{
-            <span class="prelude-val">Some</span>(forwarding_pointer)
-        }
+        <span class="self">Self</span>::get_header_forwarding_pointer(object)
     }
 
     <span class="kw">fn </span>is_live(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) -&gt; bool {
@@ -559,7 +546,6 @@
         _copy: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;,
         _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;,
     ) -&gt; ObjectReference {
-        <span class="macro">debug_assert!</span>(!object.is_null());
         <span class="macro">debug_assert!</span>(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
             <span class="string">"MarkCompact does not support transitive pin trace."
@@ -606,8 +592,9 @@
     }
 
     <span class="doccomment">/// Get header forwarding pointer for an object
-    </span><span class="kw">fn </span>get_header_forwarding_pointer(object: ObjectReference) -&gt; ObjectReference {
-        <span class="kw">unsafe </span>{ <span class="self">Self</span>::header_forwarding_pointer_address(object).load::&lt;ObjectReference&gt;() }
+    </span><span class="kw">fn </span>get_header_forwarding_pointer(object: ObjectReference) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ <span class="self">Self</span>::header_forwarding_pointer_address(object).load::&lt;Address&gt;() };
+        ObjectReference::from_raw_address(addr)
     }
 
     <span class="doccomment">/// Store header forwarding pointer for an object
@@ -680,12 +667,8 @@
             queue.enqueue(object);
         }
 
-        <span class="kw">let </span>result = <span class="self">Self</span>::get_header_forwarding_pointer(object);
-        <span class="macro">debug_assert!</span>(
-            !result.is_null(),
-            <span class="string">"Object {object} does not have a forwarding pointer"
-        </span>);
-        result
+        <span class="self">Self</span>::get_header_forwarding_pointer(object)
+            .unwrap_or_else(|| <span class="macro">panic!</span>(<span class="string">"Object {object} does not have a forwarding pointer"</span>))
     }
 
     <span class="kw">pub fn </span>test_and_mark(object: ObjectReference) -&gt; bool {
@@ -822,10 +805,9 @@
                 <span class="comment">// clear the VO bit
                 </span>vo_bit::unset_vo_bit::&lt;VM&gt;(obj);
 
-                <span class="kw">let </span>forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(obj);
-
-                <span class="macro">trace!</span>(<span class="string">"Compact {} to {}"</span>, obj, forwarding_pointer);
-                <span class="kw">if </span>!forwarding_pointer.is_null() {
+                <span class="kw">let </span>maybe_forwarding_pointer = <span class="self">Self</span>::get_header_forwarding_pointer(obj);
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(forwarding_pointer) = maybe_forwarding_pointer {
+                    <span class="macro">trace!</span>(<span class="string">"Compact {} to {}"</span>, obj, forwarding_pointer);
                     <span class="kw">let </span>new_object = forwarding_pointer;
                     <span class="self">Self</span>::clear_header_forwarding_pointer(new_object);
 
@@ -837,6 +819,8 @@
                     </span>vo_bit::set_vo_bit::&lt;VM&gt;(new_object);
                     to = new_object.to_object_start::&lt;VM&gt;() + copied_size;
                     <span class="macro">debug_assert_eq!</span>(end_of_new_object, to);
+                } <span class="kw">else </span>{
+                    <span class="macro">trace!</span>(<span class="string">"Skipping dead object {}"</span>, obj);
                 }
             }
         }

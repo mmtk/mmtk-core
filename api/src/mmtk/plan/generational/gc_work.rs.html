@@ -180,8 +180,6 @@
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanTraceObject;
@@ -227,8 +225,6 @@
     }
 
     <span class="kw">fn </span>trace_object(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference) -&gt; ObjectReference {
-        <span class="macro">debug_assert!</span>(!object.is_null());
-
         <span class="comment">// We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         </span><span class="kw">let </span>worker = <span class="self">self</span>.worker();
         <span class="self">self</span>.plan.trace_object_nursery::&lt;VectorObjectQueue, KIND&gt;(
@@ -239,10 +235,10 @@
     }
 
     <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
-        <span class="kw">let </span>object = slot.load();
-        <span class="kw">if </span>object.is_null() {
-            <span class="kw">return</span>;
-        }
+        <span class="kw">let </span><span class="prelude-val">Some</span>(object) = slot.load() <span class="kw">else </span>{
+            <span class="comment">// Skip slots that are not holding an object reference.
+            </span><span class="kw">return</span>;
+        };
         <span class="kw">let </span>new_object = <span class="self">self</span>.trace_object(object);
         <span class="macro">debug_assert!</span>(!<span class="self">self</span>.plan.is_object_in_nursery(new_object));
         <span class="comment">// Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,

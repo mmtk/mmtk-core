@@ -428,6 +428,10 @@
 <a href="#426" id="426">426</a>
 <a href="#427" id="427">427</a>
 <a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
 </pre></div><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -710,7 +714,8 @@
         <span class="kw">while </span>cell + cell_size &lt;= <span class="self">self</span>.start() + Block::BYTES {
             <span class="comment">// The invariants we checked earlier ensures that we can use cell and object reference interchangably
             // We may not really have an object in this cell, but if we do, this object reference is correct.
-            </span><span class="kw">let </span>potential_object = ObjectReference::from_raw_address(cell);
+            // About unsafe: We know `cell` is non-zero here.
+            </span><span class="kw">let </span>potential_object = <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(cell) };
 
             <span class="kw">if </span>!VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::&lt;VM&gt;(potential_object, Ordering::SeqCst)
@@ -750,9 +755,12 @@
 
         <span class="kw">while </span>cell + cell_size &lt;= <span class="self">self</span>.end() {
             <span class="comment">// possible object ref
-            </span><span class="kw">let </span>potential_object_ref = ObjectReference::from_raw_address(
-                cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
-            );
+            </span><span class="kw">let </span>potential_object_ref = <span class="kw">unsafe </span>{
+                <span class="comment">// We know cursor plus an offset cannot be 0.
+                </span>ObjectReference::from_raw_address_unchecked(
+                    cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
+                )
+            };
             <span class="macro">trace!</span>(
                 <span class="string">"{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}"</span>,
                 <span class="self">self</span>,

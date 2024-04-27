@@ -616,11 +616,22 @@
 <a href="#614" id="614">614</a>
 <a href="#615" id="615">615</a>
 <a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
 <span class="kw">use </span>bytemuck::NoUninit;
 
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::mem;
+<span class="kw">use </span>std::num::NonZeroUsize;
 <span class="kw">use </span>std::ops::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::sync::atomic::Ordering;
 
@@ -1095,30 +1106,52 @@
 /// their layout. We now only allow a binding to define their semantics through a set of
 /// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven't seen a use case for now.
+///
+/// Note that [`ObjectReference`] cannot be null.  For the cases where a non-null object reference
+/// may or may not exist, (such as the result of [`crate::vm::edge_shape::Edge::load`])
+/// `Option&lt;ObjectReference&gt;` should be used.  [`ObjectReference`] is backed by `NonZeroUsize`
+/// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
+/// optimization (NPO)][NPO], `Option&lt;ObjectReference&gt;` has the same size as `NonZeroUsize` and
+/// `usize`.  For the convenience of passing `Option&lt;ObjectReference&gt;` to and from native (C/C++)
+/// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+///
+/// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 </span><span class="attr">#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
-</span><span class="kw">pub struct </span>ObjectReference(usize);
+</span><span class="kw">pub struct </span>ObjectReference(NonZeroUsize);
 
 <span class="kw">impl </span>ObjectReference {
-    <span class="doccomment">/// The null object reference, represented as zero.
-    </span><span class="kw">pub const </span>NULL: ObjectReference = ObjectReference(<span class="number">0</span>);
-
     <span class="doccomment">/// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
     /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     </span><span class="kw">pub fn </span>to_raw_address(<span class="self">self</span>) -&gt; Address {
-        Address(<span class="self">self</span>.<span class="number">0</span>)
+        Address(<span class="self">self</span>.<span class="number">0</span>.get())
     }
 
     <span class="doccomment">/// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
     /// This is how a binding creates `ObjectReference` instances.
     ///
+    /// If `addr` is 0, the result is `None`.
+    ///
     /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
-    </span><span class="kw">pub fn </span>from_raw_address(addr: Address) -&gt; ObjectReference {
-        ObjectReference(addr.<span class="number">0</span>)
+    </span><span class="kw">pub fn </span>from_raw_address(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        NonZeroUsize::new(addr.<span class="number">0</span>).map(ObjectReference)
+    }
+
+    <span class="doccomment">/// Like `from_raw_address`, but assume `addr` is not zero.  This can be used to elide a check
+    /// against zero for performance-critical code.
+    ///
+    /// # Safety
+    ///
+    /// This method assumes `addr` is not zero.  It should only be used in cases where we know at
+    /// compile time that the input cannot be zero.  For example, if we compute the address by
+    /// adding a positive offset to a non-zero address, we know the result must not be zero.
+    </span><span class="kw">pub unsafe fn </span>from_raw_address_unchecked(addr: Address) -&gt; ObjectReference {
+        <span class="macro">debug_assert!</span>(!addr.is_zero());
+        ObjectReference(NonZeroUsize::new_unchecked(addr.<span class="number">0</span>))
     }
 
     <span class="doccomment">/// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
@@ -1159,28 +1192,15 @@
         obj
     }
 
-    <span class="doccomment">/// is this object reference null reference?
-    </span><span class="kw">pub fn </span>is_null(<span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
-    </span>}
-
     <span class="doccomment">/// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
     </span><span class="kw">pub fn </span>is_reachable&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
-        <span class="kw">if </span><span class="self">self</span>.is_null() {
-            <span class="bool-val">false
-        </span>} <span class="kw">else </span>{
-            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_reachable(<span class="self">self</span>)
-        }
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_reachable(<span class="self">self</span>)
     }
 
     <span class="doccomment">/// Is the object live, determined by the policy?
     </span><span class="kw">pub fn </span>is_live&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; bool {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0 </span>== <span class="number">0 </span>{
-            <span class="bool-val">false
-        </span>} <span class="kw">else </span>{
-            <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_live(<span class="self">self</span>)
-        }
+        <span class="kw">unsafe </span>{ SFT_MAP.get_unchecked(<span class="self">self</span>.to_address::&lt;VM&gt;()) }.is_live(<span class="self">self</span>)
     }
 
     <span class="doccomment">/// Can the object be moved?

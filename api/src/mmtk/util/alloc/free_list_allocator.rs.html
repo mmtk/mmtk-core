@@ -509,6 +509,8 @@
 <a href="#507" id="507">507</a>
 <a href="#508" id="508">508</a>
 <a href="#509" id="509">509</a>
+<a href="#510" id="510">510</a>
+<a href="#511" id="511">511</a>
 </pre></div><pre class="rust"><code><span class="comment">// This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 </span><span class="kw">use </span>std::sync::Arc;
@@ -881,6 +883,8 @@
 
     <span class="attr">#[cfg(feature = <span class="string">"malloc_native_mimalloc"</span>)]
     </span><span class="kw">fn </span>free(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) {
+        <span class="macro">assert!</span>(!addr.is_zero(), <span class="string">"Attempted to free zero address."</span>);
+
         <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
         <span class="kw">let </span>block = Block::from_unaligned_address(addr);
         <span class="kw">let </span>block_tls = block.load_tls();
@@ -913,11 +917,11 @@
         </span>}
 
         <span class="comment">// unset allocation bit
-        </span><span class="kw">unsafe </span>{
-            <span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit_unsafe::&lt;VM&gt;(
-                ObjectReference::from_raw_address(addr),
-            )
-        };
+        // Note: We cannot use `unset_vo_bit_unsafe` because two threads may attempt to free
+        // objects at adjacent addresses, and they may share the same byte in the VO bit metadata.
+        </span><span class="kw">crate</span>::util::metadata::vo_bit::unset_vo_bit::&lt;VM&gt;(<span class="kw">unsafe </span>{
+            ObjectReference::from_raw_address_unchecked(addr)
+        })
     }
 
     <span class="kw">fn </span>store_block_tls(<span class="kw-2">&amp;</span><span class="self">self</span>, block: Block) {

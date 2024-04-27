@@ -298,6 +298,10 @@
 <a href="#296" id="296">296</a>
 <a href="#297" id="297">297</a>
 <a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::{fmt::Debug, ops::Range};
@@ -349,11 +353,11 @@
     ///
     /// If the slot is not holding an object reference (For example, if it is holding NULL or a
     /// tagged non-reference value.  See trait-level doc comment.), this method should return
-    /// `ObjectReference::NULL`.
+    /// `None`.
     ///
     /// If the slot holds an object reference with tag bits, the returned value shall be the object
     /// reference with the tag bits removed.
-    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference;
+    </span><span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;;
 
     <span class="doccomment">/// Store the object reference `object` into the slot.
     ///
@@ -383,12 +387,14 @@
     </span>}
 }
 
-<span class="doccomment">/// A simple edge implementation that represents a word-sized slot where an ObjectReference value
-/// is stored as is.  It is the default edge type, and should be suitable for most VMs.
+<span class="doccomment">/// A simple edge implementation that represents a word-sized slot which holds the raw address of
+/// an `ObjectReference`, or 0 if it is holding a null reference.
+///
+/// It is the default edge type, and should be suitable for most VMs.
 </span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 </span><span class="kw">pub struct </span>SimpleEdge {
-    slot_addr: <span class="kw-2">*mut </span>Atomic&lt;ObjectReference&gt;,
+    slot_addr: <span class="kw-2">*mut </span>Atomic&lt;Address&gt;,
 }
 
 <span class="kw">impl </span>SimpleEdge {
@@ -413,12 +419,13 @@
 <span class="kw">unsafe impl </span>Send <span class="kw">for </span>SimpleEdge {}
 
 <span class="kw">impl </span>Edge <span class="kw">for </span>SimpleEdge {
-    <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
-        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).load(atomic::Ordering::Relaxed) }
+    <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).load(atomic::Ordering::Relaxed) };
+        ObjectReference::from_raw_address(addr)
     }
 
     <span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {
-        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).store(object, atomic::Ordering::Relaxed) }
+        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).store(object.to_raw_address(), atomic::Ordering::Relaxed) }
     }
 }
 
@@ -433,8 +440,9 @@
 /// simply as an `ObjectReference`.  The intention and the semantics are clearer with
 /// `SimpleEdge`.
 </span><span class="kw">impl </span>Edge <span class="kw">for </span>Address {
-    <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ObjectReference {
-        <span class="kw">unsafe </span>{ Address::load(<span class="kw-2">*</span><span class="self">self</span>) }
+    <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::load(<span class="kw-2">*</span><span class="self">self</span>) };
+        ObjectReference::from_raw_address(addr)
     }
 
     <span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference) {

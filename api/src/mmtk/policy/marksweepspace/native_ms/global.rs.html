@@ -437,7 +437,6 @@
 <a href="#435" id="435">435</a>
 <a href="#436" id="436">436</a>
 <a href="#437" id="437">437</a>
-<a href="#438" id="438">438</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>atomic::Ordering;
@@ -731,7 +730,6 @@
         queue: <span class="kw-2">&amp;mut </span>Q,
         object: ObjectReference,
     ) -&gt; ObjectReference {
-        <span class="macro">debug_assert!</span>(!object.is_null());
         <span class="macro">debug_assert!</span>(
             <span class="self">self</span>.in_space(object),
             <span class="string">"Cannot mark an object {} that was not alloced by free list allocator."</span>,
