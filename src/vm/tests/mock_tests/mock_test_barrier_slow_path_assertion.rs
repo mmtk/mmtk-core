@@ -26,7 +26,7 @@ fn test_assertion_barrier_invalid_ref() {
                 // Create an invalid object reference (offset 8 bytes on the original object ref), and invoke barrier slowpath with it
                 // The invalid object ref has no VO bit, and the assertion should fail.
                 let invalid_objref =
-                    ObjectReference::from_raw_address(objref.to_raw_address() + 8usize);
+                    ObjectReference::from_raw_address(objref.to_raw_address() + 8usize).unwrap();
                 fixture.mutator_mut().barrier.object_reference_write_slow(
                     invalid_objref,
                     edge,

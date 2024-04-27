@@ -370,6 +370,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "malloc_native_mimalloc")]
     fn free(&self, addr: Address) {
+        assert!(!addr.is_zero(), "Attempted to free zero address.");
+
         use crate::util::ObjectReference;
         let block = Block::from_unaligned_address(addr);
         let block_tls = block.load_tls();
@@ -402,11 +404,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
 
         // unset allocation bit
-        unsafe {
-            crate::util::metadata::vo_bit::unset_vo_bit_unsafe::<VM>(
-                ObjectReference::from_raw_address(addr),
-            )
-        };
+        // Note: We cannot use `unset_vo_bit_unsafe` because two threads may attempt to free
+        // objects at adjacent addresses, and they may share the same byte in the VO bit metadata.
+        crate::util::metadata::vo_bit::unset_vo_bit::<VM>(unsafe {
+            ObjectReference::from_raw_address_unchecked(addr)
+        })
     }
 
     fn store_block_tls(&self, block: Block) {

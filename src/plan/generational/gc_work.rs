@@ -43,8 +43,6 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        debug_assert!(!object.is_null());
-
         // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
         self.plan.trace_object_nursery::<VectorObjectQueue, KIND>(
@@ -55,10 +53,10 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     }
 
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        if object.is_null() {
+        let Some(object) = slot.load() else {
+            // Skip slots that are not holding an object reference.
             return;
-        }
+        };
         let new_object = self.trace_object(object);
         debug_assert!(!self.plan.is_object_in_nursery(new_object));
         // Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,

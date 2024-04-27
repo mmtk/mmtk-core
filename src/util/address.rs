@@ -3,6 +3,7 @@ use bytemuck::NoUninit;
 
 use std::fmt;
 use std::mem;
+use std::num::NonZeroUsize;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
@@ -477,30 +478,52 @@ use crate::vm::VMBinding;
 /// their layout. We now only allow a binding to define their semantics through a set of
 /// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven't seen a use case for now.
+///
+/// Note that [`ObjectReference`] cannot be null.  For the cases where a non-null object reference
+/// may or may not exist, (such as the result of [`crate::vm::edge_shape::Edge::load`])
+/// `Option<ObjectReference>` should be used.  [`ObjectReference`] is backed by `NonZeroUsize`
+/// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
+/// optimization (NPO)][NPO], `Option<ObjectReference>` has the same size as `NonZeroUsize` and
+/// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
+/// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+///
+/// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
-pub struct ObjectReference(usize);
+pub struct ObjectReference(NonZeroUsize);
 
 impl ObjectReference {
-    /// The null object reference, represented as zero.
-    pub const NULL: ObjectReference = ObjectReference(0);
-
     /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
     /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     pub fn to_raw_address(self) -> Address {
-        Address(self.0)
+        Address(self.0.get())
     }
 
     /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
     /// This is how a binding creates `ObjectReference` instances.
     ///
+    /// If `addr` is 0, the result is `None`.
+    ///
     /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
-    pub fn from_raw_address(addr: Address) -> ObjectReference {
-        ObjectReference(addr.0)
+    pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
+        NonZeroUsize::new(addr.0).map(ObjectReference)
+    }
+
+    /// Like `from_raw_address`, but assume `addr` is not zero.  This can be used to elide a check
+    /// against zero for performance-critical code.
+    ///
+    /// # Safety
+    ///
+    /// This method assumes `addr` is not zero.  It should only be used in cases where we know at
+    /// compile time that the input cannot be zero.  For example, if we compute the address by
+    /// adding a positive offset to a non-zero address, we know the result must not be zero.
+    pub unsafe fn from_raw_address_unchecked(addr: Address) -> ObjectReference {
+        debug_assert!(!addr.is_zero());
+        ObjectReference(NonZeroUsize::new_unchecked(addr.0))
     }
 
     /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
@@ -541,28 +564,15 @@ impl ObjectReference {
         obj
     }
 
-    /// is this object reference null reference?
-    pub fn is_null(self) -> bool {
-        self.0 == 0
-    }
-
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
     pub fn is_reachable<VM: VMBinding>(self) -> bool {
-        if self.is_null() {
-            false
-        } else {
-            unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_reachable(self)
-        }
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_reachable(self)
     }
 
     /// Is the object live, determined by the policy?
     pub fn is_live<VM: VMBinding>(self) -> bool {
-        if self.0 == 0 {
-            false
-        } else {
-            unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_live(self)
-        }
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_live(self)
     }
 
     /// Can the object be moved?

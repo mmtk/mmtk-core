@@ -210,7 +210,6 @@ impl ReferenceProcessor {
     /// `ObjectReference` otherwise.  The referent must be live when calling this function.
     fn get_forwarded_referent<VM: VMBinding>(referent: ObjectReference) -> ObjectReference {
         debug_assert!(referent.is_live::<VM>());
-        debug_assert!(!referent.is_null());
         referent.get_forwarded_object::<VM>().unwrap_or(referent)
     }
 
@@ -219,7 +218,6 @@ impl ReferenceProcessor {
     /// function.
     fn get_forwarded_reference<VM: VMBinding>(object: ObjectReference) -> ObjectReference {
         debug_assert!(object.is_live::<VM>());
-        debug_assert!(!object.is_null());
         object.get_forwarded_object::<VM>().unwrap_or(object)
     }
 
@@ -238,19 +236,17 @@ impl ReferenceProcessor {
         e: &mut E,
         referent: ObjectReference,
     ) -> ObjectReference {
-        debug_assert!(!referent.is_null());
         e.trace_object(referent)
     }
 
     /// This function is called when forwarding the references and referents (for MarkCompact). It
     /// -   adds the reference or the referent to the tracing queue if not yet reached, so that
-    ///     the children of the reference or referent will be kept alive, too, and
+    ///     the children of the reference or referent will be visited and forwarded, too, and
     /// -   gets the forwarded object reference of the object.
     fn trace_forward_object<E: ProcessEdgesWork>(
         e: &mut E,
         referent: ObjectReference,
     ) -> ObjectReference {
-        debug_assert!(!referent.is_null());
         e.trace_object(referent)
     }
 
@@ -261,12 +257,10 @@ impl ReferenceProcessor {
         // This is the end of a GC. We do some assertions here to make sure our reference tables are correct.
         #[cfg(debug_assertions)]
         {
-            // For references in the table, the reference needs to be valid, and if the referent is not null, it should be valid as well
+            // For references in the table, the reference needs to be valid, and if the referent is not cleared, it should be valid as well
             sync.references.iter().for_each(|reff| {
-                debug_assert!(!reff.is_null());
                 debug_assert!(reff.is_in_any_space::<VM>());
-                let referent = VM::VMReferenceGlue::get_referent(*reff);
-                if !VM::VMReferenceGlue::is_referent_cleared(referent) {
+                if let Some(referent) = VM::VMReferenceGlue::get_referent(*reff) {
                     debug_assert!(
                         referent.is_in_any_space::<VM>(),
                         "Referent {:?} (of reference {:?}) is not in any space",
@@ -275,12 +269,11 @@ impl ReferenceProcessor {
                     );
                 }
             });
-            // For references that will be enqueue'd, the referent needs to be valid, and the referent needs to be null.
+            // For references that will be enqueue'd, the reference needs to be valid, and the referent needs to be cleared.
             sync.enqueued_references.iter().for_each(|reff| {
-                debug_assert!(!reff.is_null());
                 debug_assert!(reff.is_in_any_space::<VM>());
-                let referent = VM::VMReferenceGlue::get_referent(*reff);
-                debug_assert!(VM::VMReferenceGlue::is_referent_cleared(referent));
+                let maybe_referent = VM::VMReferenceGlue::get_referent(*reff);
+                debug_assert!(maybe_referent.is_none());
             });
         }
 
@@ -305,7 +298,6 @@ impl ReferenceProcessor {
             trace: &mut E,
             reference: ObjectReference,
         ) -> ObjectReference {
-            let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
             {
                 use crate::vm::ObjectModel;
                 trace!(
@@ -315,7 +307,9 @@ impl ReferenceProcessor {
                 );
             }
 
-            if !<E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(old_referent) {
+            if let Some(old_referent) =
+                <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference)
+            {
                 let new_referent = ReferenceProcessor::trace_forward_object(trace, old_referent);
                 <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
 
@@ -329,11 +323,6 @@ impl ReferenceProcessor {
             let new_reference = ReferenceProcessor::trace_forward_object(trace, reference);
             trace!(" reference: forwarded to {}", new_reference);
 
-            debug_assert!(
-                !new_reference.is_null(),
-                "reference {:?}'s forwarding pointer is NULL",
-                reference
-            );
             new_reference
         }
 
@@ -412,8 +401,6 @@ impl ReferenceProcessor {
         );
 
         for reference in sync.references.iter() {
-            debug_assert!(!reference.is_null());
-
             trace!("Processing reference: {:?}", reference);
 
             if !reference.is_live::<E::VM>() {
@@ -421,13 +408,12 @@ impl ReferenceProcessor {
                 // following trace. We postpone the decision.
                 continue;
             }
-
             // Reference is definitely reachable.  Retain the referent.
-            let referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference);
-            if !<E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(referent) {
+            if let Some(referent) = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference)
+            {
                 Self::keep_referent_alive(trace, referent);
+                trace!(" ~> {:?} (retained)", referent);
             }
-            trace!(" ~> {:?} (retained)", referent);
         }
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
@@ -435,7 +421,7 @@ impl ReferenceProcessor {
 
     /// Process a reference.
     /// * If both the reference and the referent is alive, return the updated reference and update its referent properly.
-    /// * If the reference is alive, and the referent is not null but not alive, return None and the reference (with cleared referent) is enqueued.
+    /// * If the reference is alive, and the referent is not cleared but not alive, return None and the reference (with cleared referent) is enqueued.
     /// * For other cases, return None.
     ///
     /// If a None value is returned, the reference can be removed from the reference table. Otherwise, the updated reference should be kept
@@ -445,8 +431,6 @@ impl ReferenceProcessor {
         reference: ObjectReference,
         enqueued_references: &mut Vec<ObjectReference>,
     ) -> Option<ObjectReference> {
-        debug_assert!(!reference.is_null());
-
         trace!("Process reference: {}", reference);
 
         // If the reference is dead, we're done with it. Let it (and
@@ -454,32 +438,32 @@ impl ReferenceProcessor {
         if !reference.is_live::<VM>() {
             VM::VMReferenceGlue::clear_referent(reference);
             trace!(" UNREACHABLE reference: {}", reference);
-            trace!(" (unreachable)");
             return None;
         }
 
-        // The reference object is live
+        // The reference object is live.
         let new_reference = Self::get_forwarded_reference::<VM>(reference);
-        let old_referent = VM::VMReferenceGlue::get_referent(reference);
-        trace!(" ~> {}", old_referent);
+        trace!(" forwarded to: {}", new_reference);
+
+        // Get the old referent.
+        let maybe_old_referent = VM::VMReferenceGlue::get_referent(reference);
+        trace!(" referent: {:?}", maybe_old_referent);
 
         // If the application has cleared the referent the Java spec says
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
-        if VM::VMReferenceGlue::is_referent_cleared(old_referent) {
-            trace!(" (cleared referent) ");
+        let Some(old_referent) = maybe_old_referent else {
+            trace!("  (cleared referent) ");
             return None;
-        }
-
-        trace!(" => {}", new_reference);
+        };
 
         if old_referent.is_live::<VM>() {
             // Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
             let new_referent = Self::get_forwarded_referent::<VM>(old_referent);
             debug_assert!(new_referent.is_live::<VM>());
-            trace!(" ~> {}", new_referent);
+            trace!("  forwarded referent to: {}", new_referent);
 
             // The reference object stays on the waiting list, and the
             // referent is untouched. The only thing we must do is
@@ -492,7 +476,7 @@ impl ReferenceProcessor {
             Some(new_reference)
         } else {
             // Referent is unreachable. Clear the referent and enqueue the reference object.
-            trace!(" UNREACHABLE referent: {}", old_referent);
+            trace!("  UNREACHABLE referent: {}", old_referent);
 
             VM::VMReferenceGlue::clear_referent(new_reference);
             enqueued_references.push(new_reference);

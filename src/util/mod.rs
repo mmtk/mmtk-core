@@ -11,6 +11,8 @@ pub mod address;
 /// Allocators
 // This module is made public so the binding could implement allocator slowpaths if they would like to.
 pub mod alloc;
+/// Helpers for making native APIs.
+pub mod api_util;
 /// Constants used in MMTk
 pub mod constants;
 /// Calculation, conversion and rounding for memory related numbers.

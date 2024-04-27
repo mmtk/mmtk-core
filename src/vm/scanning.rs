@@ -16,7 +16,7 @@ impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
     fn visit_edge(&mut self, edge: ES) {
         #[cfg(debug_assertions)]
         trace!(
-            "(FunctionClosure) Visit edge {:?} (pointing to {})",
+            "(FunctionClosure) Visit edge {:?} (pointing to {:?})",
             edge,
             edge.load()
         );
@@ -27,7 +27,6 @@ impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
 /// Callback trait of scanning functions that directly trace through edges.
 pub trait ObjectTracer {
     /// Call this function to trace through an object graph edge which points to `object`.
-    /// `object` must point to a valid object, and cannot be `ObjectReference::NULL`.
     ///
     /// The return value is the new object reference for `object` if it is moved, or `object` if
     /// not moved.  If moved, the caller should update the slot that holds the reference to

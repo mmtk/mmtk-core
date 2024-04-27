@@ -37,12 +37,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        let forwarding_pointer = Self::get_header_forwarding_pointer(object);
-        if forwarding_pointer.is_null() {
-            None
-        } else {
-            Some(forwarding_pointer)
-        }
+        Self::get_header_forwarding_pointer(object)
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
@@ -130,7 +125,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompac
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        debug_assert!(!object.is_null());
         debug_assert!(
             KIND != TRACE_KIND_TRANSITIVE_PIN,
             "MarkCompact does not support transitive pin trace."
@@ -177,8 +171,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     /// Get header forwarding pointer for an object
-    fn get_header_forwarding_pointer(object: ObjectReference) -> ObjectReference {
-        unsafe { Self::header_forwarding_pointer_address(object).load::<ObjectReference>() }
+    fn get_header_forwarding_pointer(object: ObjectReference) -> Option<ObjectReference> {
+        let addr = unsafe { Self::header_forwarding_pointer_address(object).load::<Address>() };
+        ObjectReference::from_raw_address(addr)
     }
 
     /// Store header forwarding pointer for an object
@@ -251,12 +246,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             queue.enqueue(object);
         }
 
-        let result = Self::get_header_forwarding_pointer(object);
-        debug_assert!(
-            !result.is_null(),
-            "Object {object} does not have a forwarding pointer"
-        );
-        result
+        Self::get_header_forwarding_pointer(object)
+            .unwrap_or_else(|| panic!("Object {object} does not have a forwarding pointer"))
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
@@ -393,10 +384,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 // clear the VO bit
                 vo_bit::unset_vo_bit::<VM>(obj);
 
-                let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
-
-                trace!("Compact {} to {}", obj, forwarding_pointer);
-                if !forwarding_pointer.is_null() {
+                let maybe_forwarding_pointer = Self::get_header_forwarding_pointer(obj);
+                if let Some(forwarding_pointer) = maybe_forwarding_pointer {
+                    trace!("Compact {} to {}", obj, forwarding_pointer);
                     let new_object = forwarding_pointer;
                     Self::clear_header_forwarding_pointer(new_object);
 
@@ -408,6 +398,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     vo_bit::set_vo_bit::<VM>(new_object);
                     to = new_object.to_object_start::<VM>() + copied_size;
                     debug_assert_eq!(end_of_new_object, to);
+                } else {
+                    trace!("Skipping dead object {}", obj);
                 }
             }
         }

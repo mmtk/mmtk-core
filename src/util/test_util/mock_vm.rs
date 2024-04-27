@@ -232,8 +232,7 @@ pub struct MockVM {
     // reference glue
     pub weakref_clear_referent: MockMethod<ObjectReference, ()>,
     pub weakref_set_referent: MockMethod<(ObjectReference, ObjectReference), ()>,
-    pub weakref_get_referent: MockMethod<ObjectReference, ObjectReference>,
-    pub weakref_is_referent_cleared: MockMethod<ObjectReference, bool>,
+    pub weakref_get_referent: MockMethod<ObjectReference, Option<ObjectReference>>,
     pub weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
     // scanning
     pub support_edge_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
@@ -304,14 +303,13 @@ impl Default for MockVM {
                 object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
             })),
             address_to_ref: MockMethod::new_fixed(Box::new(|addr| {
-                ObjectReference::from_raw_address(addr.add(DEFAULT_OBJECT_REF_OFFSET))
+                ObjectReference::from_raw_address(addr.add(DEFAULT_OBJECT_REF_OFFSET)).unwrap()
             })),
             dump_object: MockMethod::new_unimplemented(),
 
             weakref_clear_referent: MockMethod::new_unimplemented(),
             weakref_get_referent: MockMethod::new_unimplemented(),
             weakref_set_referent: MockMethod::new_unimplemented(),
-            weakref_is_referent_cleared: MockMethod::new_fixed(Box::new(|r| r.is_null())),
             weakref_enqueue_references: MockMethod::new_unimplemented(),
 
             support_edge_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
@@ -551,11 +549,8 @@ impl crate::vm::ReferenceGlue<MockVM> for MockVM {
     fn set_referent(reference: ObjectReference, referent: ObjectReference) {
         mock!(weakref_set_referent(reference, referent))
     }
-    fn get_referent(object: ObjectReference) -> ObjectReference {
+    fn get_referent(object: ObjectReference) -> Option<ObjectReference> {
         mock!(weakref_get_referent(object))
-    }
-    fn is_referent_cleared(referent: ObjectReference) -> bool {
-        mock!(weakref_is_referent_cleared(referent))
     }
     fn enqueue_references(references: &[ObjectReference], tls: VMWorkerThread) {
         mock!(weakref_enqueue_references(lifetime!(references), tls))

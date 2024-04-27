@@ -9,14 +9,20 @@ lazy_static! {
 }
 
 #[test]
-pub fn null() {
+pub fn near_zero() {
     with_mockvm(
         default_setup,
         || {
             SINGLE_OBJECT.with_fixture(|_| {
+                // FIXME: `is_in_mmtk_space` will crash if we pass it an address lower than
+                // DEFAULT_OBJECT_REF_OFFSET.  We need to clarify its requirement on the argument,
+                // and decide if we need to test calling `is_in_mmtk_space` with 0 as an argument.
+                let addr = unsafe { Address::from_usize(DEFAULT_OBJECT_REF_OFFSET) };
                 assert!(
-                    !memory_manager::is_in_mmtk_spaces::<MockVM>(ObjectReference::NULL),
-                    "NULL pointer should not be in any MMTk spaces."
+                    !memory_manager::is_in_mmtk_spaces::<MockVM>(
+                        ObjectReference::from_raw_address(addr).unwrap()
+                    ),
+                    "A very low address {addr} should not be in any MMTk spaces."
                 );
             });
         },
@@ -32,7 +38,7 @@ pub fn max() {
             SINGLE_OBJECT.with_fixture(|_fixture| {
                 assert!(
                     !memory_manager::is_in_mmtk_spaces::<MockVM>(
-                        ObjectReference::from_raw_address(Address::MAX)
+                        ObjectReference::from_raw_address(Address::MAX).unwrap()
                     ),
                     "Address::MAX should not be in any MMTk spaces."
                 );
@@ -78,7 +84,7 @@ pub fn large_offsets_aligned() {
                     // It's just a smoke test.  It is hard to predict if the addr is still in any space,
                     // but it must not crash.
                     let _ = memory_manager::is_in_mmtk_spaces::<MockVM>(
-                        ObjectReference::from_raw_address(addr),
+                        ObjectReference::from_raw_address(addr).unwrap(),
                     );
                 }
             });
@@ -107,7 +113,7 @@ pub fn negative_offsets() {
                     // It's just a smoke test.  It is hard to predict if the addr is still in any space,
                     // but it must not crash.
                     let _ = memory_manager::is_in_mmtk_spaces::<MockVM>(
-                        ObjectReference::from_raw_address(addr),
+                        ObjectReference::from_raw_address(addr).unwrap(),
                     );
                 }
             });

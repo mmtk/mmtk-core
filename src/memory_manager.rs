@@ -638,9 +638,6 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// * `object`: The object reference to query.
 pub fn is_in_mmtk_spaces<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
-    if object.is_null() {
-        return false;
-    }
     SFT_MAP
         .get_checked(object.to_address::<VM>())
         .is_in_space(object)
