@@ -424,7 +424,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///
     /// Arguments:
-    /// * `object`: The object to be queried. It should not be null.
+    /// * `object`: The object to be queried.
     fn ref_to_object_start(object: ObjectReference) -> Address;
 
     /// Return the header base address from an object reference. Any object header metadata
@@ -433,7 +433,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// will not be called, and the binding can simply use `unreachable!()` for the method.
     ///
     /// Arguments:
-    /// * `object`: The object to be queried. It should not be null.
+    /// * `object`: The object to be queried.
     fn ref_to_header(object: ObjectReference) -> Address;
 
     /// Return an address guaranteed to be inside the storage associated
@@ -449,7 +449,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///
     /// Arguments:
-    /// * `object`: The object to be queried. It should not be null.
+    /// * `object`: The object to be queried.
     fn ref_to_address(object: ObjectReference) -> Address;
 
     /// Return an object for a given address returned by `ref_to_address()`.

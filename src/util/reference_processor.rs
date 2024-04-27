@@ -257,7 +257,7 @@ impl ReferenceProcessor {
         // This is the end of a GC. We do some assertions here to make sure our reference tables are correct.
         #[cfg(debug_assertions)]
         {
-            // For references in the table, the reference needs to be valid, and if the referent is not null, it should be valid as well
+            // For references in the table, the reference needs to be valid, and if the referent is not cleared, it should be valid as well
             sync.references.iter().for_each(|reff| {
                 debug_assert!(reff.is_in_any_space::<VM>());
                 if let Some(referent) = VM::VMReferenceGlue::get_referent(*reff) {
@@ -269,7 +269,7 @@ impl ReferenceProcessor {
                     );
                 }
             });
-            // For references that will be enqueue'd, the referent needs to be valid, and the referent needs to be null.
+            // For references that will be enqueue'd, the reference needs to be valid, and the referent needs to be cleared.
             sync.enqueued_references.iter().for_each(|reff| {
                 debug_assert!(reff.is_in_any_space::<VM>());
                 let maybe_referent = VM::VMReferenceGlue::get_referent(*reff);
@@ -421,7 +421,7 @@ impl ReferenceProcessor {
 
     /// Process a reference.
     /// * If both the reference and the referent is alive, return the updated reference and update its referent properly.
-    /// * If the reference is alive, and the referent is not null but not alive, return None and the reference (with cleared referent) is enqueued.
+    /// * If the reference is alive, and the referent is not cleared but not alive, return None and the reference (with cleared referent) is enqueued.
     /// * For other cases, return None.
     ///
     /// If a None value is returned, the reference can be removed from the reference table. Otherwise, the updated reference should be kept

@@ -691,7 +691,7 @@ pub trait PlanTraceObject<VM: VMBinding> {
     ///
     /// Arguments:
     /// * `trace`: the current transitive closure
-    /// * `object`: the object to trace. This is a non-nullable object reference.
+    /// * `object`: the object to trace.
     /// * `worker`: the GC worker that is tracing this object.
     fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
