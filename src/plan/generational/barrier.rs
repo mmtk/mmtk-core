@@ -75,7 +75,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
         &mut self,
         src: ObjectReference,
         _slot: VM::VMEdge,
-        _target: ObjectReference,
+        _target: Option<ObjectReference>,
     ) {
         // enqueue the object
         self.modbuf.push(src);

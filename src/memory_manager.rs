@@ -229,6 +229,23 @@ pub fn post_alloc<VM: VMBinding>(
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
+///
+/// # Deprecated
+///
+/// This form of write barrier has multiple issues.
+///
+/// -   It is only able to write non-null object references into the slot.  But dynamic language
+///     VMs may write non-reference values, such as tagged small integers, special values such as
+///     `null`, `undefined`, `true`, `false`, etc. into a field that previous contains an object
+///     reference.
+/// -   It relies on `slot.store` to write `target` into the slot, but `slot.store` is designed for
+///     forwarding references when an object is moved by GC, and is supposed to preserve tagged
+///     type information, the offset (if it is an interior pointer), etc.  A write barrier is
+///     associated to an assignment operation, which usually updates such information instead.
+///
+/// VM bindings should use `object_reference_write_pre` and `object_reference_write_post` instead.
+/// Those functions leaves the actual write of the slot to the VM binding.
+#[deprecated = "Use `object_reference_write_pre` and `object_reference_write_post` instead"]
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
@@ -252,12 +269,14 @@ pub fn object_reference_write<VM: VMBinding>(
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
-/// * `target`: The target for the write operation.
+/// * `target`: The target for the write operation.  `None` if the slot did not hold an object
+///   reference before the write operation.  For example, the slot may be holding a `null`
+///   reference, a small integer, or special values such as `true`, `false`, `undefined`, etc.
 pub fn object_reference_write_pre<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
     slot: VM::VMEdge,
-    target: ObjectReference,
+    target: Option<ObjectReference>,
 ) {
     mutator
         .barrier()
@@ -278,12 +297,14 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
-/// * `target`: The target for the write operation.
+/// * `target`: The target for the write operation.  `None` if the slot no longer hold an object
+///   reference after the write operation.  This may happen when writing a `null` reference, a small
+///   integers, or a special value such as`true`, `false`, `undefined`, etc., into the slot.
 pub fn object_reference_write_post<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
     slot: VM::VMEdge,
-    target: ObjectReference,
+    target: Option<ObjectReference>,
 ) {
     mutator
         .barrier()
