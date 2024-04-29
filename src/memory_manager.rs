@@ -232,7 +232,7 @@ pub fn post_alloc<VM: VMBinding>(
 ///
 /// # Deprecated
 ///
-/// This form of write barrier has multiple issues.
+/// This function needs to be redesigned.  Its current form has multiple issues.
 ///
 /// -   It is only able to write non-null object references into the slot.  But dynamic language
 ///     VMs may write non-reference values, such as tagged small integers, special values such as
@@ -243,9 +243,10 @@ pub fn post_alloc<VM: VMBinding>(
 ///     type information, the offset (if it is an interior pointer), etc.  A write barrier is
 ///     associated to an assignment operation, which usually updates such information instead.
 ///
-/// VM bindings should use `object_reference_write_pre` and `object_reference_write_post` instead.
-/// Those functions leaves the actual write of the slot to the VM binding.
-#[deprecated = "Use `object_reference_write_pre` and `object_reference_write_post` instead"]
+/// We will redesign a more general subsuming write barrier to address those problems and replace
+/// the current `object_reference_write`.  Before that happens, VM bindings should use
+/// `object_reference_write_pre` and `object_reference_write_post` instead.
+#[deprecated = "Use `object_reference_write_pre` and `object_reference_write_post` instead, until this function is redesigned"]
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
