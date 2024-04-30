@@ -30,7 +30,7 @@ fn test_assertion_barrier_invalid_ref() {
                 fixture.mutator_mut().barrier.object_reference_write_slow(
                     invalid_objref,
                     edge,
-                    objref,
+                    Some(objref),
                 );
             });
         },
@@ -51,10 +51,11 @@ fn test_assertion_barrier_valid_ref() {
                 let edge = Address::from_ref(&slot);
 
                 // Invoke barrier slowpath with the valid object ref
-                fixture
-                    .mutator_mut()
-                    .barrier
-                    .object_reference_write_slow(objref, edge, objref);
+                fixture.mutator_mut().barrier.object_reference_write_slow(
+                    objref,
+                    edge,
+                    Some(objref),
+                );
             });
         },
         no_cleanup,
