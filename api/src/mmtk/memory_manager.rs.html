@@ -868,6 +868,28 @@
 <a href="#866" id="866">866</a>
 <a href="#867" id="867">867</a>
 <a href="#868" id="868">868</a>
+<a href="#869" id="869">869</a>
+<a href="#870" id="870">870</a>
+<a href="#871" id="871">871</a>
+<a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1099,6 +1121,24 @@
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
+///
+/// # Deprecated
+///
+/// This function needs to be redesigned.  Its current form has multiple issues.
+///
+/// -   It is only able to write non-null object references into the slot.  But dynamic language
+///     VMs may write non-reference values, such as tagged small integers, special values such as
+///     `null`, `undefined`, `true`, `false`, etc. into a field that previous contains an object
+///     reference.
+/// -   It relies on `slot.store` to write `target` into the slot, but `slot.store` is designed for
+///     forwarding references when an object is moved by GC, and is supposed to preserve tagged
+///     type information, the offset (if it is an interior pointer), etc.  A write barrier is
+///     associated to an assignment operation, which usually updates such information instead.
+///
+/// We will redesign a more general subsuming write barrier to address those problems and replace
+/// the current `object_reference_write`.  Before that happens, VM bindings should use
+/// `object_reference_write_pre` and `object_reference_write_post` instead.
+</span><span class="attr">#[deprecated = <span class="string">"Use `object_reference_write_pre` and `object_reference_write_post` instead, until this function is redesigned"</span>]
 </span><span class="kw">pub fn </span>object_reference_write&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
@@ -1122,12 +1162,14 @@
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
-/// * `target`: The target for the write operation.
+/// * `target`: The target for the write operation.  `None` if the slot did not hold an object
+///   reference before the write operation.  For example, the slot may be holding a `null`
+///   reference, a small integer, or special values such as `true`, `false`, `undefined`, etc.
 </span><span class="kw">pub fn </span>object_reference_write_pre&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
     slot: VM::VMEdge,
-    target: ObjectReference,
+    target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
 ) {
     mutator
         .barrier()
@@ -1148,12 +1190,14 @@
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: The modified source object.
 /// * `slot`: The location of the field to be modified.
-/// * `target`: The target for the write operation.
+/// * `target`: The target for the write operation.  `None` if the slot no longer hold an object
+///   reference after the write operation.  This may happen when writing a `null` reference, a small
+///   integers, or a special value such as`true`, `false`, `undefined`, etc., into the slot.
 </span><span class="kw">pub fn </span>object_reference_write_post&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
     slot: VM::VMEdge,
-    target: ObjectReference,
+    target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
 ) {
     mutator
         .barrier()

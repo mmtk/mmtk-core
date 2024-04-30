@@ -188,7 +188,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
         _slot: VM::VMEdge,
-        _target: ObjectReference,
+        _target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
         <span class="comment">// enqueue the object
         </span><span class="self">self</span>.modbuf.push(src);
