@@ -36,6 +36,7 @@
     - [Performance Tuning](portingguide/perf_tuning/prefix.md)
         - [Link Time Optimization](portingguide/perf_tuning/lto.md)
         - [Optimizing Allocation](portingguide/perf_tuning/alloc.md)
+- [API Migration Guide](api_migration.md)
 
 -----------
 
