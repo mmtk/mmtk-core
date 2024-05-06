@@ -5,8 +5,6 @@
 // It tries to set a certain range as VM space. The range does not conflict with the virtual
 // address range we use for spaces. We cannot use SFTSpaceMap as the SFT map implementation.
 
-use lazy_static::lazy_static;
-
 use super::mock_test_prelude::*;
 use crate::memory_manager;
 use crate::util::Address;
