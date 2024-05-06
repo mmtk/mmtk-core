@@ -361,7 +361,7 @@ mod dense_chunk_map {
 
             let space_name = unsafe { &*space }.name().to_string();
             // We shouldn't have this space in our map yet. Otherwise, this method is called multiple times for the same space.
-            assert!(self.index_map.get(&space_name).is_none());
+            assert!(self.index_map.contains_key(&space_name));
             // Index for the space
             let index = self.sft.len();
             // Insert to hashmap and vec

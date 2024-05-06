@@ -763,10 +763,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
     /// Called after each object is scanned.
     fn post_scan_object(&self, object: ObjectReference);
 
-    /// Create another object-scanning work packet of the same kind, to scan adjacent objects of
-    /// the objects in this packet.
-    fn make_another(&self, buffer: Vec<ObjectReference>) -> Self;
-
+    /// Return the work bucket for this work packet and its derived work packets.
     fn get_bucket(&self) -> WorkBucketStage;
 
     /// The common code for ScanObjects and PlanScanObjects.
@@ -868,10 +865,6 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
 
     fn post_scan_object(&self, _object: ObjectReference) {
         // Do nothing.
-    }
-
-    fn make_another(&self, buffer: Vec<ObjectReference>) -> Self {
-        Self::new(buffer, self.concurrent, self.bucket)
     }
 }
 
@@ -996,10 +989,6 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
 
     fn post_scan_object(&self, object: ObjectReference) {
         self.plan.post_scan_object(object);
-    }
-
-    fn make_another(&self, buffer: Vec<ObjectReference>) -> Self {
-        Self::new(self.plan, buffer, self.concurrent, self.bucket)
     }
 }
 
