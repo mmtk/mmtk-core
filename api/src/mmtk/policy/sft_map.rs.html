@@ -954,7 +954,7 @@
 
             </span><span class="kw">let </span>space_name = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>space }.name().to_string();
             <span class="comment">// We shouldn't have this space in our map yet. Otherwise, this method is called multiple times for the same space.
-            </span><span class="macro">assert!</span>(<span class="self">self</span>.index_map.get(<span class="kw-2">&amp;</span>space_name).is_none());
+            </span><span class="macro">assert!</span>(!<span class="self">self</span>.index_map.contains_key(<span class="kw-2">&amp;</span>space_name));
             <span class="comment">// Index for the space
             </span><span class="kw">let </span>index = <span class="self">self</span>.sft.len();
             <span class="comment">// Insert to hashmap and vec

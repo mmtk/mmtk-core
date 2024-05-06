@@ -617,7 +617,7 @@
             // Since `Space` instances are always stored as global variables, so it is okay here
             // to turn `&amp;CommonFreeListPageResource` into `&amp;'static CommonFreeListPageResource`
             </span><span class="kw">unsafe </span>{
-                vm_map.bind_freelist(<span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>common_flpr <span class="kw">as </span><span class="kw-2">&amp;</span>CommonFreeListPageResource <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>));
+                vm_map.bind_freelist(common_flpr.as_ref() <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>);
             }
             common_flpr
         };
@@ -647,7 +647,7 @@
             // Since `Space` instances are always stored as global variables, so it is okay here
             // to turn `&amp;CommonFreeListPageResource` into `&amp;'static CommonFreeListPageResource`
             </span><span class="kw">unsafe </span>{
-                vm_map.bind_freelist(<span class="kw-2">&amp;*</span>(<span class="kw-2">&amp;</span>common_flpr <span class="kw">as </span><span class="kw-2">&amp;</span>CommonFreeListPageResource <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>));
+                vm_map.bind_freelist(common_flpr.as_ref() <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_</span>);
             }
             common_flpr
         };
