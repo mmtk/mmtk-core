@@ -49,7 +49,9 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     fn update_discontiguous_start(&mut self, start: Address) {
         // Only discontiguous FreeListPageResource needs adjustment.
         if !self.common.contiguous {
-            let mut sync = self.sync.lock().unwrap();
+            // The adjustment happens when we still have a `&mut MMTK`.
+            // We bypass the mutex lock by calling `get_mut`.
+            let sync = self.sync.get_mut().unwrap();
             sync.start = start.align_up(BYTES_IN_REGION);
         }
     }
