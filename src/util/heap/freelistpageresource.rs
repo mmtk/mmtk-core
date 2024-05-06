@@ -190,7 +190,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             // Since `Space` instances are always stored as global variables, so it is okay here
             // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
             unsafe {
-                vm_map.bind_freelist(&*(&common_flpr as &CommonFreeListPageResource as *const _));
+                vm_map.bind_freelist(common_flpr.as_ref() as *const _);
             }
             common_flpr
         };
@@ -220,7 +220,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             // Since `Space` instances are always stored as global variables, so it is okay here
             // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
             unsafe {
-                vm_map.bind_freelist(&*(&common_flpr as &CommonFreeListPageResource as *const _));
+                vm_map.bind_freelist(common_flpr.as_ref() as *const _);
             }
             common_flpr
         };
