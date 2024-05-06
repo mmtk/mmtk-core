@@ -41,6 +41,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
+
+    /// Get a mutable reference to the underlying page resource, or `None` if the space does not
+    /// have a page resource.
     fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>>;
 
     /// Initialize entires in SFT map for the space. This is called when the Space object

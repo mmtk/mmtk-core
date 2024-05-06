@@ -178,7 +178,12 @@ impl VMMap for Map64 {
         // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Map64Inner = unsafe { self.mut_self() };
-        // We used to adjust the starting addresses of spaces here.  Not we do nothing.
+
+        // Note: When using Map64, the starting address of each space is adjusted as soon as the
+        // `RawMemoryFreeList` instance in its underlying `FreeListPageResource` is created.  We no
+        // longer need to adjust the starting address here.  So we ignore the
+        // `_on_discontig_start_determined` callback which may adjust the starting address.
+
         self_mut.finalized = true;
     }
 

@@ -83,7 +83,6 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        // FIXME: We need a safe implementation
         let mut sync = self.sync.lock().unwrap();
         let mut new_chunk = false;
         let mut page_offset = sync.free_list.alloc(required_pages as _);
