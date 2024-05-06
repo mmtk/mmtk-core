@@ -1,6 +1,5 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
-/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
@@ -151,7 +150,9 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
     // We write the forwarding poiner. We know it is an object reference.
     unsafe {
-        ObjectReference::from_raw_address(crate::util::Address::from_usize(
+        // We use "unchecked" convertion becasue we guarantee the forwarding pointer we stored
+        // previously is from a valid `ObjectReference` which is never zero.
+        ObjectReference::from_raw_address_unchecked(crate::util::Address::from_usize(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
                 object,
                 Some(FORWARDING_POINTER_MASK),
@@ -174,7 +175,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
         get_forwarding_status::<VM>(object),
     );
 
-    trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
+    trace!("write_forwarding_pointer({}, {})", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_raw_address().as_usize(),

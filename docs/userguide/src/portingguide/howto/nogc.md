@@ -13,7 +13,11 @@ You want to set up the binding repository/directory structure before starting th
 
 [^1]: In fact some bindings may not be able to have such a directory structure due to the build tools used by the runtime.
 
-  - `mmtk-X/mmtk`: The MMTk side of the binding. To start with, this can be an almost direct copy of the [Dummy VM binding](https://github.com/mmtk/mmtk-core/tree/master/vmbindings/dummyvm). This is implemented in Rust.
+  - `mmtk-X/mmtk`: The MMTk side of the binding. This includes the implementation of [the `VMBinding` trait](https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html),
+    and any necessary Rust code to integrate MMTk with the VM code (e.g. exposing MMTk functions to native, allowing up-calls from the MMTk binding to the runtime, etc).
+    To start with, you can take a look at one of our officially maintained language bindings as an example: [OpenJDK](https://github.com/mmtk/mmtk-openjdk/tree/master/mmtk),
+    [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm/tree/master/mmtk), [V8](https://github.com/mmtk/mmtk-v8/tree/master/mmtk), [Julia](https://github.com/mmtk/mmtk-julia/tree/master/mmtk),
+    [V8](https://github.com/mmtk/mmtk-v8/tree/master/mmtk).
   - `mmtk-X/X`: Runtime-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the runtime and the MMTk side of the binding. This is implemented in the runtime's implementation language. Often this will be one of C or C++.
   - You can place your runtime repository at any path. For the sake of this guide, we assume you will place the runtime repo as a sibling of the binding repo. You can also clone `mmtk-core` to a local path. Using a local repo of `mmtk-core` can be beneficial to your development in case you need to make certain changes to the core (though this is unlikely).
 
@@ -107,7 +111,7 @@ We recommend going through the [list of constants in the documentation](https://
 Now that we have most of the boilerplate set up, the next step is to initialize MMTk so that we can start allocating objects.
 
 ### Runtime-side changes
-Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example.
+Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/header/mmtk.h) as an example.
 
 **Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
 

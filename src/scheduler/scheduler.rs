@@ -1,26 +1,32 @@
+use self::worker::PollResult;
+
+use super::gc_work::ScheduleCollection;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup, WorkerMonitor};
+use super::worker::{GCWorker, ThreadId, WorkerGroup};
+use super::worker_goals::{WorkerGoal, WorkerGoals};
+use super::worker_monitor::{LastParkedResult, WorkerMonitor};
 use super::*;
+use crate::global_state::GcStatus;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::util::options::AffinityKind;
 use crate::util::rust_util::array_from_fn;
 use crate::vm::Collection;
-use crate::vm::{GCThreadContext, VMBinding};
-use crossbeam::deque::{self, Steal};
+use crate::vm::VMBinding;
+use crate::Plan;
+use crossbeam::deque::Steal;
 use enum_map::{Enum, EnumMap};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Workers
     pub(crate) worker_group: Arc<WorkerGroup<VM>>,
-    /// The shared part of the GC worker object of the controller thread
-    coordinator_worker_shared: Arc<GCWorkerShared<VM>>,
-    /// Condition Variable for worker synchronization
+    /// For synchronized communication between workers and with mutators.
     pub(crate) worker_monitor: Arc<WorkerMonitor>,
     /// How to assign the affinity of each GC thread. Specified by the user.
     affinity: AffinityKind,
@@ -46,14 +52,16 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Set the open condition of each bucket.
         {
-            // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
-            // This vec will grow for each stage we call with open_next()
             let first_stw_stage = WorkBucketStage::first_stw_stage();
             let mut open_stages: Vec<WorkBucketStage> = vec![first_stw_stage];
-            // The rest will open after the previous stage is done.
             let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             for stage in stages {
+                // Unconstrained is always open.
+                // The first STW stage (Prepare) will be opened when the world stopped
+                // (i.e. when all mutators are suspended).
                 if stage != WorkBucketStage::Unconstrained && stage != first_stw_stage {
+                    // Other work packets will be opened after previous stages are done
+                    // (i.e their buckets are drained and all workers parked).
                     let cur_stages = open_stages.clone();
                     work_buckets[stage].set_open_condition(
                         move |scheduler: &GCWorkScheduler<VM>| {
@@ -65,12 +73,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
 
-        let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new(None));
-
         Arc::new(Self {
             work_buckets,
             worker_group,
-            coordinator_worker_shared,
             worker_monitor,
             affinity,
         })
@@ -80,26 +85,40 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.as_ref().worker_count()
     }
 
-    /// Create GC threads, including the controller thread and all workers.
+    /// Create GC threads for the first time.  It will also create the `GCWorker` instances.
+    ///
+    /// Currently GC threads only include worker threads, and we currently have only one worker
+    /// group.  We may add more worker groups in the future.
     pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
-        // Spawn the controller thread.
-        let coordinator_worker = GCWorker::new(
-            mmtk,
-            usize::MAX,
-            self.clone(),
-            true,
-            self.coordinator_worker_shared.clone(),
-            deque::Worker::new_fifo(),
-        );
-        let gc_controller = GCController::new(
-            mmtk,
-            mmtk.get_plan().base().gc_requester.clone(),
-            self.clone(),
-            coordinator_worker,
-        );
-        VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
+        self.worker_group.initial_spawn(tls, mmtk);
+    }
 
-        self.worker_group.spawn(mmtk, tls)
+    /// Ask all GC workers to exit for forking.
+    pub fn stop_gc_threads_for_forking(self: &Arc<Self>) {
+        self.worker_group.prepare_surrender_buffer();
+
+        debug!("A mutator is requesting GC threads to stop for forking...");
+        self.worker_monitor.make_request(WorkerGoal::StopForFork);
+    }
+
+    /// Surrender the `GCWorker` struct of a GC worker when it exits.
+    pub fn surrender_gc_worker(&self, worker: Box<GCWorker<VM>>) {
+        let all_surrendered = self.worker_group.surrender_gc_worker(worker);
+
+        if all_surrendered {
+            debug!(
+                "All {} workers surrendered.",
+                self.worker_group.worker_count()
+            );
+            self.worker_monitor.on_all_workers_exited();
+        }
+    }
+
+    /// Respawn GC threads after forking.  This will reuse the `GCWorker` instances of stopped
+    /// workers.  `tls` is the VM thread that requests GC threads to be re-spawn, and will be
+    /// passed down to [`crate::vm::Collection::spawn_gc_thread`].
+    pub fn respawn_gc_threads_after_forking(self: &Arc<Self>, tls: VMThread) {
+        self.worker_group.respawn(tls)
     }
 
     /// Resolve the affinity of a thread.
@@ -107,9 +126,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.affinity.resolve_affinity(thread);
     }
 
+    /// Request a GC to be scheduled.  Called by mutator via `GCRequester`.
+    pub(crate) fn request_schedule_collection(&self) {
+        debug!("A mutator is sending GC-scheduling request to workers...");
+        self.worker_monitor.make_request(WorkerGoal::Gc);
+    }
+
+    /// Add the `ScheduleCollection` packet.  Called by the last parked worker.
+    fn add_schedule_collection_packet(&self) {
+        // We are still holding the mutex `WorkerMonitor::sync`.  Do not notify now.
+        self.work_buckets[WorkBucketStage::Unconstrained].add_no_notify(ScheduleCollection);
+    }
+
     /// Schedule all the common work packets
     pub fn schedule_common_work<C: GCWorkContext<VM = VM>>(&self, plan: &'static C::PlanType) {
-        use crate::plan::Plan;
         use crate::scheduler::gc_work::*;
         // Stop & scan mutators (mutator scanning can happen before STW)
         self.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<C>::new());
@@ -141,16 +171,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
             };
             self.work_buckets[WorkBucketStage::SoftRefClosure]
-                .add(SoftRefProcessing::<C::ProcessEdgesWorkType>::new());
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::<C::ProcessEdgesWorkType>::new());
+                .add(SoftRefProcessing::<C::DefaultProcessEdges>::new());
+            self.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<VM>::new());
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(RefForwarding::<C::ProcessEdgesWorkType>::new());
+                    .add(RefForwarding::<C::DefaultProcessEdges>::new());
             }
 
             use crate::util::reference_processor::RefEnqueue;
@@ -162,11 +191,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             self.work_buckets[WorkBucketStage::FinalRefClosure]
-                .add(Finalization::<C::ProcessEdgesWorkType>::new());
+                .add(Finalization::<C::DefaultProcessEdges>::new());
             // forward refs
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::FinalizableForwarding]
-                    .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
+                    .add(ForwardFinalization::<C::DefaultProcessEdges>::new());
             }
         }
 
@@ -192,12 +221,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // because there are no other packets in the bucket.  We set it as sentinel for
         // consistency.
         self.work_buckets[WorkBucketStage::VMRefClosure]
-            .set_sentinel(Box::new(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new()));
+            .set_sentinel(Box::new(VMProcessWeakRefs::<C::DefaultProcessEdges>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
             self.work_buckets[WorkBucketStage::VMRefForwarding]
-                .add(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new());
+                .add(VMForwardWeakRefs::<C::DefaultProcessEdges>::new());
         }
 
         self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
@@ -358,20 +387,200 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Called by workers to get a schedulable work packet.
     /// Park the worker if there're no available packets.
-    pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
-        self.poll_schedulable_work(worker)
-            .unwrap_or_else(|| self.poll_slow(worker))
+    pub(crate) fn poll(&self, worker: &GCWorker<VM>) -> PollResult<VM> {
+        if let Some(work) = self.poll_schedulable_work(worker) {
+            return Ok(work);
+        }
+        self.poll_slow(worker)
     }
 
-    fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
+    fn poll_slow(&self, worker: &GCWorker<VM>) -> PollResult<VM> {
         loop {
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
-                return work;
+                return Ok(work);
             }
 
-            self.worker_monitor.park_and_wait(worker);
+            let ordinal = worker.ordinal;
+            self.worker_monitor
+                .park_and_wait(ordinal, |goals| self.on_last_parked(worker, goals))?;
         }
+    }
+
+    /// Called when the last worker parked.  `goal` allows this function to inspect and change the
+    /// current goal.
+    fn on_last_parked(&self, worker: &GCWorker<VM>, goals: &mut WorkerGoals) -> LastParkedResult {
+        let Some(ref current_goal) = goals.current() else {
+            // There is no goal.  Find a request to respond to.
+            return self.respond_to_requests(worker, goals);
+        };
+
+        match current_goal {
+            WorkerGoal::Gc => {
+                // We are in the progress of GC.
+
+                // In stop-the-world GC, mutators cannot request for GC while GC is in progress.
+                // When we support concurrent GC, we should remove this assertion.
+                assert!(
+                    !goals.debug_is_requested(WorkerGoal::Gc),
+                    "GC request sent to WorkerMonitor while GC is still in progress."
+                );
+
+                // We are in the middle of GC, and the last GC worker parked.
+                trace!("The last worker parked during GC.  Try to find more work to do...");
+
+                // During GC, if all workers parked, all open buckets must have been drained.
+                self.assert_all_activated_buckets_are_empty();
+
+                // Find more work for workers to do.
+                let found_more_work = self.find_more_work_for_workers();
+
+                if found_more_work {
+                    LastParkedResult::WakeAll
+                } else {
+                    // GC finished.
+                    self.on_gc_finished(worker);
+
+                    // Clear the current goal
+                    goals.on_current_goal_completed();
+                    self.respond_to_requests(worker, goals)
+                }
+            }
+            WorkerGoal::StopForFork => {
+                panic!(
+                    "Worker {} parked again when it is asked to exit.",
+                    worker.ordinal
+                )
+            }
+        }
+    }
+
+    /// Respond to a worker reqeust.
+    fn respond_to_requests(
+        &self,
+        worker: &GCWorker<VM>,
+        goals: &mut WorkerGoals,
+    ) -> LastParkedResult {
+        assert!(goals.current().is_none());
+
+        let Some(goal) = goals.poll_next_goal() else {
+            // No requests.  Park this worker, too.
+            return LastParkedResult::ParkSelf;
+        };
+
+        match goal {
+            WorkerGoal::Gc => {
+                trace!("A mutator requested a GC to be scheduled.");
+
+                // We set the eBPF trace point here so that bpftrace scripts can start recording
+                // work packet events before the `ScheduleCollection` work packet starts.
+                probe!(mmtk, gc_start);
+
+                {
+                    let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+                    assert!(gc_start_time.is_none(), "GC already started?");
+                    *gc_start_time = Some(Instant::now());
+                }
+
+                self.add_schedule_collection_packet();
+                LastParkedResult::WakeSelf
+            }
+            WorkerGoal::StopForFork => {
+                trace!("A mutator wanted to fork.");
+                LastParkedResult::WakeAll
+            }
+        }
+    }
+
+    /// Find more work for workers to do.  Return true if more work is available.
+    fn find_more_work_for_workers(&self) -> bool {
+        if self.worker_group.has_designated_work() {
+            trace!("Some workers have designated work.");
+            return true;
+        }
+
+        // See if any bucket has a sentinel.
+        if self.schedule_sentinels() {
+            trace!("Some sentinels are scheduled.");
+            return true;
+        }
+
+        // Try to open new buckets.
+        if self.update_buckets() {
+            trace!("Some buckets are opened.");
+            return true;
+        }
+
+        // If all of the above failed, it means GC has finished.
+        false
+    }
+
+    /// Called when GC has finished, i.e. when all work packets have been executed.
+    fn on_gc_finished(&self, worker: &GCWorker<VM>) {
+        // All GC workers must have parked by now.
+        debug_assert!(!self.worker_group.has_designated_work());
+        debug_assert!(self.all_buckets_empty());
+
+        // Deactivate all work buckets to prepare for the next GC.
+        self.deactivate_all();
+        self.debug_assert_all_buckets_deactivated();
+
+        let mmtk = worker.mmtk;
+
+        // Tell GC trigger that GC ended - this happens before we resume mutators.
+        mmtk.gc_trigger.policy.on_gc_end(mmtk);
+
+        // Compute the elapsed time of the GC.
+        let start_time = {
+            let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
+            gc_start_time.take().expect("GC not started yet?")
+        };
+        let elapsed = start_time.elapsed();
+
+        info!(
+            "End of GC ({}/{} pages, took {} ms)",
+            mmtk.get_plan().get_reserved_pages(),
+            mmtk.get_plan().get_total_pages(),
+            elapsed.as_millis()
+        );
+
+        // USDT tracepoint for the end of GC.
+        probe!(mmtk, gc_end);
+
+        #[cfg(feature = "count_live_bytes_in_gc")]
+        {
+            let live_bytes = mmtk.state.get_live_bytes_in_last_gc();
+            let used_bytes =
+                mmtk.get_plan().get_used_pages() << crate::util::constants::LOG_BYTES_IN_PAGE;
+            debug_assert!(
+                live_bytes <= used_bytes,
+                "Live bytes of all live objects ({} bytes) is larger than used pages ({} bytes), something is wrong.",
+                live_bytes, used_bytes
+            );
+            info!(
+                "Live objects = {} bytes ({:04.1}% of {} used pages)",
+                live_bytes,
+                live_bytes as f64 * 100.0 / used_bytes as f64,
+                mmtk.get_plan().get_used_pages()
+            );
+        }
+
+        // All other workers are parked, so it is safe to access the Plan instance mutably.
+        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
+        plan_mut.end_of_gc(worker.tls);
+
+        #[cfg(feature = "extreme_assertions")]
+        if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
+            // reset the logging info at the end of each GC
+            mmtk.edge_logger.reset();
+        }
+
+        // Reset the triggering information.
+        mmtk.state.reset_collection_trigger();
+
+        // Set to NotInGC after everything, and right before resuming mutators.
+        mmtk.set_gc_status(GcStatus::NotInGC);
+        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 
     pub fn enable_stat(&self) {
@@ -379,8 +588,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             worker_stat.enable();
         }
-        let coordinator_worker_stat = self.coordinator_worker_shared.borrow_stat();
-        coordinator_worker_stat.enable();
     }
 
     pub fn statistics(&self) -> HashMap<String, String> {
@@ -389,23 +596,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             summary.merge(&worker_stat);
         }
-        let coordinator_worker_stat = self.coordinator_worker_shared.borrow_stat();
-        summary.merge(&coordinator_worker_stat);
         summary.harness_stat()
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.get_plan().base().gc_requester.clear_request();
+        mmtk.gc_requester.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
-        // Note: This is the only place where a non-coordinator thread opens a bucket.
-        // If the `StopMutators` is executed by the coordinator thread, it will open
-        // the `Prepare` bucket and let workers start executing packets while the coordinator
-        // can still add more work packets to `Prepare`.  However, since `Prepare` is the first STW
-        // bucket and only the coordinator can open any subsequent buckets, workers cannot execute
-        // work packets out of order.  This is not generally true if we are not opening the first
-        // STW bucket.  In the future, we should redesign the opening condition of work buckets to
-        // make the synchronization more robust,
+        // Note: This is the only place where a bucket is opened without having all workers parked.
+        // We usually require all workers to park before opening new buckets because otherwise
+        // packets will be executed out of order.  However, since `Prepare` is the first STW
+        // bucket, and all subsequent buckets require all workers to park before opening, workers
+        // cannot execute work packets out of order.  This is not generally true if we are not
+        // opening the first STW bucket.  In the future, we should redesign the opening condition
+        // of work buckets to make the synchronization more robust,
         first_stw_bucket.activate();
         self.worker_monitor.notify_work_available(true);
     }

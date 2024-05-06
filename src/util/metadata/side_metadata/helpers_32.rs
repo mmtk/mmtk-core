@@ -82,12 +82,15 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
     }
 }
 
-pub(crate) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
+pub(super) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
     LOCAL_SIDE_METADATA_BASE_ADDRESS
         .add((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
 }
 
-pub const fn metadata_bytes_per_chunk(log_bytes_in_region: usize, log_num_of_bits: usize) -> usize {
+pub(super) const fn metadata_bytes_per_chunk(
+    log_bytes_in_region: usize,
+    log_num_of_bits: usize,
+) -> usize {
     1usize
         << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) + log_num_of_bits
             - log_bytes_in_region)
@@ -95,7 +98,7 @@ pub const fn metadata_bytes_per_chunk(log_bytes_in_region: usize, log_num_of_bit
 
 /// Unmaps the metadata for a single chunk starting at `start`
 #[cfg(test)]
-pub fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
+pub(crate) fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
     if local_per_chunk != 0 {
         let policy_meta_start = address_to_meta_chunk_addr(start);
         assert!(memory::munmap(policy_meta_start, local_per_chunk).is_ok())
@@ -103,7 +106,7 @@ pub fn ensure_munmap_metadata_chunk(start: Address, local_per_chunk: usize) {
 }
 
 /// Returns the size in bytes that gets mmapped in the function if success.
-pub fn try_map_per_chunk_metadata_space(
+pub(super) fn try_map_per_chunk_metadata_space(
     start: Address,
     size: usize,
     local_per_chunk: usize,
@@ -126,6 +129,9 @@ pub fn try_map_per_chunk_metadata_space(
                 } else {
                     start.align_down(BYTES_IN_CHUNK) + BYTES_IN_CHUNK
                 };
+                // The code that was intended to deal with the failing cases is commented out.
+                // See the comment below. Suppress the warning for now.
+                #[allow(clippy::never_loop)]
                 // Failure: munmap what has been mmapped before
                 while munmap_start < aligned_start {
                     // Commented out the following as we do not have unmap in Mmapper.
@@ -164,7 +170,7 @@ pub fn try_map_per_chunk_metadata_space(
 }
 
 // Try to map side metadata for the chunk starting at `start`
-pub fn try_mmap_metadata_chunk(
+pub(super) fn try_mmap_metadata_chunk(
     start: Address,
     local_per_chunk: usize,
     no_reserve: bool,

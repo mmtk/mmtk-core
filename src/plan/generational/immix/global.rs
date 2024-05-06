@@ -6,10 +6,10 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
@@ -18,6 +18,7 @@ use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -51,6 +52,7 @@ pub struct GenImmix<VM: VMBinding> {
     pub last_gc_was_full_heap: AtomicBool,
 }
 
+/// The plan constraints for the generational immix plan.
 pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     // The maximum object size that can be allocated without LOS is restricted by the max immix object size.
     // This might be too restrictive, as our default allocator is bump pointer (nursery allocator) which
@@ -90,7 +92,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             )
     }
 
-    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
+    fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool
     where
         Self: Sized,
     {
@@ -104,10 +106,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
-
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
-
         if !is_full_heap {
             debug!("Nursery GC");
             scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
@@ -128,7 +126,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
-            self.immix_space.prepare(full_heap);
+            self.immix_space.prepare(
+                full_heap,
+                crate::policy::immix::defrag::StatsForDefrag::new(self),
+            );
         }
     }
 
@@ -215,13 +216,14 @@ impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
 }
 
 impl<VM: VMBinding> crate::plan::generational::global::GenerationalPlanExt<VM> for GenImmix<VM> {
-    fn trace_object_nursery<Q: ObjectQueue>(
+    fn trace_object_nursery<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.gen.trace_object_nursery(queue, object, worker)
+        self.gen
+            .trace_object_nursery::<Q, KIND>(queue, object, worker)
     }
 }
 

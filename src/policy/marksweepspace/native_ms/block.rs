@@ -188,6 +188,7 @@ impl Block {
     }
 
     pub fn store_block_cell_size(&self, size: usize) {
+        debug_assert_ne!(size, 0);
         unsafe { Block::SIZE_TABLE.store::<usize>(self.start(), size) }
     }
 
@@ -219,23 +220,14 @@ impl Block {
         Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
-    /// Release this block if it is unmarked. Return true if the block is release.
+    /// Release this block if it is unmarked. Return true if the block is released.
     pub fn attempt_release<VM: VMBinding>(self, space: &MarkSweepSpace<VM>) -> bool {
         match self.get_state() {
-            BlockState::Unallocated => false,
+            // We should not have unallocated blocks in a block list
+            BlockState::Unallocated => unreachable!(),
             BlockState::Unmarked => {
-                unsafe {
-                    let block_list = loop {
-                        let list = self.load_block_list();
-                        (*list).lock();
-                        if list == self.load_block_list() {
-                            break list;
-                        }
-                        (*list).unlock();
-                    };
-                    (*block_list).remove(self);
-                    (*block_list).unlock();
-                }
+                let block_list = self.load_block_list();
+                unsafe { &mut *block_list }.remove(self);
                 space.release_block(self);
                 true
             }
@@ -282,12 +274,14 @@ impl Block {
     /// that we need to use this method correctly.
     fn simple_sweep<VM: VMBinding>(&self) {
         let cell_size = self.load_block_cell_size();
+        debug_assert_ne!(cell_size, 0);
         let mut cell = self.start();
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= self.start() + Block::BYTES {
             // The invariants we checked earlier ensures that we can use cell and object reference interchangably
             // We may not really have an object in this cell, but if we do, this object reference is correct.
-            let potential_object = ObjectReference::from_raw_address(cell);
+            // About unsafe: We know `cell` is non-zero here.
+            let potential_object = unsafe { ObjectReference::from_raw_address_unchecked(cell) };
 
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)
@@ -327,9 +321,12 @@ impl Block {
 
         while cell + cell_size <= self.end() {
             // possible object ref
-            let potential_object_ref = ObjectReference::from_raw_address(
-                cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
-            );
+            let potential_object_ref = unsafe {
+                // We know cursor plus an offset cannot be 0.
+                ObjectReference::from_raw_address_unchecked(
+                    cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
+                )
+            };
             trace!(
                 "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
                 self,

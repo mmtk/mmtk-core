@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.19.0"
+version = "0.24.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ repository = "https://github.com/mmtk/mmtk-core"
 readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
-rust-version = "1.70.0"
+rust-version = "1.71.1"
 build = "build.rs"
 
 [lib]
@@ -19,44 +19,49 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
-atomic = "0.5.1"
+atomic = "0.6.0"
 atomic_refcell = "0.1.7"
-atomic-traits = "0.3.0"
+atomic-traits = "0.4.0"
+bytemuck = { version = "1.14.0", features = ["derive"] }
 cfg-if = "1.0"
 crossbeam = "0.8.1"
-delegate = "0.9.0"
+delegate = "0.12.0"
 downcast-rs = "1.1.1"
 enum-map = "2.4.2"
-env_logger = "0.10.0"
+env_logger = "0.11.3"
 is-terminal = "0.4.7"
-itertools = "0.10.5"
+itertools = "0.12.0"
 jemalloc-sys = { version = "0.5.3", features = ["disable_initial_exec_tls"], optional = true }
 lazy_static = "1.1"
 libc = "0.2"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 memoffset = "0.9"
 mimalloc-sys = { version = "0.1.6", optional = true }
-# MMTk macros
-mmtk-macros = { version = "0.19.0", path = "macros/" }
+# MMTk macros - we have to specify a version here in order to publish the crate, even though we use the dependency from a local path.
+mmtk-macros = { version="0.24.0", path = "macros/" }
 num_cpus = "1.8"
 num-traits = "0.2"
-pfm = { version = "0.1.0-beta.3", optional = true }
-probe = "0.5"
+pfm = { version = "0.1.1", optional = true }
 portable-atomic = "1.4.3"
+probe = "0.5"
 regex = "1.7.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
-strum = "0.24"
-strum_macros = "0.24"
-sysinfo = "0.29"
+strum = "0.26.2"
+strum_macros = "0.26.2"
+sysinfo = "0.30.9"
 
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.8.5"
+criterion = "0.4"
 
 [build-dependencies]
-# Fix to 0.6.0. Updating to 0.6.1 requires MSRV 1.64.
-built = { version = "=0.6.0", features = ["git2"] }
+built = { version = "0.7.1", features = ["git2"] }
+
+[[bench]]
+name = "main"
+harness = false
 
 [features]
 default = []
@@ -64,6 +69,10 @@ default = []
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
 perf_counter = ["pfm"]
+
+# This feature is only used for tests with MockVM.
+# CI scripts run those tests with this feature.
+mock_test = []
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
@@ -142,6 +151,10 @@ malloc_counted_size = []
 
 # Count the size of all live objects in GC
 count_live_bytes_in_gc = []
+
+# Workaround a problem where bpftrace scripts (see tools/tracing/timeline/capture.bt) cannot
+# capture the type names of work packets.
+bpftrace_workaround = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

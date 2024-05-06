@@ -15,10 +15,9 @@
 //! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
 //! `rlib` does *not* support LTO.
 
-use crate::util::constants::*;
-
 mod active_plan;
 mod collection;
+/// Allows MMTk to access edges in a VM-defined way.
 pub mod edge_shape;
 pub(crate) mod object_model;
 mod reference_glue;
@@ -36,18 +35,28 @@ pub use self::scanning::ObjectTracerContext;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 
-const DEFAULT_LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
-const DEFAULT_LOG_MAX_ALIGNMENT: usize = LOG_BYTES_IN_LONG as usize;
+#[cfg(test)]
+mod tests;
+
+/// Default min alignment 4 bytes
+const DEFAULT_LOG_MIN_ALIGNMENT: usize = 2;
+/// Default max alignment 8 bytes
+const DEFAULT_LOG_MAX_ALIGNMENT: usize = 3;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding
 where
     Self: Sized + 'static + Send + Sync + Default,
 {
+    /// The binding's implementation of [`crate::vm::ObjectModel`].
     type VMObjectModel: ObjectModel<Self>;
+    /// The binding's implementation of [`crate::vm::Scanning`].
     type VMScanning: Scanning<Self>;
+    /// The binding's implementation of [`crate::vm::Collection`].
     type VMCollection: Collection<Self>;
+    /// The binding's implementation of [`crate::vm::ActivePlan`].
     type VMActivePlan: ActivePlan<Self>;
+    /// The binding's implementation of [`crate::vm::ReferenceGlue`].
     type VMReferenceGlue: ReferenceGlue<Self>;
 
     /// The type of edges in this VM.

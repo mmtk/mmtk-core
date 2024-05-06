@@ -44,17 +44,13 @@ pub const FULL_NURSERY_GC: bool = false;
 /// Constraints for generational plans. Each generational plan should overwrite based on this constant.
 pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
     needs_log_bit: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
     barrier: ACTIVE_BARRIER,
     // We may trace duplicate edges in sticky immix (or any plan that uses object remembering barrier). See https://github.com/mmtk/mmtk-core/issues/743.
     may_trace_duplicate_edges: ACTIVE_BARRIER.equals(BarrierSelector::ObjectBarrier),
-    max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
+    max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-        crate::util::options::NURSERY_SIZE,
-    ),
+    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 

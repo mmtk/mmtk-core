@@ -1,21 +1,18 @@
 use super::SemiSpace;
 use crate::plan::barriers::NoBarrier;
+use crate::plan::mutator_context::unreachable_prepare_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
     create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
 use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
+use crate::MMTK;
 use enum_map::EnumMap;
-
-pub fn ss_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // Do nothing
-}
 
 pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // rebind the allocation bump pointer to the appropriate semispace
@@ -50,25 +47,25 @@ lazy_static! {
 
 pub fn create_ss_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let ss = plan.downcast_ref::<SemiSpace<VM>>().unwrap();
+    let ss = mmtk.get_plan().downcast_ref::<SemiSpace<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, ss);
             vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));
             vec
         }),
-        prepare_func: &ss_mutator_prepare,
+        prepare_func: &unreachable_prepare_func,
         release_func: &ss_mutator_release,
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
-        plan,
+        plan: ss,
     }
 }

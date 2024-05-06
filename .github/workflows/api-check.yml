@@ -19,28 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout mmtk-core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # Full git history needed
           fetch-depth: 0
 
-      # cargo-public-api can be built with the latest stable toolchain.
-      - name: Install stable Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          # make it the active toolchain
-          override: true
-
       # cargo-public-api needs a nightly toolchain installed in order to work.
       # It does not have to be the active toolchain.
       - name: Install nightly Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
+        run: rustup toolchain install nightly
 
+      # Show the Rust toolchain we are actually using
+      - run: rustup show
       - run: cargo --version
       - run: cargo +nightly --version
 

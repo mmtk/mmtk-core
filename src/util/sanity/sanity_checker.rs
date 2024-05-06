@@ -7,7 +7,6 @@ use crate::MMTK;
 use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
 pub struct SanityChecker<ES: Edge> {
@@ -71,8 +70,7 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         #[cfg(feature = "extreme_assertions")]
         mmtk.edge_logger.reset();
 
-        plan.base().inside_sanity.store(true, Ordering::SeqCst);
-        // Stop & scan mutators (mutator scanning can happen before STW)
+        mmtk.sanity_begin(); // Stop & scan mutators (mutator scanning can happen before STW)
 
         // We use the cached roots for sanity gc, based on the assumption that
         // the stack scanning triggered by the selected plan is correct and precise.
@@ -98,12 +96,12 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
                 );
             }
             for roots in &sanity_checker.root_nodes {
-                scheduler.work_buckets[WorkBucketStage::Closure].add(ScanObjects::<
+                scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRootNode::<
+                    P::VM,
+                    SanityGCProcessEdges<P::VM>,
                     SanityGCProcessEdges<P::VM>,
                 >::new(
                     roots.clone(),
-                    false,
-                    true,
                     WorkBucketStage::Closure,
                 ));
             }
@@ -130,18 +128,9 @@ impl<P: Plan> SanityPrepare<P> {
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         info!("Sanity GC prepare");
-        mmtk.get_plan().enter_sanity();
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
-        }
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(PrepareMutator::<P::VM>::new(mutator));
-        }
-        for w in &mmtk.scheduler.worker_group.workers_shared {
-            let result = w.designated_work.push(Box::new(PrepareCollector));
-            debug_assert!(result.is_ok());
         }
     }
 }
@@ -159,16 +148,8 @@ impl<P: Plan> SanityRelease<P> {
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         info!("Sanity GC release");
-        mmtk.get_plan().leave_sanity();
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-                .add(ReleaseMutator::<P::VM>::new(mutator));
-        }
-        for w in &mmtk.scheduler.worker_group.workers_shared {
-            let result = w.designated_work.push(Box::new(ReleaseCollector));
-            debug_assert!(result.is_ok());
-        }
+        mmtk.sanity_end();
     }
 }
 
@@ -208,13 +189,10 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     }
 
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
         let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
-            assert!(object.is_sane(), "Invalid reference {:?}", object);
+            assert!(object.is_sane::<VM>(), "Invalid reference {:?}", object);
 
             // Let plan check object
             assert!(
@@ -246,11 +224,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         object
     }
 
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        roots: bool,
-    ) -> Self::ScanObjectsWorkType {
-        ScanObjects::<Self>::new(nodes, false, roots, WorkBucketStage::Closure)
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
+        ScanObjects::<Self>::new(nodes, false, WorkBucketStage::Closure)
     }
 }

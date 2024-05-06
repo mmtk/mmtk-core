@@ -2,13 +2,13 @@ use super::gc_work::PPGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::{plan::global::BasePlan, vm::VMBinding};
@@ -28,8 +28,10 @@ pub struct PageProtect<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
+/// The plan constraints for the page protect plan.
 pub const CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
+    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -39,8 +41,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<PPGCWorkContext<VM>>(self);
     }
 
@@ -58,7 +58,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.space.release(true);
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
 

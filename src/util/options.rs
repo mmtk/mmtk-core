@@ -1,5 +1,4 @@
 use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::Address;
 use std::default::Default;
@@ -7,26 +6,47 @@ use std::fmt::Debug;
 use std::str::FromStr;
 use strum_macros::EnumString;
 
-use super::heap::vm_layout::vm_layout;
+/// The default stress factor. This is set to the max usize,
+/// which means we will never trigger a stress GC for the default value.
+pub const DEFAULT_STRESS_FACTOR: usize = usize::max_value();
 
+/// The zeroing approach to use for new object allocations.
+/// Affects each plan differently.
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum NurseryZeroingOptions {
+    /// Zeroing with normal temporal write.
     Temporal,
+    /// Zeroing with cache-bypassing non-temporal write.
     Nontemporal,
+    /// Zeroing with a separate zeroing thread.
     Concurrent,
+    /// An adaptive approach using both non-temporal write and a concurrent zeroing thread.
     Adaptive,
 }
 
+/// Select a GC plan for MMTk.
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum PlanSelector {
+    /// Allocation only without a collector. This is usually used for debugging.
+    /// Similar to OpenJDK epsilon (<https://openjdk.org/jeps/318>).
     NoGC,
+    /// A semi-space collector, which divides the heap into two spaces and
+    /// copies the live objects into the other space for every GC.
     SemiSpace,
+    /// A generational collector that uses a copying nursery, and the semi-space policy as its mature space.
     GenCopy,
+    /// A generational collector that uses a copying nursery, and Immix as its mature space.
     GenImmix,
+    /// A mark-sweep collector, which marks live objects and sweeps dead objects during GC.
     MarkSweep,
+    /// A debugging collector that allocates memory at page granularity, and protects pages for dead objects
+    /// to prevent future access.
     PageProtect,
+    /// A mark-region collector that allows an opportunistic defragmentation mechanism.
     Immix,
+    /// A mark-compact collector that marks objects and performs Cheney-style copying.
     MarkCompact,
+    /// An Immix collector that uses a sticky mark bit to allow generational behaviors without a copying nursery.
     StickyImmix,
 }
 
@@ -39,6 +59,7 @@ pub enum PlanSelector {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PerfEventOptions {
+    /// A vector of perf events in tuples of (event name, PID, CPU)
     pub events: Vec<(String, i32, i32)>,
 }
 
@@ -74,9 +95,6 @@ impl FromStr for PerfEventOptions {
     }
 }
 
-/// The default nursery space size.
-#[cfg(target_pointer_width = "64")]
-pub const NURSERY_SIZE: usize = (1 << 20) << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "64")]
@@ -86,18 +104,21 @@ pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "64")]
 pub const DEFAULT_MAX_NURSERY: usize = (1 << 20) << LOG_BYTES_IN_MBYTE;
 
-/// The default nursery space size.
-#[cfg(target_pointer_width = "32")]
-pub const NURSERY_SIZE: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default min nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MIN_NURSERY: usize = 2 << LOG_BYTES_IN_MBYTE;
+/// The default max nursery size for 32 bits.
+pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// The default max nursery size. This does not affect the actual space we create as nursery. It is
 /// only used in the GC trigger check.
-pub const DEFAULT_MAX_NURSERY_32: usize = 32 << LOG_BYTES_IN_MBYTE;
 #[cfg(target_pointer_width = "32")]
 pub const DEFAULT_MAX_NURSERY: usize = DEFAULT_MAX_NURSERY_32;
+
+/// The default min nursery size proportional to the current heap size
+pub const DEFAULT_PROPORTIONAL_MIN_NURSERY: f64 = 0.25;
+/// The default max nursery size proportional to the current heap size
+pub const DEFAULT_PROPORTIONAL_MAX_NURSERY: f64 = 1.0;
 
 fn always_valid<T>(_: &T) -> bool {
     true
@@ -174,13 +195,14 @@ macro_rules! options {
         }
     };
 
-    ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*,) => [
-        options!($($name: $type[env_var: $env_var, command_line: $command_line, mutable: $mutable][$validator] = $default),*);
+    ($($(#[$outer:meta])*$name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*,) => [
+        options!($(#[$outer])*$($name: $type[env_var: $env_var, command_line: $command_line, mutable: $mutable][$validator] = $default),*);
     ];
-    ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*) => [
+    ($($(#[$outer:meta])*$name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*) => [
+        /// MMTk command line options.
         #[derive(Clone)]
         pub struct Options {
-            $(pub $name: MMTKOption<$type>),*
+            $($(#[$outer])*pub $name: MMTKOption<$type>),*
         }
         impl Options {
             /// Set an option from env var
@@ -235,30 +257,49 @@ macro_rules! options {
                     _ => panic!("Invalid Options key: {}", s)
                 }
             }
-        }
-        impl Default for Options {
-            fn default() -> Self {
-                let mut options = Options {
-                    $($name: MMTKOption::new($default, $validator, $env_var,$command_line)),*
-                };
 
-                // If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),
-                // we set the option to its value (if it is a valid value). Otherwise, use the default value.
+            /// Create an `Options` instance with built-in default settings.
+            fn new() -> Self {
+                Options {
+                    $($name: MMTKOption::new($default, $validator, $env_var, $command_line)),*
+                }
+            }
+
+            /// Read options from environment variables, and apply those settings to self.
+            ///
+            /// If we have environment variables that start with `MMTK_` and match any option (such
+            /// as `MMTK_STRESS_FACTOR`), we set the option to its value (if it is a valid value).
+            pub fn read_env_var_settings(&mut self) {
                 const PREFIX: &str = "MMTK_";
                 for (key, val) in std::env::vars() {
                     // strip the prefix, and get the lower case string
                     if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
                         let lowercase: &str = &rest_of_key.to_lowercase();
                         match lowercase {
-                            $(stringify!($name) => { options.set_from_env_var(lowercase, &val); },)*
+                            $(stringify!($name) => { self.set_from_env_var(lowercase, &val); },)*
                             _ => {}
                         }
                     }
                 }
-                return options;
+            }
+        }
+
+        impl Default for Options {
+            /// By default, `Options` instance is created with built-in default settings.
+            fn default() -> Self {
+                Self::new()
             }
         }
     ]
+}
+
+impl Options {
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
+    pub fn is_stress_test_gc_enabled(&self) -> bool {
+        *self.stress_factor != DEFAULT_STRESS_FACTOR
+            || *self.analysis_factor != DEFAULT_STRESS_FACTOR
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -355,60 +396,41 @@ impl FromStr for AffinityKind {
     }
 }
 
-#[derive(Copy, Clone, EnumString, Debug)]
-/// Different nursery types.
-pub enum NurseryKind {
-    /// A Bounded nursery has different upper and lower bounds. The size only controls the upper
-    /// bound. Hence, it is considered to be a "variable size" nursery. By default, a Bounded
-    /// nursery has a lower bound of 2 MB and an upper bound of 32 MB for 32-bit systems and 1 TB
-    /// for 64-bit systems.
-    Bounded,
-    /// A Fixed nursery has the same upper and lower bounds. The size controls both the upper and
-    /// lower bounds. Note that this is considered less performant than a Bounded nursery since a
-    /// Fixed nursery size can be too restrictive and cause more GCs.
-    Fixed,
-}
-
 #[derive(Copy, Clone, Debug)]
 /// An option that provides a min/max interface to MMTk and a Bounded/Fixed interface to the
 /// user/VM.
-pub struct NurserySize {
-    /// The nursery type
-    pub kind: NurseryKind,
-    /// Minimum nursery size (in bytes)
-    pub min: usize,
-    /// Maximum nursery size (in bytes)
-    max: Option<usize>,
+pub enum NurserySize {
+    /// A Bounded nursery has different upper and lower bounds. The size only controls the upper
+    /// bound. Hence, it is considered to be a "variable size" nursery.
+    Bounded {
+        /// The lower bound of the nursery size in bytes. Default to [`DEFAULT_MIN_NURSERY`].
+        min: usize,
+        /// The upper bound of the nursery size in bytes. Default to [`DEFAULT_MAX_NURSERY`].
+        max: usize,
+    },
+    /// A bounded nursery that is porportional to the current heap size.
+    ProportionalBounded {
+        /// The lower bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MIN_NURSERY`].
+        min: f64,
+        /// The upper bound of the nursery size as a proportion of the current heap size. Default to [`DEFAULT_PROPORTIONAL_MAX_NURSERY`].
+        max: f64,
+    },
+    /// A Fixed nursery has the same upper and lower bounds. The size controls both the upper and
+    /// lower bounds. Note that this is considered less performant than a Bounded nursery since a
+    /// Fixed nursery size can be too restrictive and cause more GCs.
+    Fixed(usize),
 }
 
 impl NurserySize {
-    pub fn new(kind: NurseryKind, value: Option<usize>) -> Self {
-        match kind {
-            NurseryKind::Bounded => NurserySize {
-                kind,
-                min: DEFAULT_MIN_NURSERY,
-                max: value,
-            },
-            NurseryKind::Fixed => NurserySize {
-                kind,
-                min: value.unwrap(),
-                max: value,
-            },
+    /// Return true if the values are valid.
+    fn validate(&self) -> bool {
+        match *self {
+            NurserySize::Bounded { min, max } => min <= max,
+            NurserySize::ProportionalBounded { min, max } => {
+                0.0f64 < min && min <= max && max <= 1.0f64
+            }
+            NurserySize::Fixed(_) => true,
         }
-    }
-
-    /// Returns a [`NurserySize`] or [`String`] containing error. Expects nursery size to be formatted as
-    /// `<NurseryKind>:<size in bytes>`. For example, `Fixed:8192` creates a [`NurseryKind::Fixed`] nursery of size
-    /// 8192 bytes.
-    pub fn parse(s: &str) -> Result<NurserySize, String> {
-        let ns: Vec<&str> = s.split(':').collect();
-        let kind = ns[0].parse::<NurseryKind>().map_err(|_| {
-            String::from("Please specify one of \"Bounded\" or \"Fixed\" nursery type")
-        })?;
-        let value = ns[1]
-            .parse()
-            .map_err(|_| String::from("Failed to parse size"))?;
-        Ok(NurserySize::new(kind, Some(value)))
     }
 }
 
@@ -416,42 +438,151 @@ impl FromStr for NurserySize {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        NurserySize::parse(s)
-    }
-}
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() != 2 {
+            return Err("Invalid format".to_string());
+        }
 
-impl Options {
-    /// Return upper bound of the nursery size (in number of bytes)
-    pub fn get_max_nursery_bytes(&self) -> usize {
-        self.nursery.max.unwrap_or_else(|| {
-            if !vm_layout().force_use_contiguous_spaces {
-                DEFAULT_MAX_NURSERY_32
+        let variant = parts[0];
+        let values: Vec<&str> = parts[1].split(',').collect();
+
+        fn default_or_parse<T: FromStr>(val: &str, default_value: T) -> Result<T, String> {
+            if val == "_" {
+                Ok(default_value)
             } else {
-                DEFAULT_MAX_NURSERY
+                val.parse::<T>()
+                    .map_err(|_| format!("Failed to parse {:?}", std::any::type_name::<T>()))
             }
-        })
-    }
+        }
 
-    /// Return upper bound of the nursery size (in number of pages)
-    pub fn get_max_nursery_pages(&self) -> usize {
-        crate::util::conversions::bytes_to_pages_up(self.get_max_nursery_bytes())
-    }
-
-    /// Return lower bound of the nursery size (in number of bytes)
-    pub fn get_min_nursery_bytes(&self) -> usize {
-        self.nursery.min
-    }
-
-    /// Return lower bound of the nursery size (in number of pages)
-    pub fn get_min_nursery_pages(&self) -> usize {
-        crate::util::conversions::bytes_to_pages_up(self.nursery.min)
+        match variant {
+            "Bounded" => {
+                if values.len() == 2 {
+                    let min = default_or_parse(values[0], DEFAULT_MIN_NURSERY)?;
+                    let max = default_or_parse(values[1], DEFAULT_MAX_NURSERY)?;
+                    Ok(NurserySize::Bounded { min, max })
+                } else {
+                    Err("Bounded requires two values".to_string())
+                }
+            }
+            "ProportionalBounded" => {
+                if values.len() == 2 {
+                    let min = default_or_parse(values[0], DEFAULT_PROPORTIONAL_MIN_NURSERY)?;
+                    let max = default_or_parse(values[1], DEFAULT_PROPORTIONAL_MAX_NURSERY)?;
+                    Ok(NurserySize::ProportionalBounded { min, max })
+                } else {
+                    Err("ProportionalBounded requires two values".to_string())
+                }
+            }
+            "Fixed" => {
+                if values.len() == 1 {
+                    let size = values[0]
+                        .parse::<usize>()
+                        .map_err(|_| "Invalid size value".to_string())?;
+                    Ok(NurserySize::Fixed(size))
+                } else {
+                    Err("Fixed requires one value".to_string())
+                }
+            }
+            _ => Err("Unknown variant".to_string()),
+        }
     }
 }
 
+#[cfg(test)]
+mod nursery_size_parsing_tests {
+    use super::*;
+
+    #[test]
+    fn test_bounded() {
+        // Simple case
+        let result = "Bounded:1,2".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, 1);
+            assert_eq!(max, 2);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default min
+        let result = "Bounded:_,2".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, DEFAULT_MIN_NURSERY);
+            assert_eq!(max, 2);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default max
+        let result = "Bounded:1,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, 1);
+            assert_eq!(max, DEFAULT_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default both
+        let result = "Bounded:_,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::Bounded { min, max } = result {
+            assert_eq!(min, DEFAULT_MIN_NURSERY);
+            assert_eq!(max, DEFAULT_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_proportional() {
+        // Simple case
+        let result = "ProportionalBounded:0.1,0.8"
+            .parse::<NurserySize>()
+            .unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, 0.1);
+            assert_eq!(max, 0.8);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default min
+        let result = "ProportionalBounded:_,0.8".parse::<NurserySize>().unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, DEFAULT_PROPORTIONAL_MIN_NURSERY);
+            assert_eq!(max, 0.8);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default max
+        let result = "ProportionalBounded:0.1,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, 0.1);
+            assert_eq!(max, DEFAULT_PROPORTIONAL_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+
+        // Default both
+        let result = "ProportionalBounded:_,_".parse::<NurserySize>().unwrap();
+        if let NurserySize::ProportionalBounded { min, max } = result {
+            assert_eq!(min, DEFAULT_PROPORTIONAL_MIN_NURSERY);
+            assert_eq!(max, DEFAULT_PROPORTIONAL_MAX_NURSERY);
+        } else {
+            panic!("Failed: {:?}", result);
+        }
+    }
+}
+
+/// Select a GC trigger for MMTk.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GCTriggerSelector {
+    /// GC is triggered when a fix-sized heap is full. The value specifies the fixed heap size in bytes.
     FixedHeapSize(usize),
+    /// GC is triggered by internal herusticis, and the heap size is varying between the two given values.
+    /// The two values are the lower and the upper bound of the heap size.
     DynamicHeapSize(usize, usize),
+    /// Delegate the GC triggering to the binding. This is not supported at the moment.
     Delegated,
 }
 
@@ -655,99 +786,98 @@ mod gc_trigger_tests {
 // Currently we allow all the options to be set by env var for the sake of convenience.
 // At some point, we may disallow this and all the options can only be set by command line.
 options! {
-    // The plan to use.
+    /// The GC plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::GenImmix,
-    // Number of GC worker threads. (There is always one GC controller thread.)
-    // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
-    // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
-    // See: https://github.com/mmtk/mmtk-core/issues/532
+    /// Number of GC worker threads.
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
-    // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
+    /// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Enable a return barrier (not supported)
+    /// Enable a return barrier (not supported)
     use_return_barrier:    bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should we eagerly finish sweeping at the start of a collection? (not supported)
+    /// Should we eagerly finish sweeping at the start of a collection? (not supported)
     eager_complete_sweep:  bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
+    /// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_gc:      bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // FIXME: This is not a good way to have conflicting options -- we should refactor this
-    // The nursery size for generational plans. It can be one of Bounded or Fixed. The size for a
-    // Bounded nursery only controls the upper bound, whereas the size for a Fixed nursery controls
-    // both the upper and lower bounds. The nursery size can be set like "Fixed:8192", for example,
-    // to have a Fixed nursery size of 8192 bytes
-    nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.min > 0 && v.max.map(|max| max > 0 && max >= v.min).unwrap_or(true)]
-        = NurserySize { kind: NurseryKind::Bounded, min: DEFAULT_MIN_NURSERY, max: None },
-    // Should a major GC be performed when a system GC is required?
+    /// The nursery size for generational plans. It can be one of Bounded, ProportionalBounded or Fixed.
+    /// The nursery size can be set like 'Fixed:8192', for example,
+    /// to have a Fixed nursery size of 8192 bytes, or 'ProportionalBounded:0.2,1.0' to have a nursery size
+    /// between 20% and 100% of the heap size. You can omit lower bound and upper bound to use the default
+    /// value for bounded nursery by using '_'. For example, 'ProportionalBounded:0.1,_' sets the min nursery
+    /// to 10% of the heap size while using the default value for max nursery.
+    nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.validate()]
+        = NurserySize::ProportionalBounded { min: DEFAULT_PROPORTIONAL_MIN_NURSERY, max: DEFAULT_PROPORTIONAL_MAX_NURSERY },
+    /// Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should we shrink/grow the heap to adjust to application working set? (not supported)
-    variable_size_heap:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // Should finalization be disabled?
+    /// Should finalization be disabled?
     no_finalizer:          bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // Should reference type processing be disabled?
-    // If reference type processing is disabled, no weak reference processing work is scheduled,
-    // and we expect a binding to treat weak references as strong references.
-    // We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
-    // once weak reference processing is implemented properly.
+    /// Should reference type processing be disabled?
+    /// If reference type processing is disabled, no weak reference processing work is scheduled,
+    /// and we expect a binding to treat weak references as strong references.
+    /// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`
+    /// once weak reference processing is implemented properly.
     no_reference_types:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
+    /// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     nursery_zeroing:       NurseryZeroingOptions[env_var: true, command_line: true]  [always_valid] = NurseryZeroingOptions::Temporal,
-    // How frequent (every X bytes) should we do a stress GC?
+    /// How frequent (every X bytes) should we do a stress GC?
     stress_factor:         usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    // How frequent (every X bytes) should we run analysis (a STW event that collects data)
+    /// How frequent (every X bytes) should we run analysis (a STW event that collects data)
     analysis_factor:       usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
-    // Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
-    // and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
-    // the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
-    // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
-    // factor (e.g. tens of metabytes).
+    /// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
+    /// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
+    /// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
+    /// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
+    /// factor (e.g. tens of metabytes).
     precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // The start of vmspace.
+    /// The start of vmspace.
     vm_space_start:        Address              [env_var: true, command_line: true]  [always_valid] = Address::ZERO,
-    // The size of vmspace.
+    /// The size of vmspace.
     vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0xdc0_0000,
-    // Perf events to measure
-    // Semicolons are used to separate events
-    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
-    // For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
-    //
-    // Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
+    /// Perf events to measure
+    /// Semicolons are used to separate events
+    /// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
+    /// For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
+    /// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
     // TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
     work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
-    // Measuring perf events for GC and mutators
+    /// Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
-    // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
-    // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
-    // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
-    // separated by commas and may include ranges. There should be no spaces in the core list. For
-    // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
-    // Note that in the case the program has only been allocated a certain number of cores using
-    // `taskset`, the core ids in the list should be specified by their perceived index as using
-    // `taskset` will essentially re-label the core ids. For example, running the program with
-    // `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
-    // be used to pin threads even though we specified the core ids "0,1,2,3,4".
-    // `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
-    // there is no core with (perceived) id 12.
+    /// Should we exclude perf events occurring in kernel space. By default we include the kernel.
+    /// Only set this option if you know the implications of excluding the kernel!
+    perf_exclude_kernel:    bool                  [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = false,
+    /// Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
+    /// scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
+    /// fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    /// separated by commas and may include ranges. There should be no spaces in the core list. For
+    /// example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    /// Note that in the case the program has only been allocated a certain number of cores using
+    /// `taskset`, the core ids in the list should be specified by their perceived index as using
+    /// `taskset` will essentially re-label the core ids. For example, running the program with
+    /// `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
+    /// be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    /// `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
+    /// there is no core with (perceived) id 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
-    // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
-    // Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
-    // Enable transparent hugepage support via madvise (only Linux is supported)
+    /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
+    /// Default to a fixed heap size of 0.5x physical memory.
+    gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
+    /// Enable transparent hugepage support via madvise (only Linux is supported)
     transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
 
 #[cfg(test)]
 mod tests {
+    use super::DEFAULT_STRESS_FACTOR;
     use super::*;
-    use crate::util::constants::DEFAULT_STRESS_FACTOR;
     use crate::util::options::Options;
     use crate::util::test_util::{serial_test, with_cleanup};
 
     #[test]
     fn no_env_var() {
         serial_test(|| {
-            let options = Options::default();
+            let mut options = Options::default();
+            options.read_env_var_settings();
             assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
         })
     }
@@ -759,7 +889,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_STRESS_FACTOR", "4096");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, 4096);
                 },
                 || {
@@ -777,7 +908,8 @@ mod tests {
                     std::env::set_var("MMTK_STRESS_FACTOR", "4096");
                     std::env::set_var("MMTK_NO_FINALIZER", "true");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, 4096);
                     assert!(*options.no_finalizer);
                 },
@@ -797,7 +929,8 @@ mod tests {
                     // invalid value, we cannot parse the value, so use the default value
                     std::env::set_var("MMTK_STRESS_FACTOR", "abc");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
@@ -815,11 +948,30 @@ mod tests {
                     // invalid value, we cannot parse the value, so use the default value
                     std::env::set_var("MMTK_ABC", "42");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var("MMTK_ABC");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn ignore_env_var() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_STRESS_FACTOR", "42");
+
+                    let options = Options::default();
+                    // Not calling read_env_var_settings here.
+                    assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
+                },
+                || {
+                    std::env::remove_var("MMTK_STRESS_FACTOR");
                 },
             )
         })
@@ -844,7 +996,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(
                         *options.work_perf_events,
                         PerfEventOptions {
@@ -868,7 +1021,8 @@ mod tests {
                     // The option needs to start with "hello", otherwise it is invalid.
                     std::env::set_var("MMTK_WORK_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     // invalid value from env var, use default.
                     assert_eq!(
                         *options.work_perf_events,
@@ -891,7 +1045,8 @@ mod tests {
                     // We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
                     std::env::set_var("MMTK_PHASE_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     // invalid value from env var, use default.
                     assert_eq!(
                         *options.work_perf_events,
@@ -912,7 +1067,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_THREAD_AFFINITY", "0-");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     // invalid value from env var, use default.
                     assert_eq!(*options.thread_affinity, AffinityKind::OsDefault);
                 },
@@ -931,7 +1087,8 @@ mod tests {
                 || {
                     std::env::set_var("MMTK_THREAD_AFFINITY", "0");
 
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(
                         *options.thread_affinity,
                         AffinityKind::RoundRobin(vec![0_u16])
@@ -961,7 +1118,8 @@ mod tests {
                     }
 
                     std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
-                    let options = Options::default();
+                    let mut options = Options::default();
+                    options.read_env_var_settings();
                     assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec));
                 },
                 || {

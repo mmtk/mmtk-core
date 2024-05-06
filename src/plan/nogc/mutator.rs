@@ -1,4 +1,6 @@
 use crate::plan::barriers::NoBarrier;
+use crate::plan::mutator_context::unreachable_prepare_func;
+use crate::plan::mutator_context::unreachable_release_func;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
@@ -6,10 +8,10 @@ use crate::plan::mutator_context::{
 };
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics;
-use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::{VMMutatorThread, VMWorkerThread};
+use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
+use crate::MMTK;
 use enum_map::{enum_map, EnumMap};
 
 /// We use three bump allocators when enabling nogc_multi_space.
@@ -36,38 +38,26 @@ lazy_static! {
     };
 }
 
-pub fn nogc_mutator_noop<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    unreachable!();
-}
-
 pub fn create_nogc_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static dyn Plan<VM = VM>,
+    mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
+    let plan = mmtk.get_plan().downcast_ref::<NoGC<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, plan);
-            vec.push((
-                AllocatorSelector::BumpPointer(0),
-                &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
-            ));
-            vec.push((
-                AllocatorSelector::BumpPointer(1),
-                &plan.downcast_ref::<NoGC<VM>>().unwrap().immortal,
-            ));
-            vec.push((
-                AllocatorSelector::BumpPointer(2),
-                &plan.downcast_ref::<NoGC<VM>>().unwrap().los,
-            ));
+            vec.push((AllocatorSelector::BumpPointer(0), &plan.nogc_space));
+            vec.push((AllocatorSelector::BumpPointer(1), &plan.immortal));
+            vec.push((AllocatorSelector::BumpPointer(2), &plan.los));
             vec
         }),
-        prepare_func: &nogc_mutator_noop,
-        release_func: &nogc_mutator_noop,
+        prepare_func: &unreachable_prepare_func,
+        release_func: &unreachable_release_func,
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, mmtk, &config.space_mapping),
         barrier: Box::new(NoBarrier),
         mutator_tls,
         config,

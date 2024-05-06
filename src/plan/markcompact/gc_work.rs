@@ -42,7 +42,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
-        mmtk.get_plan().base().prepare_for_stack_scanning();
+        mmtk.state.prepare_for_stack_scanning();
         // Prepare common and base spaces for the 2nd round of transitive closure
         let plan_mut = unsafe { &mut *(self.plan as *mut MarkCompact<VM>) };
         plan_mut.common.release(worker.tls, true);
@@ -102,14 +102,14 @@ pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>)
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+    type DefaultProcessEdges = MarkingProcessEdges<VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<VM>;
 }
 
 pub struct MarkCompactForwardingGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactForwardingGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type ProcessEdgesWorkType = ForwardingProcessEdges<VM>;
-    type TPProcessEdges = UnsupportedProcessEdges<VM>;
+    type DefaultProcessEdges = ForwardingProcessEdges<VM>;
+    type PinningProcessEdges = UnsupportedProcessEdges<VM>;
 }

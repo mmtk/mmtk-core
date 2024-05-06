@@ -1,25 +1,26 @@
 use crate::util::alloc::AllocationError;
+use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
 
-/// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
+/// Thread context for the spawned GC thread.  It is used by `spawn_gc_thread`.
+/// Currently, `GCWorker` is the only kind of thread that mmtk-core will create.
 pub enum GCThreadContext<VM: VMBinding> {
-    Controller(Box<GCController<VM>>),
+    /// The GC thread to spawn is a worker thread. There can be multiple worker threads.
     Worker(Box<GCWorker<VM>>),
 }
 
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
     /// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.
-    /// This method is called by a single thread in MMTk (the GC controller).
     /// This method should not return until all the threads are yielded.
     /// The actual thread synchronization mechanism is up to the VM, and MMTk does not make assumptions on that.
     /// MMTk provides a callback function and expects the binding to use the callback for each mutator when it
     /// is ready for stack scanning. Usually a stack can be scanned as soon as the thread stops in the yieldpoint.
     ///
     /// Arguments:
-    /// * `tls`: The thread pointer for the GC controller/coordinator.
+    /// * `tls`: The thread pointer for the GC worker.
     /// * `mutator_visitor`: A callback.  Call it with a mutator as argument to notify MMTk that the mutator is ready to be scanned.
     fn stop_all_mutators<F>(tls: VMWorkerThread, mutator_visitor: F)
     where
@@ -27,8 +28,10 @@ pub trait Collection<VM: VMBinding> {
 
     /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
     ///
+    /// This method may not be called by the same GC thread that called `stop_all_mutators`.
+    ///
     /// Arguments:
-    /// * `tls`: The thread pointer for the GC controller/coordinator.
+    /// * `tls`: The thread pointer for the GC worker.
     fn resume_mutators(tls: VMWorkerThread);
 
     /// Block the current thread for GC. This is called when an allocation request cannot be fulfilled and a GC
@@ -43,17 +46,16 @@ pub trait Collection<VM: VMBinding> {
     /// Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
     /// have assumptions that those calls needs to be within VM internal threads.
     /// As a result, MMTk does not spawn GC threads itself to avoid breaking this kind of assumptions.
-    /// MMTk calls this method to spawn GC threads during [`initialize_collection()`](../memory_manager/fn.initialize_collection.html).
+    /// MMTk calls this method to spawn GC threads during [`crate::mmtk::MMTK::initialize_collection`]
+    /// and [`crate::mmtk::MMTK::after_fork`].
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
     ///   calls `initialize_collection()` and passes as an argument.
     /// * `ctx`: The context for the GC thread.
-    ///   * If `Controller` is passed, it means spawning a thread to run as the GC controller.
-    ///     The spawned thread shall call `memory_manager::start_control_collector`.
-    ///   * If `Worker` is passed, it means spawning a thread to run as a GC worker.
-    ///     The spawned thread shall call `memory_manager::start_worker`.
-    ///   In either case, the `Box` inside should be passed back to the called function.
+    ///   * If [`GCThreadContext::Worker`] is passed, it means spawning a thread to run as a GC worker.
+    ///     The spawned thread shall call the entry point function `GCWorker::run`.
+    ///     Currently `Worker` is the only kind of thread which mmtk-core will create.
     fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
 
     /// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
@@ -134,5 +136,30 @@ pub trait Collection<VM: VMBinding> {
     fn vm_live_bytes() -> usize {
         // By default, MMTk assumes the amount of memory the VM allocates off-heap is negligible.
         0
+    }
+
+    /// Callback function to ask the VM whether GC is enabled or disabled, allowing or disallowing MMTk
+    /// to trigger garbage collection. When collection is disabled, you can still allocate through MMTk,
+    /// but MMTk will not trigger a GC even if the heap is full. In such a case, the allocation will
+    /// exceed MMTk's heap size (the soft heap limit). However, there is no guarantee that the physical
+    /// allocation will succeed, and if it succeeds, there is no guarantee that further allocation will
+    /// keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration
+    /// to make sure that the physical memory allows the amount of allocation. We highly recommend
+    /// to have GC always enabled (i.e. that this method always returns true). However, we support
+    /// this to accomodate some VMs that require this behavior. Note that
+    /// `handle_user_collection_request()` calls this function, too.  If this function returns
+    /// false, `handle_user_collection_request()` will not trigger GC, either. Note also that any synchronization
+    /// involving enabling and disabling collections by mutator threads should be implemented by the VM.
+    fn is_collection_enabled() -> bool {
+        // By default, MMTk assumes that collections are always enabled, and the binding should define
+        // this method if the VM supports disabling GC, or if the VM cannot safely trigger GC until some
+        // initialization is done, such as initializing class metadata for scanning objects.
+        true
+    }
+
+    /// Ask the binding to create a [`GCTriggerPolicy`] if the option `gc_trigger` is set to
+    /// `crate::util::options::GCTriggerSelector::Delegated`.
+    fn create_gc_trigger() -> Box<dyn GCTriggerPolicy<VM>> {
+        unimplemented!()
     }
 }

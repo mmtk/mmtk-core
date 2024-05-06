@@ -2,21 +2,27 @@ use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
+use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
-use sysinfo::{RefreshKind, System, SystemExt};
+use sysinfo::MemoryRefreshKind;
+use sysinfo::{RefreshKind, System};
 
-pub fn result_is_mapped(result: Result<()>) -> bool {
+/// Check the result from an mmap function in this module.
+/// Return true if the mmap has failed due to an existing conflicting mapping.
+pub(crate) fn result_is_mapped(result: Result<()>) -> bool {
     match result {
         Ok(_) => false,
         Err(err) => err.raw_os_error().unwrap() == libc::EEXIST,
     }
 }
 
+/// Set a range of memory to 0.
 pub fn zero(start: Address, len: usize) {
     set(start, 0, len);
 }
 
+/// Set a range of memory to the given value. Similar to memset.
 pub fn set(start: Address, val: u8, len: usize) {
     unsafe {
         std::ptr::write_bytes::<u8>(start.to_mut_ptr(), val, len);
@@ -34,7 +40,7 @@ pub fn set(start: Address, val: u8, len: usize) {
 /// may corrupt others' data.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub unsafe fn dzmmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    let prot = MMAP_PROT;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
     let ret = mmap_fixed(start, size, prot, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
@@ -52,14 +58,23 @@ const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_F
 // MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
 
+#[cfg(target_os = "linux")]
+const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
+#[cfg(target_os = "macos")]
+// PROT_EXEC cannot be used with PROT_READ on Apple Silicon
+const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE;
+
 /// Strategy for performing mmap
 ///
 /// This currently supports switching between different huge page allocation
 /// methods. However, this can later be refactored to reduce other code
 /// repetition.
-#[derive(Debug, Copy, Clone)]
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, NoUninit)]
 pub enum MmapStrategy {
+    /// The default mmap strategy.
     Normal,
+    /// Enable transparent huge pages for the pages that are mapped. This option is only for linux.
     TransparentHugePages,
 }
 
@@ -68,7 +83,7 @@ pub enum MmapStrategy {
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    let prot = MMAP_PROT;
     let flags = MMAP_FLAGS;
     let ret = mmap_fixed(start, size, prot, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
@@ -89,7 +104,7 @@ pub fn mmap_noreserve(start: Address, size: usize, strategy: MmapStrategy) -> Re
     mmap_fixed(start, size, prot, flags, strategy)
 }
 
-pub fn mmap_fixed(
+fn mmap_fixed(
     start: Address,
     size: usize,
     prot: libc::c_int,
@@ -119,6 +134,7 @@ pub fn mmap_fixed(
     }
 }
 
+/// Unmap the given memory (in page granularity). This wraps the unsafe libc munmap call.
 pub fn munmap(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
 }
@@ -131,6 +147,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     match error.kind() {
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
+            eprintln!("{}", get_process_memory_maps());
             // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
             trace!("Signal MmapOutOfMemory!");
             VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -143,6 +160,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
+                    eprintln!("{}", get_process_memory_maps());
                     // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
                     trace!("Signal MmapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
@@ -150,17 +168,20 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
                 }
             }
         }
-        ErrorKind::AlreadyExists => panic!("Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?"),
+        ErrorKind::AlreadyExists => {
+            eprintln!("{}", get_process_memory_maps());
+            panic!("Failed to mmap, the address is already mapped. Should MMTk quarantine the address range first?");
+        }
         _ => {}
     }
     panic!("Unexpected mmap failure: {:?}", error)
 }
 
 /// Checks if the memory has already been mapped. If not, we panic.
-// Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
-// Be very careful about using this function.
+/// Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
+/// Be very careful about using this function.
 #[cfg(target_os = "linux")]
-pub fn panic_if_unmapped(start: Address, size: usize) {
+pub(crate) fn panic_if_unmapped(start: Address, size: usize) {
     let prot = PROT_READ | PROT_WRITE;
     let flags = MMAP_FLAGS;
     match mmap_fixed(start, size, prot, flags, MmapStrategy::Normal) {
@@ -175,13 +196,17 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
     }
 }
 
+/// Checks if the memory has already been mapped. If not, we panic.
+/// This function is currently left empty for non-linux, and should be implemented in the future.
+/// As the function is only used for assertions, MMTk will still run even if we never panic.
 #[cfg(not(target_os = "linux"))]
-pub fn panic_if_unmapped(_start: Address, _size: usize) {
+pub(crate) fn panic_if_unmapped(_start: Address, _size: usize) {
     // This is only used for assertions, so MMTk will still run even if we never panic.
     // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
     // Possibly we can use posix_mem_offset for both OS/s.
 }
 
+/// Unprotect the given memory (in page granularity) to allow access (PROT_READ/WRITE/EXEC).
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(
         &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) },
@@ -189,6 +214,7 @@ pub fn munprotect(start: Address, size: usize) -> Result<()> {
     )
 }
 
+/// Protect the given memory (in page granularity) to forbid any access (PROT_NONE).
 pub fn mprotect(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(
         &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_NONE) },
@@ -207,9 +233,7 @@ fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
 
 /// Get the memory maps for the process. The returned string is a multi-line string.
 /// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
-/// If we would need to parsable memory maps, I would suggest using a library instead which saves us the trouble to deal with portability.
-#[cfg(debug_assertions)]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn get_process_memory_maps() -> String {
     // print map
     use std::fs::File;
@@ -218,6 +242,13 @@ pub fn get_process_memory_maps() -> String {
     let mut f = File::open("/proc/self/maps").unwrap();
     f.read_to_string(&mut data).unwrap();
     data
+}
+
+/// Get the memory maps for the process. The returned string is a multi-line string.
+/// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn get_process_memory_maps() -> String {
+    "(process map unavailable)".to_string()
 }
 
 /// Returns the total physical memory for the system in bytes.
@@ -233,7 +264,9 @@ pub(crate) fn get_system_total_memory() -> u64 {
     // start-up time.  During start-up, MMTk core only needs the total memory to initialize the
     // `Options`.  If we only load memory-related components on start-up, it should only take <1ms
     // to initialize the `System` instance.
-    let sys = System::new_with_specifics(RefreshKind::new().with_memory());
+    let sys = System::new_with_specifics(
+        RefreshKind::new().with_memory(MemoryRefreshKind::new().with_ram()),
+    );
     sys.total_memory()
 }
 

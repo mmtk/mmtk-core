@@ -22,7 +22,20 @@ const BITS_IN_U64: usize = 1 << LOG_BITS_IN_U64;
 /// For performance reasons, objects of this struct should be constants.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HeaderMetadataSpec {
+    /// `bit_offset` is the index of the starting bit from which the data should be read or written.
+    /// It is counted from the right (least significant bit) of the byte.
+    /// Positive values refer to the bit positions within the current byte, starting with 0 for the
+    /// least significant bit (rightmost) up to 7 for the most significant bit (leftmost).
+    /// Negative values are used to refer to bit positions in the previous bytes, where -1 indicates
+    /// the most significant bit (leftmost) of the byte immediately before the current one.
     pub bit_offset: isize,
+    /// `num_of_bits` specifies the number of consecutive bits to be read or written starting from the `bit_offset`.
+    /// This value is used to define the size of the data field in bits. For instance, if `num_of_bits` is set to 1,
+    /// only a single bit is considered, whereas a value of 8 would indicate a full byte.
+    /// This field must be a positive integer and typically should not exceed the size of the data type that
+    /// will hold the extracted value (for example, 8 bits for a `u8`, 16 bits for a `u16`, etc.).
+    /// The `num_of_bits` together with the `bit_offset` enables the extraction of bit fields of arbitrary
+    /// length and position, facilitating bit-level data manipulation.
     pub num_of_bits: usize,
 }
 
@@ -441,7 +454,7 @@ impl fmt::Debug for HeaderMetadataSpec {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod tests {
     use super::*;
     use crate::util::address::Address;
@@ -501,6 +514,59 @@ mod tests {
     }
 
     #[test]
+    fn test_negative_bit_offset() {
+        let spec = HeaderMetadataSpec {
+            bit_offset: -1,
+            num_of_bits: 1,
+        };
+        spec.assert_spec::<u8>();
+        assert_eq!(spec.get_shift_and_mask_for_bits(), (7, 0b1000_0000));
+        assert_eq!(spec.byte_offset(), -1);
+        assert_eq!(spec.get_bits_from_u8(0b1000_0000), 1);
+        assert_eq!(spec.get_bits_from_u8(0b0111_1111), 0);
+
+        let spec = HeaderMetadataSpec {
+            bit_offset: -2,
+            num_of_bits: 1,
+        };
+        spec.assert_spec::<u8>();
+        assert_eq!(spec.get_shift_and_mask_for_bits(), (6, 0b0100_0000));
+        assert_eq!(spec.byte_offset(), -1);
+        assert_eq!(spec.get_bits_from_u8(0b0100_0000), 1);
+        assert_eq!(spec.get_bits_from_u8(0b1011_1111), 0);
+
+        let spec = HeaderMetadataSpec {
+            bit_offset: -7,
+            num_of_bits: 1,
+        };
+        spec.assert_spec::<u8>();
+        assert_eq!(spec.get_shift_and_mask_for_bits(), (1, 0b0000_0010));
+        assert_eq!(spec.byte_offset(), -1);
+        assert_eq!(spec.get_bits_from_u8(0b0000_0010), 1);
+        assert_eq!(spec.get_bits_from_u8(0b1111_1101), 0);
+
+        let spec = HeaderMetadataSpec {
+            bit_offset: -8,
+            num_of_bits: 1,
+        };
+        spec.assert_spec::<u8>();
+        assert_eq!(spec.get_shift_and_mask_for_bits(), (0, 0b0000_0001));
+        assert_eq!(spec.byte_offset(), -1);
+        assert_eq!(spec.get_bits_from_u8(0b0000_0001), 1);
+        assert_eq!(spec.get_bits_from_u8(0b1111_1110), 0);
+
+        let spec = HeaderMetadataSpec {
+            bit_offset: -9,
+            num_of_bits: 1,
+        };
+        spec.assert_spec::<u8>();
+        assert_eq!(spec.get_shift_and_mask_for_bits(), (7, 0b1000_0000));
+        assert_eq!(spec.byte_offset(), -2);
+        assert_eq!(spec.get_bits_from_u8(0b1000_0000), 1);
+        assert_eq!(spec.get_bits_from_u8(0b0111_1111), 0);
+    }
+
+    #[test]
     fn test_get_bits_from_u8() {
         // 1 bit
         let spec = HeaderMetadataSpec {
@@ -508,6 +574,7 @@ mod tests {
             num_of_bits: 1,
         };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (0, 0b1));
+        assert_eq!(spec.byte_offset(), 0);
         assert_eq!(spec.get_bits_from_u8(0b0000_0001), 1);
         assert_eq!(spec.get_bits_from_u8(0b1111_1110), 0);
 

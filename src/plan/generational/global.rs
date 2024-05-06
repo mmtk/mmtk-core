@@ -3,9 +3,11 @@ use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
+use crate::policy::gc_work::{TraceKind, TRACE_KIND_TRANSITIVE_PIN};
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::Address;
@@ -39,16 +41,14 @@ pub struct CommonGenPlan<VM: VMBinding> {
 impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
         let nursery = CopySpace::new(
-            args.get_space_args(
-                "nursery",
-                true,
-                VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), false),
-            ),
+            args.get_space_args("nursery", true, VMRequest::discontiguous()),
             true,
         );
+        let full_heap_gc_count = args
+            .global_args
+            .stats
+            .new_event_counter("majorGC", true, true);
         let common = CommonPlan::new(args);
-
-        let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 
         CommonGenPlan {
             nursery,
@@ -96,10 +96,10 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         &self,
         plan: &P,
         space_full: bool,
-        space: Option<&dyn Space<VM>>,
+        space: Option<SpaceStats<VM>>,
     ) -> bool {
         let cur_nursery = self.nursery.reserved_pages();
-        let max_nursery = self.common.base.options.get_max_nursery_pages();
+        let max_nursery = self.common.base.gc_trigger.get_max_nursery_pages();
         let nursery_full = cur_nursery >= max_nursery;
         trace!(
             "nursery_full = {:?} (nursery = {}, max_nursery = {})",
@@ -107,11 +107,9 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             cur_nursery,
             max_nursery,
         );
-
         if nursery_full {
             return true;
         }
-
         if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             return true;
         }
@@ -120,7 +118,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         // - if space is none, it is not. Return false immediately.
         // - if space is some, we further check its descriptor.
         let is_triggered_by_nursery = space.map_or(false, |s| {
-            s.common().descriptor == self.nursery.common().descriptor
+            s.0.common().descriptor == self.nursery.common().descriptor
         });
         // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
         if space_full && !is_triggered_by_nursery {
@@ -151,6 +149,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
         } else if self
             .common
             .base
+            .global_state
             .user_triggered_collection
             .load(Ordering::SeqCst)
             && *self.common.base.options.full_heap_system_gc
@@ -162,6 +161,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             || self
                 .common
                 .base
+                .global_state
                 .cur_collection_attempts
                 .load(Ordering::SeqCst)
                 > 1
@@ -171,6 +171,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
                 self.next_gc_full_heap.load(Ordering::SeqCst),
                 self.common
                     .base
+                    .global_state
                     .cur_collection_attempts
                     .load(Ordering::SeqCst)
             );
@@ -222,12 +223,17 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.
-    pub fn trace_object_nursery<Q: ObjectQueue>(
+    pub fn trace_object_nursery<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        assert!(
+            KIND != TRACE_KIND_TRANSITIVE_PIN,
+            "A copying nursery cannot pin objects"
+        );
+
         // Evacuate nursery objects
         if self.nursery.in_space(object) {
             return self.nursery.trace_object::<Q>(
@@ -257,7 +263,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
         let available = plan.get_available_pages();
-        let min_nursery = plan.base().options.get_min_nursery_pages();
+        let min_nursery = plan.base().gc_trigger.get_min_nursery_pages();
         let next_gc_full_heap = available < min_nursery;
         trace!(
             "next gc will be full heap? {}, available pages = {}, min nursery = {}",
@@ -323,7 +329,7 @@ pub trait GenerationalPlan: Plan {
 pub trait GenerationalPlanExt<VM: VMBinding>: GenerationalPlan<VM = VM> {
     /// Trace an object in nursery collection. If the object is in nursery, we should call `trace_object`
     /// on the space. Otherwise, we can just return the object.
-    fn trace_object_nursery<Q: ObjectQueue>(
+    fn trace_object_nursery<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
         queue: &mut Q,
         object: ObjectReference,

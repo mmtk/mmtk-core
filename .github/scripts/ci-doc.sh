@@ -4,7 +4,7 @@
 # If the output path is changed in this script, we need to update rustdoc.yml as well.
 
 # deny warnings for rustdoc
-export RUSTDOCFLAGS="-D warnings"
+export RUSTDOCFLAGS="-D warnings -D missing_docs"
 
 # Check cargo doc
 # We document public and private items for MMTk developers (GC implementers).
@@ -22,6 +22,7 @@ if ! cat $project_root/src/plan/mod.rs | grep -q "pub mod mygc;"; then
 fi
 cargo build
 
-# Install mdbook using the stable toolchain
+# Install mdbook using the stable toolchain and the default target
+unset CARGO_BUILD_TARGET
 cargo +stable install mdbook
 mdbook build $project_root/docs/userguide

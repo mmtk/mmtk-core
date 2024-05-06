@@ -100,7 +100,8 @@ pub fn is_vo_bit_set<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
 pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
-    let potential_object = ObjectReference::from_raw_address(address);
+    let potential_object = ObjectReference::from_raw_address(address)?;
+
     let addr = potential_object.to_address::<VM>();
 
     // If we haven't mapped VO bit for the address, it cannot be an object
@@ -123,7 +124,8 @@ pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> Option<ObjectR
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
 pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
-    let potential_object = ObjectReference::from_raw_address(address);
+    let potential_object = ObjectReference::from_raw_address(address)?;
+
     let addr = potential_object.to_address::<VM>();
 
     // If we haven't mapped VO bit for the address, it cannot be an object

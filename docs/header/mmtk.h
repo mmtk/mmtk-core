@@ -34,12 +34,6 @@ extern void mmtk_flush_mutator(MMTk_Mutator mutator);
 // Initialize MMTk scheduler and GC workers
 extern void mmtk_initialize_collection(void* tls);
 
-// Allow MMTk to perform a GC when the heap is full
-extern void mmtk_enable_collection();
-
-// Disallow MMTk to perform a GC when the heap is full
-extern void mmtk_disable_collection();
-
 // Allocate memory for an object
 extern void* mmtk_alloc(MMTk_Mutator mutator,
                         size_t size,
@@ -69,9 +63,6 @@ extern bool mmtk_is_mapped_object(void* ref);
 // Return if the address pointed to by `addr` is in mapped memory
 extern bool mmtk_is_mapped_address(void* addr);
 
-// Check if a GC is in progress and if the object `ref` is movable
-extern void mmtk_modify_check(void* ref);
-
 // Return if object pointed to by `object` will never move
 extern bool mmtk_will_never_move(void* object);
 
@@ -86,9 +77,6 @@ extern void mmtk_scan_region();
 
 // Request MMTk to trigger a GC. Note that this may not actually trigger a GC
 extern void mmtk_handle_user_collection_request(void* tls);
-
-// Run the main loop for the GC controller thread. Does not return
-extern void mmtk_start_control_collector(void* tls, void* worker);
 
 // Run the main loop for a GC worker. Does not return
 extern void mmtk_start_worker(void* tls, void* worker);

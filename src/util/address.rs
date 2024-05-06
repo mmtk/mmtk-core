@@ -1,7 +1,9 @@
 use atomic_traits::Atomic;
+use bytemuck::NoUninit;
 
 use std::fmt;
 use std::mem;
+use std::num::NonZeroUsize;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
@@ -18,7 +20,7 @@ pub type ByteOffset = isize;
 /// (memory wise and time wise). The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
 pub struct Address(usize);
 
 /// Address + ByteSize (positive)
@@ -129,7 +131,9 @@ impl Shl<usize> for Address {
 }
 
 impl Address {
+    /// The lowest possible address.
     pub const ZERO: Self = Address(0);
+    /// The highest possible address.
     pub const MAX: Self = Address(usize::max_value());
 
     /// creates Address from a pointer
@@ -137,6 +141,7 @@ impl Address {
         Address(ptr as usize)
     }
 
+    /// creates Address from a Rust reference
     pub fn from_ref<T>(r: &T) -> Address {
         Address(r as *const T as usize)
     }
@@ -180,10 +185,12 @@ impl Address {
     // These const functions are duplicated with the operator traits. But we need them,
     // as we need them to declare constants.
 
+    /// Get the number of bytes between two addresses. The current address needs to be higher than the other address.
     pub const fn get_extent(self, other: Address) -> ByteSize {
         self.0 - other.0
     }
 
+    /// Get the offset from `other` to `self`. The result is negative is `self` is lower than `other`.
     pub const fn get_offset(self, other: Address) -> ByteOffset {
         self.0 as isize - other.0 as isize
     }
@@ -192,6 +199,7 @@ impl Address {
     // The add() function is const fn, and we can use it to declare Address constants.
     // The Add trait function cannot be const.
     #[allow(clippy::should_implement_trait)]
+    /// Add an offset to the address.
     pub const fn add(self, size: usize) -> Address {
         Address(self.0 + size)
     }
@@ -200,15 +208,17 @@ impl Address {
     // The sub() function is const fn, and we can use it to declare Address constants.
     // The Sub trait function cannot be const.
     #[allow(clippy::should_implement_trait)]
+    /// Subtract an offset from the address.
     pub const fn sub(self, size: usize) -> Address {
         Address(self.0 - size)
     }
 
+    /// Bitwise 'and' with a mask.
     pub const fn and(self, mask: usize) -> usize {
         self.0 & mask
     }
 
-    // Perform a saturating subtract on the Address
+    /// Perform a saturating subtract on the Address
     pub const fn saturating_sub(self, size: usize) -> Address {
         Address(self.0.saturating_sub(size))
     }
@@ -298,6 +308,14 @@ impl Address {
     /// The caller must guarantee the address actually points to a Rust object.
     pub unsafe fn as_ref<'a, T>(self) -> &'a T {
         &*self.to_mut_ptr()
+    }
+
+    /// converts the Address to a mutable Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
+    pub unsafe fn as_mut_ref<'a, T>(self) -> &'a mut T {
+        &mut *self.to_mut_ptr()
     }
 
     /// converts the Address to a pointer-sized integer
@@ -460,29 +478,52 @@ use crate::vm::VMBinding;
 /// their layout. We now only allow a binding to define their semantics through a set of
 /// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
 /// the opaque `ObjectReference` type, and we haven't seen a use case for now.
+///
+/// Note that [`ObjectReference`] cannot be null.  For the cases where a non-null object reference
+/// may or may not exist, (such as the result of [`crate::vm::edge_shape::Edge::load`])
+/// `Option<ObjectReference>` should be used.  [`ObjectReference`] is backed by `NonZeroUsize`
+/// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
+/// optimization (NPO)][NPO], `Option<ObjectReference>` has the same size as `NonZeroUsize` and
+/// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
+/// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+///
+/// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq)]
-pub struct ObjectReference(usize);
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
+pub struct ObjectReference(NonZeroUsize);
 
 impl ObjectReference {
-    pub const NULL: ObjectReference = ObjectReference(0);
-
     /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
     /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     pub fn to_raw_address(self) -> Address {
-        Address(self.0)
+        Address(self.0.get())
     }
 
     /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
     /// This is how a binding creates `ObjectReference` instances.
     ///
+    /// If `addr` is 0, the result is `None`.
+    ///
     /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
-    pub fn from_raw_address(addr: Address) -> ObjectReference {
-        ObjectReference(addr.0)
+    pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
+        NonZeroUsize::new(addr.0).map(ObjectReference)
+    }
+
+    /// Like `from_raw_address`, but assume `addr` is not zero.  This can be used to elide a check
+    /// against zero for performance-critical code.
+    ///
+    /// # Safety
+    ///
+    /// This method assumes `addr` is not zero.  It should only be used in cases where we know at
+    /// compile time that the input cannot be zero.  For example, if we compute the address by
+    /// adding a positive offset to a non-zero address, we know the result must not be zero.
+    pub unsafe fn from_raw_address_unchecked(addr: Address) -> ObjectReference {
+        debug_assert!(!addr.is_zero());
+        ObjectReference(NonZeroUsize::new_unchecked(addr.0))
     }
 
     /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
@@ -503,6 +544,9 @@ impl ObjectReference {
         VM::VMObjectModel::ref_to_header(self)
     }
 
+    /// Get the start of the allocation address for the object. This method is used by MMTk to get the start of the allocation
+    /// address originally returned from [`crate::memory_manager::alloc`] for the object.
+    /// This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_object_start`]. See comments on [`crate::vm::ObjectModel::ref_to_object_start`].
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
@@ -520,51 +564,36 @@ impl ObjectReference {
         obj
     }
 
-    /// is this object reference null reference?
-    pub fn is_null(self) -> bool {
-        self.0 == 0
-    }
-
-    /// returns the ObjectReference
-    pub fn value(self) -> usize {
-        self.0
-    }
-
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    pub fn is_reachable(self) -> bool {
-        if self.is_null() {
-            false
-        } else {
-            unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_reachable(self)
-        }
+    pub fn is_reachable<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_reachable(self)
     }
 
     /// Is the object live, determined by the policy?
-    pub fn is_live(self) -> bool {
-        if self.0 == 0 {
-            false
-        } else {
-            unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_live(self)
-        }
+    pub fn is_live<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_live(self)
     }
 
-    pub fn is_movable(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_movable()
+    /// Can the object be moved?
+    pub fn is_movable<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
-    pub fn get_forwarded_object(self) -> Option<Self> {
-        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.get_forwarded_object(self)
+    pub fn get_forwarded_object<VM: VMBinding>(self) -> Option<Self> {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.get_forwarded_object(self)
     }
 
-    pub fn is_in_any_space(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_in_space(self)
+    /// Is the object in any MMTk spaces?
+    pub fn is_in_any_space<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_in_space(self)
     }
 
+    /// Is the object sane?
     #[cfg(feature = "sanity")]
-    pub fn is_sane(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_sane()
+    pub fn is_sane<VM: VMBinding>(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_sane()
     }
 }
 

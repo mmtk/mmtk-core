@@ -1,6 +1,7 @@
 use crate::plan::is_nursery_gc;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
+use crate::util::reference_processor::RescanReferences;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::Finalizable;
@@ -53,7 +54,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         for mut f in self.candidates.drain(start..).collect::<Vec<F>>() {
             let reff = f.get_reference();
             trace!("Pop {:?} for finalization", reff);
-            if reff.is_live() {
+            if reff.is_live::<E::VM>() {
                 FinalizableProcessor::<F>::forward_finalizable_reference(e, &mut f);
                 trace!("{:?} is live, push {:?} back to candidates", reff, f);
                 self.candidates.push(f);
@@ -140,6 +141,17 @@ pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if !*mmtk.options.no_reference_types {
+            // Rescan soft and weak references at the end of the transitive closure from resurrected
+            // objects.  New soft and weak references may be discovered during this.
+            let rescan = Box::new(RescanReferences {
+                soft: true,
+                weak: true,
+                phantom_data: PhantomData,
+            });
+            worker.scheduler().work_buckets[WorkBucketStage::FinalRefClosure].set_sentinel(rescan);
+        }
+
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         debug!(
             "Finalization, {} objects in candidates, {} objects ready to finalize",

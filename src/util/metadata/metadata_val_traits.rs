@@ -6,7 +6,9 @@ use num_traits::{Unsigned, WrappingAdd, WrappingSub, Zero};
 /// Describes bits and log2 bits for the numbers.
 /// If num_traits has this, we do not need our own implementation: <https://github.com/rust-num/num-traits/issues/247>
 pub trait Bits {
+    /// The size of this atomic type in bits.
     const BITS: u32;
+    /// The size (in log2) of this atomic type in bits.
     const LOG2: u32;
 }
 macro_rules! impl_bits_trait {
@@ -26,9 +28,13 @@ impl_bits_trait!(usize);
 /// Describes bitwise operations.
 /// If num_traits has this, we do not need our own implementation: <https://github.com/rust-num/num-traits/issues/232>
 pub trait BitwiseOps {
+    /// Perform bitwise and for two values.
     fn bitand(self, other: Self) -> Self;
+    /// Perform bitwise or for two values.
     fn bitor(self, other: Self) -> Self;
+    /// Perform bitwise xor for two values.
     fn bitxor(self, other: Self) -> Self;
+    /// Perform bitwise invert (not) for the value.
     fn inv(self) -> Self;
 }
 macro_rules! impl_bitwise_ops_trait {

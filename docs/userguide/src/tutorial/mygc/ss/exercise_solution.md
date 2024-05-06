@@ -149,10 +149,6 @@ In `gc_work.rs`:
  the tospace and fromspace:
     ```rust
         fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-            if object.is_null() {
-                return object;
-            }
-
             // Add this!
             else if self.plan().youngspace().in_space(object) {
                 self.plan().youngspace.trace_object::<Self, TripleSpaceCopyContext<VM>>(

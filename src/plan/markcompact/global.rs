@@ -4,7 +4,6 @@ use super::gc_work::{
     UpdateReferences,
 };
 use crate::plan::global::CommonPlan;
-use crate::plan::global::GcStatus;
 use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -16,6 +15,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::CopySemantics;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 #[cfg(not(feature = "vo_bit"))]
@@ -36,14 +36,13 @@ pub struct MarkCompact<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
+/// The plan constraints for the mark compact plan.
 pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 1,
-    num_specialized_scans: 2,
     needs_forward_after_liveness: true,
     max_non_los_default_alloc_bytes:
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
+    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -79,9 +78,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
-
         // TODO use schedule_common once it can work with markcompact
         // self.common()
         //     .schedule_common::<Self, MarkingProcessEdges<VM>, NoCopy<VM>>(
@@ -116,9 +112,9 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
                 .add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
+                .add(WeakRefProcessing::<VM>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
-                .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
+                .add(PhantomRefProcessing::<VM>::new());
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
@@ -164,7 +160,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
 

@@ -1,6 +1,8 @@
 use atomic::Ordering;
 
 use crate::plan::PlanTraceObject;
+use crate::plan::VectorObjectQueue;
+use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
 use crate::vm::edge_shape::{Edge, MemorySlice};
@@ -14,13 +16,17 @@ use super::global::GenerationalPlanExt;
 /// Process edges for a nursery GC. This type is provided if a generational plan does not use
 /// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,
 /// it does not need to use this type.
-pub struct GenNurseryProcessEdges<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> {
+pub struct GenNurseryProcessEdges<
+    VM: VMBinding,
+    P: GenerationalPlanExt<VM> + PlanTraceObject<VM>,
+    const KIND: TraceKind,
+> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdgesWork
-    for GenNurseryProcessEdges<VM, P>
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    ProcessEdgesWork for GenNurseryProcessEdges<VM, P, KIND>
 {
     type VM = VM;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
@@ -35,33 +41,38 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> ProcessEdg
         let plan = base.plan().downcast_ref().unwrap();
         Self { plan, base }
     }
+
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
         // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
-        self.plan
-            .trace_object_nursery(&mut self.base.nodes, object, worker)
-    }
-    fn process_edge(&mut self, slot: EdgeOf<Self>) {
-        let object = slot.load();
-        let new_object = self.trace_object(object);
-        debug_assert!(!self.plan.is_object_in_nursery(new_object));
-        slot.store(new_object);
+        self.plan.trace_object_nursery::<VectorObjectQueue, KIND>(
+            &mut self.base.nodes,
+            object,
+            worker,
+        )
     }
 
-    fn create_scan_work(
-        &self,
-        nodes: Vec<ObjectReference>,
-        roots: bool,
-    ) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::new(self.plan, nodes, false, roots, self.bucket)
+    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+        let Some(object) = slot.load() else {
+            // Skip slots that are not holding an object reference.
+            return;
+        };
+        let new_object = self.trace_object(object);
+        debug_assert!(!self.plan.is_object_in_nursery(new_object));
+        // Note: If `object` is a mature object, `trace_object` will not call `space.trace_object`,
+        // but will still return `object`.  In that case, we don't need to write it back.
+        if new_object != object {
+            slot.store(new_object);
+        }
+    }
+
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Self::ScanObjectsWorkType {
+        PlanScanObjects::new(self.plan, nodes, false, self.bucket)
     }
 }
 
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> Deref
-    for GenNurseryProcessEdges<VM, P>
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind> Deref
+    for GenNurseryProcessEdges<VM, P, KIND>
 {
     type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
@@ -69,8 +80,8 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> Deref
     }
 }
 
-impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> DerefMut
-    for GenNurseryProcessEdges<VM, P>
+impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND: TraceKind>
+    DerefMut for GenNurseryProcessEdges<VM, P, KIND>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
@@ -116,7 +127,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut ScanObjects::<E>::new(modbuf, false, false, WorkBucketStage::Closure),
+                &mut ScanObjects::<E>::new(modbuf, false, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

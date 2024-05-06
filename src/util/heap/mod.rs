@@ -15,6 +15,8 @@ mod vmrequest;
 pub(crate) use self::accounting::PageAccounting;
 pub(crate) use self::blockpageresource::BlockPageResource;
 pub(crate) use self::freelistpageresource::FreeListPageResource;
+pub use self::gc_trigger::GCTriggerPolicy;
+pub use self::gc_trigger::SpaceStats;
 pub(crate) use self::heap_meta::HeapMeta;
 pub use self::layout::vm_layout;
 pub(crate) use self::monotonepageresource::MonotonePageResource;

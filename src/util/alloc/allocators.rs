@@ -1,9 +1,8 @@
-use std::mem::size_of;
 use std::mem::MaybeUninit;
+use std::sync::Arc;
 
 use memoffset::offset_of;
 
-use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
@@ -14,7 +13,9 @@ use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::Mutator;
+use crate::MMTK;
 
+use super::allocator::AllocatorContext;
 use super::FreeListAllocator;
 use super::MarkCompactAllocator;
 
@@ -62,6 +63,12 @@ impl<VM: VMBinding> Allocators<VM> {
 
     /// # Safety
     /// The selector needs to be valid, and points to an allocator that has been initialized.
+    pub unsafe fn get_typed_allocator<T: Allocator<VM>>(&self, selector: AllocatorSelector) -> &T {
+        self.get_allocator(selector).downcast_ref().unwrap()
+    }
+
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator_mut(
         &mut self,
         selector: AllocatorSelector,
@@ -83,9 +90,18 @@ impl<VM: VMBinding> Allocators<VM> {
         }
     }
 
+    /// # Safety
+    /// The selector needs to be valid, and points to an allocator that has been initialized.
+    pub unsafe fn get_typed_allocator_mut<T: Allocator<VM>>(
+        &mut self,
+        selector: AllocatorSelector,
+    ) -> &mut T {
+        self.get_allocator_mut(selector).downcast_mut().unwrap()
+    }
+
     pub fn new(
         mutator_tls: VMMutatorThread,
-        plan: &'static dyn Plan<VM = VM>,
+        mmtk: &MMTK<VM>,
         space_mapping: &[(AllocatorSelector, &'static dyn Space<VM>)],
     ) -> Self {
         let mut ret = Allocators {
@@ -96,6 +112,7 @@ impl<VM: VMBinding> Allocators<VM> {
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
             markcompact: unsafe { MaybeUninit::uninit().assume_init() },
         };
+        let context = Arc::new(AllocatorContext::new(mmtk));
 
         for &(selector, space) in space_mapping.iter() {
             match selector {
@@ -103,28 +120,28 @@ impl<VM: VMBinding> Allocators<VM> {
                     ret.bump_pointer[index as usize].write(BumpAllocator::new(
                         mutator_tls.0,
                         space,
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::LargeObject(index) => {
                     ret.large_object[index as usize].write(LargeObjectAllocator::new(
                         mutator_tls.0,
                         space.downcast_ref::<LargeObjectSpace<VM>>().unwrap(),
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::Malloc(index) => {
                     ret.malloc[index as usize].write(MallocAllocator::new(
                         mutator_tls.0,
                         space.downcast_ref::<MallocSpace<VM>>().unwrap(),
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::Immix(index) => {
                     ret.immix[index as usize].write(ImmixAllocator::new(
                         mutator_tls.0,
                         Some(space),
-                        plan,
+                        context.clone(),
                         false,
                     ));
                 }
@@ -132,14 +149,14 @@ impl<VM: VMBinding> Allocators<VM> {
                     ret.free_list[index as usize].write(FreeListAllocator::new(
                         mutator_tls.0,
                         space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::MarkCompact(index) => {
                     ret.markcompact[index as usize].write(MarkCompactAllocator::new(
                         mutator_tls.0,
                         space,
-                        plan,
+                        context.clone(),
                     ));
                 }
                 AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
@@ -150,41 +167,53 @@ impl<VM: VMBinding> Allocators<VM> {
     }
 }
 
-// This type describe which allocator in the allocators set.
-// For VM binding implementors, this type is equivalent to the following native types:
-// #[repr(C)]
-// struct AllocatorSelector {
-//   tag: AllocatorSelectorTag,
-//   payload: u8,
-// }
-// #[repr(u8)]
-// enum AllocatorSelectorTag {
-//   BumpPointer,
-//   LargeObject,
-// }
+/// This type describe an allocator in the [`crate::Mutator`].
+/// For some VM bindings, they may need to access this type from native code. This type is equivalent to the following native types:
+/// #[repr(C)]
+/// struct AllocatorSelector {
+///   tag: AllocatorSelectorTag,
+///   payload: u8,
+/// }
+/// #[repr(u8)]
+/// enum AllocatorSelectorTag {
+///   BumpPointer,
+///   LargeObject,
+///   ...
+/// }
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorSelector {
+    /// Represents a [`crate::util::alloc::bumpallocator::BumpAllocator`].
     BumpPointer(u8),
+    /// Represents a [`crate::util::alloc::large_object_allocator::LargeObjectAllocator`].
     LargeObject(u8),
+    /// Represents a [`crate::util::alloc::malloc_allocator::MallocAllocator`].
     Malloc(u8),
+    /// Represents a [`crate::util::alloc::immix_allocator::ImmixAllocator`].
     Immix(u8),
+    /// Represents a [`crate::util::alloc::markcompact_allocator::MarkCompactAllocator`].
     MarkCompact(u8),
+    /// Represents a [`crate::util::alloc::free_list_allocator::FreeListAllocator`].
     FreeList(u8),
+    /// No allocator found.
     #[default]
     None,
 }
 
 /// This type describes allocator information. It is used to
-/// generate fast paths for the GC. All offset fields are relative to [`Mutator`](crate::Mutator).
+/// generate fast paths for the GC. All offset fields are relative to [`Mutator`].
 #[repr(C, u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub enum AllocatorInfo {
+    /// This allocator uses a [`crate::util::alloc::bumpallocator::BumpPointer`] as its fastpath.
     BumpPointer {
+        /// The byte offset from the mutator's pointer to the [`crate::util::alloc::bumpallocator::BumpPointer`].
         bump_pointer_offset: usize,
     },
+    /// This allocator uses a fastpath, but we haven't implemented it yet.
     // FIXME: Add free-list fast-path
     Unimplemented,
+    /// This allocator does not have a fastpath.
     #[default]
     None,
 }
@@ -196,11 +225,9 @@ impl AllocatorInfo {
     /// Arguments:
     /// * `selector`: The allocator selector to query.
     pub fn new<VM: VMBinding>(selector: AllocatorSelector) -> AllocatorInfo {
+        let base_offset = Mutator::<VM>::get_allocator_base_offset(selector);
         match selector {
-            AllocatorSelector::BumpPointer(index) => {
-                let base_offset = offset_of!(Mutator<VM>, allocators)
-                    + offset_of!(Allocators<VM>, bump_pointer)
-                    + size_of::<BumpAllocator<VM>>() * index as usize;
+            AllocatorSelector::BumpPointer(_) => {
                 let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
@@ -208,10 +235,7 @@ impl AllocatorInfo {
                 }
             }
 
-            AllocatorSelector::Immix(index) => {
-                let base_offset = offset_of!(Mutator<VM>, allocators)
-                    + offset_of!(Allocators<VM>, immix)
-                    + size_of::<ImmixAllocator<VM>>() * index as usize;
+            AllocatorSelector::Immix(_) => {
                 let bump_pointer_offset = offset_of!(ImmixAllocator<VM>, bump_pointer);
 
                 AllocatorInfo::BumpPointer {
@@ -219,10 +243,7 @@ impl AllocatorInfo {
                 }
             }
 
-            AllocatorSelector::MarkCompact(index) => {
-                let base_offset = offset_of!(Mutator<VM>, allocators)
-                    + offset_of!(Allocators<VM>, markcompact)
-                    + size_of::<MarkCompactAllocator<VM>>() * index as usize;
+            AllocatorSelector::MarkCompact(_) => {
                 let bump_offset =
                     base_offset + offset_of!(MarkCompactAllocator<VM>, bump_allocator);
                 let bump_pointer_offset = offset_of!(BumpAllocator<VM>, bump_pointer);

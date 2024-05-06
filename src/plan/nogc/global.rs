@@ -9,6 +9,7 @@ use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::heap::gc_trigger::SpaceStats;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
@@ -34,14 +35,18 @@ pub struct NoGC<VM: VMBinding> {
     pub los: ImmortalSpace<VM>,
 }
 
-pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+/// The plan constraints for the no gc plan.
+pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    collects_garbage: false,
+    ..PlanConstraints::default()
+};
 
 impl<VM: VMBinding> Plan for NoGC<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &NOGC_CONSTRAINTS
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
 
@@ -74,15 +79,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
             + self.immortal.reserved_pages()
             + self.los.reserved_pages()
             + self.base.get_used_pages()
-    }
-
-    fn handle_user_collection_request(
-        &self,
-        _tls: VMMutatorThread,
-        _force: bool,
-        _exhaustive: bool,
-    ) {
-        warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }
 

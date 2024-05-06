@@ -1,7 +1,6 @@
 // ANCHOR: imports_no_gc_work
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
-use crate::plan::global::GcStatus; // Add
 use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
@@ -14,6 +13,7 @@ use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -45,9 +45,6 @@ pub struct MyGC<VM: VMBinding> {
 // ANCHOR: constraints
 pub const MYGC_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
     ..PlanConstraints::default()
 };
 // ANCHOR_END: constraints
@@ -77,14 +74,12 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // Modify
     // ANCHOR: schedule_collection
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
     }
     // ANCHOR_END: schedule_collection
 
     // ANCHOR: collection_required()
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
     // ANCHOR_END: collection_required()

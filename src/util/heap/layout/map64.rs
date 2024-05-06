@@ -7,7 +7,6 @@ use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory::MmapStrategy;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
-use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -45,16 +44,11 @@ impl Map64 {
             base_address[i] = base;
         }
 
+        let descriptor_map = vec![SpaceDescriptor::UNINITIALIZED; MAX_SPACES];
+
         Self {
             inner: UnsafeCell::new(Map64Inner {
-                // Note: descriptor_map is very large. Although it is initialized to
-                // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
-                // elide the storing of 0 for each of the element.  Using standard vector creation,
-                // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
-                // slowdown during start-up.
-                descriptor_map: unsafe {
-                    new_zeroed_vec::<SpaceDescriptor>(vm_layout().max_chunks())
-                },
+                descriptor_map,
                 high_water,
                 base_address,
                 finalized: false,
@@ -136,8 +130,8 @@ impl VMMap for Map64 {
 
         /* Grow the free list to accommodate the new chunks */
         if let Some(free_list) = maybe_rmfl {
-            free_list.grow_freelist(conversions::bytes_to_pages(extent) as _);
-            let base_page = conversions::bytes_to_pages(rtn - self.inner().base_address[index]);
+            free_list.grow_freelist(conversions::bytes_to_pages_up(extent) as _);
+            let base_page = conversions::bytes_to_pages_up(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
                 free_list.set_uncoalescable((base_page + offset) as _);
                 /* The 32-bit implementation requires that pages are returned allocated to the caller */

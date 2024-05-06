@@ -67,17 +67,23 @@ pub trait SFTMap {
 
 pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
     cfg_if::cfg_if! {
-        if #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))] {
-            // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
-            Box::new(dense_chunk_map::SFTDenseChunkMap::new())
-        } else if #[cfg(target_pointer_width = "64")] {
+        if #[cfg(target_pointer_width = "64")] {
+            // For 64bits, we generally want to use the space map, which requires using contiguous space and no off-heap memory.
+            // If the requirements do not meet, we have to choose a different SFT map implementation.
             use crate::util::heap::layout::vm_layout::vm_layout;
-            if vm_layout().force_use_contiguous_spaces {
-                Box::new(space_map::SFTSpaceMap::new())
-            } else {
+            if !vm_layout().force_use_contiguous_spaces {
+                // This is usually the case for compressed pointer. Use the 32bits implementation.
                 Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
+            } else if cfg!(any(feature = "malloc_mark_sweep", feature = "vm_space")) {
+                // We have off-heap memory (malloc'd objects, or VM space). We have to use a chunk-based map.
+                Box::new(dense_chunk_map::SFTDenseChunkMap::new())
+            } else {
+                // We can use space map.
+                Box::new(space_map::SFTSpaceMap::new())
             }
         } else if #[cfg(target_pointer_width = "32")] {
+            // Use sparse chunk map. As we have limited virtual address range on 32 bits,
+            // it is okay to have a sparse chunk map which maps every chunk into an index in the array.
             Box::new(sparse_chunk_map::SFTSparseChunkMap::new())
         } else {
             compile_err!("Cannot figure out which SFT map to use.");
@@ -154,15 +160,17 @@ mod space_map {
     /// Space map is a small table, and it has one entry for each MMTk space.
     pub struct SFTSpaceMap {
         sft: Vec<SFTRefStorage>,
+        space_address_start: Address,
+        space_address_end: Address,
     }
 
     unsafe impl Sync for SFTSpaceMap {}
 
     impl SFTMap for SFTSpaceMap {
-        fn has_sft_entry(&self, _addr: Address) -> bool {
-            // Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
-            // So any address has an SFT entry.
-            true
+        fn has_sft_entry(&self, addr: Address) -> bool {
+            // An arbitrary address from Address::ZERO to Address::MAX will be cyclically mapped to an index between 0 and 31
+            // Only addresses between the virtual address range we use have valid entries.
+            addr >= self.space_address_start && addr < self.space_address_end
         }
 
         fn get_side_metadata(&self) -> Option<&SideMetadataSpec> {
@@ -186,7 +194,6 @@ mod space_map {
             start: Address,
             bytes: usize,
         ) {
-            let table_size = Self::addr_to_index(Address::MAX) + 1;
             let index = Self::addr_to_index(start);
             if cfg!(debug_assertions) {
                 // Make sure we only update from empty to a valid space, or overwrite the space
@@ -194,13 +201,16 @@ mod space_map {
                 assert!((*old).name() == EMPTY_SFT_NAME || (*old).name() == (*space).name());
                 // Make sure the range is in the space
                 let space_start = Self::index_to_space_start(index);
-                // FIXME: Curerntly skip the check for the last space. The following works fine for MMTk internal spaces,
-                // but the VM space is an exception. Any address after the last space is considered as the last space,
-                // based on our indexing function. In that case, we cannot assume the end of the region is within the last space (with MAX_SPACE_EXTENT).
-                if index != table_size - 1 {
-                    assert!(start >= space_start);
-                    assert!(start + bytes <= space_start + vm_layout().max_space_extent());
-                }
+                assert!(start >= space_start);
+                assert!(
+                    start + bytes <= space_start + vm_layout().max_space_extent(),
+                    "The range of {} + {} bytes does not fall into the space range {} and {}, \
+                    and it is probably outside the address range we use.",
+                    start,
+                    bytes,
+                    space_start,
+                    space_start + vm_layout().max_space_extent()
+                );
             }
 
             self.sft.get_unchecked(index).store(space);
@@ -216,12 +226,15 @@ mod space_map {
         /// Create a new space map.
         #[allow(clippy::assertions_on_constants)] // We assert to make sure the constants
         pub fn new() -> Self {
+            use crate::util::heap::layout::heap_parameters::MAX_SPACES;
             let table_size = Self::addr_to_index(Address::MAX) + 1;
-            debug_assert!(table_size >= crate::util::heap::layout::heap_parameters::MAX_SPACES);
+            debug_assert!(table_size >= MAX_SPACES);
             Self {
                 sft: std::iter::repeat_with(SFTRefStorage::default)
                     .take(table_size)
                     .collect(),
+                space_address_start: Self::index_to_space_range(1).0, // the start of the first space
+                space_address_end: Self::index_to_space_range(MAX_SPACES - 1).1, // the end of the last space
             }
         }
 
@@ -261,7 +274,7 @@ mod space_map {
 
             let assert_for_index = |i: usize| {
                 let (start, end) = SFTSpaceMap::index_to_space_range(i);
-                debug!("Space: Index#{} = [{}, {})", i, start, end);
+                println!("Space: Index#{} = [{}, {})", i, start, end);
                 assert_eq!(SFTSpaceMap::addr_to_index(start), i);
                 assert_eq!(SFTSpaceMap::addr_to_index(end - 1), i);
             };
@@ -410,7 +423,7 @@ mod dense_chunk_map {
 
         pub fn new() -> Self {
             Self {
-                /// Empty space is at index 0
+                // Empty space is at index 0
                 sft: vec![SFTRefStorage::default()],
                 index_map: HashMap::new(),
             }

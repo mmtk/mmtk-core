@@ -20,8 +20,12 @@ use std::sync::atomic::{AtomicU8, Ordering};
 /// For performance reasons, objects of this struct should be constants.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SideMetadataSpec {
+    /// The name for this side metadata.
     pub name: &'static str,
+    /// Is this side metadata global? Local metadata is used by certain spaces,
+    /// while global metadata is used by all the spaces.
     pub is_global: bool,
+    /// The offset for this side metadata.
     pub offset: SideMetadataOffset,
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
@@ -34,16 +38,19 @@ impl SideMetadataSpec {
     pub const fn is_absolute_offset(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
     }
+
     /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
     pub const fn is_rel_offset(&self) -> bool {
         !self.is_absolute_offset()
     }
 
+    /// Get the absolute offset for the spec.
     pub const fn get_absolute_offset(&self) -> Address {
         debug_assert!(self.is_absolute_offset());
         unsafe { self.offset.addr }
     }
 
+    /// Get the relative offset for the spec.
     pub const fn get_rel_offset(&self) -> usize {
         debug_assert!(self.is_rel_offset());
         unsafe { self.offset.rel_offset }
@@ -546,6 +553,8 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Loads a value from the side metadata for the given address.
+    /// This method has similar semantics to `store` in Rust atomics.
     pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
@@ -569,6 +578,8 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Store the given value to the side metadata for the given address.
+    /// This method has similar semantics to `store` in Rust atomics.
     pub fn store_atomic<T: MetadataValue>(&self, data_addr: Address, metadata: T, order: Ordering) {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
@@ -661,6 +672,10 @@ impl SideMetadataSpec {
         }
     }
 
+    /// Stores the new value into the side metadata for the gien address if the current value is the same as the old value.
+    /// This method has similar semantics to `compare_exchange` in Rust atomics.
+    /// The return value is a result indicating whether the new value was written and containing the previous value.
+    /// On success this value is guaranteed to be equal to current.
     pub fn compare_exchange_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -746,7 +761,9 @@ impl SideMetadataSpec {
         (old_raw_byte & mask) >> lshift
     }
 
-    /// Wraps around on overflow.
+    /// Adds the value to the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_add` in Rust atomics.
+    /// Returns the previous value.
     pub fn fetch_add_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -779,6 +796,9 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Subtracts the value from the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_sub` in Rust atomics.
+    /// Returns the previous value.
     pub fn fetch_sub_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -810,6 +830,9 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Bitwise 'and' the value with the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_and` in Rust atomics.
+    /// Returns the previous value.
     pub fn fetch_and_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -841,6 +864,9 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Bitwise 'or' the value with the current value for this side metadata for the given address.
+    /// This method has similar semantics to `fetch_or` in Rust atomics.
+    /// Returns the previous value.
     pub fn fetch_or_atomic<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -872,6 +898,9 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Fetches the value for this side metadata for the given address, and applies a function to it that returns an optional new value.
+    /// This method has similar semantics to `fetch_update` in Rust atomics.
+    /// Returns a Result of Ok(previous_value) if the function returned Some(_), else Err(previous_value).
     pub fn fetch_update_atomic<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
         &self,
         data_addr: Address,
@@ -953,12 +982,12 @@ pub union SideMetadataOffset {
 }
 
 impl SideMetadataOffset {
-    // Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    /// Get an offset for a fixed address. This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
     pub const fn addr(addr: Address) -> Self {
         SideMetadataOffset { addr }
     }
 
-    // Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
+    /// Get an offset for a relative offset (usize). This is usually used to set offset for the first spec (subsequent ones can be laid out with `layout_after`).
     pub const fn rel(rel_offset: usize) -> Self {
         SideMetadataOffset { rel_offset }
     }
@@ -1003,7 +1032,7 @@ impl std::hash::Hash for SideMetadataOffset {
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan's specs.
-pub struct SideMetadataContext {
+pub(crate) struct SideMetadataContext {
     // For plans
     pub global: Vec<SideMetadataSpec>,
     // For policies
@@ -1095,7 +1124,7 @@ impl SideMetadataContext {
     /// # Arguments
     /// * `start` - The starting address of the source data.
     /// * `size` - The size of the source data (in bytes).
-    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quanrantine address range)
+    /// * `no_reserve` - whether to invoke mmap with a noreserve flag (we use this flag to quarantine address range)
     fn map_metadata_internal(&self, start: Address, size: usize, no_reserve: bool) -> Result<()> {
         for spec in self.global.iter() {
             match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
@@ -1108,15 +1137,17 @@ impl SideMetadataContext {
         let mut lsize: usize = 0;
 
         for spec in self.local.iter() {
-            // For local side metadata, we always have to reserve address space for all
-            // local metadata required by all policies in MMTk to be able to calculate a constant offset for each local metadata at compile-time
-            // (it's like assigning an ID to each policy).
-            // As the plan is chosen at run-time, we will never know which subset of policies will be used during run-time.
-            // We can't afford this much address space in 32-bits.
+            // For local side metadata, we always have to reserve address space for all local
+            // metadata required by all policies in MMTk to be able to calculate a constant offset
+            // for each local metadata at compile-time (it's like assigning an ID to each policy).
+            //
+            // As the plan is chosen at run-time, we will never know which subset of policies will
+            // be used during run-time. We can't afford this much address space in 32-bits.
             // So, we switch to the chunk-based approach for this specific case.
             //
-            // The global metadata is different in that for each plan, we can calculate its constant base addresses at compile-time.
-            // Using the chunk-based approach will need the same address space size as the current not-chunked approach.
+            // The global metadata is different in that for each plan, we can calculate its constant
+            // base addresses at compile-time. Using the chunk-based approach will need the same
+            // address space size as the current not-chunked approach.
             #[cfg(target_pointer_width = "64")]
             {
                 match try_mmap_contiguous_metadata_space(start, size, spec, no_reserve) {
@@ -1162,13 +1193,13 @@ impl SideMetadataContext {
         debug_assert!(size % BYTES_IN_PAGE == 0);
 
         for spec in self.global.iter() {
-            ensure_munmap_contiguos_metadata_space(start, size, spec);
+            ensure_munmap_contiguous_metadata_space(start, size, spec);
         }
 
         for spec in self.local.iter() {
             #[cfg(target_pointer_width = "64")]
             {
-                ensure_munmap_contiguos_metadata_space(start, size, spec);
+                ensure_munmap_contiguous_metadata_space(start, size, spec);
             }
             #[cfg(target_pointer_width = "32")]
             {

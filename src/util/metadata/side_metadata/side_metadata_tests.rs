@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod tests {
     use atomic::Ordering;
 

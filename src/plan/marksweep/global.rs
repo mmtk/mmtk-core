@@ -2,7 +2,6 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::CreateSpecificPlanArgs;
-use crate::plan::global::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -11,6 +10,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::heap::gc_trigger::SpaceStats;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::VMWorkerThread;
@@ -36,20 +36,18 @@ pub struct MarkSweep<VM: VMBinding> {
     ms: MarkSweepSpace<VM>,
 }
 
+/// The plan constraints for the mark sweep plan.
 pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: false,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
     max_non_los_default_alloc_bytes: MAX_OBJECT_SIZE,
     may_trace_duplicate_edges: true,
+    needs_prepare_mutator: !cfg!(feature = "malloc_mark_sweep")
+        && !cfg!(feature = "eager_sweeping"),
     ..PlanConstraints::default()
 };
 
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind::<Self>(self);
-        self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
     }
 
@@ -67,7 +65,11 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.release(tls, true);
     }
 
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        self.ms.end_of_gc();
+    }
+
+    fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
 

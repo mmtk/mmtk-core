@@ -17,11 +17,14 @@ use downcast_rs::Downcast;
 /// VM bindings may also use this to enable the correct fast-path, if the fast-path is implemented in the binding.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BarrierSelector {
+    /// No barrier is used.
     NoBarrier,
+    /// Object remembering barrier is used.
     ObjectBarrier,
 }
 
 impl BarrierSelector {
+    /// A const function to check if two barrier selectors are the same.
     pub const fn equals(&self, other: BarrierSelector) -> bool {
         // cast enum to u8 then compare. Otherwise, we cannot do it in a const fn.
         *self as u8 == other as u8
@@ -49,9 +52,9 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
         slot: VM::VMEdge,
         target: ObjectReference,
     ) {
-        self.object_reference_write_pre(src, slot, target);
+        self.object_reference_write_pre(src, slot, Some(target));
         slot.store(target);
-        self.object_reference_write_post(src, slot, target);
+        self.object_reference_write_post(src, slot, Some(target));
     }
 
     /// Full pre-barrier for object reference write
@@ -59,7 +62,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
         &mut self,
         _src: ObjectReference,
         _slot: VM::VMEdge,
-        _target: ObjectReference,
+        _target: Option<ObjectReference>,
     ) {
     }
 
@@ -68,7 +71,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
         &mut self,
         _src: ObjectReference,
         _slot: VM::VMEdge,
-        _target: ObjectReference,
+        _target: Option<ObjectReference>,
     ) {
     }
 
@@ -78,7 +81,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
         &mut self,
         _src: ObjectReference,
         _slot: VM::VMEdge,
-        _target: ObjectReference,
+        _target: Option<ObjectReference>,
     ) {
     }
 
@@ -144,7 +147,7 @@ pub trait BarrierSemantics: 'static + Send {
         &mut self,
         src: ObjectReference,
         slot: <Self::VM as VMBinding>::VMEdge,
-        target: ObjectReference,
+        target: Option<ObjectReference>,
     );
 
     /// Slow-path call for mempry slice copy operations. For example, array-copy operations.
@@ -214,7 +217,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         &mut self,
         src: ObjectReference,
         slot: <S::VM as VMBinding>::VMEdge,
-        target: ObjectReference,
+        target: Option<ObjectReference>,
     ) {
         if self.object_is_unlogged(src) {
             self.object_reference_write_slow(src, slot, target);
@@ -225,7 +228,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         &mut self,
         src: ObjectReference,
         slot: <S::VM as VMBinding>::VMEdge,
-        target: ObjectReference,
+        target: Option<ObjectReference>,
     ) {
         if self.log_object(src) {
             self.semantics

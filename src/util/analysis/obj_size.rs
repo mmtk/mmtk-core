@@ -1,6 +1,8 @@
 use crate::util::analysis::RtAnalysis;
 use crate::util::statistics::counter::EventCounter;
-use crate::vm::{ActivePlan, VMBinding};
+use crate::util::statistics::stats::Stats;
+use crate::vm::VMBinding;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -13,10 +15,10 @@ use std::sync::{Arc, Mutex};
  * We keep track of the size classes using a HashMap with the key being the name of the
  * size class.
  */
-#[derive(Default)]
 pub struct PerSizeClassObjectCounter {
     running: bool,
     size_classes: Mutex<HashMap<String, Arc<Mutex<EventCounter>>>>,
+    stats: Arc<Stats>,
 }
 
 // Macro to simplify the creation of a new counter for a particular size class.
@@ -31,10 +33,11 @@ macro_rules! new_ctr {
 }
 
 impl PerSizeClassObjectCounter {
-    pub fn new(running: bool) -> Self {
+    pub fn new(running: bool, stats: Arc<Stats>) -> Self {
         Self {
             running,
             size_classes: Mutex::new(HashMap::new()),
+            stats,
         }
     }
 
@@ -51,14 +54,13 @@ impl<VM: VMBinding> RtAnalysis<VM> for PerSizeClassObjectCounter {
             return;
         }
 
-        let stats = &(VM::VMActivePlan::global().base()).stats;
         let size_class = format!("size{}", self.size_class(size));
         let mut size_classes = self.size_classes.lock().unwrap();
         let c = size_classes.get_mut(&size_class);
         match c {
             None => {
                 // Create (and increment) the counter associated with the size class if it doesn't exist
-                let ctr = new_ctr!(stats, size_classes, size_class);
+                let ctr = new_ctr!(self.stats, size_classes, size_class);
                 ctr.lock().unwrap().inc();
             }
             Some(ctr) => {

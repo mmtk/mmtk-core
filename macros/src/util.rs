@@ -12,7 +12,7 @@ pub fn get_field_attribute<'f>(field: &'f Field, attr_name: &str) -> Option<&'f 
         abort! { second_attr.path().span(), "Duplicated attribute: #[{}]", attr_name }
     };
 
-    attrs.get(0).cloned()
+    attrs.first().cloned()
 }
 
 pub fn get_fields_with_attribute<'f>(fields: &'f FieldsNamed, attr_name: &str) -> Vec<&'f Field> {

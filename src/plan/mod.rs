@@ -2,12 +2,12 @@
 //!
 //! This module provides various GC plans, each of which implements a GC algorithm.
 //! Generally a plan consists of a few parts:
-//! * A plan type that implements the [`Plan`](crate::plan::Plan) trait, which defines
+//! * A plan type that implements the [`Plan`] trait, which defines
 //!   spaces used in the plan, and their behaviors in GC and page accounting.
 //! * A mutator definition, which describes the mapping between allocators and allocation semantics,
 //!   and the mapping between allocators and spaces. If the plan needs barrier, the barrier definition is
 //!   also included here.
-//! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines
+//! * A constant for [`PlanConstraints`], which defines
 //!   plan-specific constants.
 //! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC.
 //!
@@ -23,7 +23,7 @@ pub(crate) use global::create_gc_worker_context;
 pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
 pub use global::AllocationSemantics;
-pub(crate) use global::GcStatus;
+pub(crate) use global::CreateGeneralPlanArgs;
 pub(crate) use global::HasSpaces;
 pub use global::Plan;
 pub(crate) use global::PlanTraceObject;
@@ -34,7 +34,7 @@ pub use mutator_context::MutatorContext;
 
 mod plan_constraints;
 pub use plan_constraints::PlanConstraints;
-pub use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
+pub(crate) use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
 mod tracing;
 pub use tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};

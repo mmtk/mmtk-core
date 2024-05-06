@@ -91,7 +91,7 @@ impl Stats {
                 shared.clone(),
                 true,
                 false,
-                PerfEventDiffable::new(&e.0),
+                PerfEventDiffable::new(&e.0, *options.perf_exclude_kernel),
             ))));
         }
         Stats {

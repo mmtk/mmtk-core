@@ -1,13 +1,17 @@
 use atomic::Ordering;
 
+use crate::global_state::GlobalState;
+use crate::plan::gc_requester::GCRequester;
 use crate::plan::Plan;
 use crate::policy::space::Space;
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
-use crate::util::options::{GCTriggerSelector, Options};
+use crate::util::options::{GCTriggerSelector, Options, DEFAULT_MAX_NURSERY, DEFAULT_MIN_NURSERY};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 /// GCTrigger is responsible for triggering GCs based on the given policy.
 /// All the decisions about heap limit and GC triggering should be resolved here.
@@ -19,10 +23,17 @@ pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
     /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
+    gc_requester: Arc<GCRequester<VM>>,
+    options: Arc<Options>,
+    state: Arc<GlobalState>,
 }
 
 impl<VM: VMBinding> GCTrigger<VM> {
-    pub fn new(options: &Options) -> Self {
+    pub fn new(
+        options: Arc<Options>,
+        gc_requester: Arc<GCRequester<VM>>,
+        state: Arc<GlobalState>,
+    ) -> Self {
         GCTrigger {
             plan: MaybeUninit::uninit(),
             policy: match *options.gc_trigger {
@@ -33,14 +44,23 @@ impl<VM: VMBinding> GCTrigger<VM> {
                     conversions::bytes_to_pages_up(min),
                     conversions::bytes_to_pages_up(max),
                 )),
-                GCTriggerSelector::Delegated => unimplemented!(),
+                GCTriggerSelector::Delegated => {
+                    <VM::VMCollection as crate::vm::Collection<VM>>::create_gc_trigger()
+                }
             },
+            options,
+            gc_requester,
+            state,
         }
     }
 
     /// Set the plan. This is called in `create_plan()` after we created a boxed plan.
     pub fn set_plan(&mut self, plan: &'static dyn Plan<VM = VM>) {
         self.plan.write(plan);
+    }
+
+    fn plan(&self) -> &dyn Plan<VM = VM> {
+        unsafe { self.plan.assume_init() }
     }
 
     /// This method is called periodically by the allocation subsystem
@@ -52,7 +72,10 @@ impl<VM: VMBinding> GCTrigger<VM> {
     /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
         let plan = unsafe { self.plan.assume_init() };
-        if self.policy.is_gc_required(space_full, space, plan) {
+        if self
+            .policy
+            .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
+        {
             info!(
                 "[POLL] {}{} ({}/{} pages)",
                 if let Some(space) = space {
@@ -64,17 +87,102 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 plan.get_reserved_pages(),
                 plan.get_total_pages(),
             );
-            plan.base().gc_requester.request();
+            self.gc_requester.request();
             return true;
         }
         false
     }
 
+    pub fn should_do_stress_gc(&self) -> bool {
+        Self::should_do_stress_gc_inner(&self.state, &self.options)
+    }
+
+    /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
+    pub(crate) fn should_do_stress_gc_inner(state: &GlobalState, options: &Options) -> bool {
+        state.is_initialized()
+            && (state.allocation_bytes.load(Ordering::SeqCst) > *options.stress_factor)
+    }
+
     /// Check if the heap is full
     pub fn is_heap_full(&self) -> bool {
-        let plan = unsafe { self.plan.assume_init() };
-        self.policy.is_heap_full(plan)
+        self.policy.is_heap_full(self.plan())
     }
+
+    /// Return upper bound of the nursery size (in number of bytes)
+    pub fn get_max_nursery_bytes(&self) -> usize {
+        use crate::util::options::NurserySize;
+        debug_assert!(self.plan().generational().is_some());
+        match *self.options.nursery {
+            NurserySize::Bounded { min: _, max } => max,
+            NurserySize::ProportionalBounded { min: _, max } => {
+                let heap_size_bytes =
+                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages());
+                let max_bytes = heap_size_bytes as f64 * max;
+                let max_bytes = conversions::raw_align_up(max_bytes as usize, BYTES_IN_PAGE);
+                if max_bytes > DEFAULT_MAX_NURSERY {
+                    warn!("Proportional nursery with max size {} ({}) is larger than DEFAULT_MAX_NURSERY ({}). Use DEFAULT_MAX_NURSERY instead.", max, max_bytes, DEFAULT_MAX_NURSERY);
+                    DEFAULT_MAX_NURSERY
+                } else {
+                    max_bytes
+                }
+            }
+            NurserySize::Fixed(sz) => sz,
+        }
+    }
+
+    /// Return lower bound of the nursery size (in number of bytes)
+    pub fn get_min_nursery_bytes(&self) -> usize {
+        use crate::util::options::NurserySize;
+        debug_assert!(self.plan().generational().is_some());
+        match *self.options.nursery {
+            NurserySize::Bounded { min, max: _ } => min,
+            NurserySize::ProportionalBounded { min, max: _ } => {
+                let min_bytes =
+                    conversions::pages_to_bytes(self.policy.get_current_heap_size_in_pages())
+                        as f64
+                        * min;
+                let min_bytes = conversions::raw_align_up(min_bytes as usize, BYTES_IN_PAGE);
+                if min_bytes < DEFAULT_MIN_NURSERY {
+                    warn!("Proportional nursery with min size {} ({}) is smaller than DEFAULT_MIN_NURSERY ({}). Use DEFAULT_MIN_NURSERY instead.", min, min_bytes, DEFAULT_MIN_NURSERY);
+                    DEFAULT_MIN_NURSERY
+                } else {
+                    min_bytes
+                }
+            }
+            NurserySize::Fixed(sz) => sz,
+        }
+    }
+
+    /// Return upper bound of the nursery size (in number of pages)
+    pub fn get_max_nursery_pages(&self) -> usize {
+        crate::util::conversions::bytes_to_pages_up(self.get_max_nursery_bytes())
+    }
+
+    /// Return lower bound of the nursery size (in number of pages)
+    pub fn get_min_nursery_pages(&self) -> usize {
+        crate::util::conversions::bytes_to_pages_up(self.get_min_nursery_bytes())
+    }
+}
+
+/// Provides statistics about the space. This is exposed to bindings, as it is used
+/// in both [`crate::plan::Plan`] and [`GCTriggerPolicy`].
+// This type exists so we do not need to expose the `Space` trait to the bindings.
+pub struct SpaceStats<'a, VM: VMBinding>(pub(crate) &'a dyn Space<VM>);
+
+impl<'a, VM: VMBinding> SpaceStats<'a, VM> {
+    /// Create new SpaceStats.
+    fn new(space: &'a dyn Space<VM>) -> Self {
+        Self(space)
+    }
+
+    /// Get the number of reserved pages for the space.
+    pub fn reserved_pages(&self) -> usize {
+        self.0.reserved_pages()
+    }
+
+    // We may expose more methods to bindings if they need more information for implementing GC triggers.
+    // But we should never expose `Space` itself.
 }
 
 /// This trait describes a GC trigger policy. A triggering policy have hooks to be informed about
@@ -89,21 +197,29 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Inform the triggering policy that a GC starts.
     fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
-    /// in the global [`crate::scheduler::gc_work::Release`] work packet. This means we assume a plan
+    /// in the global Release work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
     /// satisfy this assumption: they schedule other release work in `plan.release()`.
     fn on_gc_release(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC ends.
     fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
-    /// Is a GC required now?
+    /// Is a GC required now? The GC trigger may implement its own heuristics to decide when
+    /// a GC should be performed. However, we recommend the implementation to do its own checks
+    /// first, and always call `plan.collection_required(space_full, space)` at the end as a fallback to see if the plan needs
+    /// to do a GC.
+    ///
+    /// Arguments:
+    /// * `space_full`: Is any space full?
+    /// * `space`: The space that is full. The GC trigger may access some stats of the space.
+    /// * `plan`: The reference to the plan in use.
     fn is_gc_required(
         &self,
         space_full: bool,
-        space: Option<&dyn Space<VM>>,
+        space: Option<SpaceStats<VM>>,
         plan: &dyn Plan<VM = VM>,
     ) -> bool;
     /// Is current heap full?
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool;
+    fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool;
     /// Return the current heap size (in pages)
     fn get_current_heap_size_in_pages(&self) -> usize;
     /// Return the upper bound of heap size
@@ -120,14 +236,14 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
     fn is_gc_required(
         &self,
         space_full: bool,
-        space: Option<&dyn Space<VM>>,
+        space: Option<SpaceStats<VM>>,
         plan: &dyn Plan<VM = VM>,
     ) -> bool {
         // Let the plan decide
         plan.collection_required(space_full, space)
     }
 
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
+    fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the total pages, the heap is full.
         plan.get_reserved_pages() > self.total_pages
     }
@@ -184,7 +300,7 @@ struct MemBalancerStats {
     allocation_pages: f64,
     /// Allocation duration in secs
     allocation_time: f64,
-    /// Collected memory in pages
+    /// Collected memory in pages (memory traversed during collection)
     collection_pages: f64,
     /// Collection duration in secs
     collection_time: f64,
@@ -265,9 +381,8 @@ impl MemBalancerStats {
     ) -> bool {
         if !plan.is_current_gc_nursery() {
             self.gc_end_live_pages = plan.get_mature_reserved_pages();
-            self.collection_pages = self
-                .gc_release_live_pages
-                .saturating_sub(self.gc_end_live_pages) as f64;
+            // Use live pages as an estimate for pages traversed during GC
+            self.collection_pages = self.gc_end_live_pages as f64;
             trace!(
                 "collected pages = mature live at gc end {} - mature live at gc release {} = {}",
                 self.gc_release_live_pages,
@@ -303,9 +418,8 @@ impl MemBalancerStats {
     fn non_generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
         self.gc_end_live_pages = mmtk.get_plan().get_reserved_pages();
         trace!("live pages = {}", self.gc_end_live_pages);
-        self.collection_pages = self
-            .gc_release_live_pages
-            .saturating_sub(self.gc_end_live_pages) as f64;
+        // Use live pages as an estimate for pages traversed during GC
+        self.collection_pages = self.gc_end_live_pages as f64;
         trace!(
             "collected pages = live at gc end {} - live at gc release {} = {}",
             self.gc_release_live_pages,
@@ -316,6 +430,16 @@ impl MemBalancerStats {
 }
 
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<SpaceStats<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
+        // Let the plan decide
+        plan.collection_required(space_full, space)
+    }
+
     fn on_pending_allocation(&self, pages: usize) {
         self.pending_pages.fetch_add(pages, Ordering::SeqCst);
     }
@@ -368,7 +492,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                         // We reserve an extra of min nursery. This ensures that we will not trigger
                         // a full heap GC in the next GC (if available pages is smaller than min nursery, we will force a full heap GC)
                         mmtk.get_plan().get_collection_reserved_pages()
-                            + mmtk.options.get_min_nursery_pages(),
+                            + mmtk.gc_trigger.get_min_nursery_pages(),
                         stats,
                     );
                 }
@@ -385,17 +509,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         self.pending_pages.store(0, Ordering::SeqCst);
     }
 
-    fn is_gc_required(
-        &self,
-        space_full: bool,
-        space: Option<&dyn Space<VM>>,
-        plan: &dyn Plan<VM = VM>,
-    ) -> bool {
-        // Let the plan decide
-        plan.collection_required(space_full, space)
-    }
-
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
+    fn is_heap_full(&self, plan: &dyn Plan<VM = VM>) -> bool {
         // If reserved pages is larger than the current heap size, the heap is full.
         plan.get_reserved_pages() > self.current_heap_pages.load(Ordering::Relaxed)
     }

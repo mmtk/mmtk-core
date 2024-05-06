@@ -104,13 +104,19 @@ the new `tospace`.
 
 ### Prepare mutator
 
-Going back to `mutator.rs`, create a new function called 
-`mygc_mutator_prepare(_mutator: &mut Mutator <MyGC<VM>>, _tls: OpaquePointer,)`. 
-This function will be called at the preparation stage of a collection 
-(at the start of a collection) for each mutator. Its body can stay empty, as 
-there aren't any preparation steps for the mutator in this GC.
-In `create_mygc_mutator()`, find the field `prep_func` and change it from
-`mygc_mutator_noop()` to `mygc_mutator_prepare()`.
+Going back to `mutator.rs`, create a new function called
+`mygc_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread)`.
+This function will be called at the preparation stage of a collection (at the start of a
+collection) for each mutator. Its body can stay empty, as there aren't any preparation steps for
+the mutator in this GC.  In `create_mygc_mutator()`, find the field `prepare_func` and change it
+from `&unreachable_prepare_func` to `&mygc_mutator_prepare`.
+
+> 💡 Hint: If your plan does nothing when preparing mutators, there is an optimization you can do.
+You may set the plan constraints field `PlanConstraints::needs_prepare_mutator` to `false` so that
+the `PrepareMutator` work packets which call `prepare_func` will not be created in the first place.
+This optimization is helpful for VMs that run with a large number of mutator threads.  If you do
+this optimization, you may also leave the `MutatorConfig::prepare_func` field as
+`&unreachable_prepare_func` to indicate it should not be called.
 
 ## Release
 
@@ -131,24 +137,18 @@ routines for the common plan spaces and the fromspace.
 
 ### Release in mutator
 
-Go back to `mutator.rs`. In `create_mygc_mutator()`, replace 
-`mygc_mutator_noop()` in the `release_func` field with `mygc_mutator_release()`.
-Leave the `release()` function in the `CopyContext` empty. There are no 
-release steps for `CopyContext` in this collector.
+Go back to `mutator.rs`.  Create a new function called `mygc_mutator_release()` that takes the same
+inputs as the `mygc_mutator_prepare()` function above.
 
-Create a new function called `mygc_mutator_release()` that takes the same 
-inputs as the `prepare()` function above. This function will be called at the 
-release stage of a collection (at the end of a collection) for each mutator. 
-It rebinds the allocator for the `Default` allocation semantics to the new 
-tospace. When the mutator threads resume, any new allocations for `Default` 
-will then go to the new tospace.
- 
 ```rust
 {{#include ../../code/mygc_semispace/mutator.rs:release}}
 ```
 
-Delete `mygc_mutator_noop()`. It was a placeholder for the prepare and 
-release functions that you have now added, so it is now dead code.
+Then go to `create_mygc_mutator()`, replace `&unreachable_release_func` in the `release_func` field
+with `&mygc_mutator_release`.  This function will be called at the release stage of a collection
+(at the end of a collection) for each mutator.  It rebinds the allocator for the `Default`
+allocation semantics to the new tospace. When the mutator threads resume, any new allocations for
+`Default` will then go to the new tospace.
 
 ## ProcessEdgesWork for MyGC
 
@@ -202,7 +202,7 @@ With the derive macro, your `MyGC` struct should look like this:
 {{#include ../../code/mygc_semispace/global.rs:plan_def}}
 ```
 
-Once this is done, you can specify `PlanProcessEdges` as the `ProcessEdgesWorkType` in your GC work context:
+Once this is done, you can specify `PlanProcessEdges` as the `DefaultProcessEdges` in your GC work context:
 ```rust
 {{#include ../../code/mygc_semispace/gc_work.rs:workcontext_plan}}
 ```
@@ -238,7 +238,7 @@ dereferenced as `ProcessEdgesBase`.
 {{#include ../../code/mygc_semispace/gc_work.rs:mygc_process_edges_deref}}
 ```
 
-In the end, use `MyGCProcessEdges` as `ProcessEdgesWorkType` in the `GCWorkContext`:
+In the end, use `MyGCProcessEdges` as `DefaultProcessEdges` in the `GCWorkContext`:
 ```rust
 {{#include ../../code/mygc_semispace/gc_work.rs:workcontext_mygc}}
 ```

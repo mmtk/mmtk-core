@@ -2,65 +2,73 @@ use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::Address;
 
-/* Alignment */
-
+/// Is the address aligned to word boundary?
 pub fn is_address_aligned(addr: Address) -> bool {
     addr.is_aligned_to(BYTES_IN_ADDRESS)
 }
 
+/// Align down an address to the nearest page.
 pub fn page_align_down(address: Address) -> Address {
     address.align_down(BYTES_IN_PAGE)
 }
 
+/// Is the address aligned to page boundary?
 pub fn is_page_aligned(address: Address) -> bool {
     address.is_aligned_to(BYTES_IN_PAGE)
 }
 
-// const function cannot have conditional expression
+/// Align up an address to the nearest chunk.
 pub const fn chunk_align_up(addr: Address) -> Address {
     addr.align_up(BYTES_IN_CHUNK)
 }
 
-// const function cannot have conditional expression
+/// Align down an address to the nearest chunk.
 pub const fn chunk_align_down(addr: Address) -> Address {
     addr.align_down(BYTES_IN_CHUNK)
 }
 
+/// Align up an address to the nearest chunk at which granularity we mmap memory.
 pub const fn mmap_chunk_align_up(addr: Address) -> Address {
     addr.align_up(MMAP_CHUNK_BYTES)
 }
 
+/// Align down an address to the nearest chunk at which granularity we mmap memory.
 pub const fn mmap_chunk_align_down(addr: Address) -> Address {
     addr.align_down(MMAP_CHUNK_BYTES)
 }
 
+/// Convert size in bytes to the number of chunks (aligned up).
 pub fn bytes_to_chunks_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_CHUNK - 1) >> LOG_BYTES_IN_CHUNK
 }
 
+/// Convert an address to the chunk index (aligned down).
 pub fn address_to_chunk_index(addr: Address) -> usize {
     addr >> LOG_BYTES_IN_CHUNK
 }
 
+/// Convert a chunk index to the start address of the chunk.
 pub fn chunk_index_to_address(chunk: usize) -> Address {
     unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
 }
 
+/// Align up an integer to the given alignment. `align` must be a power of two.
 pub const fn raw_align_up(val: usize, align: usize) -> usize {
     // See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192
     val.wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1)
 }
 
+/// Align down an integer to the given alignment. `align` must be a power of two.
 pub const fn raw_align_down(val: usize, align: usize) -> usize {
     val & !align.wrapping_sub(1)
 }
 
+/// Is the integer aligned to the given alignment? `align` must be a power of two.
 pub const fn raw_is_aligned(val: usize, align: usize) -> bool {
     val & align.wrapping_sub(1) == 0
 }
 
-/* Conversion */
-
+/// Convert the number of pages to bytes.
 pub fn pages_to_bytes(pages: usize) -> usize {
     pages << LOG_BYTES_IN_PAGE
 }
@@ -68,25 +76,6 @@ pub fn pages_to_bytes(pages: usize) -> usize {
 /// Convert size in bytes to the number of pages (aligned up)
 pub fn bytes_to_pages_up(bytes: usize) -> usize {
     raw_align_up(bytes, BYTES_IN_PAGE) >> LOG_BYTES_IN_PAGE
-}
-
-pub fn bytes_to_pages(bytes: usize) -> usize {
-    let pages = bytes_to_pages_up(bytes);
-
-    if cfg!(debug = "true") {
-        let computed_extent = pages << LOG_BYTES_IN_PAGE;
-        let bytes_match_pages = computed_extent == bytes;
-        assert!(
-            bytes_match_pages,
-            "ERROR: number of bytes computed from pages must match original byte amount!\
-             bytes = {}\
-             pages = {}\
-             bytes computed from pages = {}",
-            bytes, pages, computed_extent
-        );
-    }
-
-    pages
 }
 
 /// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.

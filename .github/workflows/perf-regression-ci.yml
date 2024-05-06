@@ -17,18 +17,22 @@ env:
   RESULT_REPO_BRANCH: 'self-hosted'
   # Whether we deploy the generated page. Set to true for master.
   DEPLOY: true
+  # Directories in ci-perf-kit that will be uploaded as artifacts. The dirs can be found in ci-perf-kit/scripts/common.sh
+  CI_PERF_KIT_BUILD: ci-perf-kit/upload
+  CI_PERF_KIT_LOG: ci-perf-kit/logs-ng
 
 jobs:
   # JikesRVM
   jikesrvm-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-jikesrvm
           path: mmtk-jikesrvm
@@ -38,10 +42,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.6.10"
+          ref: "0.7.5"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -53,13 +57,11 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       # run
       - name: Performance Run
         run: |
@@ -71,24 +73,37 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jikesrvm-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jikesrvm-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   # OpenJDK
   openjdk-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
@@ -98,10 +113,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.6.10"
+          ref: "0.7.5"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -118,13 +133,11 @@ jobs:
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       # run
       - name: Performance Run
         run: |
@@ -136,23 +149,36 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
 
   openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: mmtk-core
       - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
@@ -162,10 +188,10 @@ jobs:
           ./.github/scripts/ci-checkout.sh
       # checkout perf-kit
       - name: Checkout Perf Kit
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.6.10"
+          ref: "0.7.5"
           path: ci-perf-kit
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
@@ -181,12 +207,10 @@ jobs:
           rm -rf mmtk-openjdk/repos/openjdk/build
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+        run: echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')" >> $GITHUB_OUTPUT
       - name: Setup
         run: |
           ./ci-perf-kit/scripts/history-run-setup.sh
-          mkdir -p ci-perf-kit/running/benchmarks/dacapo
-          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       # run
@@ -201,10 +225,22 @@ jobs:
       # deploy
       - name: Deploy to Github Page
         if: ${{ env.DEPLOY == 'true' }}
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
           external_repository: mmtk/ci-perf-result
           publish_dir: ./reports
           publish_branch: gh-pages
           keep_files: true
+      - name: Upload build as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutator-regression-build
+          path: ${{ env.CI_PERF_KIT_BUILD }}
+          if-no-files-found: error
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutator-regression-logs
+          path: ${{ env.CI_PERF_KIT_LOG }}
+          if-no-files-found: error
