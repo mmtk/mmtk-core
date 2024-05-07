@@ -1,8 +1,6 @@
 <!--
 The canonical location of this document is `mmtk-core/doc/userguide/src/api_migration.md`.
 It will be part of the MMTk User Guide, available online at <https://docs.mmtk.io/index.html>.
-A symbolic link is available at `mmtk-core/API-MIGRATION.md` to make this document easier to find in
-the repository.
 -->
 
 # API Migration Guide

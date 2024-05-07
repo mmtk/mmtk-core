@@ -43,7 +43,7 @@ jobs:
     needs: check-public-api-changes
     runs-on: ubuntu-latest
     env:
-      MIGRATION_GUIDE_PATH: 'docs/userguide/src/api_migration.md'
+      MIGRATION_GUIDE_PATH: 'docs/userguide/src/migration/**'
     steps:
       # Check if migration guide is updated.
       - name: Get the update status for the migration guide.
