@@ -194,6 +194,8 @@ impl<VM: VMBinding> MMTK<VM> {
             heap.get_discontig_end(),
             &mut |start_address| {
                 plan.for_each_space_mut(&mut |space| {
+                    // If the `VMMap` has a discontiguous memory range, we notify all discontiguous
+                    // space that the starting address has been determined.
                     if let Some(pr) = space.maybe_get_page_resource_mut() {
                         pr.update_discontiguous_start(start_address);
                     }

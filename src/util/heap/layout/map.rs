@@ -45,6 +45,16 @@ pub trait VMMap: Sync {
     /// Caller must ensure that only one thread is calling this method.
     unsafe fn free_contiguous_chunks(&self, start: Address) -> usize;
 
+    /// Finalize the globlal maps in the implementations of `VMMap`.  This should be called after
+    /// all spaces are created.
+    ///
+    /// Arguments:
+    /// -   `from`: the starting address of the heap
+    /// -   `to`: the address of the last byte within the heap
+    /// -   `on_discontig_start_determined`: Called when the address range of the discontiguous
+    ///     memory range is determined.  Will not be called if the `VMMap` implementation does not
+    ///     have a discontigous memory range.  The `Address` argument of the callback is the
+    ///     starting address of the discontiguous memory range.
     fn finalize_static_space_map(
         &self,
         from: Address,
