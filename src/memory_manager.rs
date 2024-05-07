@@ -888,3 +888,8 @@ pub fn add_work_packets<VM: VMBinding>(
 ) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }
+
+/// Test if we properly check changes for API and migration guide.
+pub fn test_api_change() {
+    unreachable!()
+}
