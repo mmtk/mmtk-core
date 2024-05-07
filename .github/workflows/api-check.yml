@@ -58,4 +58,4 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            core.setFailed('Public API is changed, but the migration guide (${{ env.MIGRATION_GUIDE_PATH }}) is not updated.')
+            core.setFailed('Public API is changed, but the migration guide (${{ env.MIGRATION_GUIDE_PATH }}) is not updated. If the bindings need to be updated for the API change, the migration guide needs to be updated as well.')
