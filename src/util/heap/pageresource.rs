@@ -1,7 +1,7 @@
 use crate::util::address::Address;
 use crate::util::conversions;
+use crate::util::freelist::FreeList;
 use crate::util::opaque_pointer::*;
-use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::vm::ActivePlan;
 use std::sync::Mutex;
 
@@ -149,11 +149,14 @@ impl CommonPageResource {
     /// Extend the virtual memory associated with a particular discontiguous
     /// space.  This simply involves requesting a suitable number of chunks
     /// from the pool of chunks available to discontiguous spaces.
+    ///
+    /// If the concrete page resource is using a `FreeList`, it should pass it
+    /// via `freelist`, or `None` if not using `FreeList`.
     pub fn grow_discontiguous_space(
         &self,
         space_descriptor: SpaceDescriptor,
         chunks: usize,
-        maybe_rmfl: Option<&mut RawMemoryFreeList>,
+        freelist: Option<&mut dyn FreeList>,
     ) -> Address {
         let mut head_discontiguous_region = self.head_discontiguous_region.lock().unwrap();
 
@@ -162,7 +165,7 @@ impl CommonPageResource {
                 space_descriptor,
                 chunks,
                 *head_discontiguous_region,
-                maybe_rmfl,
+                freelist,
             )
         };
         if new_head.is_zero() {

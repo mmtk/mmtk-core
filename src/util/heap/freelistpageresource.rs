@@ -275,10 +275,11 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     ) -> i32 {
         let mut rtn = freelist::FAILURE;
         let required_chunks = crate::policy::space::required_chunks(pages);
-        let maybe_rmfl = sync.free_list.downcast_mut::<RawMemoryFreeList>();
-        let region =
-            self.common
-                .grow_discontiguous_space(space_descriptor, required_chunks, maybe_rmfl);
+        let region = self.common.grow_discontiguous_space(
+            space_descriptor,
+            required_chunks,
+            Some(sync.free_list.as_mut()),
+        );
 
         if !region.is_zero() {
             let region_start = conversions::bytes_to_pages_up(region - sync.start);

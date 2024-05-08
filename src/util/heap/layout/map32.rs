@@ -7,7 +7,6 @@ use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::int_array_freelist::IntArrayFreeList;
-use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -118,7 +117,7 @@ impl VMMap for Map32 {
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
-        _maybe_rmfl: Option<&mut RawMemoryFreeList>,
+        _maybe_freelist: Option<&mut dyn FreeList>,
     ) -> Address {
         let (_sync, self_mut) = self.mut_self_with_sync();
         let chunk = self_mut.region_map.alloc(chunks as _);

@@ -1,6 +1,5 @@
 use crate::util::freelist::FreeList;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
-use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 
 /// The result of creating free list.
@@ -39,7 +38,7 @@ pub trait VMMap: Sync {
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
-        maybe_rmfl: Option<&mut RawMemoryFreeList>,
+        maybe_freelist: Option<&mut dyn FreeList>,
     ) -> Address;
 
     fn get_next_contiguous_region(&self, start: Address) -> Address;

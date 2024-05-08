@@ -124,7 +124,7 @@ impl VMMap for Map64 {
         descriptor: SpaceDescriptor,
         chunks: usize,
         _head: Address,
-        maybe_rmfl: Option<&mut RawMemoryFreeList>,
+        maybe_freelist: Option<&mut dyn FreeList>,
     ) -> Address {
         debug_assert!(Self::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
@@ -136,14 +136,20 @@ impl VMMap for Map64 {
         let extent = chunks << LOG_BYTES_IN_CHUNK;
         self_mut.high_water[index] = rtn + extent;
 
-        /* Grow the free list to accommodate the new chunks */
-        if let Some(free_list) = maybe_rmfl {
-            free_list.grow_freelist(conversions::bytes_to_pages_up(extent) as _);
+        if let Some(freelist) = maybe_freelist {
+            let Some(rmfl) = freelist.downcast_mut::<RawMemoryFreeList>() else {
+                // `Map64` allocates chunks by raising the high water mark to provide previously
+                // uncovered address range to the caller.  Therefore if the `PageResource` that
+                // made the allocation request is based on freelist, the freelist must be grown to
+                // accommodate the new chunks.  Currently only `RawMemoryFreeList` can grow.
+                panic!("Map64 requires a growable free list implementation (RawMemoryFreeList).");
+            };
+            rmfl.grow_freelist(conversions::bytes_to_pages_up(extent) as _);
             let base_page = conversions::bytes_to_pages_up(rtn - self.inner().base_address[index]);
             for offset in (0..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
-                free_list.set_uncoalescable((base_page + offset) as _);
+                rmfl.set_uncoalescable((base_page + offset) as _);
                 /* The 32-bit implementation requires that pages are returned allocated to the caller */
-                free_list.alloc_from_unit(PAGES_IN_CHUNK as _, (base_page + offset) as _);
+                rmfl.alloc_from_unit(PAGES_IN_CHUNK as _, (base_page + offset) as _);
             }
         }
         rtn
