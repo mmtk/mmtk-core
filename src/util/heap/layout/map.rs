@@ -3,15 +3,33 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
 use crate::util::Address;
 
+/// The result of creating free list.
+///
+/// `VMMap` will select an implementation of `FreeList`.  If it is `RawMemoryFreeList`, it will
+/// occupy a portion of address range at the beginning of the space.  That will require the
+/// starting address of the space to be displaced.  This information is conveyed via the
+/// `space_displacement` field.
+pub struct CreateFreeListResult {
+    // The created free list.
+    pub free_list: Box<dyn FreeList>,
+    // The number of bytes to be added to the starting address of the space.  Zero if not needed.
+    // Always aligned to chunks.
+    pub space_displacement: usize,
+}
+
 pub trait VMMap: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
-    fn create_freelist(&self, start: Address) -> Box<dyn FreeList>;
+    fn create_freelist(&self, start: Address) -> CreateFreeListResult;
 
     /// Create a free-list for a contiguous space. Must only be called at boot time.
-    fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
-        -> Box<dyn FreeList>;
+    fn create_parent_freelist(
+        &self,
+        start: Address,
+        units: usize,
+        grain: i32,
+    ) -> CreateFreeListResult;
 
     /// # Safety
     ///

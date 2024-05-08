@@ -11,6 +11,7 @@ use crate::util::conversions;
 use crate::util::freelist;
 use crate::util::freelist::FreeList;
 use crate::util::heap::layout::vm_layout::*;
+use crate::util::heap::layout::CreateFreeListResult;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::memory;
@@ -144,14 +145,19 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn VMMap) -> Self {
         let pages = conversions::bytes_to_pages_up(bytes);
-        let free_list = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
-        let actual_start = if let Some(rmfl) = free_list.downcast_ref::<RawMemoryFreeList>() {
-            // If `vm_map` created a `RawMemoryFreeList`, it will be placed in the beginning of the
-            // space.  We adjust the start address of the current page resource.
-            conversions::chunk_align_up(rmfl.get_limit())
-        } else {
-            start
-        };
+        let CreateFreeListResult {
+            free_list,
+            space_displacement,
+        } = vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _);
+
+        // If it is RawMemoryFreeList, it will occupy `space_displacement` bytes at the start of
+        // the space.  We add it to the start address.
+        let actual_start = start + space_displacement;
+        debug!(
+            "  in new_contiguous: space_displacement = {:?}, actual_start = {}",
+            space_displacement, actual_start
+        );
+
         let growable = cfg!(target_pointer_width = "64");
         FreeListPageResource {
             common: CommonPageResource::new(true, growable, vm_map),
@@ -167,12 +173,30 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     pub fn new_discontiguous(vm_map: &'static dyn VMMap) -> Self {
+        // This is a place-holder value that is used by neither `vm_map.create_freelist` nor the
+        // space.  The location of discontiguous spaces is not determined before all contiguous
+        // spaces are places, at which time the starting address of discontiguous spaces will be
+        // updated to the correct value.
         let start = vm_layout().available_start();
-        let free_list = vm_map.create_freelist(start);
+
+        let CreateFreeListResult {
+            free_list,
+            space_displacement,
+        } = vm_map.create_freelist(start);
+
+        // In theory, nothing prevents us from using `RawMemoryFreeList` for discontiguous spaces.
+        // But in the current implementation, only `Map32` supports discontiguous spaces, and
+        // `Map32` only uses `IntArrayFreeList`.
         debug_assert!(
             free_list.downcast_ref::<RawMemoryFreeList>().is_none(),
             "We can't allocate RawMemoryFreeList for discontiguous spaces."
         );
+
+        // Discontiguous free list page resources are only used by `Map32` which uses
+        // `IntArrayFreeList` exclusively.  It does not have space displacement.
+        debug_assert_eq!(space_displacement, 0);
+        debug!("new_discontiguous. start: {start})");
+
         FreeListPageResource {
             common: CommonPageResource::new(false, true, vm_map),
             sync: Mutex::new(FreeListPageResourceSync {

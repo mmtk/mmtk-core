@@ -1,3 +1,4 @@
+use super::map::CreateFreeListResult;
 use super::map::VMMap;
 use crate::util::constants::*;
 use crate::util::conversions;
@@ -69,7 +70,7 @@ impl VMMap for Map64 {
         self_mut.descriptor_map[index] = descriptor;
     }
 
-    fn create_freelist(&self, start: Address) -> Box<dyn FreeList> {
+    fn create_freelist(&self, start: Address) -> CreateFreeListResult {
         let units = vm_layout().space_size_64() >> LOG_BYTES_IN_PAGE;
         self.create_parent_freelist(start, units, units as _)
     }
@@ -79,7 +80,9 @@ impl VMMap for Map64 {
         start: Address,
         mut units: usize,
         grain: i32,
-    ) -> Box<dyn FreeList> {
+    ) -> CreateFreeListResult {
+        debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+
         // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut = unsafe { self.mut_self() };
         let index = Self::space_index(start).unwrap();
@@ -105,7 +108,12 @@ impl VMMap for Map64 {
 
         self_mut.high_water[index] = base;
         self_mut.base_address[index] = base;
-        list
+
+        let space_displacement = base - start;
+        CreateFreeListResult {
+            free_list: list,
+            space_displacement,
+        }
     }
 
     /// # Safety

@@ -1,3 +1,4 @@
+use super::map::CreateFreeListResult;
 use super::map::VMMap;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
@@ -88,11 +89,15 @@ impl VMMap for Map32 {
         }
     }
 
-    fn create_freelist(&self, _start: Address) -> Box<dyn FreeList> {
-        Box::new(IntArrayFreeList::from_parent(
+    fn create_freelist(&self, _start: Address) -> CreateFreeListResult {
+        let free_list = Box::new(IntArrayFreeList::from_parent(
             &self.global_page_map,
             self.get_discontig_freelist_pr_ordinal() as _,
-        ))
+        ));
+        CreateFreeListResult {
+            free_list,
+            space_displacement: 0,
+        }
     }
 
     fn create_parent_freelist(
@@ -100,8 +105,12 @@ impl VMMap for Map32 {
         _start: Address,
         units: usize,
         grain: i32,
-    ) -> Box<dyn FreeList> {
-        Box::new(IntArrayFreeList::new(units, grain, 1))
+    ) -> CreateFreeListResult {
+        let free_list = Box::new(IntArrayFreeList::new(units, grain, 1));
+        CreateFreeListResult {
+            free_list,
+            space_displacement: 0,
+        }
     }
 
     unsafe fn allocate_contiguous_chunks(
