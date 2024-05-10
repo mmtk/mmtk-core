@@ -397,6 +397,10 @@
 <a href="#395" id="395">395</a>
 <a href="#396" id="396">396</a>
 <a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use super</span>::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -433,6 +437,10 @@
 
     <span class="kw">fn </span>common_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>CommonPageResource {
         <span class="self">self</span>.flpr.common_mut()
+    }
+
+    <span class="kw">fn </span>update_discontiguous_start(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address) {
+        <span class="self">self</span>.flpr.update_discontiguous_start(start)
     }
 
     <span class="kw">fn </span>alloc_pages(

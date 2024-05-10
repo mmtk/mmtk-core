@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":["VMMap"]};
+window.SIDEBAR_ITEMS = {"struct":["CreateFreeListResult"],"trait":["VMMap"]};

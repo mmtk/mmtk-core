@@ -320,25 +320,17 @@
 <a href="#318" id="318">318</a>
 <a href="#319" id="319">319</a>
 <a href="#320" id="320">320</a>
-<a href="#321" id="321">321</a>
-<a href="#322" id="322">322</a>
-<a href="#323" id="323">323</a>
-<a href="#324" id="324">324</a>
-<a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a>
-<a href="#327" id="327">327</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
+<span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::int_array_freelist::IntArrayFreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::cell::UnsafeCell;
-<span class="kw">use </span>std::ptr::NonNull;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 <span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
@@ -354,7 +346,6 @@
     region_map: IntArrayFreeList,
     global_page_map: IntArrayFreeList,
     shared_discontig_fl_count: usize,
-    shared_fl_map: Vec&lt;<span class="prelude-ty">Option</span>&lt;NonNull&lt;CommonFreeListPageResource&gt;&gt;&gt;,
     total_available_discontiguous_chunks: usize,
     finalized: bool,
     descriptor_map: Vec&lt;SpaceDescriptor&gt;,
@@ -379,7 +370,6 @@
                 region_map: IntArrayFreeList::new(max_chunks, max_chunks <span class="kw">as _</span>, <span class="number">1</span>),
                 global_page_map: IntArrayFreeList::new(<span class="number">1</span>, <span class="number">1</span>, MAX_SPACES),
                 shared_discontig_fl_count: <span class="number">0</span>,
-                shared_fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
                 total_available_discontiguous_chunks: <span class="number">0</span>,
                 finalized: <span class="bool-val">false</span>,
                 descriptor_map: <span class="macro">vec!</span>[SpaceDescriptor::UNINITIALIZED; max_chunks],
@@ -420,11 +410,15 @@
         }
     }
 
-    <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, _start: Address) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
-        Box::new(IntArrayFreeList::from_parent(
+    <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, _start: Address) -&gt; CreateFreeListResult {
+        <span class="kw">let </span>free_list = Box::new(IntArrayFreeList::from_parent(
             <span class="kw-2">&amp;</span><span class="self">self</span>.global_page_map,
             <span class="self">self</span>.get_discontig_freelist_pr_ordinal() <span class="kw">as _</span>,
-        ))
+        ));
+        CreateFreeListResult {
+            free_list,
+            space_displacement: <span class="number">0</span>,
+        }
     }
 
     <span class="kw">fn </span>create_parent_freelist(
@@ -432,18 +426,12 @@
         _start: Address,
         units: usize,
         grain: i32,
-    ) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
-        Box::new(IntArrayFreeList::new(units, grain, <span class="number">1</span>))
-    }
-
-    <span class="kw">unsafe fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">*const </span>CommonFreeListPageResource) {
-        <span class="kw">let </span>ordinal: usize = (<span class="kw-2">*</span>pr)
-            .free_list
-            .downcast_ref::&lt;IntArrayFreeList&gt;()
-            .unwrap()
-            .get_ordinal() <span class="kw">as </span>usize;
-        <span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="self">self</span>.mut_self();
-        self_mut.shared_fl_map[ordinal] = <span class="prelude-val">Some</span>(NonNull::new_unchecked(pr <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>));
+    ) -&gt; CreateFreeListResult {
+        <span class="kw">let </span>free_list = Box::new(IntArrayFreeList::new(units, grain, <span class="number">1</span>));
+        CreateFreeListResult {
+            free_list,
+            space_displacement: <span class="number">0</span>,
+        }
     }
 
     <span class="kw">unsafe fn </span>allocate_contiguous_chunks(
@@ -451,6 +439,7 @@
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
+        _maybe_freelist: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FreeList&gt;,
     ) -&gt; Address {
         <span class="kw">let </span>(_sync, self_mut) = <span class="self">self</span>.mut_self_with_sync();
         <span class="kw">let </span>chunk = self_mut.region_map.alloc(chunks <span class="kw">as _</span>);
@@ -526,7 +515,12 @@
         <span class="self">self</span>.free_contiguous_chunks_no_lock(chunk <span class="kw">as _</span>)
     }
 
-    <span class="kw">fn </span>finalize_static_space_map(<span class="kw-2">&amp;</span><span class="self">self</span>, from: Address, to: Address) {
+    <span class="kw">fn </span>finalize_static_space_map(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        from: Address,
+        to: Address,
+        on_discontig_start_determined: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(Address),
+    ) {
         <span class="comment">// This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map32Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
@@ -540,17 +534,9 @@
         <span class="comment">// start_address=0xb0000000, first_chunk=704, last_chunk=703, unavail_start_chunk=704, trailing_chunks=320, pages=0
         // startAddress=0x68000000 firstChunk=416 lastChunk=703 unavailStartChunk=704 trailingChunks=320 pages=294912
         </span>self_mut.global_page_map.resize_freelist(pages, pages <span class="kw">as _</span>);
-        <span class="comment">// TODO: Clippy favors using iter().flatten() rather than iter() with if-let.
-        // https://rust-lang.github.io/rust-clippy/master/index.html#manual_flatten
-        // Yi: I am not doing this refactoring right now, as I am not familiar with flatten() and
-        // there is no test to ensure the refactoring will be correct.
-        </span><span class="attr">#[allow(clippy::manual_flatten)]
-        </span><span class="kw">for </span>fl <span class="kw">in </span>self_mut.shared_fl_map.iter().copied() {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>fl) = fl {
-                <span class="kw">let </span>fl_mut = <span class="kw">unsafe </span>{ fl.as_mut() };
-                fl_mut.resize_freelist(start_address);
-            }
-        }
+
+        on_discontig_start_determined(start_address);
+
         <span class="comment">// [
         //  2: -1073741825
         //  3: -1073741825

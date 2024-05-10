@@ -309,6 +309,9 @@
 <a href="#307" id="307">307</a>
 <a href="#308" id="308">308</a>
 <a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -416,6 +419,9 @@
     </span>}
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>PageResource&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.pr
+    }
+    <span class="kw">fn </span>maybe_get_page_resource_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>PageResource&lt;VM&gt;&gt; {
+        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut </span><span class="self">self</span>.pr)
     }
 
     <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {

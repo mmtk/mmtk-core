@@ -437,6 +437,10 @@
 <a href="#435" id="435">435</a>
 <a href="#436" id="436">436</a>
 <a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>atomic::Ordering;
@@ -446,7 +450,7 @@
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
-        heap::FreeListPageResource,
+        heap::{FreeListPageResource, PageResource},
         metadata::{<span class="self">self</span>, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
@@ -646,6 +650,10 @@
 
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span><span class="kw">crate</span>::util::heap::PageResource&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.pr
+    }
+
+    <span class="kw">fn </span>maybe_get_page_resource_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>PageResource&lt;VM&gt;&gt; {
+        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut </span><span class="self">self</span>.pr)
     }
 
     <span class="kw">fn </span>initialize_sft(<span class="kw-2">&amp;</span><span class="self">self</span>, sft_map: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span><span class="kw">crate</span>::policy::sft_map::SFTMap) {

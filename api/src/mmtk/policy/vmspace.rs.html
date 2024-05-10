@@ -257,6 +257,9 @@
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
 <a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -345,6 +348,9 @@
     </span>}
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>PageResource&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.pr
+    }
+    <span class="kw">fn </span>maybe_get_page_resource_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>PageResource&lt;VM&gt;&gt; {
+        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut </span><span class="self">self</span>.pr)
     }
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonSpace&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.common

@@ -331,6 +331,10 @@
 <a href="#329" id="329">329</a>
 <a href="#330" id="330">330</a>
 <a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -433,6 +437,10 @@
 
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>PageResource&lt;VM&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.pr
+    }
+
+    <span class="kw">fn </span>maybe_get_page_resource_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>PageResource&lt;VM&gt;&gt; {
+        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut </span><span class="self">self</span>.pr)
     }
 
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonSpace&lt;VM&gt; {

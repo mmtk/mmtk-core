@@ -251,23 +251,11 @@
 <a href="#249" id="249">249</a>
 <a href="#250" id="250">250</a>
 <a href="#251" id="251">251</a>
-<a href="#252" id="252">252</a>
-<a href="#253" id="253">253</a>
-<a href="#254" id="254">254</a>
-<a href="#255" id="255">255</a>
-<a href="#256" id="256">256</a>
-<a href="#257" id="257">257</a>
-<a href="#258" id="258">258</a>
-<a href="#259" id="259">259</a>
-<a href="#260" id="260">260</a>
-<a href="#261" id="261">261</a>
-<a href="#262" id="262">262</a>
-<a href="#263" id="263">263</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::VMMap;
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::map::CreateFreeListResult;
+<span class="kw">use </span><span class="kw">super</span>::map::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions;
 <span class="kw">use </span><span class="kw">crate</span>::util::freelist::FreeList;
-<span class="kw">use </span><span class="kw">crate</span>::util::heap::freelistpageresource::CommonFreeListPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::heap_parameters::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
@@ -275,7 +263,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::raw_memory_freelist::RawMemoryFreeList;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::cell::UnsafeCell;
-<span class="kw">use </span>std::ptr::NonNull;
 <span class="kw">use </span>std::sync::atomic::{AtomicUsize, Ordering};
 
 <span class="kw">const </span>NON_MAP_FRACTION: f64 = <span class="number">1.0 </span>- <span class="number">8.0 </span>/ <span class="number">4096.0</span>;
@@ -285,8 +272,6 @@
 }
 
 <span class="kw">struct </span>Map64Inner {
-    fl_page_resources: Vec&lt;<span class="prelude-ty">Option</span>&lt;NonNull&lt;CommonFreeListPageResource&gt;&gt;&gt;,
-    fl_map: Vec&lt;<span class="prelude-ty">Option</span>&lt;NonNull&lt;RawMemoryFreeList&gt;&gt;&gt;,
     finalized: bool,
     descriptor_map: Vec&lt;SpaceDescriptor&gt;,
     base_address: Vec&lt;Address&gt;,
@@ -320,8 +305,6 @@
                 descriptor_map,
                 high_water,
                 base_address,
-                fl_page_resources: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
-                fl_map: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; MAX_SPACES],
                 finalized: <span class="bool-val">false</span>,
                 cumulative_committed_pages: AtomicUsize::new(<span class="number">0</span>),
             }),
@@ -340,7 +323,7 @@
         self_mut.descriptor_map[index] = descriptor;
     }
 
-    <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
+    <span class="kw">fn </span>create_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address) -&gt; CreateFreeListResult {
         <span class="kw">let </span>units = vm_layout().space_size_64() &gt;&gt; LOG_BYTES_IN_PAGE;
         <span class="self">self</span>.create_parent_freelist(start, units, units <span class="kw">as _</span>)
     }
@@ -350,7 +333,9 @@
         start: Address,
         <span class="kw-2">mut </span>units: usize,
         grain: i32,
-    ) -&gt; Box&lt;<span class="kw">dyn </span>FreeList&gt; {
+    ) -&gt; CreateFreeListResult {
+        <span class="macro">debug_assert!</span>(start.is_aligned_to(BYTES_IN_CHUNK));
+
         <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         </span><span class="kw">let </span>self_mut = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
         <span class="kw">let </span>index = <span class="self">Self</span>::space_index(start).unwrap();
@@ -361,7 +346,7 @@
 
         <span class="kw">let </span>heads = <span class="number">1</span>;
         <span class="kw">let </span>pages_per_block = RawMemoryFreeList::default_block_size(units <span class="kw">as _</span>, heads);
-        <span class="kw">let </span><span class="kw-2">mut </span>list = Box::new(RawMemoryFreeList::new(
+        <span class="kw">let </span>list = Box::new(RawMemoryFreeList::new(
             start,
             start + list_extent,
             pages_per_block,
@@ -371,22 +356,17 @@
             MmapStrategy::Normal,
         ));
 
-        <span class="comment">/*self_mut.fl_map[index] =
-            Some(unsafe { &amp;*(&amp;list as &amp;RawMemoryFreeList as *const RawMemoryFreeList) });
-        */
-        </span>self_mut.fl_map[index] = <span class="kw">unsafe </span>{ <span class="prelude-val">Some</span>(NonNull::new_unchecked(<span class="kw-2">&amp;mut *</span>list)) };
         <span class="comment">/* Adjust the base address and highwater to account for the allocated chunks for the map */
         </span><span class="kw">let </span>base = conversions::chunk_align_up(start + list_extent);
 
         self_mut.high_water[index] = base;
         self_mut.base_address[index] = base;
-        list
-    }
 
-    <span class="kw">unsafe fn </span>bind_freelist(<span class="kw-2">&amp;</span><span class="self">self</span>, pr: <span class="kw-2">*const </span>CommonFreeListPageResource) {
-        <span class="kw">let </span>index = <span class="self">Self</span>::space_index((<span class="kw-2">*</span>pr).get_start()).unwrap();
-        <span class="kw">let </span>self_mut = <span class="self">self</span>.mut_self();
-        self_mut.fl_page_resources[index] = <span class="prelude-val">Some</span>(NonNull::new_unchecked(pr <span class="kw">as _</span>));
+        <span class="kw">let </span>space_displacement = base - start;
+        CreateFreeListResult {
+            free_list: list,
+            space_displacement,
+        }
     }
 
     <span class="doccomment">/// # Safety
@@ -397,6 +377,7 @@
         descriptor: SpaceDescriptor,
         chunks: usize,
         _head: Address,
+        maybe_freelist: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FreeList&gt;,
     ) -&gt; Address {
         <span class="macro">debug_assert!</span>(<span class="self">Self</span>::space_index(descriptor.get_start()).unwrap() == descriptor.get_index());
         <span class="comment">// Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
@@ -408,16 +389,20 @@
         <span class="kw">let </span>extent = chunks &lt;&lt; LOG_BYTES_IN_CHUNK;
         self_mut.high_water[index] = rtn + extent;
 
-        <span class="comment">/* Grow the free list to accommodate the new chunks */
-        </span><span class="kw">let </span>free_list = <span class="self">self</span>.inner().fl_map[<span class="self">Self</span>::space_index(descriptor.get_start()).unwrap()];
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>free_list) = free_list {
-            <span class="kw">let </span>free_list = free_list.as_mut();
-            free_list.grow_freelist(conversions::bytes_to_pages_up(extent) <span class="kw">as _</span>);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(freelist) = maybe_freelist {
+            <span class="kw">let </span><span class="prelude-val">Some</span>(rmfl) = freelist.downcast_mut::&lt;RawMemoryFreeList&gt;() <span class="kw">else </span>{
+                <span class="comment">// `Map64` allocates chunks by raising the high water mark to provide previously
+                // uncovered address range to the caller.  Therefore if the `PageResource` that
+                // made the allocation request is based on freelist, the freelist must be grown to
+                // accommodate the new chunks.  Currently only `RawMemoryFreeList` can grow.
+                </span><span class="macro">panic!</span>(<span class="string">"Map64 requires a growable free list implementation (RawMemoryFreeList)."</span>);
+            };
+            rmfl.grow_freelist(conversions::bytes_to_pages_up(extent) <span class="kw">as _</span>);
             <span class="kw">let </span>base_page = conversions::bytes_to_pages_up(rtn - <span class="self">self</span>.inner().base_address[index]);
             <span class="kw">for </span>offset <span class="kw">in </span>(<span class="number">0</span>..(chunks * PAGES_IN_CHUNK)).step_by(PAGES_IN_CHUNK) {
-                free_list.set_uncoalescable((base_page + offset) <span class="kw">as _</span>);
+                rmfl.set_uncoalescable((base_page + offset) <span class="kw">as _</span>);
                 <span class="comment">/* The 32-bit implementation requires that pages are returned allocated to the caller */
-                </span>free_list.alloc_from_unit(PAGES_IN_CHUNK <span class="kw">as _</span>, (base_page + offset) <span class="kw">as _</span>);
+                </span>rmfl.alloc_from_unit(PAGES_IN_CHUNK <span class="kw">as _</span>, (base_page + offset) <span class="kw">as _</span>);
             }
         }
         rtn
@@ -451,31 +436,22 @@
         <span class="macro">unreachable!</span>()
     }
 
-    <span class="kw">fn </span>boot(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">fn </span>finalize_static_space_map(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _from: Address,
+        _to: Address,
+        _on_discontig_start_determined: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(Address),
+    ) {
         <span class="comment">// This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map64Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-        <span class="kw">for </span>pr <span class="kw">in </span><span class="number">0</span>..MAX_SPACES {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>fl) = self_mut.fl_map[pr] {
-                <span class="kw">let </span>fl_mut: <span class="kw-2">&amp;mut </span>RawMemoryFreeList = <span class="kw">unsafe </span>{ fl.as_mut() };
-                fl_mut.grow_freelist(<span class="number">0</span>);
-            }
-        }
-    }
 
-    <span class="kw">fn </span>finalize_static_space_map(<span class="kw-2">&amp;</span><span class="self">self</span>, _from: Address, _to: Address) {
-        <span class="comment">// This is only called during boot process by a single thread.
-        // It is fine to get a mutable reference.
-        </span><span class="kw">let </span>self_mut: <span class="kw-2">&amp;mut </span>Map64Inner = <span class="kw">unsafe </span>{ <span class="self">self</span>.mut_self() };
-        <span class="kw">for </span>pr <span class="kw">in </span><span class="number">0</span>..MAX_SPACES {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>fl) = self_mut.fl_page_resources[pr] {
-                <span class="kw">let </span>fl_mut = <span class="kw">unsafe </span>{ fl.as_mut() };
-                fl_mut.resize_freelist(conversions::chunk_align_up(<span class="kw">unsafe </span>{
-                    <span class="self">self</span>.inner().fl_map[pr].unwrap().as_ref().get_limit()
-                }));
-            }
-        }
-        self_mut.finalized = <span class="bool-val">true</span>;
+        <span class="comment">// Note: When using Map64, the starting address of each space is adjusted as soon as the
+        // `RawMemoryFreeList` instance in its underlying `FreeListPageResource` is created.  We no
+        // longer need to adjust the starting address here.  So we ignore the
+        // `_on_discontig_start_determined` callback which may adjust the starting address.
+
+        </span>self_mut.finalized = <span class="bool-val">true</span>;
     }
 
     <span class="kw">fn </span>is_finalized(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {

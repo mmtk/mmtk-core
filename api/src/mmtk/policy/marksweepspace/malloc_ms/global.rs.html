@@ -817,6 +817,10 @@
 <a href="#815" id="815">815</a>
 <a href="#816" id="816">816</a>
 <a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
@@ -955,6 +959,10 @@
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>PageResource&lt;VM&gt; {
         <span class="macro">unreachable!</span>()
     }
+
+    <span class="kw">fn </span>maybe_get_page_resource_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>PageResource&lt;VM&gt;&gt; {
+        <span class="prelude-val">None
+    </span>}
 
     <span class="kw">fn </span>common(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>CommonSpace&lt;VM&gt; {
         <span class="macro">unreachable!</span>()

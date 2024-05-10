@@ -516,9 +516,9 @@
         <span class="kw">if </span>!<span class="self">self</span>.common().contiguous &amp;&amp; tmp &gt; sync.sentinel {
             <span class="comment">/* we're out of virtual memory within our discontiguous region, so ask for more */
             </span><span class="kw">let </span>required_chunks = required_chunks(required_pages);
-            sync.current_chunk = <span class="self">self
-                </span>.common
-                .grow_discontiguous_space(space_descriptor, required_chunks); <span class="comment">// Returns zero on failure
+            sync.current_chunk =
+                <span class="self">self</span>.common
+                    .grow_discontiguous_space(space_descriptor, required_chunks, <span class="prelude-val">None</span>); <span class="comment">// Returns zero on failure
             </span>sync.cursor = sync.current_chunk;
             sync.sentinel = sync.cursor
                 + <span class="kw">if </span>sync.current_chunk.is_zero() {

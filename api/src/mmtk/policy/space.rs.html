@@ -636,6 +636,10 @@
 <a href="#634" id="634">634</a>
 <a href="#635" id="635">635</a>
 <a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+<a href="#640" id="640">640</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
@@ -679,6 +683,10 @@
     <span class="kw">fn </span>as_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Space&lt;VM&gt;;
     <span class="kw">fn </span>as_sft(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>SFT + Sync + <span class="lifetime">'static</span>);
     <span class="kw">fn </span>get_page_resource(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>PageResource&lt;VM&gt;;
+
+    <span class="doccomment">/// Get a mutable reference to the underlying page resource, or `None` if the space does not
+    /// have a page resource.
+    </span><span class="kw">fn </span>maybe_get_page_resource_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>PageResource&lt;VM&gt;&gt;;
 
     <span class="doccomment">/// Initialize entires in SFT map for the space. This is called when the Space object
     /// has a non-moving address, as we will use the address to set sft.
