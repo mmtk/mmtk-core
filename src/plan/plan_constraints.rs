@@ -55,11 +55,15 @@ impl PlanConstraints {
             needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
                 || crate::util::constants::LAZY_SWEEP,
             needs_concurrent_workers: false,
-            may_trace_duplicate_edges: false,
+            // The nonmoving space, marksweep, may trace duplicate edges. However, with this default to true,
+            // essentially, we are not checking any duplicated edges.
+            // FIXME: Should we remove this field and no longer check for duplicate edges? Or we could ask
+            // the binding if they would use nonmoving or not.
+            may_trace_duplicate_edges: true,
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
-            needs_prepare_mutator: true,
+            needs_prepare_mutator: !cfg!(feature = "eager_sweeping"),
         }
     }
 }

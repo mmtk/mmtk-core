@@ -37,6 +37,7 @@ impl BlockList {
 
     /// Remove a block from the list
     pub fn remove(&mut self, block: Block) {
+        trace!("Blocklist {:?}: Remove {:?}", self as *const _, block);
         match (block.load_prev_block(), block.load_next_block()) {
             (None, None) => {
                 self.first = None;
@@ -45,12 +46,14 @@ impl BlockList {
             (None, Some(next)) => {
                 next.clear_prev_block();
                 self.first = Some(next);
-                next.store_block_list(self);
+                // next.store_block_list(self);
+                debug_assert_eq!(next.load_block_list(), self as *mut _);
             }
             (Some(prev), None) => {
                 prev.clear_next_block();
                 self.last = Some(prev);
-                prev.store_block_list(self);
+                // prev.store_block_list(self);
+                debug_assert_eq!(prev.load_block_list(), self as *mut _);
             }
             (Some(prev), Some(next)) => {
                 prev.store_next_block(next);
@@ -80,6 +83,7 @@ impl BlockList {
 
     /// Push block to the front of the list
     pub fn push(&mut self, block: Block) {
+        trace!("Blocklist {:?}: Push {:?}", self as *const _, block);
         if self.is_empty() {
             block.clear_next_block();
             block.clear_prev_block();
@@ -132,6 +136,7 @@ impl BlockList {
 
     /// Remove all blocks
     fn reset(&mut self) {
+        trace!("Blocklist {:?}: Reset", self as *const _);
         self.first = None;
         self.last = None;
     }
@@ -152,10 +157,12 @@ impl BlockList {
                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok();
         }
+        trace!("Blocklist {:?}: locked", self as *const _);
     }
 
     /// Unlock list. See the comments on the lock method.
     pub fn unlock(&mut self) {
+        trace!("Blocklist {:?}: unlock", self as *const _);
         self.lock.store(false, Ordering::SeqCst);
     }
 

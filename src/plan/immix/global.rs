@@ -41,7 +41,6 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: crate::policy::immix::DEFRAG,
     // Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
-    needs_prepare_mutator: false,
     ..PlanConstraints::default()
 };
 
@@ -95,6 +94,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // release the collected region
         self.last_gc_was_defrag
             .store(self.immix_space.release(true), Ordering::Relaxed);
+    }
+
+    fn end_of_gc(&mut self, tls: VMWorkerThread) {
+        self.common.end_of_gc(tls);
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
