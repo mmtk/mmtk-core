@@ -162,7 +162,7 @@ impl<VM: VMBinding> MMTK<VM> {
         // So we do not save it in MMTK. This may change in the future.
         let mut heap = HeapMeta::new();
 
-        let plan = crate::plan::create_plan(
+        let mut plan = crate::plan::create_plan(
             *options.plan,
             CreateGeneralPlanArgs {
                 vm_map: VM_MAP.as_ref(),
@@ -188,9 +188,20 @@ impl<VM: VMBinding> MMTK<VM> {
         }
 
         // TODO: This probably does not work if we have multiple MMTk instances.
-        VM_MAP.boot();
         // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
-        VM_MAP.finalize_static_space_map(heap.get_discontig_start(), heap.get_discontig_end());
+        VM_MAP.finalize_static_space_map(
+            heap.get_discontig_start(),
+            heap.get_discontig_end(),
+            &mut |start_address| {
+                plan.for_each_space_mut(&mut |space| {
+                    // If the `VMMap` has a discontiguous memory range, we notify all discontiguous
+                    // space that the starting address has been determined.
+                    if let Some(pr) = space.maybe_get_page_resource_mut() {
+                        pr.update_discontiguous_start(start_address);
+                    }
+                })
+            },
+        );
 
         if *options.transparent_hugepages {
             MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
