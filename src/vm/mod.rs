@@ -18,7 +18,7 @@
 mod active_plan;
 mod collection;
 /// Allows MMTk to access edges in a VM-defined way.
-pub mod edge_shape;
+pub mod slot;
 pub(crate) mod object_model;
 mod reference_glue;
 mod scanning;
@@ -60,9 +60,9 @@ where
     type VMReferenceGlue: ReferenceGlue<Self>;
 
     /// The type of edges in this VM.
-    type VMEdge: edge_shape::Edge;
+    type VMSlot: slot::Slot;
     /// The type of heap memory slice in this VM.
-    type VMMemorySlice: edge_shape::MemorySlice<Edge = Self::VMEdge>;
+    type VMMemorySlice: slot::MemorySlice<SlotType = Self::VMSlot>;
 
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;

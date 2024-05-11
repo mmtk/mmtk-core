@@ -4,7 +4,7 @@ use crate::global_state::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
 use crate::util::*;
-use crate::vm::edge_shape::Edge;
+use crate::vm::slot::Slot;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
@@ -441,7 +441,7 @@ impl<C: GCWorkContext> GCWork<C::VM> for ScanVMSpecificRoots<C> {
 }
 
 pub struct ProcessEdgesBase<VM: VMBinding> {
-    pub edges: Vec<VM::VMEdge>,
+    pub edges: Vec<VM::VMSlot>,
     pub nodes: VectorObjectQueue,
     mmtk: &'static MMTK<VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
@@ -457,7 +457,7 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
     pub fn new(
-        edges: Vec<VM::VMEdge>,
+        edges: Vec<VM::VMSlot>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -505,7 +505,7 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
 }
 
 /// A short-hand for `<E::VM as VMBinding>::VMEdge`.
-pub type EdgeOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMEdge;
+pub type EdgeOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
 
 /// Scan & update a list of object slots
 //
@@ -702,9 +702,9 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
 }
 
 impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
-    RootsWorkFactory<VM::VMEdge> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
+    RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
-    fn create_process_edge_roots_work(&mut self, edges: Vec<VM::VMEdge>) {
+    fn create_process_edge_roots_work(&mut self, edges: Vec<VM::VMSlot>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,

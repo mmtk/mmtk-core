@@ -1,7 +1,7 @@
 use crate::plan::Plan;
 use crate::scheduler::gc_work::*;
 use crate::util::ObjectReference;
-use crate::vm::edge_shape::Edge;
+use crate::vm::slot::Slot;
 use crate::vm::*;
 use crate::MMTK;
 use crate::{scheduler::*, ObjectQueue};
@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 #[allow(dead_code)]
-pub struct SanityChecker<ES: Edge> {
+pub struct SanityChecker<ES: Slot> {
     /// Visited objects
     refs: HashSet<ObjectReference>,
     /// Cached root edges for sanity root scanning
@@ -18,13 +18,13 @@ pub struct SanityChecker<ES: Edge> {
     root_nodes: Vec<Vec<ObjectReference>>,
 }
 
-impl<ES: Edge> Default for SanityChecker<ES> {
+impl<ES: Slot> Default for SanityChecker<ES> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<ES: Edge> SanityChecker<ES> {
+impl<ES: Slot> SanityChecker<ES> {
     pub fn new() -> Self {
         Self {
             refs: HashSet::new(),

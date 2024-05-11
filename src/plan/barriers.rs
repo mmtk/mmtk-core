@@ -1,6 +1,6 @@
 //! Read/Write barrier implementations.
 
-use crate::vm::edge_shape::{Edge, MemorySlice};
+use crate::vm::slot::{Slot, MemorySlice};
 use crate::vm::ObjectModel;
 use crate::{
     util::{metadata::MetadataSpec, *},
@@ -49,7 +49,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn object_reference_write(
         &mut self,
         src: ObjectReference,
-        slot: VM::VMEdge,
+        slot: VM::VMSlot,
         target: ObjectReference,
     ) {
         self.object_reference_write_pre(src, slot, Some(target));
@@ -61,7 +61,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn object_reference_write_pre(
         &mut self,
         _src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
     }
@@ -70,7 +70,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn object_reference_write_post(
         &mut self,
         _src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
     }
@@ -80,7 +80,7 @@ pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn object_reference_write_slow(
         &mut self,
         _src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
     }
@@ -146,7 +146,7 @@ pub trait BarrierSemantics: 'static + Send {
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
-        slot: <Self::VM as VMBinding>::VMEdge,
+        slot: <Self::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     );
 
@@ -216,7 +216,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
     fn object_reference_write_post(
         &mut self,
         src: ObjectReference,
-        slot: <S::VM as VMBinding>::VMEdge,
+        slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
         if self.object_is_unlogged(src) {
@@ -227,7 +227,7 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
-        slot: <S::VM as VMBinding>::VMEdge,
+        slot: <S::VM as VMBinding>::VMSlot,
         target: Option<ObjectReference>,
     ) {
         if self.log_object(src) {

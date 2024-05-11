@@ -44,7 +44,7 @@ use crate::util::{Address, ObjectReference};
 /// Note: this trait only concerns the representation (i.e. the shape) of the edge, not its
 /// semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference
 /// in a word as a pointer, it can also use `SimpleEdge` for weak reference fields.
-pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
+pub trait Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     /// Load object reference from the slot.
     ///
     /// If the slot is not holding an object reference (For example, if it is holding NULL or a
@@ -89,11 +89,11 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
 /// It is the default edge type, and should be suitable for most VMs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct SimpleEdge {
+pub struct SimpleSlot {
     slot_addr: *mut Atomic<Address>,
 }
 
-impl SimpleEdge {
+impl SimpleSlot {
     /// Create a simple edge from an address.
     ///
     /// Arguments:
@@ -112,9 +112,9 @@ impl SimpleEdge {
     }
 }
 
-unsafe impl Send for SimpleEdge {}
+unsafe impl Send for SimpleSlot {}
 
-impl Edge for SimpleEdge {
+impl Slot for SimpleSlot {
     fn load(&self) -> Option<ObjectReference> {
         let addr = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         ObjectReference::from_raw_address(addr)
@@ -135,7 +135,7 @@ impl Edge for SimpleEdge {
 /// hand, `SimpleEdge` is all about how to access a field that holds a reference represented
 /// simply as an `ObjectReference`.  The intention and the semantics are clearer with
 /// `SimpleEdge`.
-impl Edge for Address {
+impl Slot for Address {
     fn load(&self) -> Option<ObjectReference> {
         let addr = unsafe { Address::load(*self) };
         ObjectReference::from_raw_address(addr)
@@ -147,9 +147,9 @@ impl Edge for Address {
 }
 
 #[test]
-fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
+fn a_simple_slot_should_have_the_same_size_as_a_pointer() {
     assert_eq!(
-        std::mem::size_of::<SimpleEdge>(),
+        std::mem::size_of::<SimpleSlot>(),
         std::mem::size_of::<*mut libc::c_void>()
     );
 }
@@ -157,11 +157,11 @@ fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
 /// A abstract memory slice represents a piece of **heap** memory.
 pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     /// The associate type to define how to access edges from a memory slice.
-    type Edge: Edge;
+    type SlotType: Slot;
     /// The associate type to define how to iterate edges in a memory slice.
-    type EdgeIterator: Iterator<Item = Self::Edge>;
+    type SlotIterator: Iterator<Item = Self::SlotType>;
     /// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
-    fn iter_edges(&self) -> Self::EdgeIterator;
+    fn iter_slots(&self) -> Self::SlotIterator;
     /// The object which this slice belongs to. If we know the object for the slice, we will check the object state (e.g. mature or not), rather than the slice address.
     /// Normally checking the object and checking the slice does not make a difference, as the slice is part of the object (in terms of memory range). However,
     /// if a slice is in a different location from the object, the object state and the slice can be hugely different, and providing a proper implementation
@@ -196,10 +196,10 @@ impl Iterator for AddressRangeIterator {
 }
 
 impl MemorySlice for Range<Address> {
-    type Edge = Address;
-    type EdgeIterator = AddressRangeIterator;
+    type SlotType = Address;
+    type SlotIterator = AddressRangeIterator;
 
-    fn iter_edges(&self) -> Self::EdgeIterator {
+    fn iter_slots(&self) -> Self::SlotIterator {
         AddressRangeIterator {
             cursor: self.start,
             limit: self.end,
@@ -238,12 +238,12 @@ impl MemorySlice for Range<Address> {
 /// Memory slice type with empty implementations.
 /// For VMs that do not use the memory slice type.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct UnimplementedMemorySlice<E: Edge = SimpleEdge>(PhantomData<E>);
+pub struct UnimplementedMemorySlice<E: Slot = SimpleSlot>(PhantomData<E>);
 
 /// Edge iterator for `UnimplementedMemorySlice`.
-pub struct UnimplementedMemorySliceEdgeIterator<E: Edge>(PhantomData<E>);
+pub struct UnimplementedMemorySliceEdgeIterator<E: Slot>(PhantomData<E>);
 
-impl<E: Edge> Iterator for UnimplementedMemorySliceEdgeIterator<E> {
+impl<E: Slot> Iterator for UnimplementedMemorySliceEdgeIterator<E> {
     type Item = E;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -251,11 +251,11 @@ impl<E: Edge> Iterator for UnimplementedMemorySliceEdgeIterator<E> {
     }
 }
 
-impl<E: Edge> MemorySlice for UnimplementedMemorySlice<E> {
-    type Edge = E;
-    type EdgeIterator = UnimplementedMemorySliceEdgeIterator<E>;
+impl<E: Slot> MemorySlice for UnimplementedMemorySlice<E> {
+    type SlotType = E;
+    type SlotIterator = UnimplementedMemorySliceEdgeIterator<E>;
 
-    fn iter_edges(&self) -> Self::EdgeIterator {
+    fn iter_slots(&self) -> Self::SlotIterator {
         unimplemented!()
     }
 
@@ -284,7 +284,7 @@ mod tests {
     fn address_range_iteration() {
         let src: Vec<usize> = (0..32).collect();
         let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
-        for (i, v) in src_slice.iter_edges().enumerate() {
+        for (i, v) in src_slice.iter_slots().enumerate() {
             assert_eq!(i, unsafe { v.load::<usize>() })
         }
     }

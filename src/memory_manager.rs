@@ -22,7 +22,7 @@ use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout::vm_layout;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::edge_shape::MemorySlice;
+use crate::vm::slot::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 
@@ -250,7 +250,7 @@ pub fn post_alloc<VM: VMBinding>(
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
-    slot: VM::VMEdge,
+    slot: VM::VMSlot,
     target: ObjectReference,
 ) {
     mutator.barrier().object_reference_write(src, slot, target);
@@ -276,7 +276,7 @@ pub fn object_reference_write<VM: VMBinding>(
 pub fn object_reference_write_pre<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
-    slot: VM::VMEdge,
+    slot: VM::VMSlot,
     target: Option<ObjectReference>,
 ) {
     mutator
@@ -304,7 +304,7 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 pub fn object_reference_write_post<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
-    slot: VM::VMEdge,
+    slot: VM::VMSlot,
     target: Option<ObjectReference>,
 ) {
     mutator

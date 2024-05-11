@@ -5,7 +5,7 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
-use crate::vm::edge_shape::{Edge, MemorySlice};
+use crate::vm::slot::{Slot, MemorySlice};
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -165,7 +165,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
             // Collect all the entries in all the slices
             let mut edges = vec![];
             for slice in &self.modbuf {
-                for edge in slice.iter_edges() {
+                for edge in slice.iter_slots() {
                     edges.push(edge);
                 }
             }

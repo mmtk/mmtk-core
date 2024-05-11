@@ -5,19 +5,19 @@
 //!
 
 use crate::plan::Plan;
-use crate::vm::edge_shape::Edge;
+use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
 use std::collections::HashSet;
 use std::sync::RwLock;
 
-pub struct EdgeLogger<ES: Edge> {
+pub struct SlotLogger<ES: Slot> {
     // A private hash-set to keep track of edges.
     edge_log: RwLock<HashSet<ES>>,
 }
 
-unsafe impl<ES: Edge> Sync for EdgeLogger<ES> {}
+unsafe impl<ES: Slot> Sync for SlotLogger<ES> {}
 
-impl<ES: Edge> EdgeLogger<ES> {
+impl<ES: Slot> SlotLogger<ES> {
     pub fn new() -> Self {
         Self {
             edge_log: Default::default(),
