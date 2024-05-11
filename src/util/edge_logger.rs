@@ -10,14 +10,14 @@ use crate::vm::VMBinding;
 use std::collections::HashSet;
 use std::sync::RwLock;
 
-pub struct SlotLogger<ES: Slot> {
+pub struct SlotLogger<SL: Slot> {
     // A private hash-set to keep track of edges.
-    edge_log: RwLock<HashSet<ES>>,
+    edge_log: RwLock<HashSet<SL>>,
 }
 
-unsafe impl<ES: Slot> Sync for SlotLogger<ES> {}
+unsafe impl<SL: Slot> Sync for SlotLogger<SL> {}
 
-impl<ES: Slot> SlotLogger<ES> {
+impl<SL: Slot> SlotLogger<SL> {
     pub fn new() -> Self {
         Self {
             edge_log: Default::default(),
@@ -31,7 +31,7 @@ impl<ES: Slot> SlotLogger<ES> {
     ///
     /// * `edge` - The edge to log.
     ///
-    pub fn log_edge(&self, edge: ES) {
+    pub fn log_edge(&self, edge: SL) {
         trace!("log_edge({:?})", edge);
         let mut edge_log = self.edge_log.write().unwrap();
         assert!(

@@ -9,22 +9,22 @@ use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 #[allow(dead_code)]
-pub struct SanityChecker<ES: Slot> {
+pub struct SanityChecker<SL: Slot> {
     /// Visited objects
     refs: HashSet<ObjectReference>,
     /// Cached root edges for sanity root scanning
-    root_edges: Vec<Vec<ES>>,
+    root_edges: Vec<Vec<SL>>,
     /// Cached root nodes for sanity root scanning
     root_nodes: Vec<Vec<ObjectReference>>,
 }
 
-impl<ES: Slot> Default for SanityChecker<ES> {
+impl<SL: Slot> Default for SanityChecker<SL> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<ES: Slot> SanityChecker<ES> {
+impl<SL: Slot> SanityChecker<SL> {
     pub fn new() -> Self {
         Self {
             refs: HashSet::new(),
@@ -34,7 +34,7 @@ impl<ES: Slot> SanityChecker<ES> {
     }
 
     /// Cache a list of root edges to the sanity checker.
-    pub fn add_root_edges(&mut self, roots: Vec<ES>) {
+    pub fn add_root_edges(&mut self, roots: Vec<SL>) {
         self.root_edges.push(roots)
     }
 

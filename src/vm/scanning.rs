@@ -6,14 +6,14 @@ use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
 
 /// Callback trait of scanning functions that report edges.
-pub trait EdgeVisitor<ES: Slot> {
+pub trait EdgeVisitor<SL: Slot> {
     /// Call this function for each edge.
-    fn visit_edge(&mut self, edge: ES);
+    fn visit_edge(&mut self, edge: SL);
 }
 
 /// This lets us use closures as EdgeVisitor.
-impl<ES: Slot, F: FnMut(ES)> EdgeVisitor<ES> for F {
-    fn visit_edge(&mut self, edge: ES) {
+impl<SL: Slot, F: FnMut(SL)> EdgeVisitor<SL> for F {
+    fn visit_edge(&mut self, edge: SL) {
         #[cfg(debug_assertions)]
         trace!(
             "(FunctionClosure) Visit edge {:?} (pointing to {:?})",
@@ -98,14 +98,14 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
 ///     it needs `Send` to be sent between threads.  `'static` means it must not have
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
-pub trait RootsWorkFactory<ES: Slot>: Clone + Send + 'static {
+pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     /// Create work packets to handle root edges.
     ///
     /// The work packet may update the edges.
     ///
     /// Arguments:
     /// * `edges`: A vector of edges.
-    fn create_process_edge_roots_work(&mut self, edges: Vec<ES>);
+    fn create_process_edge_roots_work(&mut self, edges: Vec<SL>);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///
