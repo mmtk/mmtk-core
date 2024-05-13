@@ -72,6 +72,10 @@ See also:
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/42>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/43>
 
+<script type="text/javascript">
+// This will tell api-migration-details.js to run some code and enable the collapsing feature.
+const isApiMigrationGuide = true;
+</script>
 
 <!--
 vim: tw=100

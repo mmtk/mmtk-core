@@ -166,6 +166,10 @@ See also:
 -   PR: <https://github.com/mmtk/mmtk-core/pull/1067>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/268>
 
+<script type="text/javascript">
+const isApiMigrationGuide = true;
+</script>
+
 <!--
 vim: tw=100
 -->
