@@ -570,7 +570,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         plan_mut.end_of_gc(worker.tls);
 
         #[cfg(feature = "extreme_assertions")]
-        if crate::util::slot_logger::should_check_duplicate_edges(mmtk.get_plan()) {
+        if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             // reset the logging info at the end of each GC
             mmtk.slot_logger.reset();
         }
