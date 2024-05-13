@@ -5,26 +5,26 @@ use crate::util::VMWorkerThread;
 use crate::vm::slot::Slot;
 use crate::vm::VMBinding;
 
-/// Callback trait of scanning functions that report edges.
-pub trait EdgeVisitor<SL: Slot> {
-    /// Call this function for each edge.
-    fn visit_edge(&mut self, edge: SL);
+/// Callback trait of scanning functions that report slots.
+pub trait SlotVisitor<SL: Slot> {
+    /// Call this function for each slot.
+    fn visit_slot(&mut self, slot: SL);
 }
 
-/// This lets us use closures as EdgeVisitor.
-impl<SL: Slot, F: FnMut(SL)> EdgeVisitor<SL> for F {
-    fn visit_edge(&mut self, edge: SL) {
+/// This lets us use closures as SlotVisitor.
+impl<SL: Slot, F: FnMut(SL)> SlotVisitor<SL> for F {
+    fn visit_slot(&mut self, slot: SL) {
         #[cfg(debug_assertions)]
         trace!(
-            "(FunctionClosure) Visit edge {:?} (pointing to {:?})",
-            edge,
-            edge.load()
+            "(FunctionClosure) Visit slot {:?} (pointing to {:?})",
+            slot,
+            slot.load()
         );
-        self(edge)
+        self(slot)
     }
 }
 
-/// Callback trait of scanning functions that directly trace through edges.
+/// Callback trait of scanning functions that directly trace through object graph edges.
 pub trait ObjectTracer {
     /// Call this function to trace through an object graph edge which points to `object`.
     ///
@@ -99,13 +99,13 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
 pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
-    /// Create work packets to handle root edges.
+    /// Create work packets to handle root slots.
     ///
-    /// The work packet may update the edges.
+    /// The work packet may update the slots.
     ///
     /// Arguments:
-    /// * `edges`: A vector of edges.
-    fn create_process_edge_roots_work(&mut self, edges: Vec<SL>);
+    /// * `slots`: A vector of slots.
+    fn create_process_slot_roots_work(&mut self, slots: Vec<SL>);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///
@@ -114,10 +114,10 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     /// But it will not prevent the children of those objects from moving.
     ///
     /// This method is useful for conservative stack scanning, or VMs that cannot update some
-    /// of the root edges.
+    /// of the root slots.
     ///
     /// Arguments:
-    /// * `nodes`: A vector of references to objects pointed by root edges.
+    /// * `nodes`: A vector of references to objects pointed by edges from roots.
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
 
     /// Create work packets to handle transitively pinning (TP) roots.
@@ -126,18 +126,18 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     /// Unlike `create_process_pinning_roots_work`, no objects in the transitive closure of `nodes` will be moved, either.
     ///
     /// Arguments:
-    /// * `nodes`: A vector of references to objects pointed by root edges.
+    /// * `nodes`: A vector of references to objects pointed by edges from roots.
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
 /// VM-specific methods for scanning roots/objects.
 pub trait Scanning<VM: VMBinding> {
-    /// Return true if the given object supports edge enqueuing.
+    /// Return true if the given object supports slot enqueuing.
     ///
     /// -   If this returns true, MMTk core will call `scan_object` on the object.
     /// -   Otherwise, MMTk core will call `scan_object_and_trace_edges` on the object.
     ///
-    /// For maximum performance, the VM should support edge-enqueuing for as many objects as
+    /// For maximum performance, the VM should support slot-enqueuing for as many objects as
     /// practical.  Also note that this method is called for every object to be scanned, so it
     /// must be fast.  The VM binding should avoid expensive checks and keep it as efficient as
     /// possible.
@@ -145,16 +145,19 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    fn support_edge_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -> bool {
+    fn support_slot_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -> bool {
         true
     }
 
     /// Delegated scanning of a object, visiting each reference field encountered.
     ///
-    /// The VM shall call `edge_visitor.visit_edge` on each reference field.
+    /// The VM shall call `slot_visitor.visit_slot` on each reference field.  This effectively
+    /// visits all outgoing edges from the current object in the form of slots.
     ///
-    /// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged
-    /// references, it must skip tagged reference fields which are not holding references.
+    /// The VM may skip a reference field if it is not holding an object reference (e.g. if the
+    /// field is holding a null reference, or a tagged non-reference value such as small integer).
+    /// Even if not skipped, [`Slot::load`] will still return `None` if the slot is not holding an
+    /// object reference.
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the "is_mmtk_object" feature is enabled, and
@@ -163,23 +166,23 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    /// * `edge_visitor`: Called back for each edge.
-    fn scan_object<EV: EdgeVisitor<VM::VMSlot>>(
+    /// * `slot_visitor`: Called back for each field.
+    fn scan_object<SV: SlotVisitor<VM::VMSlot>>(
         tls: VMWorkerThread,
         object: ObjectReference,
-        edge_visitor: &mut EV,
+        slot_visitor: &mut SV,
     );
 
-    /// Delegated scanning of a object, visiting each reference field encountered, and trace the
+    /// Delegated scanning of a object, visiting each reference field encountered, and tracing the
     /// objects pointed by each field.
     ///
-    /// The VM shall call `object_tracer.trace_object` on the value held in each reference field,
-    /// and assign the returned value back to the field.  If the VM uses tagged references, the
-    /// value passed to `object_tracer.trace_object` shall be the `ObjectReference` to the object
-    /// without any tag bits.
+    /// The VM shall call `object_tracer.trace_object` with the argument being the object reference
+    /// held in each reference field.  If the GC moves the object, the VM shall update the field so
+    /// that it refers to the object using the object reference returned from `trace_object`.  This
+    /// effectively traces through all outgoing edges from the current object directly.
     ///
-    /// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged
-    /// references, it must skip tagged reference fields which are not holding references.
+    /// The VM must skip reference fields that are not holding object references (e.g. if the
+    /// field is holding a null reference, or a tagged non-reference value such as small integer).
     ///
     /// The `memory_manager::is_mmtk_object` function can be used in this function if
     /// -   the "is_mmtk_object" feature is enabled, and
@@ -188,13 +191,13 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    /// * `object_tracer`: Called back for the content of each edge.
+    /// * `object_tracer`: Called back for the object reference held in each field.
     fn scan_object_and_trace_edges<OT: ObjectTracer>(
         _tls: VMWorkerThread,
         _object: ObjectReference,
         _object_tracer: &mut OT,
     ) {
-        unreachable!("scan_object_and_trace_edges() will not be called when support_edge_enqueue() is always true.")
+        unreachable!("scan_object_and_trace_edges() will not be called when support_slot_enqueuing() is always true.")
     }
 
     /// MMTk calls this method at the first time during a collection that thread's stacks

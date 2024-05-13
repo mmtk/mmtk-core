@@ -704,7 +704,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
 impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
     RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
-    fn create_process_edge_roots_work(&mut self, edges: Vec<VM::VMSlot>) {
+    fn create_process_slot_roots_work(&mut self, edges: Vec<VM::VMSlot>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
@@ -790,7 +790,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                     .shared
                     .increase_live_bytes(VM::VMObjectModel::get_current_size(object));
 
-                if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
+                if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (edge) {}", object);
                     // If an object supports edge-enqueuing, we enqueue its edges.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);

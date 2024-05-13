@@ -4,7 +4,7 @@
 use crate::scheduler::gc_work::{EdgeOf, ProcessEdgesWork};
 use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
-use crate::vm::EdgeVisitor;
+use crate::vm::SlotVisitor;
 
 /// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
@@ -111,8 +111,8 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 }
 
-impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
-    fn visit_edge(&mut self, slot: EdgeOf<E>) {
+impl<'a, E: ProcessEdgesWork> SlotVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
+    fn visit_slot(&mut self, slot: EdgeOf<E>) {
         #[cfg(debug_assertions)]
         {
             use crate::vm::slot::Slot;
