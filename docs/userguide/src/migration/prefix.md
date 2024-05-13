@@ -1,8 +1,3 @@
-<!--
-The canonical location of this document is `mmtk-core/doc/userguide/src/api_migration.md`.
-It will be part of the MMTk User Guide, available online at <https://docs.mmtk.io/index.html>.
--->
-
 # API Migration Guide
 
 This document lists changes to the MMTk-VM API that require changes to be made by the VM bindings.
@@ -29,7 +24,7 @@ editor can still read comfortably.
 
 <!-- Template
 
-## 0.xx.0 (the version number)
+## 0.xx.0 (the version number.  Make sure you add contents for the **upcoming** release)
 
 ### Title of a change.  (Usually one per PR.  May coalesce several related PRs.)
 
@@ -81,8 +76,8 @@ See also:
 
 -   PR: <https://github.com/mmtk/mmtk-core/pull/121>
 -   PR: <https://github.com/mmtk/mmtk-core/pull/122>
--   Binding example: <https://github.com/mmtk/mmtk-openjdk/pull/42>
--   Binding example: <https://github.com/mmtk/mmtk-openjdk/pull/43>
+-   Example: <https://github.com/mmtk/mmtk-openjdk/pull/42>
+-   Example: <https://github.com/mmtk/mmtk-openjdk/pull/43>
 
 -->
 
@@ -92,7 +87,7 @@ See also:
 ### `ObjectReference` is no longer nullable
 
 **TL;DR** `ObjectReference` can no longer represent a NULL reference.  Some methods of
-`ObjectReferences` and write barrier functions are changed.  The VM bindings need to re-implement
+`ObjectReferences` and write barrier functions are changed.  VM bindings need to re-implement
 methods of the `Edge`, `ObjectModel` and `ReferenceGlue` traits.
 
 API changes:
