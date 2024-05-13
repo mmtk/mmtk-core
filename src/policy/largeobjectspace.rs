@@ -106,6 +106,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
+    fn maybe_get_page_resource_mut(&mut self) -> Option<&mut dyn PageResource<VM>> {
+        Some(&mut self.pr)
+    }
 
     fn initialize_sft(&self, sft_map: &mut dyn crate::policy::sft_map::SFTMap) {
         self.common().initialize_sft(self.as_sft(), sft_map)

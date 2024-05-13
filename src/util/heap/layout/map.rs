@@ -1,28 +1,34 @@
 use crate::util::freelist::FreeList;
-use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
+
+/// The result of creating free list.
+///
+/// `VMMap` will select an implementation of `FreeList`.  If it is `RawMemoryFreeList`, it will
+/// occupy a portion of address range at the beginning of the space.  That will require the
+/// starting address of the space to be displaced.  This information is conveyed via the
+/// `space_displacement` field.
+pub struct CreateFreeListResult {
+    // The created free list.
+    pub free_list: Box<dyn FreeList>,
+    // The number of bytes to be added to the starting address of the space.  Zero if not needed.
+    // Always aligned to chunks.
+    pub space_displacement: usize,
+}
 
 pub trait VMMap: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
-    /// bind_freelist() must be called by the caller after this method.
-    fn create_freelist(&self, start: Address) -> Box<dyn FreeList>;
+    fn create_freelist(&self, start: Address) -> CreateFreeListResult;
 
     /// Create a free-list for a contiguous space. Must only be called at boot time.
-    /// bind_freelist() must be called by the caller after this method.
-    fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
-        -> Box<dyn FreeList>;
-
-    /// Bind a created freelist with the page resource.
-    /// This must called after create_freelist() or create_parent_freelist().
-    ///
-    /// # Safety
-    ///
-    /// * `pr` must be a valid pointer to a CommonFreeListPageResource and be alive
-    ///  for the duration of the VMMap.
-    unsafe fn bind_freelist(&self, pr: *const CommonFreeListPageResource);
+    fn create_parent_freelist(
+        &self,
+        start: Address,
+        units: usize,
+        grain: i32,
+    ) -> CreateFreeListResult;
 
     /// # Safety
     ///
@@ -32,6 +38,7 @@ pub trait VMMap: Sync {
         descriptor: SpaceDescriptor,
         chunks: usize,
         head: Address,
+        maybe_freelist: Option<&mut dyn FreeList>,
     ) -> Address;
 
     fn get_next_contiguous_region(&self, start: Address) -> Address;
@@ -55,9 +62,22 @@ pub trait VMMap: Sync {
     /// Caller must ensure that only one thread is calling this method.
     unsafe fn free_contiguous_chunks(&self, start: Address) -> usize;
 
-    fn boot(&self) {}
-
-    fn finalize_static_space_map(&self, from: Address, to: Address);
+    /// Finalize the globlal maps in the implementations of `VMMap`.  This should be called after
+    /// all spaces are created.
+    ///
+    /// Arguments:
+    /// -   `from`: the starting address of the heap
+    /// -   `to`: the address of the last byte within the heap
+    /// -   `on_discontig_start_determined`: Called when the address range of the discontiguous
+    ///     memory range is determined.  Will not be called if the `VMMap` implementation does not
+    ///     have a discontigous memory range.  The `Address` argument of the callback is the
+    ///     starting address of the discontiguous memory range.
+    fn finalize_static_space_map(
+        &self,
+        from: Address,
+        to: Address,
+        on_discontig_start_determined: &mut dyn FnMut(Address),
+    );
 
     fn is_finalized(&self) -> bool;
 

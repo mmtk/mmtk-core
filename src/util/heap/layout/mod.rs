@@ -8,6 +8,7 @@ mod byte_map_mmapper;
 mod fragmented_mapper;
 
 mod map;
+pub(crate) use self::map::CreateFreeListResult;
 pub use self::map::VMMap;
 use self::vm_layout::vm_layout;
 mod map32;
