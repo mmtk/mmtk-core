@@ -463,10 +463,10 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
         bucket: WorkBucketStage,
     ) -> Self {
         #[cfg(feature = "extreme_assertions")]
-        if crate::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
+        if crate::util::slot_logger::should_check_duplicate_edges(mmtk.get_plan()) {
             for edge in &edges {
                 // log edge, panic if already logged
-                mmtk.edge_logger.log_edge(*edge);
+                mmtk.slot_logger.log_edge(*edge);
             }
         }
         Self {

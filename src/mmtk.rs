@@ -9,7 +9,7 @@ use crate::scheduler::GCWorkScheduler;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 #[cfg(feature = "extreme_assertions")]
-use crate::util::edge_logger::SlotLogger;
+use crate::util::slot_logger::SlotLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
@@ -115,7 +115,7 @@ pub struct MMTK<VM: VMBinding> {
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMSlot>>,
     #[cfg(feature = "extreme_assertions")]
-    pub(crate) edge_logger: SlotLogger<VM::VMSlot>,
+    pub(crate) slot_logger: SlotLogger<VM::VMSlot>,
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
@@ -222,7 +222,7 @@ impl<VM: VMBinding> MMTK<VM> {
             inside_sanity: AtomicBool::new(false),
             inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
-            edge_logger: SlotLogger::new(),
+            slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
             analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,

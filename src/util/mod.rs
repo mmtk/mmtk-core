@@ -37,7 +37,7 @@ pub mod test_util;
 pub(crate) mod analysis;
 /// Logging edges to check duplicated edges in GC.
 #[cfg(feature = "extreme_assertions")]
-pub(crate) mod edge_logger;
+pub(crate) mod slot_logger;
 /// Non-generic refs to generic types of `<VM>`.
 pub(crate) mod erase_vm;
 /// Finalization implementation.

@@ -68,7 +68,7 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
 
         // We are going to do sanity GC which will traverse the object graph again. Reset edge logger to clear recorded edges.
         #[cfg(feature = "extreme_assertions")]
-        mmtk.edge_logger.reset();
+        mmtk.slot_logger.reset();
 
         mmtk.sanity_begin(); // Stop & scan mutators (mutator scanning can happen before STW)
 
