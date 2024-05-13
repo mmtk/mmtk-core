@@ -4,85 +4,30 @@ This document lists changes to the MMTk-VM API that require changes to be made b
 VM binding developers can use this document as a guide to update their code to maintain
 compatibility with the latest release of MMTk.
 
+
+## View control
+
+Collapse details to show only two levels of the list.  This allows you to browse through the
+changes quickly and selectively expand the details of your interested items.
+
+<button class="api-migration-details-collapse-all" type="button">Collapse all details</button>
+<button class="api-migration-details-expand-all" type="button">Expand all details</button>
+
 <!--
-Developers of mmtk-core:
 
-Add an item when making API-breaking changes, but edit existing item if the same API is changed
-again before the upcoming release.  No need to add item if a change only adds new API functions, or
-if it is source-compatible with the previous version so that VM binding code does not need to be
-changed.
+Notes for the mmtk-core developers:
 
-Check the current version in `Cargo.toml` before adding items.
-New items should be added to the section for the *upcoming* release.
-
-Use URLs of the pull requests to link to the relevant revisions.  Do not use commit hashes because
-they will change after squash-merging.
-
-Maintain a line width of 100 characters so that developers who read this file in an IDE or text
-editor can still read comfortably.
--->
-
-<!-- Template
-
-## 0.xx.0 (the version number.  Make sure you add contents for the **upcoming** release)
-
-### Title of a change.  (Usually one per PR.  May coalesce several related PRs.)
-
-**TL;DR** Use a few sentences to summarize the change so that the reader knows what has bee changed
-without reading through the following list.
-
-API changes:
-
-*   type `Foo` (Put types/traits/modules at the first level.  Keep the "type/trait/module" prefix
-    so that the reader can search for "type `Foo`" to find actual changes about `Foo` rather than
-    places that merely mention `Foo`.)
-    -   `abc()` is removed. (Put methods/functions/constants/other items at the second level)
-        +   Use `abc2` instead. (Put suggestions at the third level)
-    -   `defg()`
-        +   It now takes an additional parameter `blah` which is required by blah blah blah because
-            blah blah blah blah.  Now we have to blah blah blah blah... (Feel free to put long
-            descriptions down one hierarchy level.)
-        +   If you used to do xxxx, pass yyyy as `blah`.
-        +   Otherwise, use the default value `Blah::default()`.
-
-*   module `aaa::bbb::ccc`
-    -   **Only affects users of feature "xxxx"** (When omitted, it means it affects everyone.)
-    -   `method1()`
-        +   What happened to it...
-        +   Suggestion...
-    -   `method2()`
-        +   What happened to it...
-        +   Suggestion...
-
-VM bindings need to re-implement the following traits:
-
-*   trait `Bar`
-    -   `method1()`
-        +   MMTk now expects the VM binding to...
-        +   The VM binding should...
-    -   `method2()`
-        +   MMTk now expects the VM binding to...
-        +   The VM binding should...
-
-*   trait `Baz`
-    -   insert methods here...
-
-Miscellaneous changes:
-
-*   Add more stuff if it doesn't belong to any of the categories, but still needs the attention from
-    the VM binding developers.
-
-See also:
-
--   PR: <https://github.com/mmtk/mmtk-core/pull/121>
--   PR: <https://github.com/mmtk/mmtk-core/pull/122>
--   Example: <https://github.com/mmtk/mmtk-openjdk/pull/42>
--   Example: <https://github.com/mmtk/mmtk-openjdk/pull/43>
+-   Make sure you add to the **upcoming release**.  Check the current version in `Cargo.toml`.
+-   You may add new items or edit existing items before a release, whichever makes sense.
+-   No need to mention API changes that are source compatible and do not require VM binding code
+    to be updated.
+-   Use the [template](template.md).
+-   100 characters per line.  Those who read this doc in text editors and IDEs will thank you.
 
 -->
+
 
 ## 0.25.0
-
 
 ### `ObjectReference` is no longer nullable
 
@@ -103,7 +48,6 @@ API changes:
         +   It returns `None` if `addr` is not zero.
         +   If you know `addr` cannot be zero, you can use the new method
             `from_raw_address_unchecked(addr)`, instead.
-
 *   module `mmtk::memory_manager`
     -   **Only affects users of write barriers**
     -   `object_reference_write_pre(mutator, obj, slot, target)`
@@ -124,7 +68,6 @@ VM bindings need to re-implement the following traits:
         +   The return type is changed to `Option<ObjectReference>`.
         +   It returns `None` if the slot is holding a NULL reference or other non-reference
             values.  MMTk will skip those slots.
-
 *   trait `ObjectModel`
     -   `copy(from, semantics, copy_context)`
         +   Previously VM bindings convert the result of `copy_context.alloc_copy()` to
@@ -138,7 +81,6 @@ VM bindings need to re-implement the following traits:
         +   `addr` is never zero because this method is an inverse operation of
             `ref_to_address(objref)` where `objref` is never NULL.
         +   You may skip the zero check, too.
-
 *   trait `ReferenceGlue`
     -   *Note: If your VM binding is still using `ReferenceGlue` and the reference processor and
         finalization processor in mmtk-core, it is strongly recommended to switch to the
@@ -205,7 +147,6 @@ API changes:
         +   It now takes ownership of the `Box<GCWorker>` instance instead of borrowing it.
         +   The VM binding can simply call the method `worker.run()` on the worker instance from
             `GCThreadContext::Worker(worker)`.
-
 *   module `mmtk::memory_manager`
     -   `start_worker`
         +   It is now a simple wrapper of `GCWorker::run` for legacy code.  It takes ownership of
