@@ -177,7 +177,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
 
     const OVERWRITE_REFERENCE: bool = false;
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        edges: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,

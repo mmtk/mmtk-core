@@ -504,8 +504,8 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     }
 }
 
-/// A short-hand for `<E::VM as VMBinding>::VMEdge`.
-pub type EdgeOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
+/// A short-hand for `<E::VM as VMBinding>::VMSlot`.
+pub type SlotOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
 
 /// Scan & update a list of object slots
 //
@@ -545,7 +545,7 @@ pub trait ProcessEdgesWork:
     /// * `mmtk`: a reference to the MMTK instance.
     /// * `bucket`: which work bucket this packet belongs to. Further work generated from this packet will also be put to the same bucket.
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        edges: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<Self::VM>,
         bucket: WorkBucketStage,
@@ -602,7 +602,7 @@ pub trait ProcessEdgesWork:
 
     /// Process an edge, including loading the object reference from the memory slot,
     /// trace the object and store back the new object reference if necessary.
-    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+    fn process_edge(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else {
             // Skip slots that are not holding an object reference.
             return;
@@ -653,7 +653,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        edges: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -899,7 +899,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        edges: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -920,7 +920,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
             .trace_object::<VectorObjectQueue, KIND>(&mut self.base.nodes, object, worker)
     }
 
-    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+    fn process_edge(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else {
             // Skip slots that are not holding an object reference.
             return;
@@ -1122,7 +1122,7 @@ impl<VM: VMBinding> ProcessEdgesWork for UnsupportedProcessEdges<VM> {
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn new(
-        _edges: Vec<EdgeOf<Self>>,
+        _edges: Vec<SlotOf<Self>>,
         _roots: bool,
         _mmtk: &'static MMTK<Self::VM>,
         _bucket: WorkBucketStage,

@@ -32,7 +32,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        edges: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
@@ -52,7 +52,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         )
     }
 
-    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+    fn process_edge(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else {
             // Skip slots that are not holding an object reference.
             return;
