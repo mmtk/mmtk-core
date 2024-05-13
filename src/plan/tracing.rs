@@ -77,8 +77,8 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
     }
 }
 
-/// A transitive closure visitor to collect the edges from objects.
-/// It maintains a buffer for the edges, and flushes edges to a new work packet
+/// A transitive closure visitor to collect the slots from objects.
+/// It maintains a buffer for the slots, and flushes slots to a new work packet
 /// if the buffer is full or if the type gets dropped.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<SlotOf<E>>,
@@ -117,7 +117,7 @@ impl<'a, E: ProcessEdgesWork> SlotVisitor<SlotOf<E>> for ObjectsClosure<'a, E> {
         {
             use crate::vm::slot::Slot;
             trace!(
-                "(ObjectsClosure) Visit edge {:?} (pointing to {:?})",
+                "(ObjectsClosure) Visit slot {:?} (pointing to {:?})",
                 slot,
                 slot.load()
             );
