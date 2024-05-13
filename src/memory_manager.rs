@@ -315,7 +315,7 @@ pub fn object_reference_write_post<VM: VMBinding>(
 /// The *subsuming* memory region copy barrier by MMTk.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be able to filter out non-reference values on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on slot iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
@@ -340,7 +340,7 @@ pub fn memory_region_copy<VM: VMBinding>(
 /// *before* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be able to filter out non-reference values on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on slot iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
@@ -365,7 +365,7 @@ pub fn memory_region_copy_pre<VM: VMBinding>(
 /// *after* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be able to filter out non-reference values on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on slot iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
