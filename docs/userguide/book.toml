@@ -11,5 +11,11 @@ edition = "2021"
 git-repository-url = "https://github.com/mmtk/mmtk-core/tree/master/docs/userguide"
 git-repository-icon = "fa-github"
 edit-url-template = "https://github.com/mmtk/mmtk-core/edit/master/docs/userguide/{path}"
-additional-css = ["theme/api-migration-details.css"]
+additional-css = ["theme/api-migration-details.css", "assets/css/mdbook-admonish.css"]
 additional-js = ["theme/api-migration-details.js"]
+
+[preprocessor]
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`

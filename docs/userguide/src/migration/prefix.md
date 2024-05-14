@@ -33,9 +33,11 @@ Notes for the mmtk-core developers:
 
 ### `ObjectReference` is no longer nullable
 
-**TL;DR** `ObjectReference` can no longer represent a NULL reference.  Some methods of
+```admonish tldr
+`ObjectReference` can no longer represent a NULL reference.  Some methods of
 `ObjectReferences` and write barrier functions are changed.  VM bindings need to re-implement
 methods of the `Edge`, `ObjectModel` and `ReferenceGlue` traits.
+```
 
 API changes:
 
@@ -116,7 +118,9 @@ See also:
 
 ### Instance methods of `ObjectReference` changed
 
-**TL;DR** Some methods of `ObjectReference` are changed.
+```admonish tldr
+Some methods of `ObjectReference` are changed.
+```
 
 API changes:
 
@@ -139,8 +143,10 @@ See also:
 
 ### The GC controller (a.k.a. coordinator) is removed
 
-**TL;DR**: The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement
+```admonish tldr
+The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement
 `Collection::spawn_gc_thread`.
+```
 
 API changes:
 

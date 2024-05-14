@@ -24,5 +24,5 @@ cargo build
 
 # Install mdbook using the stable toolchain and the default target
 unset CARGO_BUILD_TARGET
-cargo +stable install mdbook
+cargo +stable install mdbook mdbook-admonish
 mdbook build $project_root/docs/userguide

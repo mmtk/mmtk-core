@@ -18,8 +18,12 @@ Try clicking those buttons and see what they do.
 
 ### Title of a change
 
-**TL;DR** Use a few sentences to summarize the change so that the reader knows what has bee changed
+```admonish tldr
+Use a few sentences to summarize the change so that the reader knows what has been changed
 without reading through the following list.
+
+`mdbook-admonish` has a built-in block name `tldr`.
+```
 
 API changes:
 
