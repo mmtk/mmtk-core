@@ -507,19 +507,32 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
 /// A short-hand for `<E::VM as VMBinding>::VMSlot`.
 pub type SlotOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
 
-/// Process object graph edges represented as object slots.  Work packets of this trait contain a
-/// list of object slots to be processed.  They trace the objects pointed by the object reference in
-/// each slot, and update the slots if the GC moves the target object when tracing.
+/// An abstract trait for work packets that process object graph edges.  Its method
+/// [`ProcessEdgesWork::trace_object`] traces an object and, upon first visit, enqueues it into an
+/// internal queue inside the `ProcessEdgesWork` instance.  Each implementation of this trait
+/// implement `trace_object` differently.  During [`Plan::schedule_collection`], plans select
+/// (usually via [`GCWorkContext`]) specialized implementations of this trait to be used during each
+/// trace according the nature of each trace, such as whether it is a nursery collection, whether it
+/// is a defrag collection, whether it pins objects, etc.
 ///
-/// Instances of this trait can also be abused as a provider of the `trace_object` method, without
-/// representing edges as slots.  In that case, an object graph edge is represented as the object
-/// reference to the target node, while the source node is implicit.  The caller of `trace_object`
-/// is responsible for updating the slot (field or root variable).  This is useful for
-/// node-enqueuing tracing ([`Scanning::scan_object_and_trace_edges`]) as well as weak reference
-/// processing ([`Scanning::process_weak_refs`]).
+/// This trait was originally designed for work packets that process object graph edges represented
+/// as slots.  The constructor [`ProcessEdgesWork::new`] takes a vector of slots, and the created
+/// work packet will trace the objects pointed by the object reference in each slot using the
+/// `trace_object` method, and update the slot if the GC moves the target object when tracing.
 ///
-/// TODO: We should refactor this trait to decouple it from slots.
-/// See: <https://github.com/mmtk/mmtk-core/issues/599>
+/// This trait can also be used merely as a provider of the `trace_object` method by giving it an
+/// empty vector of slots.  This is useful for node-enqueuing tracing
+/// ([`Scanning::scan_object_and_trace_edges`]) as well as weak reference processing
+/// ([`Scanning::process_weak_refs`] as well as [`ReferenceProcessor`] and
+/// [`FinalizableProcessor`]).  In those cases, the caller passes the reference to the target object
+/// to `trace_object`, an the caller is responsible for updating the slots according the return
+/// value of `trace_object`.
+///
+/// [`ReferenceProcessor`]: crate::util::reference_processor::ReferenceProcessor
+/// [`FinalizableProcessor`]: crate::util::finalizable_processor::FinalizableProcessor
+///
+/// TODO: We should refactor this trait to decouple it from slots. See:
+/// <https://github.com/mmtk/mmtk-core/issues/599>
 //
 // Note: be very careful when using this trait. process_node() will push objects
 // to the buffer, and it is expected that at the end of the operation, flush()
