@@ -27,9 +27,9 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:gcworker_exit()`: a GC worker thread exits its work loop
 -   `mmtk:gc_start()`: a collection epoch starts
 -   `mmtk:gc_end()`: a collection epoch ends
--   `mmtk:process_edges(num_edges: int, is_roots: bool)`: a invocation of the `process_edges`
-    method. The first argument is the number of edges to be processed, and the second argument is
-    whether these edges are root edges.
+-   `mmtk:process_slots(num_slots: int, is_roots: bool)`: an invocation of the `process_slots`
+    method. The first argument is the number of slots to be processed, and the second argument is
+    whether these slots are root slots.
 -   `mmtk:bucket_opened(id: int)`: a work bucket opened. The first argument is the numerical
     representation of `enum WorkBucketStage`.
 -   `mmtk:work_poll()`: a work packet is to be polled.
@@ -44,7 +44,7 @@ Currently, the core provides the following tracepoints.
 Each sub-directory contains a set of scripts.
 
 -   `performance`: Print various GC-related statistics, such as the distribution of time spent in
-    allocation slow path, the time spent in each GC stages, and the distribution of `process_edges`
+    allocation slow path, the time spent in each GC stages, and the distribution of `process_slots`
     packet sizes.
 -   `timeline`: Record the start and end time of each GC and each work packet, and visualize them on
     a timeline in Perfetto UI.
