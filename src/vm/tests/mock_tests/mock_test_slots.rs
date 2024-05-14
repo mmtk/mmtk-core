@@ -5,7 +5,7 @@
 use super::mock_test_prelude::*;
 use crate::{
     util::{Address, ObjectReference},
-    vm::edge_shape::{Edge, SimpleEdge},
+    vm::slot::{Slot, SimpleSlot},
 };
 use atomic::{Atomic, Ordering};
 
@@ -13,7 +13,7 @@ lazy_static! {
     static ref FIXTURE: Fixture<TwoObjects> = Fixture::new();
 }
 
-mod simple_edges {
+mod simple_slots {
     use super::*;
 
     #[test]
@@ -24,8 +24,8 @@ mod simple_edges {
                 FIXTURE.with_fixture(|fixture| {
                     let mut slot: Atomic<ObjectReference> = Atomic::new(fixture.objref1);
 
-                    let edge = SimpleEdge::from_address(Address::from_ref(&slot));
-                    let objref = edge.load();
+                    let slot = SimpleSlot::from_address(Address::from_ref(&slot));
+                    let objref = slot.load();
 
                     assert_eq!(objref, Some(fixture.objref1));
                 });
@@ -42,7 +42,7 @@ mod simple_edges {
                 FIXTURE.with_fixture(|fixture| {
                     let mut slot: Atomic<ObjectReference> = Atomic::new(fixture.objref1);
 
-                    let edge = SimpleEdge::from_address(Address::from_ref(&slot));
+                    let edge = SimpleSlot::from_address(Address::from_ref(&slot));
                     edge.store(fixture.objref2);
                     assert_eq!(slot.load(Ordering::SeqCst), fixture.objref2);
 
@@ -80,7 +80,7 @@ mod compressed_oop {
         }
     }
 
-    impl Edge for CompressedOopEdge {
+    impl Slot for CompressedOopEdge {
         fn load(&self) -> Option<ObjectReference> {
             let compressed = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let expanded = (compressed as usize) << 3;
@@ -173,7 +173,7 @@ mod offset_edge {
         }
     }
 
-    impl Edge for OffsetEdge {
+    impl Slot for OffsetEdge {
         fn load(&self) -> Option<ObjectReference> {
             let middle = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let begin = middle - self.offset;
@@ -254,7 +254,7 @@ mod tagged_edge {
         }
     }
 
-    impl Edge for TaggedEdge {
+    impl Slot for TaggedEdge {
         fn load(&self) -> Option<ObjectReference> {
             let tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let untagged = tagged & !Self::TAG_BITS_MASK;
@@ -344,12 +344,12 @@ mod mixed {
     use super::tagged_edge::TaggedEdge;
     use super::tagged_edge::TAG1;
     use super::*;
-    use crate::vm::edge_shape::SimpleEdge;
+    use crate::vm::slot::SimpleSlot;
 
     /// If a VM supports multiple kinds of edges, we can use tagged union to represent all of them.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub enum DummyVMEdge {
-        Simple(SimpleEdge),
+        Simple(SimpleSlot),
         #[cfg(target_pointer_width = "64")]
         Compressed(compressed_oop::CompressedOopEdge),
         Offset(OffsetEdge),
@@ -358,7 +358,7 @@ mod mixed {
 
     unsafe impl Send for DummyVMEdge {}
 
-    impl Edge for DummyVMEdge {
+    impl Slot for DummyVMEdge {
         fn load(&self) -> Option<ObjectReference> {
             match self {
                 DummyVMEdge::Simple(e) => e.load(),
@@ -395,7 +395,7 @@ mod mixed {
                     let mut slot3: Atomic<Address> = Atomic::new(addr1 + OFFSET);
                     let mut slot4: Atomic<usize> = Atomic::new(addr1.as_usize() | TAG1);
 
-                    let edge1 = SimpleEdge::from_address(Address::from_ref(&slot1));
+                    let edge1 = SimpleSlot::from_address(Address::from_ref(&slot1));
                     let edge3 = OffsetEdge::new_with_offset(Address::from_ref(&slot3), OFFSET);
                     let edge4 = TaggedEdge::new(Address::from_ref(&slot4));
 
@@ -409,7 +409,7 @@ mod mixed {
                         assert_eq!(
                             objref,
                             Some(fixture.objref1),
-                            "Edge {} is not properly loaded",
+                            "Slot {} is not properly loaded",
                             i
                         );
                     }
@@ -421,7 +421,7 @@ mod mixed {
                         assert_eq!(
                             objref,
                             Some(fixture.objref2),
-                            "Edge {} is not properly loaded after store",
+                            "Slot {} is not properly loaded after store",
                             i
                         );
                     }
