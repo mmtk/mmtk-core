@@ -79,6 +79,42 @@ See also:
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/42>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/43>
 
+### Title of another change
+
+```admonish tldr
+Insert summary here.
+```
+
+VM bindings need to re-implement the following traits:
+
+*   trait `Bar2`
+    -   `method3()`
+    -   `method4()`
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/123>
+-   Example: <https://github.com/mmtk/mmtk-openjdk/pull/44>
+
+## 0.yy.0
+
+### Title of an old change
+
+```admonish tldr
+Insert summary here.
+```
+
+API changes:
+
+*   type `Foo3`
+    -   `bar()`
+    -   `baz()`
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/124>
+-   Example: <https://github.com/mmtk/mmtk-openjdk/pull/45>
+
 </div>
 
 <script type="text/javascript">

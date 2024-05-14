@@ -23,12 +23,18 @@ function wrapWithDetails(elem) {
     details.appendChild(elem);
 }
 
+function isH3OrAbove(node) {
+    let nodeName = node.nodeName;
+    return nodeName == "H1" || nodeName == "H2" || nodeName == "H3";
+
+}
+
 function wrapAfterTldr() {
     document.querySelectorAll("#api-migration-detail-body div.admonition").forEach((value, key, parent) => {
         if (value.id.startsWith("admonition-tldr")) {
             let details = makeDetails("show details...", "api-migration-level0-detail")
             value.insertAdjacentElement("afterend", details);
-            while (details.nextSibling != null && details.nextSibling.nodeName != "H3") {
+            while (details.nextSibling != null && !isH3OrAbove(details.nextSibling)) {
                 details.appendChild(details.nextSibling);
             }
         }
