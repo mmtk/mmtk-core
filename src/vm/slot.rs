@@ -1,3 +1,7 @@
+//! This module provides the trait [`Slot`] and related traits and types which allow VMs to
+//! customize the layout of slots and the behavior of loading and updating object references in
+//! slots.
+
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::{fmt::Debug, ops::Range};

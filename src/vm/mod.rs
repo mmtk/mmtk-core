@@ -17,7 +17,6 @@
 
 mod active_plan;
 mod collection;
-/// Allows MMTk to access edges in a VM-defined way.
 pub mod slot;
 pub(crate) mod object_model;
 mod reference_glue;
@@ -59,7 +58,7 @@ where
     /// The binding's implementation of [`crate::vm::ReferenceGlue`].
     type VMReferenceGlue: ReferenceGlue<Self>;
 
-    /// The type of edges in this VM.
+    /// The type of slots in this VM.
     type VMSlot: slot::Slot;
     /// The type of heap memory slice in this VM.
     type VMMemorySlice: slot::MemorySlice<SlotType = Self::VMSlot>;
