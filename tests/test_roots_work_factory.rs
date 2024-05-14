@@ -25,7 +25,7 @@ impl MockScanning {
     }
 }
 
-static EDGES: [Address; 3] = [
+static SLOTS: [Address; 3] = [
     unsafe { Address::from_usize(0x8) },
     unsafe { Address::from_usize(0x8) },
     unsafe { Address::from_usize(0x8) },
@@ -42,8 +42,8 @@ struct MockFactory {
 }
 
 impl RootsWorkFactory<Address> for MockFactory {
-    fn create_process_slot_roots_work(&mut self, edges: Vec<Address>) {
-        assert_eq!(edges, EDGES);
+    fn create_process_slot_roots_work(&mut self, slots: Vec<Address>) {
+        assert_eq!(slots, SLOTS);
         match self.round {
             1 => {
                 assert_eq!(self.v, "y");
@@ -84,7 +84,7 @@ fn test_scan() {
         a: Arc::new(Mutex::new("a".to_string())),
     };
     let mut scanning = MockScanning::default();
-    scanning.add_roots(&EDGES);
+    scanning.add_roots(&SLOTS);
     scanning.mock_scan_roots(factory);
 }
 
@@ -105,7 +105,7 @@ fn test_clone() {
 
     let mut scanning = MockScanning::default();
 
-    scanning.add_roots(&EDGES);
+    scanning.add_roots(&SLOTS);
     scanning.mock_scan_roots(factory1);
     scanning.mock_scan_roots(factory2);
 }
