@@ -511,7 +511,7 @@ pub type SlotOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
 /// [`ProcessEdgesWork::trace_object`] traces an object and, upon first visit, enqueues it into an
 /// internal queue inside the `ProcessEdgesWork` instance.  Each implementation of this trait
 /// implement `trace_object` differently.  During [`Plan::schedule_collection`], plans select
-/// (usually via [`GCWorkContext`]) specialized implementations of this trait to be used during each
+/// (usually via `GCWorkContext`) specialized implementations of this trait to be used during each
 /// trace according the nature of each trace, such as whether it is a nursery collection, whether it
 /// is a defrag collection, whether it pins objects, etc.
 ///
@@ -523,13 +523,9 @@ pub type SlotOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
 /// This trait can also be used merely as a provider of the `trace_object` method by giving it an
 /// empty vector of slots.  This is useful for node-enqueuing tracing
 /// ([`Scanning::scan_object_and_trace_edges`]) as well as weak reference processing
-/// ([`Scanning::process_weak_refs`] as well as [`ReferenceProcessor`] and
-/// [`FinalizableProcessor`]).  In those cases, the caller passes the reference to the target object
-/// to `trace_object`, an the caller is responsible for updating the slots according the return
-/// value of `trace_object`.
-///
-/// [`ReferenceProcessor`]: crate::util::reference_processor::ReferenceProcessor
-/// [`FinalizableProcessor`]: crate::util::finalizable_processor::FinalizableProcessor
+/// ([`Scanning::process_weak_refs`] as well as `ReferenceProcessor` and `FinalizableProcessor`).
+/// In those cases, the caller passes the reference to the target object to `trace_object`, an the
+/// caller is responsible for updating the slots according the return value of `trace_object`.
 ///
 /// TODO: We should refactor this trait to decouple it from slots. See:
 /// <https://github.com/mmtk/mmtk-core/issues/599>
