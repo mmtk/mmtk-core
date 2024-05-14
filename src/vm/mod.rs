@@ -17,10 +17,10 @@
 
 mod active_plan;
 mod collection;
-pub mod slot;
 pub(crate) mod object_model;
 mod reference_glue;
 mod scanning;
+pub mod slot;
 pub use self::active_plan::ActivePlan;
 pub use self::collection::Collection;
 pub use self::collection::GCThreadContext;
@@ -28,11 +28,11 @@ pub use self::object_model::specs::*;
 pub use self::object_model::ObjectModel;
 pub use self::reference_glue::Finalizable;
 pub use self::reference_glue::ReferenceGlue;
-pub use self::scanning::SlotVisitor;
 pub use self::scanning::ObjectTracer;
 pub use self::scanning::ObjectTracerContext;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
+pub use self::scanning::SlotVisitor;
 
 #[cfg(test)]
 mod tests;

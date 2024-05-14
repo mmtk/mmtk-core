@@ -8,8 +8,6 @@ use crate::scheduler::GCWorkScheduler;
 
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
-#[cfg(feature = "extreme_assertions")]
-use crate::util::slot_logger::SlotLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
@@ -20,6 +18,8 @@ use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+#[cfg(feature = "extreme_assertions")]
+use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;

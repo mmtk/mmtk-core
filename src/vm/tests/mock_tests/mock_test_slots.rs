@@ -5,7 +5,7 @@
 use super::mock_test_prelude::*;
 use crate::{
     util::{Address, ObjectReference},
-    vm::slot::{Slot, SimpleSlot},
+    vm::slot::{SimpleSlot, Slot},
 };
 use atomic::{Atomic, Ordering};
 

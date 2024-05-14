@@ -5,7 +5,7 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
-use crate::vm::slot::{Slot, MemorySlice};
+use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;

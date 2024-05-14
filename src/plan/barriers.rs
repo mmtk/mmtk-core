@@ -1,6 +1,6 @@
 //! Read/Write barrier implementations.
 
-use crate::vm::slot::{Slot, MemorySlice};
+use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::ObjectModel;
 use crate::{
     util::{metadata::MetadataSpec, *},
