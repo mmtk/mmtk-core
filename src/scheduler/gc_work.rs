@@ -533,13 +533,6 @@ pub type SlotOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMSlot;
 ///
 /// TODO: We should refactor this trait to decouple it from slots. See:
 /// <https://github.com/mmtk/mmtk-core/issues/599>
-//
-// Note: be very careful when using this trait. process_node() will push objects
-// to the buffer, and it is expected that at the end of the operation, flush()
-// is called to create new scan work from the buffered objects. If flush()
-// is not called, we may miss the objects in the GC and have dangling pointers.
-// FIXME: We possibly want to enforce Drop on this trait, and require calling
-// flush() in Drop.
 pub trait ProcessEdgesWork:
     Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self::VM>>
 {
