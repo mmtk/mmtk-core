@@ -23,6 +23,8 @@ Notes for the mmtk-core developers:
     to be updated.
 -   Use the [template](template.md).
 -   100 characters per line.  Those who read this doc in text editors and IDEs will thank you.
+    -   vim: "gq" formats the selected lines, and "gqap" formats one paragraph.
+    -   vscode: The "Rewrap" plugin can re-wrap a paragraph with one hot key.
 
 -->
 
