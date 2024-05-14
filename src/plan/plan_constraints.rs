@@ -21,9 +21,14 @@ pub struct PlanConstraints {
     pub max_non_los_copy_bytes: usize,
     /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
     pub needs_log_bit: bool,
-    /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same edges
-    /// multiple times. If a plan allows tracing duplicate edges, we will not run duplicate edge check
-    /// in extreme_assertions.
+    /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same
+    /// edge multiple times. If a plan allows tracing duplicated edges, we will not run duplicate
+    /// edge check in extreme_assertions.
+    ///
+    /// Note: Both [`crate::vm::Scanning::scan_object`] (which enqueues slots) and
+    /// [`crate::vm::Scanning::scan_object_and_trace_edges`] (which traces the targets directly) are
+    /// affected by such benign races.  But our current duplicate edge check in extreme_assertions
+    /// only identifies duplicated slots.
     pub may_trace_duplicate_edges: bool,
     /// The barrier this plan uses. A binding may check this and know what kind of write barrier is in use
     /// if they would like to implement the barrier fast path in the binding side.
