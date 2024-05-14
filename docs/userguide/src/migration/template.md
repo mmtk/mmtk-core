@@ -5,24 +5,27 @@ This template is for the developers of MMTk-core.
 
 ## View control
 
-The following buttons allow the third level of the lists to be collapsed.  Therefore, you can keep
-the first two levels of the lists terse, and add detailed explanations at the third level.
+The following buttons allow the readers to choose how many details they want to read.  Therefore, we
+can keep the TL;DR and the first two levels of the lists terse, and add detailed explanations at the
+third level.
 
 Try clicking those buttons and see what they do.
 
-<button class="api-migration-details-collapse-all" type="button">Collapse all details</button>
-<button class="api-migration-details-expand-all" type="button">Expand all details</button>
+{{#include view-controls.html}}
 
+<div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 
 ## 0.xx.0
 
 ### Title of a change
 
 ```admonish tldr
-Use a few sentences to summarize the change so that the reader knows what has been changed
-without reading through the following list.
+Use a few sentences to summarize the change so that the reader knows what has been changed without
+reading through the following list.
 
-`mdbook-admonish` has a built-in block name `tldr`.
+Keep in mind that the reader can use the buttons above to hide everything but the TL;DR.  Make sure
+the TL;DR part covers all types/modules that are changed so that the readers know what changed by
+reading the TL;DR alone.
 ```
 
 API changes:
@@ -75,6 +78,8 @@ See also:
 -   PR: <https://github.com/mmtk/mmtk-core/pull/122>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/42>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/43>
+
+</div>
 
 <script type="text/javascript">
 // This will tell api-migration-details.js to run some code and enable the collapsing feature.

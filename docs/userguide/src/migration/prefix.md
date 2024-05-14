@@ -7,11 +7,9 @@ compatibility with the latest release of MMTk.
 
 ## View control
 
-Collapse details to show only two levels of the list.  This allows you to browse through the
-changes quickly and selectively expand the details of your interested items.
+Choose how many details you want to read.
 
-<button class="api-migration-details-collapse-all" type="button">Collapse all details</button>
-<button class="api-migration-details-expand-all" type="button">Expand all details</button>
+{{#include view-controls.html}}
 
 <!--
 
@@ -28,15 +26,18 @@ Notes for the mmtk-core developers:
 
 -->
 
+<div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
+
+<!-- Insert new versions here -->
 
 ## 0.25.0
 
 ### `ObjectReference` is no longer nullable
 
 ```admonish tldr
-`ObjectReference` can no longer represent a NULL reference.  Some methods of
-`ObjectReferences` and write barrier functions are changed.  VM bindings need to re-implement
-methods of the `Edge`, `ObjectModel` and `ReferenceGlue` traits.
+`ObjectReference` can no longer represent a NULL reference.  Some methods of `ObjectReference` and
+write barrier functions are  changed.  VM bindings need to re-implement methods of the `Edge`,
+`ObjectModel` and `ReferenceGlue` traits.
 ```
 
 API changes:
@@ -173,6 +174,8 @@ See also:
 
 -   PR: <https://github.com/mmtk/mmtk-core/pull/1067>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/268>
+
+</div>
 
 <script type="text/javascript">
 const isApiMigrationGuide = true;
