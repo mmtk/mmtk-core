@@ -45,12 +45,12 @@ impl<VM: VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        slots: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
+        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
         Self { base, plan }
     }
