@@ -9,7 +9,7 @@ compatibility with the latest release of MMTk.
 
 Choose how many details you want to read.
 
-{{#include view-controls.html}}
+{{#include ../../assets/snippets/view-controls.html}}
 
 <!--
 

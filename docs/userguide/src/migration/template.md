@@ -11,7 +11,7 @@ third level.
 
 Try clicking those buttons and see what they do.
 
-{{#include view-controls.html}}
+{{#include ../../assets/snippets/view-controls.html}}
 
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 

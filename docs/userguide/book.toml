@@ -11,8 +11,8 @@ edition = "2021"
 git-repository-url = "https://github.com/mmtk/mmtk-core/tree/master/docs/userguide"
 git-repository-icon = "fa-github"
 edit-url-template = "https://github.com/mmtk/mmtk-core/edit/master/docs/userguide/{path}"
-additional-css = ["theme/api-migration-details.css", "assets/css/mdbook-admonish.css"]
-additional-js = ["theme/api-migration-details.js"]
+additional-css = ["assets/css/api-migration-details.css", "assets/css/mdbook-admonish.css"]
+additional-js = ["assets/js/api-migration-details.js"]
 
 [preprocessor]
 
