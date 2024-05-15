@@ -54,11 +54,16 @@ API changes:
     -   `method2()`
         +   What happened to it...
         +   Suggestions...
+*   type `crate::policy::immix::Block` *(Note: Qualify the name if ambiguous)*
+    -   insert methods here...
+*   type `crate::policy::marksweepspace::native_ms::Block` *(Note: ditto)*
+    -   insert methods here...
 
 VM bindings need to re-implement the following traits:
 
 *   trait `Bar`
     -   `method1()`
+        +   **Only affects users of feature "yyyy"** *(Note: When omitted, it affects everyone.)*
         +   MMTk now expects the VM binding to...
         +   The VM binding should...
     -   `method2()`
@@ -83,6 +88,9 @@ See also:
 
 ```admonish tldr
 Insert summary here.
+
+**Only affects users of feature "zzzz"** *(Note: When omitted, it affects everyone.)*
+
 ```
 
 VM bindings need to re-implement the following traits:
