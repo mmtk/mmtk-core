@@ -14,8 +14,6 @@ edit-url-template = "https://github.com/mmtk/mmtk-core/edit/master/docs/userguid
 additional-css = ["assets/css/api-migration-details.css", "assets/css/mdbook-admonish.css"]
 additional-js = ["assets/js/api-migration-details.js"]
 
-[preprocessor]
-
 [preprocessor.admonish]
 command = "mdbook-admonish"
 assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
