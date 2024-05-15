@@ -19,3 +19,6 @@ additional-js = ["assets/js/api-migration-details.js"]
 [preprocessor.admonish]
 command = "mdbook-admonish"
 assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
+
+[preprocessor.hide]
+hide = false # Change this to true when publishing.

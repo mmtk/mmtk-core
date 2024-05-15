@@ -1,3 +1,6 @@
+<!--hidden-->
+<!-- We use `mdbook-hide` to hide this document from the published version. -->
+
 # The template of the API migration guide
 
 This template is for the developers of MMTk-core.
