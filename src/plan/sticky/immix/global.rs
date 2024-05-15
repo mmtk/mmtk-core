@@ -126,9 +126,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            let was_defrag = self.immix.immix_space.release(false);
-            self.immix
-                .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
             self.immix.common.los.release(false);
         } else {
             self.immix.release(tls);
@@ -140,6 +137,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::Relaxed);
+
+        let was_defrag = self.immix.immix_space.end_of_gc();
+        self.immix
+            .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
