@@ -304,9 +304,9 @@ pub trait Plan: 'static + HasSpaces + Sync + Downcast {
     /// of objects.
     ///
     /// This function is callable during a GC.  From the VM binding's point of view, the information
-    /// of whether the current GC is a defrag GC is available since `Collection::stop_mutators` is
-    /// called, and remains available until (but not including) `resume_mutators` at which time the
-    /// current GC has just finished.
+    /// of whether the current GC moves object or not is available since `Collection::stop_mutators`
+    /// is called, and remains available until (but not including) `resume_mutators` at which time
+    /// the current GC has just finished.
     fn current_gc_may_move_object(&self) -> bool;
 
     /// An object is firstly reached by a sanity GC. So the object is reachable
