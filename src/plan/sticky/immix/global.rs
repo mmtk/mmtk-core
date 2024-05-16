@@ -7,6 +7,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::policy::immix::ImmixSpace;
+use crate::policy::immix::PREFER_COPY_ON_NURSERY_GC;
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
@@ -162,9 +163,9 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn current_gc_may_move_object(&self) -> bool {
         if self.is_current_gc_nursery() {
-            !cfg!(feature = "sticky_immix_non_moving_nursery")
+            PREFER_COPY_ON_NURSERY_GC
         } else {
-            return self.get_immix_space().in_defrag();
+            self.get_immix_space().in_defrag()
         }
     }
 
