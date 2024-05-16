@@ -370,6 +370,17 @@
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
 <a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -379,6 +390,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::ImmixSpace;
+<span class="kw">use </span><span class="kw">crate</span>::policy::immix::PREFER_COPY_ON_NURSERY_GC;
 <span class="kw">use </span><span class="kw">crate</span>::policy::immix::TRACE_KIND_FAST;
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::Space;
@@ -498,9 +510,7 @@
 
     <span class="kw">fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tls: <span class="kw">crate</span>::util::VMWorkerThread) {
         <span class="kw">if </span><span class="self">self</span>.is_current_gc_nursery() {
-            <span class="kw">let </span>was_defrag = <span class="self">self</span>.immix.immix_space.release(<span class="bool-val">false</span>);
-            <span class="self">self</span>.immix
-                .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
+            <span class="self">self</span>.immix.immix_space.release(<span class="bool-val">false</span>);
             <span class="self">self</span>.immix.common.los.release(<span class="bool-val">false</span>);
         } <span class="kw">else </span>{
             <span class="self">self</span>.immix.release(tls);
@@ -512,6 +522,10 @@
             <span class="kw">crate</span>::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>);
         <span class="self">self</span>.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::Relaxed);
+
+        <span class="kw">let </span>was_defrag = <span class="self">self</span>.immix.immix_space.end_of_gc();
+        <span class="self">self</span>.immix
+            .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
     }
 
     <span class="kw">fn </span>collection_required(<span class="kw-2">&amp;</span><span class="self">self</span>, space_full: bool, space: <span class="prelude-ty">Option</span>&lt;SpaceStats&lt;<span class="self">Self</span>::VM&gt;&gt;) -&gt; bool {
@@ -528,6 +542,14 @@
 
     <span class="kw">fn </span>last_collection_was_exhaustive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.gc_full_heap.load(Ordering::Relaxed) &amp;&amp; <span class="self">self</span>.immix.last_collection_was_exhaustive()
+    }
+
+    <span class="kw">fn </span>current_gc_may_move_object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.is_current_gc_nursery() {
+            PREFER_COPY_ON_NURSERY_GC
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.get_immix_space().in_defrag()
+        }
     }
 
     <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

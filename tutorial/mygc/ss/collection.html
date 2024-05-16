@@ -216,6 +216,14 @@ space here.</p>
         }
     }
 <span class="boring">}</span></code></pre></pre>
+<p>Because the semispace GC copies objects in every single GC, we modify the method
+<code>current_gc_may_move_object()</code> in <code>MyGC</code> so that it always returns <code>true</code>.</p>
+<pre><pre class="playground"><code class="language-rust edition2021"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn current_gc_may_move_object(&amp;self) -&gt; bool {
+        true
+    }
+<span class="boring">}</span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
 <p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,

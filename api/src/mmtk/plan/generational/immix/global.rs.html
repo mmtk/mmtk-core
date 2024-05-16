@@ -265,6 +265,14 @@
 <a href="#263" id="263">263</a>
 <a href="#264" id="264">264</a>
 <a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -404,10 +412,7 @@
         <span class="kw">let </span>full_heap = !<span class="self">self</span>.gen.is_current_gc_nursery();
         <span class="self">self</span>.gen.release(tls);
         <span class="kw">if </span>full_heap {
-            <span class="kw">let </span>did_defrag = <span class="self">self</span>.immix_space.release(full_heap);
-            <span class="self">self</span>.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
-        } <span class="kw">else </span>{
-            <span class="self">self</span>.last_gc_was_defrag.store(<span class="bool-val">false</span>, Ordering::Relaxed);
+            <span class="self">self</span>.immix_space.release(full_heap);
         }
         <span class="self">self</span>.last_gc_was_full_heap
             .store(full_heap, Ordering::Relaxed);
@@ -416,6 +421,17 @@
     <span class="kw">fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _tls: VMWorkerThread) {
         <span class="self">self</span>.gen
             .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(<span class="self">self</span>));
+
+        <span class="kw">let </span>did_defrag = <span class="self">self</span>.immix_space.end_of_gc();
+        <span class="self">self</span>.last_gc_was_defrag.store(did_defrag, Ordering::Relaxed);
+    }
+
+    <span class="kw">fn </span>current_gc_may_move_object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.is_current_gc_nursery() {
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            <span class="self">self</span>.immix_space.in_defrag()
+        }
     }
 
     <span class="kw">fn </span>get_collection_reserved_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

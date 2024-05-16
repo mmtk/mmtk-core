@@ -1094,6 +1094,9 @@
 <a href="#1092" id="1092">1092</a>
 <a href="#1093" id="1093">1093</a>
 <a href="#1094" id="1094">1094</a>
+<a href="#1095" id="1095">1095</a>
+<a href="#1096" id="1096">1096</a>
+<a href="#1097" id="1097">1097</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1536,12 +1539,10 @@
         }
     }
 
-    <span class="doccomment">/// Release for the immix space. This is called when a GC finished.
-    /// Return whether this GC was a defrag GC, as a plan may want to know this.
-    </span><span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, major_gc: bool) -&gt; bool {
-        <span class="kw">let </span>did_defrag = <span class="self">self</span>.defrag.in_defrag();
+    <span class="doccomment">/// Release for the immix space.
+    </span><span class="kw">pub fn </span>release(<span class="kw-2">&amp;mut </span><span class="self">self</span>, major_gc: bool) {
         <span class="kw">if </span>major_gc {
-            <span class="comment">// Update line_unavail_state for hole searching afte this GC.
+            <span class="comment">// Update line_unavail_state for hole searching after this GC.
             </span><span class="kw">if </span>!<span class="kw">super</span>::BLOCK_ONLY {
                 <span class="self">self</span>.line_unavail_state.store(
                     <span class="self">self</span>.line_mark_state.load(Ordering::Acquire),
@@ -1556,12 +1557,17 @@
         <span class="comment">// Sweep chunks and blocks
         </span><span class="kw">let </span>work_packets = <span class="self">self</span>.generate_sweep_tasks();
         <span class="self">self</span>.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-        <span class="kw">if </span><span class="kw">super</span>::DEFRAG {
-            <span class="self">self</span>.defrag.release(<span class="self">self</span>);
-        }
 
         <span class="self">self</span>.lines_consumed.store(<span class="number">0</span>, Ordering::Relaxed);
+    }
 
+    <span class="doccomment">/// This is called when a GC finished.
+    /// Return whether this GC was a defrag GC, as a plan may want to know this.
+    </span><span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">let </span>did_defrag = <span class="self">self</span>.defrag.in_defrag();
+        <span class="kw">if </span><span class="kw">super</span>::DEFRAG {
+            <span class="self">self</span>.defrag.reset_in_defrag();
+        }
         did_defrag
     }
 

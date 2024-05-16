@@ -263,6 +263,10 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
@@ -391,6 +395,10 @@
     <span class="kw">fn </span>get_used_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.gen.get_used_pages() + <span class="self">self</span>.tospace().reserved_pages()
     }
+
+    <span class="kw">fn </span>current_gc_may_move_object(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="bool-val">true
+    </span>}
 
     <span class="doccomment">/// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
     </span><span class="kw">fn </span>get_available_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
