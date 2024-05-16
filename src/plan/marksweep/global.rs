@@ -73,6 +73,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.base().collection_required(self, space_full)
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        false
+    }
+
     fn get_used_pages(&self) -> usize {
         self.common.get_used_pages() + self.ms.reserved_pages()
     }

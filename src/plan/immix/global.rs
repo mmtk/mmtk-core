@@ -93,8 +93,16 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
+        self.immix_space.release(true);
+    }
+
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         self.last_gc_was_defrag
-            .store(self.immix_space.release(true), Ordering::Relaxed);
+            .store(self.immix_space.end_of_gc(), Ordering::Relaxed);
+    }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        self.immix_space.in_defrag()
     }
 
     fn get_collection_reserved_pages(&self) -> usize {

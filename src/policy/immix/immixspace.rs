@@ -440,12 +440,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
-    /// Release for the immix space. This is called when a GC finished.
-    /// Return whether this GC was a defrag GC, as a plan may want to know this.
-    pub fn release(&mut self, major_gc: bool) -> bool {
-        let did_defrag = self.defrag.in_defrag();
+    /// Release for the immix space.
+    pub fn release(&mut self, major_gc: bool) {
         if major_gc {
-            // Update line_unavail_state for hole searching afte this GC.
+            // Update line_unavail_state for hole searching after this GC.
             if !super::BLOCK_ONLY {
                 self.line_unavail_state.store(
                     self.line_mark_state.load(Ordering::Acquire),
@@ -460,12 +458,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         // Sweep chunks and blocks
         let work_packets = self.generate_sweep_tasks();
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-        if super::DEFRAG {
-            self.defrag.release(self);
-        }
 
         self.lines_consumed.store(0, Ordering::Relaxed);
+    }
 
+    /// This is called when a GC finished.
+    /// Return whether this GC was a defrag GC, as a plan may want to know this.
+    pub fn end_of_gc(&mut self) -> bool {
+        let did_defrag = self.defrag.in_defrag();
+        if super::DEFRAG {
+            self.defrag.reset_in_defrag();
+        }
         did_defrag
     }
 
