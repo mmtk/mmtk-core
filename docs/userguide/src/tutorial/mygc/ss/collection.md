@@ -29,6 +29,13 @@ space here.
 {{#include ../../code/mygc_semispace/global.rs:create_copy_config}}
 ```
 
+Because the semispace GC copies objects in every single GC, we modify the method
+`current_gc_may_move_object()` in `MyGC` so that it always returns `true`.
+
+```rust
+{{#include ../../code/mygc_semispace/global.rs:current_gc_may_move_object}}
+```
+
 ## Introduce collection to MyGC plan
 
 Add a new method to `Plan for MyGC`, `schedule_collection()`. This function 
