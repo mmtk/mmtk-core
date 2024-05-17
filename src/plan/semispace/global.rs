@@ -100,6 +100,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().collection_required(self, space_full)
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
+
     fn get_collection_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
     }

@@ -74,6 +74,10 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!("GC triggered in nogc")
     }
 
+    fn current_gc_may_move_object(&self) -> bool {
+        false
+    }
+
     fn get_used_pages(&self) -> usize {
         self.nogc_space.reserved_pages()
             + self.immortal.reserved_pages()
