@@ -720,7 +720,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
 impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
     RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
-    fn create_process_slot_roots_work(&mut self, slots: Vec<VM::VMSlot>) {
+    fn create_process_root_slots_work(&mut self, slots: Vec<VM::VMSlot>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,

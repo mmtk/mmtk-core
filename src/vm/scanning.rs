@@ -99,13 +99,20 @@ pub trait ObjectTracerContext<VM: VMBinding>: Clone + Send + 'static {
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
 pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
+    // TODO:
+    // 1.  Rename the functions and remove the repeating `create_process_` and `_work`.
+    // 2.  Rename the functions to reflect both the form (slots / nodes) and the semantics (pinning
+    //     / transitive pinning / non-pinning) of each function.
+    // 3.  Introduce a function to give the VM binding a way to update root edges without
+    //     representing the roots as slots.  See: https://github.com/mmtk/mmtk-core/issues/710
+
     /// Create work packets to handle root slots.
     ///
     /// The work packet may update the slots.
     ///
     /// Arguments:
     /// * `slots`: A vector of slots.
-    fn create_process_slot_roots_work(&mut self, slots: Vec<SL>);
+    fn create_process_root_slots_work(&mut self, slots: Vec<SL>);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///
