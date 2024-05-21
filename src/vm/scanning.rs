@@ -106,13 +106,14 @@ pub trait RootsWorkFactory<SL: Slot>: Clone + Send + 'static {
     // 3.  Introduce a function to give the VM binding a way to update root edges without
     //     representing the roots as slots.  See: https://github.com/mmtk/mmtk-core/issues/710
 
-    /// Create work packets to handle root slots.
+    /// Create work packets to handle non-pinned roots.  The roots are represented as slots so that
+    /// they can be updated.
     ///
     /// The work packet may update the slots.
     ///
     /// Arguments:
     /// * `slots`: A vector of slots.
-    fn create_process_root_slots_work(&mut self, slots: Vec<SL>);
+    fn create_process_roots_work(&mut self, slots: Vec<SL>);
 
     /// Create work packets to handle non-transitively pinning roots.
     ///
