@@ -45,6 +45,11 @@ it should have been "slot".  The find/replace tools in text editors and IDEs sho
 API changes:
 
 *   module `edge_shape` -> `slot`
+*   type `RootsWorkFactory`
+    -   `<ES: Edge>` -> `<SL: Slot>`
+    -   `create_process_edge_roots_work` -> `create_process_roots_work`
+*   type `SimpleEdge` -> `SimpleSlot`
+*   type `UnimplementedMemorySliceEdgeIterator` -> `UnimplementedMemorySliceSlotIterator`
 *   trait `Edge` -> `Slot`
 *   trait `EdgeVisitor` -> `SlotVisitor`
     -   `<ES: Edge>` -> `<SL: Slot>`
@@ -63,13 +68,6 @@ API changes:
         +   Same as above.
 *   trait `VMBinding`
     -   `VMEdge` -> `VMSlot`
-*   type `RootsWorkFactory`
-    -   `<ES: Edge>` -> `<SL: Slot>`
-    -   `create_process_edge_roots_work` -> `create_process_roots_work`
-*   type `SimpleEdge` -> `SimpleSlot`
-*   type `UnimplementedMemorySliceEdgeIterator` -> `UnimplementedMemorySliceSlotIterator`
-*   module `memory_manager`
-    -   `object_reference_write`
 
 
 ## 0.25.0
@@ -107,9 +105,6 @@ API changes:
             of storing a non-reference value (such as tagged small integer) into the slot.
         +   Before a replacement is available, use `object_reference_write_pre` and
             `object_reference_write_post`, instead.
-
-VM bindings need to re-implement the following traits:
-
 *   trait `Edge`
     -   `load()`
         +   The return type is changed to `Option<ObjectReference>`.
@@ -142,14 +137,17 @@ VM bindings need to re-implement the following traits:
         +   Note: The `Edge` trait does not have a method for storing NULL to a slot.  The VM
             binding needs to implement its own method to store NULL to a slot.
 
-Miscellaneous changes:
+Not API change, but worth noting:
 
-*   Some public API functions still return `Option<ObjectReference>`, but VM bindings can no longer
-    wrap them into `extern "C"` functions that return `ObjectReference` because
-    `ObjectReference::NULL` is removed.  Use `mmtk::util::api_util::NullableObjectReference` for the
-    return value.
+*   Functions that return `Option<ObjectReference>`
     -   `memory_manager::get_finalized_object`
     -   `ObjectReference::get_forwarded_object`
+        +   The functions listed above did not change, as they still return
+            `Option<ObjectReference>`.  But some VM bindings used to expose them to native programs
+            by wrapping them into `extern "C"` functions that return `ObjectReference`, and return
+            `ObjectReference::NULL` for `None`.  This is no longer possible since we removed
+            `ObjectReference::NULL`.  The VM bindings should use
+            `mmtk::util::api_util::NullableObjectReference` for the return type instead.
 
 See also:
 
@@ -203,9 +201,6 @@ API changes:
     -   `start_worker`
         +   It is now a simple wrapper of `GCWorker::run` for legacy code.  It takes ownership of
             the `Box<GCWorker>` instance, too.
-
-VM bindings need to re-implement the following traits:
-
 *   trait `Collection`
     -   `Collection::spawn_gc_thread`
         +   It no longer asks the binding to spawn the controller thread.
