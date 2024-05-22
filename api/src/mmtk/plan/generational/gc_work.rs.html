@@ -187,7 +187,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::{gc_work::<span class="kw-2">*</span>, GCWork, GCWorker, WorkBucketStage};
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
-<span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::{Edge, MemorySlice};
+<span class="kw">use </span><span class="kw">crate</span>::vm::slot::{MemorySlice, Slot};
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use </span>std::marker::PhantomData;
@@ -214,12 +214,12 @@
     <span class="kw">type </span>ScanObjectsWorkType = PlanScanObjects&lt;<span class="self">Self</span>, P&gt;;
 
     <span class="kw">fn </span>new(
-        edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
+        slots: Vec&lt;SlotOf&lt;<span class="self">Self</span>&gt;&gt;,
         roots: bool,
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
+        <span class="kw">let </span>base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         <span class="kw">let </span>plan = base.plan().downcast_ref().unwrap();
         <span class="self">Self </span>{ plan, base }
     }
@@ -234,7 +234,7 @@
         )
     }
 
-    <span class="kw">fn </span>process_edge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: EdgeOf&lt;<span class="self">Self</span>&gt;) {
+    <span class="kw">fn </span>process_slot(<span class="kw-2">&amp;mut </span><span class="self">self</span>, slot: SlotOf&lt;<span class="self">Self</span>&gt;) {
         <span class="kw">let </span><span class="prelude-val">Some</span>(object) = slot.load() <span class="kw">else </span>{
             <span class="comment">// Skip slots that are not holding an object reference.
             </span><span class="kw">return</span>;
@@ -345,15 +345,15 @@
             .is_current_gc_nursery()
         {
             <span class="comment">// Collect all the entries in all the slices
-            </span><span class="kw">let </span><span class="kw-2">mut </span>edges = <span class="macro">vec!</span>[];
+            </span><span class="kw">let </span><span class="kw-2">mut </span>slots = <span class="macro">vec!</span>[];
             <span class="kw">for </span>slice <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.modbuf {
-                <span class="kw">for </span>edge <span class="kw">in </span>slice.iter_edges() {
-                    edges.push(edge);
+                <span class="kw">for </span>slot <span class="kw">in </span>slice.iter_slots() {
+                    slots.push(slot);
                 }
             }
             <span class="comment">// Forward entries
             </span>GCWork::do_work(
-                <span class="kw-2">&amp;mut </span>E::new(edges, <span class="bool-val">false</span>, mmtk, WorkBucketStage::Closure),
+                <span class="kw-2">&amp;mut </span>E::new(slots, <span class="bool-val">false</span>, mmtk, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

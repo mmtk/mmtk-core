@@ -484,8 +484,6 @@
 
 <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::analysis::AnalysisManager;
-<span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-</span><span class="kw">use </span><span class="kw">crate</span>::util::edge_logger::EdgeLogger;
 <span class="kw">use </span><span class="kw">crate</span>::util::finalizable_processor::FinalizableProcessor;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
@@ -496,6 +494,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::reference_processor::ReferenceProcessors;
 <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::sanity::sanity_checker::SanityChecker;
+<span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::slot_logger::SlotLogger;
 <span class="kw">use </span><span class="kw">crate</span>::util::statistics::stats::Stats;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ReferenceGlue;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -589,9 +589,9 @@
         Mutex&lt;FinalizableProcessor&lt;&lt;VM::VMReferenceGlue <span class="kw">as </span>ReferenceGlue&lt;VM&gt;&gt;::FinalizableType&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
     <span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) sanity_checker: Mutex&lt;SanityChecker&lt;VM::VMEdge&gt;&gt;,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) sanity_checker: Mutex&lt;SanityChecker&lt;VM::VMSlot&gt;&gt;,
     <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) edge_logger: EdgeLogger&lt;VM::VMEdge&gt;,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) slot_logger: SlotLogger&lt;VM::VMSlot&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) gc_requester: Arc&lt;GCRequester&lt;VM&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) stats: Arc&lt;Stats&gt;,
@@ -698,7 +698,7 @@
             </span>inside_sanity: AtomicBool::new(<span class="bool-val">false</span>),
             inside_harness: AtomicBool::new(<span class="bool-val">false</span>),
             <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-            </span>edge_logger: EdgeLogger::new(),
+            </span>slot_logger: SlotLogger::new(),
             <span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
             </span>analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,

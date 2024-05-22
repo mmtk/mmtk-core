@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":["EdgeVisitor","ObjectTracer","ObjectTracerContext","RootsWorkFactory","Scanning"]};
+window.SIDEBAR_ITEMS = {"trait":["ObjectTracer","ObjectTracerContext","RootsWorkFactory","Scanning","SlotVisitor"]};

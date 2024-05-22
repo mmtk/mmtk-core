@@ -254,7 +254,7 @@
 <a href="#252" id="252">252</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.
 
-</span><span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::{Edge, MemorySlice};
+</span><span class="kw">use </span><span class="kw">crate</span>::vm::slot::{MemorySlice, Slot};
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
 <span class="kw">use crate</span>::{
     util::{metadata::MetadataSpec, <span class="kw-2">*</span>},
@@ -303,7 +303,7 @@
     </span><span class="kw">fn </span>object_reference_write(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
-        slot: VM::VMEdge,
+        slot: VM::VMSlot,
         target: ObjectReference,
     ) {
         <span class="self">self</span>.object_reference_write_pre(src, slot, <span class="prelude-val">Some</span>(target));
@@ -315,7 +315,7 @@
     </span><span class="kw">fn </span>object_reference_write_pre(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         _src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
     }
@@ -324,7 +324,7 @@
     </span><span class="kw">fn </span>object_reference_write_post(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         _src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
     }
@@ -334,7 +334,7 @@
     </span><span class="kw">fn </span>object_reference_write_slow(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         _src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
     }
@@ -400,7 +400,7 @@
     </span><span class="kw">fn </span>object_reference_write_slow(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
-        slot: &lt;<span class="self">Self</span>::VM <span class="kw">as </span>VMBinding&gt;::VMEdge,
+        slot: &lt;<span class="self">Self</span>::VM <span class="kw">as </span>VMBinding&gt;::VMSlot,
         target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     );
 
@@ -470,7 +470,7 @@
     <span class="kw">fn </span>object_reference_write_post(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
-        slot: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMEdge,
+        slot: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMSlot,
         target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
         <span class="kw">if </span><span class="self">self</span>.object_is_unlogged(src) {
@@ -481,7 +481,7 @@
     <span class="kw">fn </span>object_reference_write_slow(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
-        slot: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMEdge,
+        slot: &lt;S::VM <span class="kw">as </span>VMBinding&gt;::VMSlot,
         target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
         <span class="kw">if </span><span class="self">self</span>.log_object(src) {

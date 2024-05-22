@@ -119,9 +119,6 @@
 </span><span class="doccomment">/// An analysis framework for collecting data and profiling in GC.
 </span><span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>analysis;
-<span class="doccomment">/// Logging edges to check duplicated edges in GC.
-</span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>edge_logger;
 <span class="doccomment">/// Non-generic refs to generic types of `&lt;VM&gt;`.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>erase_vm;
 <span class="doccomment">/// Finalization implementation.
@@ -146,6 +143,9 @@
 <span class="doccomment">/// Sanity checker for GC.
 </span><span class="attr">#[cfg(feature = <span class="string">"sanity"</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>sanity;
+<span class="doccomment">/// Logging slots to check duplicated edges in GC.
+</span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>slot_logger;
 <span class="doccomment">/// Utils for collecting statistics.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>statistics;
 <span class="doccomment">/// A treadmill implementation.

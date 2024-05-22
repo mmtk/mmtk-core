@@ -463,12 +463,12 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
     type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
 
     fn new(
-        edges: Vec&lt;EdgeOf&lt;Self&gt;&gt;,
+        slots: Vec&lt;SlotOf&lt;Self&gt;&gt;,
         roots: bool,
         mmtk: &amp;'static MMTK&lt;VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
+        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self { base, plan }
     }

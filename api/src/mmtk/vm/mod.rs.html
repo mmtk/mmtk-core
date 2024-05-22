@@ -82,7 +82,6 @@
 <a href="#80" id="80">80</a>
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
-<a href="#83" id="83">83</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.
 //!
 //! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.
@@ -102,11 +101,10 @@
 
 </span><span class="kw">mod </span>active_plan;
 <span class="kw">mod </span>collection;
-<span class="doccomment">/// Allows MMTk to access edges in a VM-defined way.
-</span><span class="kw">pub mod </span>edge_shape;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_model;
 <span class="kw">mod </span>reference_glue;
 <span class="kw">mod </span>scanning;
+<span class="kw">pub mod </span>slot;
 <span class="kw">pub use </span><span class="self">self</span>::active_plan::ActivePlan;
 <span class="kw">pub use </span><span class="self">self</span>::collection::Collection;
 <span class="kw">pub use </span><span class="self">self</span>::collection::GCThreadContext;
@@ -114,11 +112,11 @@
 <span class="kw">pub use </span><span class="self">self</span>::object_model::ObjectModel;
 <span class="kw">pub use </span><span class="self">self</span>::reference_glue::Finalizable;
 <span class="kw">pub use </span><span class="self">self</span>::reference_glue::ReferenceGlue;
-<span class="kw">pub use </span><span class="self">self</span>::scanning::EdgeVisitor;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::ObjectTracer;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::ObjectTracerContext;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::RootsWorkFactory;
 <span class="kw">pub use </span><span class="self">self</span>::scanning::Scanning;
+<span class="kw">pub use </span><span class="self">self</span>::scanning::SlotVisitor;
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>tests;
@@ -144,10 +142,10 @@
     <span class="doccomment">/// The binding's implementation of [`crate::vm::ReferenceGlue`].
     </span><span class="kw">type </span>VMReferenceGlue: ReferenceGlue&lt;<span class="self">Self</span>&gt;;
 
-    <span class="doccomment">/// The type of edges in this VM.
-    </span><span class="kw">type </span>VMEdge: edge_shape::Edge;
+    <span class="doccomment">/// The type of slots in this VM.
+    </span><span class="kw">type </span>VMSlot: slot::Slot;
     <span class="doccomment">/// The type of heap memory slice in this VM.
-    </span><span class="kw">type </span>VMMemorySlice: edge_shape::MemorySlice&lt;Edge = <span class="self">Self</span>::VMEdge&gt;;
+    </span><span class="kw">type </span>VMMemorySlice: slot::MemorySlice&lt;SlotType = <span class="self">Self</span>::VMSlot&gt;;
 
     <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging.
     </span><span class="kw">const </span>ALIGNMENT_VALUE: usize = <span class="number">0xdead_beef</span>;

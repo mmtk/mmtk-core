@@ -120,7 +120,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::WorkBucketStage;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_INT;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
-<span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::MemorySlice;
+<span class="kw">use </span><span class="kw">crate</span>::vm::slot::MemorySlice;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 
@@ -187,7 +187,7 @@
     <span class="kw">fn </span>object_reference_write_slow(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
     ) {
         <span class="comment">// enqueue the object

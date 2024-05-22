@@ -233,7 +233,7 @@
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::Plan;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::gc_work::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
-<span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::Edge;
+<span class="kw">use </span><span class="kw">crate</span>::vm::slot::Slot;
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::MMTK;
 <span class="kw">use crate</span>::{scheduler::<span class="kw-2">*</span>, ObjectQueue};
@@ -241,33 +241,33 @@
 <span class="kw">use </span>std::ops::{Deref, DerefMut};
 
 <span class="attr">#[allow(dead_code)]
-</span><span class="kw">pub struct </span>SanityChecker&lt;ES: Edge&gt; {
+</span><span class="kw">pub struct </span>SanityChecker&lt;SL: Slot&gt; {
     <span class="doccomment">/// Visited objects
     </span>refs: HashSet&lt;ObjectReference&gt;,
-    <span class="doccomment">/// Cached root edges for sanity root scanning
-    </span>root_edges: Vec&lt;Vec&lt;ES&gt;&gt;,
+    <span class="doccomment">/// Cached root slots for sanity root scanning
+    </span>root_slots: Vec&lt;Vec&lt;SL&gt;&gt;,
     <span class="doccomment">/// Cached root nodes for sanity root scanning
     </span>root_nodes: Vec&lt;Vec&lt;ObjectReference&gt;&gt;,
 }
 
-<span class="kw">impl</span>&lt;ES: Edge&gt; Default <span class="kw">for </span>SanityChecker&lt;ES&gt; {
+<span class="kw">impl</span>&lt;SL: Slot&gt; Default <span class="kw">for </span>SanityChecker&lt;SL&gt; {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new()
     }
 }
 
-<span class="kw">impl</span>&lt;ES: Edge&gt; SanityChecker&lt;ES&gt; {
+<span class="kw">impl</span>&lt;SL: Slot&gt; SanityChecker&lt;SL&gt; {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             refs: HashSet::new(),
-            root_edges: <span class="macro">vec!</span>[],
+            root_slots: <span class="macro">vec!</span>[],
             root_nodes: <span class="macro">vec!</span>[],
         }
     }
 
-    <span class="doccomment">/// Cache a list of root edges to the sanity checker.
-    </span><span class="kw">pub fn </span>add_root_edges(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: Vec&lt;ES&gt;) {
-        <span class="self">self</span>.root_edges.push(roots)
+    <span class="doccomment">/// Cache a list of root slots to the sanity checker.
+    </span><span class="kw">pub fn </span>add_root_slots(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: Vec&lt;SL&gt;) {
+        <span class="self">self</span>.root_slots.push(roots)
     }
 
     <span class="kw">pub fn </span>add_root_nodes(<span class="kw-2">&amp;mut </span><span class="self">self</span>, roots: Vec&lt;ObjectReference&gt;) {
@@ -276,7 +276,7 @@
 
     <span class="doccomment">/// Reset roots cache at the end of the sanity gc.
     </span><span class="kw">fn </span>clear_roots_cache(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.root_edges.clear();
+        <span class="self">self</span>.root_slots.clear();
         <span class="self">self</span>.root_nodes.clear();
     }
 }
@@ -298,9 +298,9 @@
 
         scheduler.reset_state();
 
-        <span class="comment">// We are going to do sanity GC which will traverse the object graph again. Reset edge logger to clear recorded edges.
+        <span class="comment">// We are going to do sanity GC which will traverse the object graph again. Reset slot logger to clear recorded slots.
         </span><span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-        </span>mmtk.edge_logger.reset();
+        </span>mmtk.slot_logger.reset();
 
         mmtk.sanity_begin(); <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)
 
@@ -317,7 +317,7 @@
         // }
         </span>{
             <span class="kw">let </span>sanity_checker = mmtk.sanity_checker.lock().unwrap();
-            <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_edges {
+            <span class="kw">for </span>roots <span class="kw">in </span><span class="kw-2">&amp;</span>sanity_checker.root_slots {
                 scheduler.work_buckets[WorkBucketStage::Closure].add(
                     SanityGCProcessEdges::&lt;P::VM&gt;::new(
                         roots.clone(),
@@ -409,13 +409,13 @@
 
     <span class="kw">const </span>OVERWRITE_REFERENCE: bool = <span class="bool-val">false</span>;
     <span class="kw">fn </span>new(
-        edges: Vec&lt;EdgeOf&lt;<span class="self">Self</span>&gt;&gt;,
+        slots: Vec&lt;SlotOf&lt;<span class="self">Self</span>&gt;&gt;,
         roots: bool,
         mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;,
         bucket: WorkBucketStage,
     ) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            base: ProcessEdgesBase::new(edges, roots, mmtk, bucket),
+            base: ProcessEdgesBase::new(slots, roots, mmtk, bucket),
             <span class="comment">// ..Default::default()
         </span>}
     }

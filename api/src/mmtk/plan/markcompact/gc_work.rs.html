@@ -165,7 +165,7 @@
         plan_mut.common.release(worker.tls, <span class="bool-val">true</span>);
         plan_mut.common.prepare(worker.tls, <span class="bool-val">true</span>);
         <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-        </span>mmtk.edge_logger.reset();
+        </span>mmtk.slot_logger.reset();
 
         <span class="comment">// We do two passes of transitive closures. We clear the live bytes from the first pass.
         </span><span class="attr">#[cfg(feature = <span class="string">"count_live_bytes_in_gc"</span>)]

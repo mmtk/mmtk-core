@@ -1188,9 +1188,9 @@
         plan_mut.end_of_gc(worker.tls);
 
         <span class="attr">#[cfg(feature = <span class="string">"extreme_assertions"</span>)]
-        </span><span class="kw">if </span><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges(mmtk.get_plan()) {
+        </span><span class="kw">if </span><span class="kw">crate</span>::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {
             <span class="comment">// reset the logging info at the end of each GC
-            </span>mmtk.edge_logger.reset();
+            </span>mmtk.slot_logger.reset();
         }
 
         <span class="comment">// Reset the triggering information.

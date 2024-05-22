@@ -914,7 +914,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::vm_layout;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
-<span class="kw">use </span><span class="kw">crate</span>::vm::edge_shape::MemorySlice;
+<span class="kw">use </span><span class="kw">crate</span>::vm::slot::MemorySlice;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ReferenceGlue;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
@@ -1142,7 +1142,7 @@
 </span><span class="kw">pub fn </span>object_reference_write&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
-    slot: VM::VMEdge,
+    slot: VM::VMSlot,
     target: ObjectReference,
 ) {
     mutator.barrier().object_reference_write(src, slot, target);
@@ -1168,7 +1168,7 @@
 </span><span class="kw">pub fn </span>object_reference_write_pre&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
-    slot: VM::VMEdge,
+    slot: VM::VMSlot,
     target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
 ) {
     mutator
@@ -1196,7 +1196,7 @@
 </span><span class="kw">pub fn </span>object_reference_write_post&lt;VM: VMBinding&gt;(
     mutator: <span class="kw-2">&amp;mut </span>Mutator&lt;VM&gt;,
     src: ObjectReference,
-    slot: VM::VMEdge,
+    slot: VM::VMSlot,
     target: <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;,
 ) {
     mutator
@@ -1207,7 +1207,7 @@
 <span class="doccomment">/// The *subsuming* memory region copy barrier by MMTk.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be able to filter out non-reference values on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on slot iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
@@ -1232,7 +1232,7 @@
 /// *before* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be able to filter out non-reference values on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on slot iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
@@ -1257,7 +1257,7 @@
 /// *after* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be able to filter out non-reference values on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on slot iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,

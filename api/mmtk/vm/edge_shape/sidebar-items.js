@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AddressRangeIterator","SimpleEdge","UnimplementedMemorySlice","UnimplementedMemorySliceEdgeIterator"],"trait":["Edge","MemorySlice"]};

@@ -72,6 +72,11 @@
 <a href="#70" id="70">70</a>
 <a href="#71" id="71">71</a>
 <a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::BarrierSelector;
@@ -95,9 +100,14 @@
     </span><span class="kw">pub </span>max_non_los_copy_bytes: usize,
     <span class="doccomment">/// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
     </span><span class="kw">pub </span>needs_log_bit: bool,
-    <span class="doccomment">/// Some plans may allow benign race for testing mark bit, and this will lead to trace the same edges
-    /// multiple times. If a plan allows tracing duplicate edges, we will not run duplicate edge check
-    /// in extreme_assertions.
+    <span class="doccomment">/// Some plans may allow benign race for testing mark bit, and this will lead to trace the same
+    /// edge multiple times. If a plan allows tracing duplicated edges, we will not run duplicate
+    /// edge check in extreme_assertions.
+    ///
+    /// Note: Both [`crate::vm::Scanning::scan_object`] (which enqueues slots) and
+    /// [`crate::vm::Scanning::scan_object_and_trace_edges`] (which traces the targets directly) are
+    /// affected by such benign races.  But our current duplicate edge check in extreme_assertions
+    /// only identifies duplicated slots.
     </span><span class="kw">pub </span>may_trace_duplicate_edges: bool,
     <span class="doccomment">/// The barrier this plan uses. A binding may check this and know what kind of write barrier is in use
     /// if they would like to implement the barrier fast path in the binding side.

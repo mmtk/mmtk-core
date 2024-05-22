@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/edge_shape.rs`."><title>edge_shape.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/vm/slot.rs`."><title>slot.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mmtk" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0 (aedd173a2 2024-03-17)" data-channel="1.77.0" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
             <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
     <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../../mmtk/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
@@ -302,7 +302,16 @@
 <a href="#300" id="300">300</a>
 <a href="#301" id="301">301</a>
 <a href="#302" id="302">302</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! This module provides the trait [`Slot`] and related traits and types which allow VMs to
+//! customize the layout of slots and the behavior of loading and updating object references in
+//! slots.
+
+</span><span class="kw">use </span>std::hash::Hash;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::{fmt::Debug, ops::Range};
 
@@ -311,18 +320,20 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 
-<span class="doccomment">/// An `Edge` represents a slot in an object (a.k.a. a field), on the stack (i.e. a local variable)
+<span class="doccomment">/// A `Slot` represents a slot in an object (a.k.a. a field), on the stack (i.e. a local variable)
 /// or any other places (such as global variables).  A slot may hold an object reference. We can
-/// load the object reference from it, and we can store an ObjectReference into it.  For some VMs,
-/// a slot may sometimes not hold an object reference.  For example, it can hold a special `NULL`
-/// pointer which does not point to any object, or it can hold a tagged non-reference value, such
-/// as small integers and special values such as `true`, `false`, `null` (a.k.a. "none", "nil",
-/// etc. for other VMs), `undefined`, etc.
+/// load the object reference from it, and we can update the object reference in it after the GC
+/// moves the object.
+///
+/// For some VMs, a slot may sometimes not hold an object reference.  For example, it can hold a
+/// special `NULL` pointer which does not point to any object, or it can hold a tagged
+/// non-reference value, such as small integers and special values such as `true`, `false`, `null`
+/// (a.k.a. "none", "nil", etc. for other VMs), `undefined`, etc.
 ///
 /// This intends to abstract out the differences of reference field representation among different
 /// VMs.  If the VM represent a reference field as a word that holds the pointer to the object, it
-/// can use the default `SimpleEdge` we provide.  In some cases, the VM need to implement its own
-/// `Edge` instances.
+/// can use the default `SimpleSlot` we provide.  In some cases, the VM need to implement its own
+/// `Slot` instances.
 ///
 /// For example:
 /// -   The VM uses compressed pointer (Compressed OOP in OpenJDK's terminology), where the heap
@@ -332,23 +343,22 @@
 /// -   A field holds a pointer to the middle of an object (an object field, or an array element,
 ///     or some arbitrary offset) for some reasons.
 ///
-/// When loading, `Edge::load` shall decode its internal representation to a "regular"
-/// `ObjectReference`.  The implementation
-/// can do this with any appropriate operations, usually shifting and masking bits or subtracting
-/// offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a
-/// VM-neutral way, knowing only `ObjectReference`.
+/// When loading, `Slot::load` shall decode its internal representation to a "regular"
+/// `ObjectReference`.  The implementation can do this with any appropriate operations, usually
+/// shifting and masking bits or subtracting offset from the address.  By doing this conversion,
+/// MMTk can implement GC algorithms in a VM-neutral way, knowing only `ObjectReference`.
 ///
-/// When GC moves object, `Edge::store` shall convert the updated `ObjectReference` back to the
-/// edge-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
+/// When GC moves object, `Slot::store` shall convert the updated `ObjectReference` back to the
+/// slot-specific representation.  Compressed pointers remain compressed; tagged pointers preserve
 /// their tag bits; and offsetted pointers keep their offsets.
 ///
 /// The methods of this trait are called on hot paths.  Please ensure they have high performance.
 /// Use inlining when appropriate.
 ///
-/// Note: this trait only concerns the representation (i.e. the shape) of the edge, not its
+/// Note: this trait only concerns the representation (i.e. the shape) of the slot, not its
 /// semantics, such as whether it holds strong or weak references.  If a VM holds a weak reference
-/// in a word as a pointer, it can also use `SimpleEdge` for weak reference fields.
-</span><span class="kw">pub trait </span>Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
+/// in a word as a pointer, it can also use `SimpleSlot` for weak reference fields.
+</span><span class="kw">pub trait </span>Slot: Copy + Send + Debug + PartialEq + Eq + Hash {
     <span class="doccomment">/// Load object reference from the slot.
     ///
     /// If the slot is not holding an object reference (For example, if it is holding NULL or a
@@ -376,29 +386,29 @@
     /// See: &lt;https://github.com/mmtk/mmtk-core/issues/1038&gt;
     </span><span class="kw">fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference);
 
-    <span class="doccomment">/// Prefetch the edge so that a subsequent `load` will be faster.
+    <span class="doccomment">/// Prefetch the slot so that a subsequent `load` will be faster.
     </span><span class="kw">fn </span>prefetch_load(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// no-op by default
     </span>}
 
-    <span class="doccomment">/// Prefetch the edge so that a subsequent `store` will be faster.
+    <span class="doccomment">/// Prefetch the slot so that a subsequent `store` will be faster.
     </span><span class="kw">fn </span>prefetch_store(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="comment">// no-op by default
     </span>}
 }
 
-<span class="doccomment">/// A simple edge implementation that represents a word-sized slot which holds the raw address of
+<span class="doccomment">/// A simple slot implementation that represents a word-sized slot which holds the raw address of
 /// an `ObjectReference`, or 0 if it is holding a null reference.
 ///
-/// It is the default edge type, and should be suitable for most VMs.
+/// It is the default slot type, and should be suitable for most VMs.
 </span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-</span><span class="kw">pub struct </span>SimpleEdge {
+</span><span class="kw">pub struct </span>SimpleSlot {
     slot_addr: <span class="kw-2">*mut </span>Atomic&lt;Address&gt;,
 }
 
-<span class="kw">impl </span>SimpleEdge {
-    <span class="doccomment">/// Create a simple edge from an address.
+<span class="kw">impl </span>SimpleSlot {
+    <span class="doccomment">/// Create a simple slot from an address.
     ///
     /// Arguments:
     /// *   `address`: The address in memory where an `ObjectReference` is stored.
@@ -408,7 +418,7 @@
         }
     }
 
-    <span class="doccomment">/// Get the address of the edge.
+    <span class="doccomment">/// Get the address of the slot.
     ///
     /// Return the address at which the `ObjectReference` is stored.
     </span><span class="kw">pub fn </span>as_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
@@ -416,9 +426,9 @@
     }
 }
 
-<span class="kw">unsafe impl </span>Send <span class="kw">for </span>SimpleEdge {}
+<span class="kw">unsafe impl </span>Send <span class="kw">for </span>SimpleSlot {}
 
-<span class="kw">impl </span>Edge <span class="kw">for </span>SimpleEdge {
+<span class="kw">impl </span>Slot <span class="kw">for </span>SimpleSlot {
     <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.slot_addr).load(atomic::Ordering::Relaxed) };
         ObjectReference::from_raw_address(addr)
@@ -429,17 +439,17 @@
     }
 }
 
-<span class="doccomment">/// For backword compatibility, we let `Address` implement `Edge` so that existing bindings that
-/// use `Address` to represent an edge can continue to work.
+<span class="doccomment">/// For backword compatibility, we let `Address` implement `Slot` with the same semantics as
+/// [`SimpleSlot`] so that existing bindings that use `Address` as `Slot` can continue to work.
 ///
-/// However, we should use `SimpleEdge` directly instead of using `Address`.  The purpose of the
+/// However, we should use `SimpleSlot` directly instead of using `Address`.  The purpose of the
 /// `Address` type is to represent an address in memory.  It is not directly related to fields
 /// that hold references to other objects.  Calling `load()` and `store()` on an `Address` does
 /// not indicate how many bytes to load or store, or how to interpret those bytes.  On the other
-/// hand, `SimpleEdge` is all about how to access a field that holds a reference represented
+/// hand, `SimpleSlot` is all about how to access a field that holds a reference represented
 /// simply as an `ObjectReference`.  The intention and the semantics are clearer with
-/// `SimpleEdge`.
-</span><span class="kw">impl </span>Edge <span class="kw">for </span>Address {
+/// `SimpleSlot`.
+</span><span class="kw">impl </span>Slot <span class="kw">for </span>Address {
     <span class="kw">fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="kw">let </span>addr = <span class="kw">unsafe </span>{ Address::load(<span class="kw-2">*</span><span class="self">self</span>) };
         ObjectReference::from_raw_address(addr)
@@ -451,21 +461,21 @@
 }
 
 <span class="attr">#[test]
-</span><span class="kw">fn </span>a_simple_edge_should_have_the_same_size_as_a_pointer() {
+</span><span class="kw">fn </span>a_simple_slot_should_have_the_same_size_as_a_pointer() {
     <span class="macro">assert_eq!</span>(
-        std::mem::size_of::&lt;SimpleEdge&gt;(),
+        std::mem::size_of::&lt;SimpleSlot&gt;(),
         std::mem::size_of::&lt;<span class="kw-2">*mut </span>libc::c_void&gt;()
     );
 }
 
-<span class="doccomment">/// A abstract memory slice represents a piece of **heap** memory.
+<span class="doccomment">/// A abstract memory slice represents a piece of **heap** memory which may contains many slots.
 </span><span class="kw">pub trait </span>MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
-    <span class="doccomment">/// The associate type to define how to access edges from a memory slice.
-    </span><span class="kw">type </span>Edge: Edge;
-    <span class="doccomment">/// The associate type to define how to iterate edges in a memory slice.
-    </span><span class="kw">type </span>EdgeIterator: Iterator&lt;Item = <span class="self">Self</span>::Edge&gt;;
-    <span class="doccomment">/// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
-    </span><span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator;
+    <span class="doccomment">/// The associate type to define how to access slots from a memory slice.
+    </span><span class="kw">type </span>SlotType: Slot;
+    <span class="doccomment">/// The associate type to define how to iterate slots in a memory slice.
+    </span><span class="kw">type </span>SlotIterator: Iterator&lt;Item = <span class="self">Self</span>::SlotType&gt;;
+    <span class="doccomment">/// Iterate object slots within the slice. If there are non-reference values in the slice, the iterator should skip them.
+    </span><span class="kw">fn </span>iter_slots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::SlotIterator;
     <span class="doccomment">/// The object which this slice belongs to. If we know the object for the slice, we will check the object state (e.g. mature or not), rather than the slice address.
     /// Normally checking the object and checking the slice does not make a difference, as the slice is part of the object (in terms of memory range). However,
     /// if a slice is in a different location from the object, the object state and the slice can be hugely different, and providing a proper implementation
@@ -479,7 +489,7 @@
     </span><span class="kw">fn </span>copy(src: <span class="kw-2">&amp;</span><span class="self">Self</span>, tgt: <span class="kw-2">&amp;</span><span class="self">Self</span>);
 }
 
-<span class="doccomment">/// Iterate edges within `Range&lt;Address&gt;`.
+<span class="doccomment">/// Iterate slots within `Range&lt;Address&gt;`.
 </span><span class="kw">pub struct </span>AddressRangeIterator {
     cursor: Address,
     limit: Address,
@@ -492,18 +502,18 @@
         <span class="kw">if </span><span class="self">self</span>.cursor &gt;= <span class="self">self</span>.limit {
             <span class="prelude-val">None
         </span>} <span class="kw">else </span>{
-            <span class="kw">let </span>edge = <span class="self">self</span>.cursor;
+            <span class="kw">let </span>slot = <span class="self">self</span>.cursor;
             <span class="self">self</span>.cursor += BYTES_IN_ADDRESS;
-            <span class="prelude-val">Some</span>(edge)
+            <span class="prelude-val">Some</span>(slot)
         }
     }
 }
 
 <span class="kw">impl </span>MemorySlice <span class="kw">for </span>Range&lt;Address&gt; {
-    <span class="kw">type </span>Edge = Address;
-    <span class="kw">type </span>EdgeIterator = AddressRangeIterator;
+    <span class="kw">type </span>SlotType = Address;
+    <span class="kw">type </span>SlotIterator = AddressRangeIterator;
 
-    <span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
+    <span class="kw">fn </span>iter_slots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::SlotIterator {
         AddressRangeIterator {
             cursor: <span class="self">self</span>.start,
             limit: <span class="self">self</span>.end,
@@ -542,24 +552,24 @@
 <span class="doccomment">/// Memory slice type with empty implementations.
 /// For VMs that do not use the memory slice type.
 </span><span class="attr">#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-</span><span class="kw">pub struct </span>UnimplementedMemorySlice&lt;E: Edge = SimpleEdge&gt;(PhantomData&lt;E&gt;);
+</span><span class="kw">pub struct </span>UnimplementedMemorySlice&lt;SL: Slot = SimpleSlot&gt;(PhantomData&lt;SL&gt;);
 
-<span class="doccomment">/// Edge iterator for `UnimplementedMemorySlice`.
-</span><span class="kw">pub struct </span>UnimplementedMemorySliceEdgeIterator&lt;E: Edge&gt;(PhantomData&lt;E&gt;);
+<span class="doccomment">/// Slot iterator for `UnimplementedMemorySlice`.
+</span><span class="kw">pub struct </span>UnimplementedMemorySliceSlotIterator&lt;SL: Slot&gt;(PhantomData&lt;SL&gt;);
 
-<span class="kw">impl</span>&lt;E: Edge&gt; Iterator <span class="kw">for </span>UnimplementedMemorySliceEdgeIterator&lt;E&gt; {
-    <span class="kw">type </span>Item = E;
+<span class="kw">impl</span>&lt;SL: Slot&gt; Iterator <span class="kw">for </span>UnimplementedMemorySliceSlotIterator&lt;SL&gt; {
+    <span class="kw">type </span>Item = SL;
 
     <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
         <span class="macro">unimplemented!</span>()
     }
 }
 
-<span class="kw">impl</span>&lt;E: Edge&gt; MemorySlice <span class="kw">for </span>UnimplementedMemorySlice&lt;E&gt; {
-    <span class="kw">type </span>Edge = E;
-    <span class="kw">type </span>EdgeIterator = UnimplementedMemorySliceEdgeIterator&lt;E&gt;;
+<span class="kw">impl</span>&lt;SL: Slot&gt; MemorySlice <span class="kw">for </span>UnimplementedMemorySlice&lt;SL&gt; {
+    <span class="kw">type </span>SlotType = SL;
+    <span class="kw">type </span>SlotIterator = UnimplementedMemorySliceSlotIterator&lt;SL&gt;;
 
-    <span class="kw">fn </span>iter_edges(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::EdgeIterator {
+    <span class="kw">fn </span>iter_slots(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::SlotIterator {
         <span class="macro">unimplemented!</span>()
     }
 
@@ -588,7 +598,7 @@
     </span><span class="kw">fn </span>address_range_iteration() {
         <span class="kw">let </span>src: Vec&lt;usize&gt; = (<span class="number">0</span>..<span class="number">32</span>).collect();
         <span class="kw">let </span>src_slice = Address::from_ptr(<span class="kw-2">&amp;</span>src[<span class="number">0</span>])..Address::from_ptr(<span class="kw-2">&amp;</span>src[<span class="number">0</span>]) + src.len();
-        <span class="kw">for </span>(i, v) <span class="kw">in </span>src_slice.iter_edges().enumerate() {
+        <span class="kw">for </span>(i, v) <span class="kw">in </span>src_slice.iter_slots().enumerate() {
             <span class="macro">assert_eq!</span>(i, <span class="kw">unsafe </span>{ v.load::&lt;usize&gt;() })
         }
     }
