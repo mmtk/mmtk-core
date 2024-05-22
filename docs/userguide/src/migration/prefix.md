@@ -35,11 +35,12 @@ Notes for the mmtk-core developers:
 ### Rename "edge" to "slot"
 
 ```admonish tldr
-The word "edge" in many identifiers have been changed to "slot" if it actaully means slot.  Notable
-items include the traits `Edge`, `EdgeVisitor` and the module `edge_shape`.  Many function names and
-parameters are changed, too.  The VM bindings should not only make changes for the name changes from
-the MMTk-core's side, but also make changes to their own identifiers if they also use "edge" where
-it should have been "slot".  The find/replace tools in text editors and IDEs should be helpful.
+The word "edge" **in many identifiers** have been changed to "slot" if it actaully means slot.
+Notable items include the traits `Edge`, `EdgeVisitor`, the module `edge_shape`, and member types
+and functions in the `Scanning` and `VMBinding` traits.  The VM bindings should not only make
+changes in response to the changes in MMTk-core, but also make changes to their own identifiers if
+they also use "edge" where it should have been "slot".  The find/replace tools in text editors and
+the refactoring/renaming tools in IDEs should be helpful.
 ```
 
 API changes:
