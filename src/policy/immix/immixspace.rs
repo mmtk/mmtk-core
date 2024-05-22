@@ -887,7 +887,7 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let mut histogram = self.space.defrag.new_histogram();
         if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
             let line_mark_state = if super::BLOCK_ONLY {
@@ -919,7 +919,10 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         // If the forwarding bits are on the side, we clear them in the end of each GC, including
         // both nursery GC and full-heap GC.
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+            // Since not all GCs move object, we only clear side forwarding bits after moving GCs.
+            if mmtk.get_plan().current_gc_may_move_object() {
+                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+            }
         }
     }
 }
