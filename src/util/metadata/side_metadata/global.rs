@@ -1080,8 +1080,6 @@ impl SideMetadataContext {
         total
     }
 
-    pub fn reset(&self) {}
-
     // ** NOTE: **
     //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 
