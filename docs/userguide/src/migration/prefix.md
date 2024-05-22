@@ -69,6 +69,11 @@ API changes:
 *   trait `VMBinding`
     -   `VMEdge` -> `VMSlot`
 
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1134>
+-   Example: <https://github.com/mmtk/mmtk-openjdk/pull/274>
+
 
 ## 0.25.0
 
