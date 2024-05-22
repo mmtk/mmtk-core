@@ -1,0 +1,573 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>API Migration Guide - MMTk User Guide</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="The guide describes the usage of MMTk for GC and language runtime developers.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../assets/css/api-migration-details.css">
+        <link rel="stylesheet" href="../assets/css/mdbook-admonish.css">
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">Introduction</a></li><li class="chapter-item expanded affix "><li class="part-title">For GC Developers</li><li class="chapter-item expanded "><a href="../tutorial/prefix.html"><strong aria-hidden="true">1.</strong> Tutorial: Add a new GC plan to MMTk</a></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">1.1.</strong> Introduction</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../tutorial/intro/what_is_mmtk.html"><strong aria-hidden="true">1.1.1.</strong> What is MMTk?</a></li><li class="chapter-item expanded "><a href="../tutorial/intro/what_will_this_tutorial_cover.html"><strong aria-hidden="true">1.1.2.</strong> What will this tutorial cover?</a></li><li class="chapter-item expanded "><a href="../tutorial/intro/glossary.html"><strong aria-hidden="true">1.1.3.</strong> Glossary</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.2.</strong> Preliminaries</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../tutorial/preliminaries/set_up.html"><strong aria-hidden="true">1.2.1.</strong> Set up MMTk and OpenJDK</a></li><li class="chapter-item expanded "><a href="../tutorial/preliminaries/test.html"><strong aria-hidden="true">1.2.2.</strong> Test the build</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.3.</strong> MyGC</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../tutorial/mygc/create.html"><strong aria-hidden="true">1.3.1.</strong> Create MyGC</a></li><li class="chapter-item expanded "><a href="../tutorial/mygc/ss/prefix.html"><strong aria-hidden="true">1.3.2.</strong> Building a semispace GC</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../tutorial/mygc/ss/alloc.html"><strong aria-hidden="true">1.3.2.1.</strong> Allocation</a></li><li class="chapter-item expanded "><a href="../tutorial/mygc/ss/collection.html"><strong aria-hidden="true">1.3.2.2.</strong> Collection</a></li><li class="chapter-item expanded "><a href="../tutorial/mygc/ss/exercise.html"><strong aria-hidden="true">1.3.2.3.</strong> Exercise</a></li><li class="chapter-item expanded "><a href="../tutorial/mygc/ss/exercise_solution.html"><strong aria-hidden="true">1.3.2.4.</strong> Exercise solution</a></li></ol></li><li class="chapter-item expanded "><a href="../tutorial/mygc/gencopy.html"><strong aria-hidden="true">1.3.3.</strong> Building a generational copying GC</a></li></ol></li><li class="chapter-item expanded "><a href="../tutorial/further_reading.html"><strong aria-hidden="true">1.4.</strong> Further Reading</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">For Language Runtime Developers</li><li class="chapter-item expanded "><a href="../portingguide/prefix.html"><strong aria-hidden="true">2.</strong> Porting Guide</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../portingguide/portability.html"><strong aria-hidden="true">2.1.</strong> MMTk’s Approach to Portability</a></li><li class="chapter-item expanded "><a href="../portingguide/before_start.html"><strong aria-hidden="true">2.2.</strong> Before Starting a Port</a></li><li class="chapter-item expanded "><a href="../portingguide/howto/prefix.html"><strong aria-hidden="true">2.3.</strong> How to Undertake a Port</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../portingguide/howto/nogc.html"><strong aria-hidden="true">2.3.1.</strong> NoGC</a></li><li class="chapter-item expanded "><a href="../portingguide/howto/next_steps.html"><strong aria-hidden="true">2.3.2.</strong> Next Steps</a></li></ol></li><li class="chapter-item expanded "><a href="../portingguide/debugging/prefix.html"><strong aria-hidden="true">2.4.</strong> Debugging Tips</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../portingguide/debugging/assertions.html"><strong aria-hidden="true">2.4.1.</strong> Enabling Debug Assertions</a></li></ol></li><li class="chapter-item expanded "><a href="../portingguide/perf_tuning/prefix.html"><strong aria-hidden="true">2.5.</strong> Performance Tuning</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../portingguide/perf_tuning/lto.html"><strong aria-hidden="true">2.5.1.</strong> Link Time Optimization</a></li><li class="chapter-item expanded "><a href="../portingguide/perf_tuning/alloc.html"><strong aria-hidden="true">2.5.2.</strong> Optimizing Allocation</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../migration/prefix.html" class="active"><strong aria-hidden="true">3.</strong> API Migration Guide</a></li><li class="chapter-item expanded affix "><li class="spacer"></li><li class="chapter-item expanded affix "><a href="../misc/contributors.html">Contributors</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">MMTk User Guide</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/userguide" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        <a href="https://github.com/mmtk/mmtk-core/edit/master/docs/userguide/src/migration/prefix.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="api-migration-guide"><a class="header" href="#api-migration-guide">API Migration Guide</a></h1>
+<p>This document lists changes to the MMTk-VM API that require changes to be made by the VM bindings.
+VM binding developers can use this document as a guide to update their code to maintain
+compatibility with the latest release of MMTk.</p>
+<h2 id="view-control"><a class="header" href="#view-control">View control</a></h2>
+<p>Choose how many details you want to read.</p>
+<p><button class="api-migration-details-show-tldr" type="button">Show TL;DR only</button>
+<button class="api-migration-details-show-outline" type="button">Show outline</button>
+<button class="api-migration-details-show-all" type="button">Show all details</button></p>
+<!--
+
+Notes for the mmtk-core developers:
+
+-   Make sure you add to the **upcoming release**.  Check the current version in `Cargo.toml`.
+-   You may add new items or edit existing items before a release, whichever makes sense.
+-   No need to mention API changes that are source compatible and do not require VM binding code
+    to be updated.
+-   Use the [template](template.md).
+-   100 characters per line.  Those who read this doc in text editors and IDEs will thank you.
+    -   vim: "gq" formats the selected lines, and "gqap" formats one paragraph.
+    -   vscode: The "Rewrap" plugin can re-wrap a paragraph with one hot key.
+
+-->
+<div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
+<!-- Insert new versions here -->
+<h2 id="0260"><a class="header" href="#0260">0.26.0</a></h2>
+<h3 id="rename-edge-to-slot"><a class="header" href="#rename-edge-to-slot">Rename "edge" to "slot"</a></h3>
+<div id="admonition-tldr" class="admonition admonish-abstract">
+<div class="admonition-title">
+<p>TL;DR</p>
+<p><a class="admonition-anchor-link" href="#admonition-tldr"></a></p>
+</div>
+<div>
+<p>The word "edge" <strong>in many identifiers</strong> have been changed to "slot" if it actaully means slot.
+Notable items include the traits <code>Edge</code>, <code>EdgeVisitor</code>, the module <code>edge_shape</code>, and member types
+and functions in the <code>Scanning</code> and <code>VMBinding</code> traits.  The VM bindings should not only make
+changes in response to the changes in MMTk-core, but also make changes to their own identifiers if
+they also use "edge" where it should have been "slot".  The find/replace tools in text editors and
+the refactoring/renaming tools in IDEs should be helpful.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>module <code>edge_shape</code> -&gt; <code>slot</code></li>
+<li>type <code>RootsWorkFactory</code>
+<ul>
+<li><code>&lt;ES: Edge&gt;</code> -&gt; <code>&lt;SL: Slot&gt;</code></li>
+<li><code>create_process_edge_roots_work</code> -&gt; <code>create_process_roots_work</code></li>
+</ul>
+</li>
+<li>type <code>SimpleEdge</code> -&gt; <code>SimpleSlot</code></li>
+<li>type <code>UnimplementedMemorySliceEdgeIterator</code> -&gt; <code>UnimplementedMemorySliceSlotIterator</code></li>
+<li>trait <code>Edge</code> -&gt; <code>Slot</code></li>
+<li>trait <code>EdgeVisitor</code> -&gt; <code>SlotVisitor</code>
+<ul>
+<li><code>&lt;ES: Edge&gt;</code> -&gt; <code>&lt;SL: Slot&gt;</code></li>
+<li><code>visit_edge</code> -&gt; <code>visit_slot</code></li>
+</ul>
+</li>
+<li>trait <code>MemorySlice</code>
+<ul>
+<li><code>Edge</code> -&gt; <code>SlotType</code></li>
+<li><code>EdgeIterator</code> -&gt; <code>SlotIterator</code></li>
+<li><code>iter_edges</code> -&gt; <code>iter_slots</code></li>
+</ul>
+</li>
+<li>trait <code>Scanning</code>
+<ul>
+<li><code>support_edge_enqueuing</code> -&gt; <code>support_slot_enqueuing</code></li>
+<li><code>scan_object</code>
+<ul>
+<li><code>&lt;EV: EdgeVisitor&gt;</code> -&gt; <code>&lt;SV: SlotVisitor&gt;</code></li>
+</ul>
+</li>
+<li><code>scan_roots_in_mutator_thread</code>
+<ul>
+<li>Type parameter of <code>factory</code> changed. See type <code>RootsWorkFactory</code>.</li>
+</ul>
+</li>
+<li><code>scan_vm_specific_roots</code>
+<ul>
+<li>Same as above.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>trait <code>VMBinding</code>
+<ul>
+<li><code>VMEdge</code> -&gt; <code>VMSlot</code></li>
+</ul>
+</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1134">https://github.com/mmtk/mmtk-core/pull/1134</a></li>
+<li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/274">https://github.com/mmtk/mmtk-openjdk/pull/274</a></li>
+</ul>
+<h2 id="0250"><a class="header" href="#0250">0.25.0</a></h2>
+<h3 id="objectreference-is-no-longer-nullable"><a class="header" href="#objectreference-is-no-longer-nullable"><code>ObjectReference</code> is no longer nullable</a></h3>
+<div id="admonition-tldr-1" class="admonition admonish-abstract">
+<div class="admonition-title">
+<p>TL;DR</p>
+<p><a class="admonition-anchor-link" href="#admonition-tldr-1"></a></p>
+</div>
+<div>
+<p><code>ObjectReference</code> can no longer represent a NULL reference.  Some methods of <code>ObjectReference</code> and
+the write barrier functions in <code>memory_manager</code> are changed.  VM bindings need to re-implement
+methods of the <code>Edge</code>, <code>ObjectModel</code> and <code>ReferenceGlue</code> traits.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>type <code>ObjectReference</code>
+<ul>
+<li>It can no longer represent NULL reference.
+<ul>
+<li>It is now backed by <code>NonZeroUsize</code>, and MMTk uses <code>Option&lt;ObjectReference&gt;</code> universally
+when an <code>ObjectReference</code> may or may not exist.  It is more idiomatic in Rust.</li>
+</ul>
+</li>
+<li>The constant <code>ObjectReference::NULL</code> is removed.</li>
+<li><code>is_null()</code> is removed.</li>
+<li><code>from_raw_address(addr)</code>
+<ul>
+<li>The return type is changed to <code>Option&lt;ObjectReference&gt;</code>.</li>
+<li>It returns <code>None</code> if <code>addr</code> is not zero.</li>
+<li>If you know <code>addr</code> cannot be zero, you can use the new method
+<code>from_raw_address_unchecked(addr)</code>, instead.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>module <code>mmtk::memory_manager</code>
+<ul>
+<li><strong>Only affects users of write barriers</strong></li>
+<li><code>object_reference_write_pre(mutator, obj, slot, target)</code>
+<ul>
+<li>The <code>target</code> parameter is now <code>Option&lt;ObjectReference&gt;</code>.</li>
+<li>Pass <code>None</code> if the slot was holding a NULL reference or any non-reference value.</li>
+</ul>
+</li>
+<li><code>object_reference_write_post(mutator, obj, slot, target)</code>
+<ul>
+<li>Same as above.</li>
+</ul>
+</li>
+<li><code>object_reference_write(mutator, obj, slot, target)</code>
+<ul>
+<li>It is labelled as <code>#[deprecated]</code> and needs to be redesigned.  It cannot handle the case
+of storing a non-reference value (such as tagged small integer) into the slot.</li>
+<li>Before a replacement is available, use <code>object_reference_write_pre</code> and
+<code>object_reference_write_post</code>, instead.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>trait <code>Edge</code>
+<ul>
+<li><code>load()</code>
+<ul>
+<li>The return type is changed to <code>Option&lt;ObjectReference&gt;</code>.</li>
+<li>It returns <code>None</code> if the slot is holding a NULL reference or other non-reference
+values.  MMTk will skip those slots.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>trait <code>ObjectModel</code>
+<ul>
+<li><code>copy(from, semantics, copy_context)</code>
+<ul>
+<li>Previously VM bindings convert the result of <code>copy_context.alloc_copy()</code> to
+<code>ObjectReference</code> using <code>ObjectReference::from_raw_address()</code>.</li>
+<li>Because <code>CopyContext::alloc_copy()</code> never returns zero, you can use
+<code>ObjectReference::from_raw_address_unchecked()</code> to skip the zero check.</li>
+</ul>
+</li>
+<li><code>get_reference_when_copied_to(from, to)</code>
+<ul>
+<li><code>to</code> is never zero because MMTk only calls this after the destination is determined.</li>
+<li>You may skip the zero check, too.</li>
+</ul>
+</li>
+<li><code>address_to_ref(addr)</code>
+<ul>
+<li><code>addr</code> is never zero because this method is an inverse operation of
+<code>ref_to_address(objref)</code> where <code>objref</code> is never NULL.</li>
+<li>You may skip the zero check, too.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>trait <code>ReferenceGlue</code>
+<ul>
+<li><em>Note: If your VM binding is still using <code>ReferenceGlue</code> and the reference processor and
+finalization processor in mmtk-core, it is strongly recommended to switch to the
+<code>Scanning::process_weak_refs</code> method and implement weak reference and finalization
+processing on the VM side.</em></li>
+<li><code>get_referent()</code>
+<ul>
+<li>The return type is changed to <code>Option&lt;ObjectReference&gt;</code>.</li>
+<li>It now returns <code>None</code> if the referent is cleared.</li>
+</ul>
+</li>
+<li><code>clear_referent()</code>
+<ul>
+<li>It now needs to be explicitly implemented because <code>ObjectReference::NULL</code> no longer
+exists.</li>
+<li>Note: The <code>Edge</code> trait does not have a method for storing NULL to a slot.  The VM
+binding needs to implement its own method to store NULL to a slot.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>Not API change, but worth noting:</p>
+<ul>
+<li>Functions that return <code>Option&lt;ObjectReference&gt;</code>
+<ul>
+<li><code>memory_manager::get_finalized_object</code></li>
+<li><code>ObjectReference::get_forwarded_object</code>
+<ul>
+<li>The functions listed above did not change, as they still return
+<code>Option&lt;ObjectReference&gt;</code>.  But some VM bindings used to expose them to native programs
+by wrapping them into <code>extern "C"</code> functions that return <code>ObjectReference</code>, and return
+<code>ObjectReference::NULL</code> for <code>None</code>.  This is no longer possible since we removed
+<code>ObjectReference::NULL</code>.  The VM bindings should use
+<code>mmtk::util::api_util::NullableObjectReference</code> for the return type instead.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1064">https://github.com/mmtk/mmtk-core/pull/1064</a></li>
+<li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1130">https://github.com/mmtk/mmtk-core/pull/1130</a> (for write barriers)</li>
+<li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/265">https://github.com/mmtk/mmtk-openjdk/pull/265</a></li>
+<li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/273">https://github.com/mmtk/mmtk-openjdk/pull/273</a> (for write barriers)</li>
+</ul>
+<h3 id="instance-methods-of-objectreference-changed"><a class="header" href="#instance-methods-of-objectreference-changed">Instance methods of <code>ObjectReference</code> changed</a></h3>
+<div id="admonition-tldr-2" class="admonition admonish-abstract">
+<div class="admonition-title">
+<p>TL;DR</p>
+<p><a class="admonition-anchor-link" href="#admonition-tldr-2"></a></p>
+</div>
+<div>
+<p>Some methods of <code>ObjectReference</code> now have a type parameter <code>&lt;VM&gt;</code>.  <code>ObjectReference::value()</code> is
+removed.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>type <code>ObjectReference</code>
+<ul>
+<li>The following methods now require a generic argument <code>&lt;VM: VMBinding&gt;</code>:
+<ul>
+<li><code>ObjectReference::is_reachable</code></li>
+<li><code>ObjectReference::is_live</code></li>
+<li><code>ObjectReference::is_movable</code></li>
+<li><code>ObjectReference::get_forwarded_object</code></li>
+<li><code>ObjectReference::is_in_any_space</code></li>
+<li><code>ObjectReference::is_sane</code></li>
+</ul>
+</li>
+<li><code>ObjectReference::value()</code> is removed.
+<ul>
+<li>Use <code>ObjectReference::to_raw_address()</code> instead.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1122">https://github.com/mmtk/mmtk-core/pull/1122</a></li>
+<li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/272">https://github.com/mmtk/mmtk-openjdk/pull/272</a></li>
+</ul>
+<h3 id="the-gc-controller-aka-coordinator-is-removed"><a class="header" href="#the-gc-controller-aka-coordinator-is-removed">The GC controller (a.k.a. coordinator) is removed</a></h3>
+<div id="admonition-tldr-3" class="admonition admonish-abstract">
+<div class="admonition-title">
+<p>TL;DR</p>
+<p><a class="admonition-anchor-link" href="#admonition-tldr-3"></a></p>
+</div>
+<div>
+<p>The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement
+<code>Collection::spawn_gc_thread</code> and call <code>GCWorker::run</code> differently.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>type <code>GCWorker</code>
+<ul>
+<li><code>GCWorker::run</code>
+<ul>
+<li>It now takes ownership of the <code>Box&lt;GCWorker&gt;</code> instance instead of borrowing it.</li>
+<li>The VM binding can simply call the method <code>worker.run()</code> on the worker instance from
+<code>GCThreadContext::Worker(worker)</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>module <code>mmtk::memory_manager</code>
+<ul>
+<li><code>start_worker</code>
+<ul>
+<li>It is now a simple wrapper of <code>GCWorker::run</code> for legacy code.  It takes ownership of
+the <code>Box&lt;GCWorker&gt;</code> instance, too.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>trait <code>Collection</code>
+<ul>
+<li><code>Collection::spawn_gc_thread</code>
+<ul>
+<li>It no longer asks the binding to spawn the controller thread.</li>
+<li>The VM binding can simply remove the code path related to creating the controller
+thread.</li>
+<li>Note the API change when calling <code>GCWorker::run</code> or <code>start_worker</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li>PR: <a href="https://github.com/mmtk/mmtk-core/pull/1067">https://github.com/mmtk/mmtk-core/pull/1067</a></li>
+<li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/268">https://github.com/mmtk/mmtk-openjdk/pull/268</a></li>
+</ul>
+</div>
+<script type="text/javascript">
+const isApiMigrationGuide = true;
+</script>
+<!--
+vim: tw=100
+-->
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../portingguide/perf_tuning/alloc.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../misc/contributors.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../portingguide/perf_tuning/alloc.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../misc/contributors.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../assets/js/api-migration-details.js"></script>
+
+
+    </div>
+    </body>
+</html>
