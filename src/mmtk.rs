@@ -8,8 +8,6 @@ use crate::scheduler::GCWorkScheduler;
 
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
-#[cfg(feature = "extreme_assertions")]
-use crate::util::edge_logger::EdgeLogger;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
@@ -20,6 +18,8 @@ use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+#[cfg(feature = "extreme_assertions")]
+use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
@@ -113,9 +113,9 @@ pub struct MMTK<VM: VMBinding> {
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
-    pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMEdge>>,
+    pub(crate) sanity_checker: Mutex<SanityChecker<VM::VMSlot>>,
     #[cfg(feature = "extreme_assertions")]
-    pub(crate) edge_logger: EdgeLogger<VM::VMEdge>,
+    pub(crate) slot_logger: SlotLogger<VM::VMSlot>,
     pub(crate) gc_trigger: Arc<GCTrigger<VM>>,
     pub(crate) gc_requester: Arc<GCRequester<VM>>,
     pub(crate) stats: Arc<Stats>,
@@ -222,7 +222,7 @@ impl<VM: VMBinding> MMTK<VM> {
             inside_sanity: AtomicBool::new(false),
             inside_harness: AtomicBool::new(false),
             #[cfg(feature = "extreme_assertions")]
-            edge_logger: EdgeLogger::new(),
+            slot_logger: SlotLogger::new(),
             #[cfg(feature = "analysis")]
             analysis_manager: Arc::new(AnalysisManager::new(stats.clone())),
             gc_trigger,

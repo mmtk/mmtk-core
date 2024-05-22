@@ -7,7 +7,7 @@ use crate::policy::gc_work::DEFAULT_TRACE;
 use crate::scheduler::WorkBucketStage;
 use crate::util::constants::BYTES_IN_INT;
 use crate::util::*;
-use crate::vm::edge_shape::MemorySlice;
+use crate::vm::slot::MemorySlice;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
@@ -74,7 +74,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>> BarrierSem
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
-        _slot: VM::VMEdge,
+        _slot: VM::VMSlot,
         _target: Option<ObjectReference>,
     ) {
         // enqueue the object

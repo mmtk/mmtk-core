@@ -152,15 +152,16 @@ If you can't tell which lock instance is for which lock in MMTk, you can trace
 the allocation of the Mutex and record the stack trace (note that you might want
 to compile MMTk with `force-frame-pointers` to obtain better stack traces).
 
-### Measuring the distribution of `process_edges` packet sizes (`packet_size`)
-Most of the GC time is spend in the transitive closure for tracing-based GCs,
-and MMTk performs transitive closure via work packets that calls the `process_edges` method.
-This tool measures the distribution of the sizes of these work packets, and also
-count root edges separately.
+### Measuring the distribution of `ProcessEdgesWork` packet sizes (`packet_size`)
+
+Most of the GC time is spend in the transitive closure for tracing-based GCs, and MMTk performs
+transitive closure via work packets that implement `ProcessEdgesWork` and call the `process_slots`
+method. This tool measures the distribution of the sizes (as the number of slots) of these work
+packets, and also counts root slots separately.
 
 Sample output:
 ```
-@process_edges_packet_size:
+@process_edges_work_packet_size:
 [1]                  238 |@@@@@                                               |
 [2, 4)               806 |@@@@@@@@@@@@@@@@@                                   |
 [4, 8)              1453 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                     |
@@ -177,7 +178,7 @@ Sample output:
 [8K, 16K)             58 |@                                                   |
 [16K, 32K)             5 |                                                    |
 
-@process_edges_root_packet_size:
+@process_edges_work_root_packet_size:
 [1]                   71 |@@@@@@@                                             |
 [2, 4)                 4 |                                                    |
 [4, 8)               276 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@                        |
@@ -195,8 +196,8 @@ Sample output:
 [16K, 32K)             3 |                                                    |
 ```
 
-In the above output, we can see that overall, the sizes of the `process_edges`
-has a unimodal distribution with a peak around 16\~32 edges per packet.
-However, if we focus on root edges, the distribution is roughly bimodal, with a
-first peak around 8\~16 and a second peak around 4096\~8192.
+In the above output, we can see that overall, the number of slots processed by a invocation of
+`process_slots` has a unimodal distribution with a peak around 16\~32 slots per packet. However, if
+we focus on root slots, the distribution is roughly bimodal, with a first peak around 8\~16 and a
+second peak around 4096\~8192.
 

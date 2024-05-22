@@ -30,14 +30,14 @@
 //! When the VO bits are available during tracing, if a plan uses evacuation to reclaim space, then
 //! both the from-space copy and the to-space copy of an object will have the VO-bit set.
 //!
-//! *(Note: There are several reasons behind this semantics.  One reason is that an edge may be
-//! visited multiple times during GC.  If an edge is visited twice, we will see it pointing to the
-//! from-space copy during the first visit, but pointing to the to-space copy during the second
-//! visit.  We consider the edge valid if it points to either the from-space or the to-space copy.
-//! If each edge is visited only once, and we see an edge happen to hold a pointer into the
-//! to-space during its only visit, that must a dangling pointer, and error should be reported.
-//! However, it is hard to guarantee each edge is only visited once during tracing because both the
-//! VM and the GC algorithm may break this guarantee.  See:
+//! *(Note: There are several reasons behind this semantics.  One reason is that a slot may be
+//! visited multiple times during GC.  If a slot is visited twice, we will see the object reference
+//! in the slot pointing to the from-space copy during the first visit, but pointing to the to-space
+//! copy during the second visit.  We consider an object reference valid if it points to either the
+//! from-space or the to-space copy.  If each slot is visited only once, and we see a slot happen to
+//! hold a pointer into the to-space during its only visit, that must be a dangling pointer, and
+//! error should be reported.  However, it is hard to guarantee each slot is only visited once
+//! during tracing because both the VM and the GC algorithm may break this guarantee.  See:
 //! [`crate::plan::PlanConstraints::may_trace_duplicate_edges`])*
 
 // FIXME: The entire vo_bit module should only be available if the "vo_bit" feature is enabled.
