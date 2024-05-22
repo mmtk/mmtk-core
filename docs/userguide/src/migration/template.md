@@ -61,9 +61,6 @@ API changes:
     -   insert methods here...
 *   type `crate::policy::marksweepspace::native_ms::Block` *(Note: ditto)*
     -   insert methods here...
-
-VM bindings need to re-implement the following traits:
-
 *   trait `Bar`
     -   `method1()`
         +   **Only affects users of feature "yyyy"** *(Note: When omitted, it affects everyone.)*
@@ -75,10 +72,9 @@ VM bindings need to re-implement the following traits:
 *   trait `Baz`
     -   insert methods here...
 
-Miscellaneous changes:
+Not API change, but worth noting:
 
-*   Add more stuff if it doesn't belong to any of the categories, but still needs the attention from
-    the VM binding developers.
+*   Add other things besides API changes that need the attention from the VM binding developers.
 
 See also:
 
@@ -96,7 +92,7 @@ Insert summary here.
 
 ```
 
-VM bindings need to re-implement the following traits:
+API changes:
 
 *   trait `Bar2`
     -   `method3()`
