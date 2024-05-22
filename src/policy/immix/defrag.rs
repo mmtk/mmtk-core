@@ -205,9 +205,9 @@ impl Defrag {
             .store(threshold, Ordering::Release);
     }
 
-    /// Release work. Should be called in ImmixSpace::release.
+    /// Reset the in-defrag state.
     #[allow(clippy::assertions_on_constants)]
-    pub fn release<VM: VMBinding>(&self, _space: &ImmixSpace<VM>) {
+    pub fn reset_in_defrag(&self) {
         debug_assert!(super::DEFRAG);
         self.in_defrag_collection.store(false, Ordering::Release);
     }

@@ -5,7 +5,7 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker, WorkBucketStage};
 use crate::util::ObjectReference;
-use crate::vm::edge_shape::{Edge, MemorySlice};
+use crate::vm::slot::{MemorySlice, Slot};
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -32,12 +32,12 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn new(
-        edges: Vec<EdgeOf<Self>>,
+        slots: Vec<SlotOf<Self>>,
         roots: bool,
         mmtk: &'static MMTK<VM>,
         bucket: WorkBucketStage,
     ) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk, bucket);
+        let base = ProcessEdgesBase::new(slots, roots, mmtk, bucket);
         let plan = base.plan().downcast_ref().unwrap();
         Self { plan, base }
     }
@@ -52,7 +52,7 @@ impl<VM: VMBinding, P: GenerationalPlanExt<VM> + PlanTraceObject<VM>, const KIND
         )
     }
 
-    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+    fn process_slot(&mut self, slot: SlotOf<Self>) {
         let Some(object) = slot.load() else {
             // Skip slots that are not holding an object reference.
             return;
@@ -163,15 +163,15 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
             .is_current_gc_nursery()
         {
             // Collect all the entries in all the slices
-            let mut edges = vec![];
+            let mut slots = vec![];
             for slice in &self.modbuf {
-                for edge in slice.iter_edges() {
-                    edges.push(edge);
+                for slot in slice.iter_slots() {
+                    slots.push(slot);
                 }
             }
             // Forward entries
             GCWork::do_work(
-                &mut E::new(edges, false, mmtk, WorkBucketStage::Closure),
+                &mut E::new(slots, false, mmtk, WorkBucketStage::Closure),
                 worker,
                 mmtk,
             )

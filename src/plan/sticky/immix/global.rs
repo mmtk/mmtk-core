@@ -7,6 +7,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
 use crate::policy::immix::ImmixSpace;
+use crate::policy::immix::PREFER_COPY_ON_NURSERY_GC;
 use crate::policy::immix::TRACE_KIND_FAST;
 use crate::policy::sft::SFT;
 use crate::policy::space::Space;
@@ -126,9 +127,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            let was_defrag = self.immix.immix_space.release(false);
-            self.immix
-                .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
+            self.immix.immix_space.release(false);
             self.immix.common.los.release(false);
         } else {
             self.immix.release(tls);
@@ -140,6 +139,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
         self.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::Relaxed);
+
+        let was_defrag = self.immix.immix_space.end_of_gc();
+        self.immix
+            .set_last_gc_was_defrag(was_defrag, Ordering::Relaxed);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<SpaceStats<Self::VM>>) -> bool {
@@ -156,6 +159,14 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn last_collection_was_exhaustive(&self) -> bool {
         self.gc_full_heap.load(Ordering::Relaxed) && self.immix.last_collection_was_exhaustive()
+    }
+
+    fn current_gc_may_move_object(&self) -> bool {
+        if self.is_current_gc_nursery() {
+            PREFER_COPY_ON_NURSERY_GC
+        } else {
+            self.get_immix_space().in_defrag()
+        }
     }
 
     fn get_collection_reserved_pages(&self) -> usize {

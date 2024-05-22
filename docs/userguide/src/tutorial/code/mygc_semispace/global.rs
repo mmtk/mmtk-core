@@ -72,6 +72,13 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR_END: create_copy_config
 
     // Modify
+    // ANCHOR: current_gc_may_move_object
+    fn current_gc_may_move_object(&self) -> bool {
+        true
+    }
+    // ANCHOR_END: current_gc_may_move_object
+
+    // Modify
     // ANCHOR: schedule_collection
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);

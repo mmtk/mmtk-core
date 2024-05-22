@@ -1,3 +1,45 @@
+0.25.0 (2024-05-17)
+===
+
+## What's Changed
+
+### Plan
+* Allow roots to be pinned for StickyImmix nursery collections by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1108
+* Check `FULL_NURSERY_GC` for StickyImmix as well by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1124
+
+### Policy
+* Remove data race for marksweep block lists by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1112
+
+### Scheduler
+* Remove coordinator and support forking by @wks in https://github.com/mmtk/mmtk-core/pull/1067
+
+### API
+* Allow nursery size to be proportional to the heap size by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1087
+* Remove NULL ObjectReference by @wks in https://github.com/mmtk/mmtk-core/pull/1064
+* Fix write barrier parameter type by @wks in https://github.com/mmtk/mmtk-core/pull/1130
+* Allow querying if the current GC may move objects. by @wks in https://github.com/mmtk/mmtk-core/pull/1128
+
+### CI
+* Use host toolchain and explicit target in CI script by @wks in https://github.com/mmtk/mmtk-core/pull/1109
+* Fix ignores in merge check by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1117
+* Fix the openjdk test name in merge check by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1119
+
+### Misc
+* Bump dependencies after version 0.24 by @wks in https://github.com/mmtk/mmtk-core/pull/1105
+* Don't use `PROT_EXEC` with `mmap` on macos by @eileencodes in https://github.com/mmtk/mmtk-core/pull/1110
+* Rename associated types in GCWorkContext by @wks in https://github.com/mmtk/mmtk-core/pull/1116
+* Add missing pinning metadata to mock_vm by @wks in https://github.com/mmtk/mmtk-core/pull/1121
+* Use to_address for SFT access by @wks in https://github.com/mmtk/mmtk-core/pull/1122
+* Ensure reference objects are either traced or cleared by @wks in https://github.com/mmtk/mmtk-core/pull/1126
+* Dump process map on `mmap` failure and fix typos by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1127
+* Fix compiler errors and warnings for Rust 1.78.0 by @wks in https://github.com/mmtk/mmtk-core/pull/1132
+* Remove fl_map and refactor FreeListPageResoure by @wks in https://github.com/mmtk/mmtk-core/pull/953
+
+## New Contributors
+* @eileencodes made their first contribution in https://github.com/mmtk/mmtk-core/pull/1110
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.24.0...v0.25.0
+
 0.24.0 (2024-04-08)
 ===
 

@@ -12,11 +12,11 @@ use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::object_model::specs::*;
-use crate::vm::EdgeVisitor;
 use crate::vm::GCThreadContext;
 use crate::vm::ObjectTracer;
 use crate::vm::ObjectTracerContext;
 use crate::vm::RootsWorkFactory;
+use crate::vm::SlotVisitor;
 use crate::vm::VMBinding;
 use crate::Mutator;
 
@@ -235,12 +235,12 @@ pub struct MockVM {
     pub weakref_get_referent: MockMethod<ObjectReference, Option<ObjectReference>>,
     pub weakref_enqueue_references: MockMethod<(&'static [ObjectReference], VMWorkerThread), ()>,
     // scanning
-    pub support_edge_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
+    pub support_slot_enqueuing: MockMethod<(VMWorkerThread, ObjectReference), bool>,
     pub scan_object: MockMethod<
         (
             VMWorkerThread,
             ObjectReference,
-            &'static mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>,
+            &'static mut dyn SlotVisitor<<MockVM as VMBinding>::VMSlot>,
         ),
         (),
     >,
@@ -312,7 +312,7 @@ impl Default for MockVM {
             weakref_set_referent: MockMethod::new_unimplemented(),
             weakref_enqueue_references: MockMethod::new_unimplemented(),
 
-            support_edge_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
+            support_slot_enqueuing: MockMethod::new_fixed(Box::new(|_| true)),
             scan_object: MockMethod::new_unimplemented(),
             scan_object_and_trace_edges: MockMethod::new_unimplemented(),
             // We instantiate a `MockMethod` with the arguments as ProcessEdgesWorkRootsWorkFactory<..., SFTProcessEdges<MockVM>, ...>,
@@ -374,7 +374,7 @@ unsafe impl Sync for MockVM {}
 unsafe impl Send for MockVM {}
 
 impl VMBinding for MockVM {
-    type VMEdge = Address;
+    type VMSlot = Address;
     type VMMemorySlice = Range<Address>;
 
     type VMActivePlan = MockVM;
@@ -558,18 +558,18 @@ impl crate::vm::ReferenceGlue<MockVM> for MockVM {
 }
 
 impl crate::vm::Scanning<MockVM> for MockVM {
-    fn support_edge_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
-        mock!(support_edge_enqueuing(tls, object))
+    fn support_slot_enqueuing(tls: VMWorkerThread, object: ObjectReference) -> bool {
+        mock!(support_slot_enqueuing(tls, object))
     }
-    fn scan_object<EV: EdgeVisitor<<MockVM as VMBinding>::VMEdge>>(
+    fn scan_object<SV: SlotVisitor<<MockVM as VMBinding>::VMSlot>>(
         tls: VMWorkerThread,
         object: ObjectReference,
-        edge_visitor: &mut EV,
+        slot_visitor: &mut SV,
     ) {
         mock!(scan_object(
             tls,
             object,
-            lifetime!(edge_visitor as &mut dyn EdgeVisitor<<MockVM as VMBinding>::VMEdge>)
+            lifetime!(slot_visitor as &mut dyn SlotVisitor<<MockVM as VMBinding>::VMSlot>)
         ))
     }
     fn scan_object_and_trace_edges<OT: ObjectTracer>(
@@ -586,7 +586,7 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     fn scan_roots_in_mutator_thread(
         tls: VMWorkerThread,
         mutator: &'static mut Mutator<Self>,
-        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>,
+        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock_any!(scan_roots_in_mutator_thread(
             tls,
@@ -596,7 +596,7 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     }
     fn scan_vm_specific_roots(
         tls: VMWorkerThread,
-        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMEdge>,
+        factory: impl RootsWorkFactory<<MockVM as VMBinding>::VMSlot>,
     ) {
         mock_any!(scan_vm_specific_roots(tls, Box::new(factory)))
     }

@@ -73,9 +73,9 @@ usdt:$MMTK:mmtk:work {
     }
 }
 
-usdt:$MMTK:mmtk:process_edges {
+usdt:$MMTK:mmtk:process_slots {
     if (@enable_print) {
-        printf("process_edges,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
+        printf("process_slots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);
     }
 }
 
