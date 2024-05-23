@@ -906,13 +906,11 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 .iter_region::<Block>()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
             {
-                if !block.sweep(self.space, &mut histogram, line_mark_state) {
-                    // Block is live. Increment the allocated block count.
-                    allocated_blocks += 1;
-                }
-
                 // Clear side forwarding bits.
                 // In the beginning of the next GC, no side forwarding bits shall be set.
+                // Note, `block.sweep()` overwrites `DEFRAG_STATE_TABLE` with the number of holes,
+                // but we need it to know if a block is a defrag source.
+                // We clear forwarding bits before `block.sweep()`.
                 if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
                     if is_moving_gc {
                         let objects_may_move = if is_defrag_gc {
@@ -928,6 +926,11 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                             side.bzero_metadata(block.start(), Block::BYTES);
                         }
                     }
+                }
+
+                if !block.sweep(self.space, &mut histogram, line_mark_state) {
+                    // Block is live. Increment the allocated block count.
+                    allocated_blocks += 1;
                 }
             }
             // Set this chunk as free if there is not live blocks.
