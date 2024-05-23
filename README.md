@@ -89,6 +89,7 @@ To integrate MMTk with your language implementation, you need to provide an impl
 you can optionally call MMTk's API for your needs.
 
 For more information, you can refer to our [porting guide](https://docs.mmtk.io/portingguide/prefix.html) for VM implementors.
+We maintain a [migration guide](https://docs.mmtk.io/migration/prefix.html) to help VM implementors to migrate MMTk to newer versions.
 
 ### Implement your GC
 
