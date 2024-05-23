@@ -895,6 +895,9 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             } else {
                 Some(self.space.line_mark_state.load(Ordering::Acquire))
             };
+            // Hints for clearing side forwarding bits.
+            let is_moving_gc = mmtk.get_plan().current_gc_may_move_object();
+            let is_defrag_gc = self.space.defrag.in_defrag();
             // number of allocated blocks.
             let mut allocated_blocks = 0;
             // Iterate over all allocated blocks in this chunk.
@@ -907,6 +910,17 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                     // Block is live. Increment the allocated block count.
                     allocated_blocks += 1;
                 }
+
+                // Clear side forwarding bits.
+                // In the beginning of the next GC, no side forwarding bits shall be set.
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+                    if is_moving_gc {
+                        let objects_may_move = !is_defrag_gc || block.is_defrag_source();
+                        if objects_may_move {
+                            side.bzero_metadata(block.start(), Block::BYTES);
+                        }
+                    }
+                }
             }
             // Set this chunk as free if there is not live blocks.
             if allocated_blocks == 0 {
@@ -915,15 +929,6 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         self.epilogue.finish_one_work_packet();
-
-        // If the forwarding bits are on the side, we clear them in the end of each GC, including
-        // both nursery GC and full-heap GC.
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            // Since not all GCs move object, we only clear side forwarding bits after moving GCs.
-            if mmtk.get_plan().current_gc_may_move_object() {
-                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-            }
-        }
     }
 }
 
