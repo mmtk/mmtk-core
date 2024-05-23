@@ -915,7 +915,15 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 // In the beginning of the next GC, no side forwarding bits shall be set.
                 if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
                     if is_moving_gc {
-                        let objects_may_move = !is_defrag_gc || block.is_defrag_source();
+                        let objects_may_move = if is_defrag_gc {
+                            // If it is a defrag GC, we only clear forwarding bits for defrag sources.
+                            block.is_defrag_source()
+                        } else {
+                            // Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
+                            // We don't have information about which block contains moved objects,
+                            // so we have to clear forwarding bits for all blocks.
+                            true
+                        };
                         if objects_may_move {
                             side.bzero_metadata(block.start(), Block::BYTES);
                         }
