@@ -710,8 +710,9 @@ pub fn add_phantom_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReferen
     mmtk.reference_processors.add_phantom_candidate(reff);
 }
 
-/// Generic hook to allow benchmarks to be harnessed. We do a full heap
-/// GC, and then start recording statistics for MMTk.
+/// Generic hook to allow benchmarks to be harnessed. It is recommended that
+/// the application/benchmark should trigger a GC through [`crate::memory_manager::handle_user_collection_request`]
+/// before calling `harness_begin`.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.

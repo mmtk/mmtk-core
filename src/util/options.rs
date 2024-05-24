@@ -807,7 +807,7 @@ options! {
     nursery:               NurserySize          [env_var: true, command_line: true]  [|v: &NurserySize| v.validate()]
         = NurserySize::ProportionalBounded { min: DEFAULT_PROPORTIONAL_MIN_NURSERY, max: DEFAULT_PROPORTIONAL_MAX_NURSERY },
     /// Should a major GC be performed when a system GC is required?
-    full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
+    full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = true,
     /// Should finalization be disabled?
     no_finalizer:          bool                 [env_var: true, command_line: true]  [always_valid] = false,
     /// Should reference type processing be disabled?

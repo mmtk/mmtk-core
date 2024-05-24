@@ -318,12 +318,10 @@ impl<VM: VMBinding> MMTK<VM> {
         self.scheduler.respawn_gc_threads_after_forking(tls);
     }
 
-    /// Generic hook to allow benchmarks to be harnessed. MMTk will trigger a GC
-    /// to clear any residual garbage and start collecting statistics for the benchmark.
+    /// Generic hook to allow benchmarks to be harnessed.
     /// This is usually called by the benchmark harness as its last step before the actual benchmark.
-    pub fn harness_begin(&self, tls: VMMutatorThread) {
+    pub fn harness_begin(&self, _tls: VMMutatorThread) {
         probe!(mmtk, harness_begin);
-        self.handle_user_collection_request(tls, true, true);
         self.inside_harness.store(true, Ordering::SeqCst);
         self.stats.start_all();
         self.scheduler.enable_stat();
