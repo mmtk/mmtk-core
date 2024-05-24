@@ -405,10 +405,7 @@ impl<VM: VMBinding> MMTK<VM> {
     ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
-    pub fn handle_user_collection_request(
-        &self,
-        tls: VMMutatorThread
-    ) {
+    pub fn handle_user_collection_request(&self, tls: VMMutatorThread) {
         use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
             warn!("User attempted a collection request, but the plan can not do GC. The request is ignored.");
