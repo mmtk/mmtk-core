@@ -401,7 +401,7 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     /// The application code has requested a collection. This is just a GC hint, and
-    /// we may ignore it (See `ignore_system_gc` and `full_heap_system_gc` in [`mmtk::util::options::Options`]).
+    /// we may ignore it (See `ignore_system_gc` and `full_heap_system_gc` in [`crate::util::options::Options`]).
     ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
