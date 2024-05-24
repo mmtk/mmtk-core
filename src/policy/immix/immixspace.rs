@@ -908,6 +908,8 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             {
                 // Clear side forwarding bits.
                 // In the beginning of the next GC, no side forwarding bits shall be set.
+                // In this way, we can omit clearing forwarding bits when copying object.
+                // See `GCWorkerCopyContext::post_copy`.
                 // Note, `block.sweep()` overwrites `DEFRAG_STATE_TABLE` with the number of holes,
                 // but we need it to know if a block is a defrag source.
                 // We clear forwarding bits before `block.sweep()`.
