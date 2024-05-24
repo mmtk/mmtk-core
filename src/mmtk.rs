@@ -401,17 +401,13 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     /// The application code has requested a collection. This is just a GC hint, and
-    /// we may ignore it.
+    /// we may ignore it (See `ignore_system_gc` and `full_heap_system_gc` in [`mmtk::util::options::Options`]).
     ///
     /// # Arguments
     /// * `tls`: The mutator thread that requests the GC
-    /// * `force`: The request cannot be ignored (except for NoGC)
-    /// * `exhaustive`: The requested GC should be exhaustive. This is also a hint.
     pub fn handle_user_collection_request(
         &self,
-        tls: VMMutatorThread,
-        force: bool,
-        exhaustive: bool,
+        tls: VMMutatorThread
     ) {
         use crate::vm::Collection;
         if !self.get_plan().constraints().collects_garbage {
@@ -419,17 +415,11 @@ impl<VM: VMBinding> MMTK<VM> {
             return;
         }
 
-        if force || !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
+        if !*self.options.ignore_system_gc && VM::VMCollection::is_collection_enabled() {
             info!("User triggering collection");
-            if exhaustive {
-                if let Some(gen) = self.get_plan().generational() {
-                    gen.force_full_heap_collection();
-                }
-            }
-
             self.state
                 .user_triggered_collection
-                .store(true, Ordering::Relaxed);
+                .store(true, Ordering::SeqCst);
             self.gc_requester.request();
             VM::VMCollection::block_for_gc(tls);
         }
