@@ -23,7 +23,7 @@ fi
 cargo build
 
 # Check dummyvm in portingguide
-dummyvm_code_dir=$project_root/docs/userguide/src/portingguide/code/dummyvm
+dummyvm_code_dir=$project_root/docs/dummyvm
 cargo build --manifest-path $dummyvm_code_dir/Cargo.toml
 
 # Install mdbook using the stable toolchain and the default target

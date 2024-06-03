@@ -51,4 +51,4 @@ style_check_auxiliary_crate() {
 }
 
 style_check_auxiliary_crate macros
-style_check_auxiliary_crate docs/userguide/src/portingguide/code/dummyvm
+style_check_auxiliary_crate docs/dummyvm
