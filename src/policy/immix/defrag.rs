@@ -78,7 +78,7 @@ impl Defrag {
                 || !exhausted_reusable_space
                 || super::STRESS_DEFRAG
                 || (collect_whole_heap && user_triggered && full_heap_system_gc));
-        // println!("Defrag: {}", in_defrag);
+        info!("Defrag: {}", in_defrag);
         self.in_defrag_collection
             .store(in_defrag, Ordering::Release)
     }
