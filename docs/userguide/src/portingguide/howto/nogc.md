@@ -110,6 +110,29 @@ We recommend going through the [list of constants in the documentation](https://
 ## MMTk initialization
 Now that we have most of the boilerplate set up, the next step is to initialize MMTk so that we can start allocating objects.
 
+In short, MMTk uses the builder pattern. The binding needs to create an [`MMTKBuilder`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html),
+create an [`MMTK`](https://docs.mmtk.io/api/mmtk/mmtk/struct.MMTK.html) instance from the builder, and then initialize MMTk's collection
+when the runtime system is ready for GCs.
+The following steps describes details. In an actual binding implementation, the binding may choose to combine several
+steps into one function call to make things simpler.
+
+1. Create an `MMTKBuilder` using [`MMTKBuilder::new()`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html#method.new). You can set
+   runtime options via [`set_option()`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html#method.set_option) for things like
+   the GC plan to use, heap sizes, etc. This is [a full list of runtime options](https://docs.mmtk.io/api/mmtk/util/options/struct.Options.html).
+   It is a common practice that the VM parses its command line arguments, then sets some GC-related options
+   to MMTk here. You can also set virtual memory layout for MMTk. Some runtimes may require special layouts, such as using compressed pointers
+   with a fixed heap range. However, both setting options and VM layouts are optional -- MMTk will use the default values if none is set.
+2. Create an `MMTK` instance via [`memory_manager::mmtk_init()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.mmtk_init.html). This
+   enables the binding to use most of the MMTk APIs in [`memory_manager`](https://docs.mmtk.io/api/mmtk/memory_manager/index.html), as most
+   APIs require a reference to `MMTK`.
+3. When the runtime is ready for GCs (including getting its thread system ready to spawn GC threads), it is expected to call [`memory_manager::initialize_collection`]
+   (https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html). Once the function returns, MMTk may trigger a GC at any time.
+   In terms of getting NoGC to work, this step is optional, as NoGC will not trigger GCs.
+
+In practice, it greatly depends on the runtime about how to expose the MMTk's Rust API above to native, and when to call the native API in the runtime.
+In the following example, we assume a `MMTKBuilder` is created statically (Step 1), and expects a call from the runtime to set heap sizes to the builder
+via `mmtk_set_heap_size()`. We will create an `MMTK` instance from the builder in `mmtk_init()` (Step 2). Step 3 is omitted, as we do not need it for NoGC.
+
 ### Runtime-side changes
 Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/header/mmtk.h) as an example.
 
