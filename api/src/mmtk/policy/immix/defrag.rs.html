@@ -294,8 +294,8 @@
                 || !exhausted_reusable_space
                 || <span class="kw">super</span>::STRESS_DEFRAG
                 || (collect_whole_heap &amp;&amp; user_triggered &amp;&amp; full_heap_system_gc));
-        <span class="comment">// println!("Defrag: {}", in_defrag);
-        </span><span class="self">self</span>.in_defrag_collection
+        <span class="macro">info!</span>(<span class="string">"Defrag: {}"</span>, in_defrag);
+        <span class="self">self</span>.in_defrag_collection
             .store(in_defrag, Ordering::Release)
     }
 

@@ -329,12 +329,6 @@
 <a href="#327" id="327">327</a>
 <a href="#328" id="328">328</a>
 <a href="#329" id="329">329</a>
-<a href="#330" id="330">330</a>
-<a href="#331" id="331">331</a>
-<a href="#332" id="332">332</a>
-<a href="#333" id="333">333</a>
-<a href="#334" id="334">334</a>
-<a href="#335" id="335">335</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -505,32 +499,26 @@
 
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;</span><span class="self">self</span>, from_space: bool) {
         <span class="self">self</span>.from_space.store(from_space, Ordering::SeqCst);
-        <span class="comment">// Clear the metadata if we are using side forwarding status table. Otherwise
-        // objects may inherit forwarding status from the previous GC.
-        // TODO: Fix performance.
-        </span><span class="kw">if let </span>MetadataSpec::OnSide(side_forwarding_status_table) =
-            <span class="kw-2">*</span>&lt;VM::VMObjectModel <span class="kw">as </span>ObjectModel&lt;VM&gt;&gt;::LOCAL_FORWARDING_BITS_SPEC
-        {
-            side_forwarding_status_table
-                .bzero_metadata(<span class="self">self</span>.common.start, <span class="self">self</span>.pr.cursor() - <span class="self">self</span>.common.start);
-        }
     }
 
     <span class="kw">pub fn </span>release(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
+            <span class="comment">// Clear the forwarding bits if it is on the side.
+            </span><span class="kw">if let </span>MetadataSpec::OnSide(side_forwarding_status_table) =
+                <span class="kw-2">*</span>&lt;VM::VMObjectModel <span class="kw">as </span>ObjectModel&lt;VM&gt;&gt;::LOCAL_FORWARDING_BITS_SPEC
+            {
+                side_forwarding_status_table.bzero_metadata(start, size);
+            }
+
+            <span class="comment">// Clear VO bits because all objects in the space are dead.
+            </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+            </span><span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(start, size);
+        }
+
         <span class="kw">unsafe </span>{
-            <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-            </span><span class="self">self</span>.reset_vo_bit();
             <span class="self">self</span>.pr.reset();
         }
-        <span class="self">self</span>.common.metadata.reset();
         <span class="self">self</span>.from_space.store(<span class="bool-val">false</span>, Ordering::SeqCst);
-    }
-
-    <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
-    </span><span class="kw">unsafe fn </span>reset_vo_bit(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for </span>(start, size) <span class="kw">in </span><span class="self">self</span>.pr.iterate_allocated_regions() {
-            <span class="kw">crate</span>::util::metadata::vo_bit::bzero_vo_bit(start, size);
-        }
     }
 
     <span class="kw">fn </span>is_from_space(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {

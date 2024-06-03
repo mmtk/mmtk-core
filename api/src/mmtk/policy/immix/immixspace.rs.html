@@ -1097,6 +1097,29 @@
 <a href="#1095" id="1095">1095</a>
 <a href="#1096" id="1096">1096</a>
 <a href="#1097" id="1097">1097</a>
+<a href="#1098" id="1098">1098</a>
+<a href="#1099" id="1099">1099</a>
+<a href="#1100" id="1100">1100</a>
+<a href="#1101" id="1101">1101</a>
+<a href="#1102" id="1102">1102</a>
+<a href="#1103" id="1103">1103</a>
+<a href="#1104" id="1104">1104</a>
+<a href="#1105" id="1105">1105</a>
+<a href="#1106" id="1106">1106</a>
+<a href="#1107" id="1107">1107</a>
+<a href="#1108" id="1108">1108</a>
+<a href="#1109" id="1109">1109</a>
+<a href="#1110" id="1110">1110</a>
+<a href="#1111" id="1111">1111</a>
+<a href="#1112" id="1112">1112</a>
+<a href="#1113" id="1113">1113</a>
+<a href="#1114" id="1114">1114</a>
+<a href="#1115" id="1115">1115</a>
+<a href="#1116" id="1116">1116</a>
+<a href="#1117" id="1117">1117</a>
+<a href="#1118" id="1118">1118</a>
+<a href="#1119" id="1119">1119</a>
+<a href="#1120" id="1120">1120</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1940,10 +1963,6 @@
                 </span><span class="macro">unimplemented!</span>(<span class="string">"We cannot bulk zero unlogged bit."</span>)
             }
         }
-        <span class="comment">// If the forwarding bits are on the side, we need to clear them, too.
-        </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            side.bzero_metadata(<span class="self">self</span>.chunk.start(), Chunk::BYTES);
-        }
     }
 }
 
@@ -1990,7 +2009,7 @@
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>SweepChunk&lt;VM&gt; {
-    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, _mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
+    <span class="kw">fn </span>do_work(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _worker: <span class="kw-2">&amp;mut </span>GCWorker&lt;VM&gt;, mmtk: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>MMTK&lt;VM&gt;) {
         <span class="kw">let </span><span class="kw-2">mut </span>histogram = <span class="self">self</span>.space.defrag.new_histogram();
         <span class="kw">if </span><span class="self">self</span>.space.chunk_map.get(<span class="self">self</span>.chunk) == ChunkState::Allocated {
             <span class="kw">let </span>line_mark_state = <span class="kw">if </span><span class="kw">super</span>::BLOCK_ONLY {
@@ -1998,6 +2017,9 @@
             </span>} <span class="kw">else </span>{
                 <span class="prelude-val">Some</span>(<span class="self">self</span>.space.line_mark_state.load(Ordering::Acquire))
             };
+            <span class="comment">// Hints for clearing side forwarding bits.
+            </span><span class="kw">let </span>is_moving_gc = mmtk.get_plan().current_gc_may_move_object();
+            <span class="kw">let </span>is_defrag_gc = <span class="self">self</span>.space.defrag.in_defrag();
             <span class="comment">// number of allocated blocks.
             </span><span class="kw">let </span><span class="kw-2">mut </span>allocated_blocks = <span class="number">0</span>;
             <span class="comment">// Iterate over all allocated blocks in this chunk.
@@ -2006,6 +2028,30 @@
                 .iter_region::&lt;Block&gt;()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
             {
+                <span class="comment">// Clear side forwarding bits.
+                // In the beginning of the next GC, no side forwarding bits shall be set.
+                // In this way, we can omit clearing forwarding bits when copying object.
+                // See `GCWorkerCopyContext::post_copy`.
+                // Note, `block.sweep()` overwrites `DEFRAG_STATE_TABLE` with the number of holes,
+                // but we need it to know if a block is a defrag source.
+                // We clear forwarding bits before `block.sweep()`.
+                </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+                    <span class="kw">if </span>is_moving_gc {
+                        <span class="kw">let </span>objects_may_move = <span class="kw">if </span>is_defrag_gc {
+                            <span class="comment">// If it is a defrag GC, we only clear forwarding bits for defrag sources.
+                            </span>block.is_defrag_source()
+                        } <span class="kw">else </span>{
+                            <span class="comment">// Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
+                            // We don't have information about which block contains moved objects,
+                            // so we have to clear forwarding bits for all blocks.
+                            </span><span class="bool-val">true
+                        </span>};
+                        <span class="kw">if </span>objects_may_move {
+                            side.bzero_metadata(block.start(), Block::BYTES);
+                        }
+                    }
+                }
+
                 <span class="kw">if </span>!block.sweep(<span class="self">self</span>.space, <span class="kw-2">&amp;mut </span>histogram, line_mark_state) {
                     <span class="comment">// Block is live. Increment the allocated block count.
                     </span>allocated_blocks += <span class="number">1</span>;

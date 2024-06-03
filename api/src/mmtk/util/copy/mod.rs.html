@@ -264,6 +264,13 @@
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
 <a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::MaybeUninit;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -376,8 +383,15 @@
     /// * `bytes`: The size of the object in bytes.
     /// * `semantics`: The copy semantic used for the copying.
     </span><span class="kw">pub fn </span>post_copy(<span class="kw-2">&amp;mut </span><span class="self">self</span>, object: ObjectReference, bytes: usize, semantics: CopySemantics) {
-        <span class="comment">// Clear forwarding bits.
-        </span>object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
+        <span class="kw">if </span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.is_in_header() {
+            <span class="comment">// Clear forwarding bits if the forwarding bits are in the header.
+            </span>object_forwarding::clear_forwarding_bits::&lt;VM&gt;(object);
+        } <span class="kw">else </span>{
+            <span class="comment">// We ensure no stale side forwarding bits exist before tracing.
+            </span><span class="macro">debug_assert!</span>(!object_forwarding::is_forwarded_or_being_forwarded::&lt;VM&gt;(
+                object
+            ));
+        }
         <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.
         </span><span class="kw">if </span>semantics.is_mature() &amp;&amp; <span class="self">self</span>.config.constraints.needs_log_bit {
             <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
