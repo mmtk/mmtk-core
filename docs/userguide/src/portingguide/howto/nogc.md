@@ -128,7 +128,7 @@ steps into one function call to make things simpler.
    enables the binding to use most of the MMTk APIs in [`memory_manager`](https://docs.mmtk.io/api/mmtk/memory_manager/index.html), as most
    APIs require a reference to `MMTK`.
 3. When the runtime is ready for GCs (including getting its thread system ready to spawn GC threads), it is expected to call [`memory_manager::initialize_collection`]
-   (https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html). Once the function returns, MMTk may trigger a GC at any time.
+   (https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html). Once the function returns, MMTk may trigger a GC at any appropriate time.
    In terms of getting NoGC to work, this step is optional, as NoGC will not trigger GCs.
 
 In practice, it greatly depends on the runtime about how to expose the MMTk's Rust API above to native, and when to call the native API in the runtime.
