@@ -54,6 +54,7 @@ pub struct InitializeOnce<T: 'static> {
 }
 
 impl<T> InitializeOnce<T> {
+    /// Create a new `InitializeOnce` instance. The value needs to be later initialized with `initialize_once`.
     pub const fn new() -> Self {
         InitializeOnce {
             v: UnsafeCell::new(MaybeUninit::uninit()),
