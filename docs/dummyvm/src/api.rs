@@ -1,6 +1,7 @@
 // All functions here are extern function. There is no point for marking them as unsafe.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+use crate::mmtk;
 use crate::DummyVM;
 use crate::SINGLETON;
 use libc::c_char;
@@ -17,18 +18,49 @@ use std::ffi::CStr;
 // Most commonly used APIs are listed in https://docs.mmtk.io/api/mmtk/memory_manager/index.html. The binding can expose them here.
 
 #[no_mangle]
+pub extern "C" fn mmtk_create_builder() -> *mut MMTKBuilder {
+    Box::into_raw(Box::new(mmtk::MMTKBuilder::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn mmtk_set_option_from_string(
+    builder: *mut MMTKBuilder,
+    name: *const c_char,
+    value: *const c_char,
+) -> bool {
+    let builder = unsafe { &mut *builder };
+    let name_str: &CStr = unsafe { CStr::from_ptr(name) };
+    let value_str: &CStr = unsafe { CStr::from_ptr(value) };
+    builder.set_option(name_str.to_str().unwrap(), value_str.to_str().unwrap())
+}
+
+#[no_mangle]
+pub extern "C" fn mmtk_set_fixed_heap_size(builder: *mut MMTKBuilder, heap_size: usize) -> bool {
+    let builder = unsafe { &mut *builder };
+    builder
+        .options
+        .gc_trigger
+        .set(mmtk::util::options::GCTriggerSelector::FixedHeapSize(
+            heap_size,
+        ))
+}
+
+#[no_mangle]
 pub fn mmtk_init(builder: *mut MMTKBuilder) {
     let builder = unsafe { Box::from_raw(builder) };
 
-    // Initialize mmtk, and set SINGLETON to it.
-    let closure = move || memory_manager::mmtk_init::<DummyVM>(&builder);
+    // Create MMTK instance.
+    let mmtk = memory_manager::mmtk_init::<DummyVM>(&builder);
 
-    SINGLETON.initialize_once(&closure);
+    // Set SINGLETON to the instance.
+    SINGLETON.set(mmtk).unwrap_or_else(|_| {
+        panic!("Failed to set SINGLETON");
+    });
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyVM> {
-    Box::into_raw(memory_manager::bind_mutator(&SINGLETON, tls))
+    Box::into_raw(memory_manager::bind_mutator(mmtk(), tls))
 }
 
 #[no_mangle]
@@ -51,7 +83,7 @@ pub extern "C" fn mmtk_alloc(
     // In pratice, a binding may want to lift this code to somewhere in the runtime where the allocated bytes is constant so
     // they can statically know if a normal allocation or a large object allocation is needed.
     if size
-        >= SINGLETON
+        >= mmtk()
             .get_plan()
             .constraints()
             .max_non_los_default_alloc_bytes
@@ -72,7 +104,7 @@ pub extern "C" fn mmtk_post_alloc(
     // In pratice, a binding may want to lift this code to somewhere in the runtime where the allocated bytes is constant so
     // they can statically know if a normal allocation or a large object allocation is needed.
     if bytes
-        >= SINGLETON
+        >= mmtk()
             .get_plan()
             .constraints()
             .max_non_los_default_alloc_bytes
@@ -85,27 +117,27 @@ pub extern "C" fn mmtk_post_alloc(
 #[no_mangle]
 pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: *mut GCWorker<DummyVM>) {
     let worker = unsafe { Box::from_raw(worker) };
-    memory_manager::start_worker::<DummyVM>(&SINGLETON, tls, worker)
+    memory_manager::start_worker::<DummyVM>(mmtk(), tls, worker)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_initialize_collection(tls: VMThread) {
-    memory_manager::initialize_collection(&SINGLETON, tls)
+    memory_manager::initialize_collection(mmtk(), tls)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_used_bytes() -> usize {
-    memory_manager::used_bytes(&SINGLETON)
+    memory_manager::used_bytes(mmtk())
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_free_bytes() -> usize {
-    memory_manager::free_bytes(&SINGLETON)
+    memory_manager::free_bytes(mmtk())
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_total_bytes() -> usize {
-    memory_manager::total_bytes(&SINGLETON)
+    memory_manager::total_bytes(mmtk())
 }
 
 #[no_mangle]
@@ -136,52 +168,32 @@ pub extern "C" fn mmtk_is_mapped_address(address: Address) -> bool {
 
 #[no_mangle]
 pub extern "C" fn mmtk_handle_user_collection_request(tls: VMMutatorThread) {
-    memory_manager::handle_user_collection_request::<DummyVM>(&SINGLETON, tls);
+    memory_manager::handle_user_collection_request::<DummyVM>(mmtk(), tls);
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_add_weak_candidate(reff: ObjectReference) {
-    memory_manager::add_weak_candidate(&SINGLETON, reff)
+    memory_manager::add_weak_candidate(mmtk(), reff)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_add_soft_candidate(reff: ObjectReference) {
-    memory_manager::add_soft_candidate(&SINGLETON, reff)
+    memory_manager::add_soft_candidate(mmtk(), reff)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_add_phantom_candidate(reff: ObjectReference) {
-    memory_manager::add_phantom_candidate(&SINGLETON, reff)
+    memory_manager::add_phantom_candidate(mmtk(), reff)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_harness_begin(tls: VMMutatorThread) {
-    memory_manager::harness_begin(&SINGLETON, tls)
+    memory_manager::harness_begin(mmtk(), tls)
 }
 
 #[no_mangle]
 pub extern "C" fn mmtk_harness_end() {
-    memory_manager::harness_end(&SINGLETON)
-}
-
-#[no_mangle]
-pub extern "C" fn mmtk_create_builder() -> *mut MMTKBuilder {
-    Box::into_raw(Box::new(mmtk::MMTKBuilder::new()))
-}
-
-#[no_mangle]
-pub extern "C" fn mmtk_process(
-    builder: *mut MMTKBuilder,
-    name: *const c_char,
-    value: *const c_char,
-) -> bool {
-    let name_str: &CStr = unsafe { CStr::from_ptr(name) };
-    let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    memory_manager::process(
-        unsafe { &mut *builder },
-        name_str.to_str().unwrap(),
-        value_str.to_str().unwrap(),
-    )
+    memory_manager::harness_end(mmtk())
 }
 
 #[no_mangle]
@@ -197,7 +209,7 @@ pub extern "C" fn mmtk_last_heap_address() -> Address {
 #[no_mangle]
 #[cfg(feature = "malloc_counted_size")]
 pub extern "C" fn mmtk_counted_malloc(size: usize) -> Address {
-    memory_manager::counted_malloc::<DummyVM>(&SINGLETON, size)
+    memory_manager::counted_malloc::<DummyVM>(mmtk(), size)
 }
 #[no_mangle]
 pub extern "C" fn mmtk_malloc(size: usize) -> Address {
@@ -207,7 +219,7 @@ pub extern "C" fn mmtk_malloc(size: usize) -> Address {
 #[no_mangle]
 #[cfg(feature = "malloc_counted_size")]
 pub extern "C" fn mmtk_counted_calloc(num: usize, size: usize) -> Address {
-    memory_manager::counted_calloc::<DummyVM>(&SINGLETON, num, size)
+    memory_manager::counted_calloc::<DummyVM>(mmtk(), num, size)
 }
 #[no_mangle]
 pub extern "C" fn mmtk_calloc(num: usize, size: usize) -> Address {
@@ -221,7 +233,7 @@ pub extern "C" fn mmtk_realloc_with_old_size(
     size: usize,
     old_size: usize,
 ) -> Address {
-    memory_manager::realloc_with_old_size::<DummyVM>(&SINGLETON, addr, size, old_size)
+    memory_manager::realloc_with_old_size::<DummyVM>(mmtk(), addr, size, old_size)
 }
 #[no_mangle]
 pub extern "C" fn mmtk_realloc(addr: Address, size: usize) -> Address {
@@ -231,7 +243,7 @@ pub extern "C" fn mmtk_realloc(addr: Address, size: usize) -> Address {
 #[no_mangle]
 #[cfg(feature = "malloc_counted_size")]
 pub extern "C" fn mmtk_free_with_size(addr: Address, old_size: usize) {
-    memory_manager::free_with_size::<DummyVM>(&SINGLETON, addr, old_size)
+    memory_manager::free_with_size::<DummyVM>(mmtk(), addr, old_size)
 }
 #[no_mangle]
 pub extern "C" fn mmtk_free(addr: Address) {
@@ -241,7 +253,7 @@ pub extern "C" fn mmtk_free(addr: Address) {
 #[no_mangle]
 #[cfg(feature = "malloc_counted_size")]
 pub extern "C" fn mmtk_get_malloc_bytes() -> usize {
-    memory_manager::get_malloc_bytes(&SINGLETON)
+    memory_manager::get_malloc_bytes(mmtk())
 }
 
 #[cfg(test)]
@@ -252,38 +264,32 @@ mod tests {
 
     #[test]
     fn mmtk_init_test() {
-        // Create an MMTk builder
-        let builder = mmtk_create_builder();
-        // Set heap size and GC plan
-        // Using exposed C API
-        {
-            let name = CString::new("gc_trigger").unwrap();
-            let val = CString::new("Fixed:1048576").unwrap();
-            mmtk_process(builder, name.as_ptr(), val.as_ptr());
+        // `MMTKBuilder::new()`` also initializes options from environment variables "MMTK_*".
+        // This is useful in the early stage of VM binding development.
+        // Use `MMTKBuilder::new_no_env_vars` to ignore environment variables.
+        let mut builder = MMTKBuilder::new();
 
-            let name = CString::new("plan").unwrap();
-            let val = CString::new("NoGC").unwrap();
-            mmtk_process(builder, name.as_ptr(), val.as_ptr());
-        }
-        // or Rust
-        {
-            let builder = unsafe { &mut *builder };
-            let success = builder.options.gc_trigger.set(
-                mmtk::util::options::GCTriggerSelector::FixedHeapSize(1048576),
-            );
-            assert!(success);
+        // Real-world VM bindings should parse command line arguments and set MMTk options accordingly.
+        // We demonstrate two ways to set MMTk options.
 
-            let success = builder
-                .options
-                .plan
-                .set(mmtk::util::options::PlanSelector::NoGC);
-            assert!(success);
-        }
+        // Set option by string.  The option name and value are prased using the predefined format
+        // defined by each MMTk option.  Convenient for parsing command line arguments.
+        builder.set_option("gc_trigger", "Fixed:1048576");
+
+        // Set option by value.  We set the the option direcly using `MMTKOption::set`. Useful if
+        // the VM binding wants to set options directly, or if the VM binding has its own format for
+        // command line arguments.
+        let success = builder
+            .options
+            .plan
+            .set(mmtk::util::options::PlanSelector::NoGC);
+        assert!(success);
+
         // Set layout if necessary
         // builder.set_vm_layout(layout);
 
         // Init MMTk
-        mmtk_init(builder);
+        mmtk_init(&mut builder);
 
         // Create an MMTk mutator
         let tls = VMMutatorThread(VMThread(OpaquePointer::UNINITIALIZED)); // FIXME: Use the actual thread pointer or identifier
@@ -301,5 +307,24 @@ mod tests {
 
         // If the thread quits, destroy the mutator.
         mmtk_destroy_mutator(mutator);
+    }
+
+    #[test]
+    fn mmtk_init_test_native() {
+        // We demonstrate creating builders and setting options using extern "C" wrapper functions.
+
+        // Create the builder using extern "C" wrapper.
+        let builder = mmtk_create_builder();
+
+        // Set option by value using extern "C" wrapper.
+        let success = mmtk_set_fixed_heap_size(builder, 1048576);
+        assert!(success);
+
+        // Set option by string using extern "C" wrapper.
+        let name = CString::new("plan").unwrap();
+        let val = CString::new("NoGC").unwrap();
+        mmtk_set_option_from_string(builder, name.as_ptr(), val.as_ptr());
+
+        // mmtk_init(builder);
     }
 }

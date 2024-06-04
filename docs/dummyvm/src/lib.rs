@@ -1,6 +1,8 @@
 extern crate libc;
 extern crate mmtk;
 
+use std::sync::OnceLock;
+
 use mmtk::vm::VMBinding;
 use mmtk::MMTK;
 
@@ -30,5 +32,8 @@ impl VMBinding for DummyVM {
     const MAX_ALIGNMENT: usize = 1 << 6;
 }
 
-use mmtk::util::InitializeOnce;
-pub static SINGLETON: InitializeOnce<Box<MMTK<DummyVM>>> = InitializeOnce::new();
+pub static SINGLETON: OnceLock<Box<MMTK<DummyVM>>> = OnceLock::new();
+
+fn mmtk() -> &'static MMTK<DummyVM> {
+    SINGLETON.get().unwrap()
+}
