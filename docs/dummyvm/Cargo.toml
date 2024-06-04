@@ -15,12 +15,11 @@ lto = true
 
 [dependencies]
 # We use a local path as the MMTk dependency here, as we want to test the code with the current version.
-# Generally for a binding, you would like to a specific version, or a git commit.
+# Generally for a binding, you would like to use a specific version, or a git commit.
 # mmtk = "0.25.0"
 # mmtk = { git = "https://github.com/mmtk/mmtk-core.git", branch = "master" }
-mmtk = { path = "../../../../../../" }
+mmtk = { path = "../../." }
 libc = "0.2"
-lazy_static = "1.4"
 atomic = "0.6"
 
 [features]

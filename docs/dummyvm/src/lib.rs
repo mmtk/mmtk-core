@@ -1,10 +1,7 @@
 extern crate libc;
 extern crate mmtk;
-#[macro_use]
-extern crate lazy_static;
 
 use mmtk::vm::VMBinding;
-use mmtk::MMTKBuilder;
 use mmtk::MMTK;
 
 pub mod active_plan;
@@ -33,19 +30,5 @@ impl VMBinding for DummyVM {
     const MAX_ALIGNMENT: usize = 1 << 6;
 }
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
-
-/// This is used to ensure we initialize MMTk at a specified timing.
-pub static MMTK_INITIALIZED: AtomicBool = AtomicBool::new(false);
-
-lazy_static! {
-    pub static ref BUILDER: Mutex<MMTKBuilder> = Mutex::new(MMTKBuilder::new());
-    pub static ref SINGLETON: MMTK<DummyVM> = {
-        let builder = BUILDER.lock().unwrap();
-        debug_assert!(!MMTK_INITIALIZED.load(Ordering::SeqCst));
-        let ret = mmtk::memory_manager::mmtk_init(&builder);
-        MMTK_INITIALIZED.store(true, std::sync::atomic::Ordering::Relaxed);
-        *ret
-    };
-}
+use mmtk::util::InitializeOnce;
+pub static SINGLETON: InitializeOnce<Box<MMTK<DummyVM>>> = InitializeOnce::new();

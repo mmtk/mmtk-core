@@ -65,7 +65,7 @@ impl<T> InitializeOnce<T> {
     /// If this method is called by multiple threads, the first thread will
     /// initialize the value, and the other threads will be blocked until the
     /// initialization is done (`Once` returns).
-    pub fn initialize_once(&self, init_fn: &'static dyn Fn() -> T) {
+    pub fn initialize_once(&self, init_fn: &dyn Fn() -> T) {
         self.once.call_once(|| {
             unsafe { &mut *self.v.get() }.write(init_fn());
         });

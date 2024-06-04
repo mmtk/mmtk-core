@@ -2,49 +2,28 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use crate::DummyVM;
-use crate::BUILDER;
 use crate::SINGLETON;
 use libc::c_char;
 use mmtk::memory_manager;
 use mmtk::scheduler::GCWorker;
-use mmtk::util::heap::vm_layout::VMLayout;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::AllocationSemantics;
+use mmtk::MMTKBuilder;
 use mmtk::Mutator;
 use std::ffi::CStr;
-use std::sync::atomic::Ordering;
 
 // This file exposes MMTk Rust API to the native code. This is not an exhaustive list of all the APIs.
 // Most commonly used APIs are listed in https://docs.mmtk.io/api/mmtk/memory_manager/index.html. The binding can expose them here.
 
 #[no_mangle]
-pub fn mmtk_init(heap_size: usize) {
-    mmtk_init_with_layout(heap_size, None)
-}
+pub fn mmtk_init(builder: *mut MMTKBuilder) {
+    let builder = unsafe { Box::from_raw(builder) };
 
-#[no_mangle]
-pub fn mmtk_init_with_layout(heap_size: usize, layout: Option<VMLayout>) {
-    {
-        // Set options and VM layout with the builder first.
-        let mut builder = BUILDER.lock().unwrap();
-        if let Some(layout) = layout {
-            builder.set_vm_layout(layout);
-        }
-        let success =
-            builder
-                .options
-                .gc_trigger
-                .set(mmtk::util::options::GCTriggerSelector::FixedHeapSize(
-                    heap_size,
-                ));
-        assert!(success, "Failed to set heap size to {}", heap_size);
-    }
+    // Initialize mmtk, and set SINGLETON to it.
+    let closure = move || memory_manager::mmtk_init::<DummyVM>(&builder);
 
-    // Make sure MMTk has not yet been initialized
-    assert!(!crate::MMTK_INITIALIZED.load(Ordering::SeqCst));
-    // Initialize MMTk here
-    lazy_static::initialize(&SINGLETON);
+    SINGLETON.initialize_once(&closure);
 }
 
 #[no_mangle]
@@ -186,12 +165,20 @@ pub extern "C" fn mmtk_harness_end() {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_process(name: *const c_char, value: *const c_char) -> bool {
+pub extern "C" fn create_mmtk_builder() -> *mut MMTKBuilder {
+    Box::into_raw(Box::new(mmtk::MMTKBuilder::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn mmtk_process(
+    builder: *mut MMTKBuilder,
+    name: *const c_char,
+    value: *const c_char,
+) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    let mut builder = BUILDER.lock().unwrap();
     memory_manager::process(
-        &mut builder,
+        unsafe { &mut *builder },
         name_str.to_str().unwrap(),
         value_str.to_str().unwrap(),
     )
@@ -255,4 +242,64 @@ pub extern "C" fn mmtk_free(addr: Address) {
 #[cfg(feature = "malloc_counted_size")]
 pub extern "C" fn mmtk_get_malloc_bytes() -> usize {
     memory_manager::get_malloc_bytes(&SINGLETON)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mmtk::vm::ObjectModel;
+    use std::ffi::CString;
+
+    #[test]
+    fn mmtk_init_test() {
+        // Create an MMTk builder
+        let builder = create_mmtk_builder();
+        // Set heap size and GC plan
+        // Using exposed C API
+        {
+            let name = CString::new("gc_trigger").unwrap();
+            let val = CString::new("Fixed:1048576").unwrap();
+            mmtk_process(builder, name.as_ptr(), val.as_ptr());
+
+            let name = CString::new("plan").unwrap();
+            let val = CString::new("NoGC").unwrap();
+            mmtk_process(builder, name.as_ptr(), val.as_ptr());
+        }
+        // or Rust
+        {
+            let builder = unsafe { &mut *builder };
+            let success = builder.options.gc_trigger.set(
+                mmtk::util::options::GCTriggerSelector::FixedHeapSize(1048576),
+            );
+            assert!(success);
+
+            let success = builder
+                .options
+                .plan
+                .set(mmtk::util::options::PlanSelector::NoGC);
+            assert!(success);
+        }
+        // Set layout if necessary
+        // builder.set_vm_layout(layout);
+
+        // Init MMTk
+        mmtk_init(builder);
+
+        // Create an MMTk mutator
+        let tls = VMMutatorThread(VMThread(OpaquePointer::UNINITIALIZED)); // FIXME: Use the actual thread pointer or identifier
+        let mutator = mmtk_bind_mutator(tls);
+
+        // Do an allocation
+        let addr = mmtk_alloc(mutator, 32, 8, 4, mmtk::AllocationSemantics::Default);
+        assert!(!addr.is_zero());
+
+        // Turn the allocation address into the object reference
+        let obj = crate::object_model::VMObjectModel::address_to_ref(addr);
+
+        // Post allocation
+        mmtk_post_alloc(mutator, obj, 32, mmtk::AllocationSemantics::Default);
+
+        // If the thread quits, destroy the mutator.
+        mmtk_destroy_mutator(mutator);
+    }
 }
