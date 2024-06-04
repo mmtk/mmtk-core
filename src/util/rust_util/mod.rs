@@ -103,6 +103,12 @@ impl<T> std::ops::Deref for InitializeOnce<T> {
 
 unsafe impl<T> Sync for InitializeOnce<T> {}
 
+impl<T> std::default::Default for InitializeOnce<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// This implements `std::array::from_fn` introduced in Rust 1.63.
 /// We should replace this with the standard counterpart after bumping MSRV,
 /// but we also need to evaluate whether it would use too much stack space (see code comments).
