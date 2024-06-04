@@ -15,7 +15,7 @@ You want to set up the binding repository/directory structure before starting th
 
   - `mmtk-X/mmtk`: The MMTk side of the binding. This includes the implementation of [the `VMBinding` trait](https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html),
     and any necessary Rust code to integrate MMTk with the VM code (e.g. exposing MMTk functions to native, allowing up-calls from the MMTk binding to the runtime, etc).
-    To start with, you can copy [the `DummyVM`](https://github.com/mmtk/mmtk-core/tree/master/docs/userguide/src/portingguide/code/dummyvm) code and start from there.
+    To start with, you can copy [the `DummyVM`](https://github.com/mmtk/mmtk-core/tree/master/docs/dummyvm) code and start from there.
     `DummyVM` provides all the Rust boilerplates that you need to implement in the binding side.
     You can also take a look at one of our officially maintained language bindings as an example: [OpenJDK](https://github.com/mmtk/mmtk-openjdk/tree/master/mmtk),
     [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm/tree/master/mmtk), [V8](https://github.com/mmtk/mmtk-v8/tree/master/mmtk), [Julia](https://github.com/mmtk/mmtk-julia/tree/master/mmtk),
