@@ -165,7 +165,7 @@ pub extern "C" fn mmtk_harness_end() {
 }
 
 #[no_mangle]
-pub extern "C" fn create_mmtk_builder() -> *mut MMTKBuilder {
+pub extern "C" fn mmtk_create_builder() -> *mut MMTKBuilder {
     Box::into_raw(Box::new(mmtk::MMTKBuilder::new()))
 }
 
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn mmtk_init_test() {
         // Create an MMTk builder
-        let builder = create_mmtk_builder();
+        let builder = mmtk_create_builder();
         // Set heap size and GC plan
         // Using exposed C API
         {
