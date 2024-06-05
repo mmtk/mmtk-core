@@ -54,7 +54,6 @@ pub struct InitializeOnce<T: 'static> {
 }
 
 impl<T> InitializeOnce<T> {
-    /// Create a new `InitializeOnce` instance. The value needs to be later initialized with `initialize_once`.
     pub const fn new() -> Self {
         InitializeOnce {
             v: UnsafeCell::new(MaybeUninit::uninit()),
@@ -66,7 +65,7 @@ impl<T> InitializeOnce<T> {
     /// If this method is called by multiple threads, the first thread will
     /// initialize the value, and the other threads will be blocked until the
     /// initialization is done (`Once` returns).
-    pub fn initialize_once(&self, init_fn: &dyn Fn() -> T) {
+    pub fn initialize_once(&self, init_fn: &'static dyn Fn() -> T) {
         self.once.call_once(|| {
             unsafe { &mut *self.v.get() }.write(init_fn());
         });
@@ -102,12 +101,6 @@ impl<T> std::ops::Deref for InitializeOnce<T> {
 }
 
 unsafe impl<T> Sync for InitializeOnce<T> {}
-
-impl<T> std::default::Default for InitializeOnce<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// This implements `std::array::from_fn` introduced in Rust 1.63.
 /// We should replace this with the standard counterpart after bumping MSRV,
