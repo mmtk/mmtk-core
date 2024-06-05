@@ -22,6 +22,9 @@ if ! cat $project_root/src/plan/mod.rs | grep -q "pub mod mygc;"; then
 fi
 cargo build
 
+# Check dummyvm in portingguide
+cargo build --manifest-path $dummyvm_toml
+
 # Install mdbook using the stable toolchain and the default target
 unset CARGO_BUILD_TARGET
 cargo +stable install mdbook mdbook-admonish mdbook-hide

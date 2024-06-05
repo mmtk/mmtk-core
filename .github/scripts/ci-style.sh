@@ -51,3 +51,4 @@ style_check_auxiliary_crate() {
 }
 
 style_check_auxiliary_crate macros
+style_check_auxiliary_crate docs/dummyvm
