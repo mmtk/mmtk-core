@@ -290,14 +290,14 @@ mod tests {
         let mutator = mmtk_bind_mutator(tls);
 
         // Do an allocation
-        let addr = mmtk_alloc(mutator, 32, 8, 4, mmtk::AllocationSemantics::Default);
+        let addr = mmtk_alloc(mutator, 16, 8, 0, mmtk::AllocationSemantics::Default);
         assert!(!addr.is_zero());
 
         // Turn the allocation address into the object reference
         let obj = crate::object_model::VMObjectModel::address_to_ref(addr);
 
         // Post allocation
-        mmtk_post_alloc(mutator, obj, 32, mmtk::AllocationSemantics::Default);
+        mmtk_post_alloc(mutator, obj, 16, mmtk::AllocationSemantics::Default);
 
         // If the thread quits, destroy the mutator.
         mmtk_destroy_mutator(mutator);
