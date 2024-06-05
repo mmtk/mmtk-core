@@ -6,10 +6,11 @@ use mmtk::vm::*;
 pub struct VMObjectModel {}
 
 // This is the offset from the allocation result to the object reference for the object.
+// The binding can set this to a different value if the ObjectReference in the VM has an offset from the allocation starting address.
 // Many methods like `address_to_ref` and `ref_to_address` use this constant.
 // For bindings that this offset is not a constant, you can implement the calculation in the methods, and
 // remove this constant.
-pub const OBJECT_REF_OFFSET: usize = 4;
+pub const OBJECT_REF_OFFSET: usize = 0;
 
 // Documentation: https://docs.mmtk.io/api/mmtk/vm/object_model/trait.ObjectModel.html
 impl ObjectModel<DummyVM> for VMObjectModel {

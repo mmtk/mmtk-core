@@ -21,10 +21,10 @@ impl Scanning<DummyVM> for VMScanning {
     fn scan_vm_specific_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<DummyVMSlot>) {
         unimplemented!()
     }
-    fn scan_object<EV: SlotVisitor<DummyVMSlot>>(
+    fn scan_object<SV: SlotVisitor<DummyVMSlot>>(
         _tls: VMWorkerThread,
         _object: ObjectReference,
-        _edge_visitor: &mut EV,
+        _slot_visitor: &mut SV,
     ) {
         unimplemented!()
     }
