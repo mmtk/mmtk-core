@@ -95,9 +95,11 @@ We recommend going through the [list of metadata specifications](https://docs.mm
 
 #### `ObjectReference` vs `Address`
 
-A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address.
+A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address. You might be interested in reading the *Demystifying Magic: High-level Low-level Programming* paper[^3] which describes the above in more detail.
 
-You might be interested in reading the *Demystifying Magic: High-level Low-level Programming* paper[^3] which describes the above in more detail.
+In MMTk, `ObjectReference` is a special address that represents an object. A binding may use tagged references, compressed pointers, etc.
+They need to deal with the encoding and the decoding in their [`Slot`](https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html) implementation,
+and always present plain `ObjectReference`s to MMTk. See [this test](https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs) for some `Slot` implementation examples.
 
 [^3]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
 
@@ -121,6 +123,7 @@ steps into one function call to make things simpler.
 1. Create an `MMTKBuilder` using [`MMTKBuilder::new()`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html#method.new). You can set
    runtime options via [`set_option()`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html#method.set_option) for things like
    the GC plan to use, heap sizes, etc. This is [a full list of runtime options](https://docs.mmtk.io/api/mmtk/util/options/struct.Options.html).
+   You can also set options by directly accessing the `options` in the builder, such as `builder.options.threads.set(4)`.
    It is a common practice that the VM parses its command line arguments, then sets some GC-related options
    to MMTk here. You can also set virtual memory layout for MMTk. Some runtimes may require special layouts, such as using compressed pointers
    with a fixed heap range. However, both setting options and VM layouts are optional -- MMTk will use the default values if none is set.
