@@ -354,7 +354,13 @@ impl<VM: VMBinding> StickyImmix<VM> {
             .global_state
             .user_triggered_collection
             .load(Ordering::SeqCst)
-            && *self.immix.common.base.options.full_heap_system_gc
+            && self
+                .immix
+                .common
+                .base
+                .global_state
+                .user_triggered_exhaustive_gc
+                .load(Ordering::SeqCst)
         {
             // User triggered collection, and we force full heap for user triggered collection
             true

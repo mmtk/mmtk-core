@@ -571,8 +571,13 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
-pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    mmtk.handle_user_collection_request(tls);
+/// * `exhaustive`: The GC should be exhaustive (e.g. full heap GC, compaction GCs, etc.)
+pub fn handle_user_collection_request<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    tls: VMMutatorThread,
+    exhaustive: bool,
+) {
+    mmtk.handle_user_collection_request(tls, exhaustive);
 }
 
 /// Is the object alive?
