@@ -32,6 +32,29 @@ Notes for the mmtk-core developers:
 
 ## 0.26.0
 
+### Remove GC in `harness_begin`
+
+```admonish tldr
+`harness_begin` no longer triggers a GC before collecting statistics. The user application
+is responsible to trigger a GC before calling `harness_begin`.
+```
+
+API changes:
+* module `memory_manager`
+  * `handle_user_collection_request`
+    * It now takes an argument `exhaustive` to indicate if the user triggered GC is
+      exhaustive (full heap) or not.
+* type `Options`
+  * The runtime option `full_heap_sytem_gc` is removed.
+
+Not API change, but worth noting:
+
+* module `mmtk::memory_manager`
+  * `harness_begin`
+    * The function used to trigger a forced full heap GC before starting collecting statistics.
+      Now it no longer triggers the GC.
+    * The user applications and benchmarks are responsible to trigger a GC before calling `harness_begin`.
+
 ### Rename "edge" to "slot"
 
 ```admonish tldr
@@ -74,24 +97,6 @@ See also:
 
 -   PR: <https://github.com/mmtk/mmtk-core/pull/1134>
 -   Example: <https://github.com/mmtk/mmtk-openjdk/pull/274>
-
-### Remove GC in `harness_begin`
-
-```admonish tldr
-`harness_begin` no longer triggers a GC before collecting statistics. The user application
-is responsible to trigger a GC before calling `harness_begin`.
-```
-
-Not API change, but worth noting:
-
-* module `mmtk::memory_manager`
-  * `harness_begin`
-    * The function used to trigger a forced full heap GC before starting collecting statistics.
-      Now it no longer triggers the GC.
-    * The user applications and benchmarks are responsible to trigger a GC before calling `harness_begin`.
-  * `handle_user_collection_request`
-    * The runtime option `full_heap_sytem_gc` defaults to `true` now (it used to be `false` by default).
-      The GC triggered by this function will be a full heap GC by default.
 
 ## 0.25.0
 
