@@ -91,6 +91,8 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn address_to_ref(addr: Address) -> ObjectReference {
+        // This is the reverse operation of `ref_to_address`.
+        // If the implementation of `ref_to_address` is changed, this implementation needs to be changed accordingly.
         unsafe { ObjectReference::from_raw_address_unchecked(addr.add(OBJECT_REF_OFFSET)) }
     }
 
