@@ -13,7 +13,7 @@ pub mod object_model;
 pub mod reference_glue;
 pub mod scanning;
 
-mod slots;
+pub type DummyVMSlot = mmtk::vm::slot::SimpleSlot;
 
 #[derive(Default)]
 pub struct DummyVM;
@@ -25,8 +25,8 @@ impl VMBinding for DummyVM {
     type VMCollection = collection::VMCollection;
     type VMActivePlan = active_plan::VMActivePlan;
     type VMReferenceGlue = reference_glue::VMReferenceGlue;
-    type VMSlot = slots::DummyVMSlot;
-    type VMMemorySlice = slots::DummyVMMemorySlice;
+    type VMSlot = DummyVMSlot;
+    type VMMemorySlice = mmtk::vm::slot::UnimplementedMemorySlice;
 
     /// Allowed maximum alignment in bytes.
     const MAX_ALIGNMENT: usize = 1 << 6;

@@ -1,5 +1,5 @@
-use crate::slots::DummyVMSlot;
 use crate::DummyVM;
+use crate::DummyVMSlot;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::ObjectReference;
 use mmtk::vm::RootsWorkFactory;

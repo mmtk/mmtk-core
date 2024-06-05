@@ -12,6 +12,10 @@ pub struct VMObjectModel {}
 // remove this constant.
 pub const OBJECT_REF_OFFSET: usize = 0;
 
+// This is the offset from the object reference to the object header.
+// This value is used in `ref_to_header` where MMTk loads header metadata from.
+pub const OBJECT_HEADER_OFFSET: usize = 0;
+
 // Documentation: https://docs.mmtk.io/api/mmtk/vm/object_model/trait.ObjectModel.html
 impl ObjectModel<DummyVM> for VMObjectModel {
     // Global metadata
@@ -76,11 +80,13 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn ref_to_header(object: ObjectReference) -> Address {
-        object.to_raw_address()
+        object.to_raw_address().sub(OBJECT_HEADER_OFFSET)
     }
 
     fn ref_to_address(object: ObjectReference) -> Address {
-        // Just use object start.
+        // This method should return an address that is within the allocation.
+        // Using `ref_to_object_start` is always correct here.
+        // However, a binding may optimize this method to make it more efficient.
         Self::ref_to_object_start(object)
     }
 
