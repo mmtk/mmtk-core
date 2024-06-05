@@ -264,32 +264,26 @@ mod tests {
 
     #[test]
     fn mmtk_init_test() {
-        // `MMTKBuilder::new()`` also initializes options from environment variables "MMTK_*".
-        // This is useful in the early stage of VM binding development.
-        // Use `MMTKBuilder::new_no_env_vars` to ignore environment variables.
-        let mut builder = MMTKBuilder::new();
+        // We demonstrate the main workflow to initialize MMTk, create mutators and allocate objects.
+        let builder = mmtk_create_builder();
 
-        // Real-world VM bindings should parse command line arguments and set MMTk options accordingly.
-        // We demonstrate two ways to set MMTk options.
-
-        // Set option by string.  The option name and value are prased using the predefined format
-        // defined by each MMTk option.  Convenient for parsing command line arguments.
-        builder.set_option("gc_trigger", "Fixed:1048576");
+        // Set option by value using extern "C" wrapper.
+        let success = mmtk_set_fixed_heap_size(builder, 1048576);
+        assert!(success);
 
         // Set option by value.  We set the the option direcly using `MMTKOption::set`. Useful if
         // the VM binding wants to set options directly, or if the VM binding has its own format for
         // command line arguments.
-        let success = builder
-            .options
-            .plan
-            .set(mmtk::util::options::PlanSelector::NoGC);
+        let name = CString::new("plan").unwrap();
+        let val = CString::new("NoGC").unwrap();
+        let success = mmtk_set_option_from_string(builder, name.as_ptr(), val.as_ptr());
         assert!(success);
 
         // Set layout if necessary
         // builder.set_vm_layout(layout);
 
         // Init MMTk
-        mmtk_init(&mut builder);
+        mmtk_init(builder);
 
         // Create an MMTk mutator
         let tls = VMMutatorThread(VMThread(OpaquePointer::UNINITIALIZED)); // FIXME: Use the actual thread pointer or identifier
@@ -307,24 +301,5 @@ mod tests {
 
         // If the thread quits, destroy the mutator.
         mmtk_destroy_mutator(mutator);
-    }
-
-    #[test]
-    fn mmtk_init_test_native() {
-        // We demonstrate creating builders and setting options using extern "C" wrapper functions.
-
-        // Create the builder using extern "C" wrapper.
-        let builder = mmtk_create_builder();
-
-        // Set option by value using extern "C" wrapper.
-        let success = mmtk_set_fixed_heap_size(builder, 1048576);
-        assert!(success);
-
-        // Set option by string using extern "C" wrapper.
-        let name = CString::new("plan").unwrap();
-        let val = CString::new("NoGC").unwrap();
-        mmtk_set_option_from_string(builder, name.as_ptr(), val.as_ptr());
-
-        // mmtk_init(builder);
     }
 }
