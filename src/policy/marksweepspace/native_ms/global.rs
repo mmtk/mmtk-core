@@ -432,9 +432,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
         } else {
             // Otherwise this chunk is occupied, and we reset the mark bit if it is on the side.
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                for chunk in self.space.chunk_map.all_chunks() {
-                    side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                }
+                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
             }
         }
     }
