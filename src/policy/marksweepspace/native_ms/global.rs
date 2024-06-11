@@ -359,6 +359,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
         #[cfg(debug_assertions)]
         from.assert_empty();
+
+        // BlockPageResource uses worker-local block queues to eliminate contention when releasing
+        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
+        // returning to the global pool.  We flush the BlockPageResource, too.
+        self.pr.flush_all();
     }
 
     /// Release a block.

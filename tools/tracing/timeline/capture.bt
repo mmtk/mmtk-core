@@ -79,4 +79,16 @@ usdt:$MMTK:mmtk:process_slots {
     }
 }
 
+usdt:$MMTK:mmtk:plan_end_of_gc_begin {
+    if (@enable_print) {
+        printf("plan_end_of_gc,B,%d,%lu\n", tid, nsecs);
+    }
+}
+
+usdt:$MMTK:mmtk:plan_end_of_gc_end {
+    if (@enable_print) {
+        printf("plan_end_of_gc,E,%d,%lu\n", tid, nsecs);
+    }
+}
+
 // vim: ft=bpftrace ts=4 sw=4 sts=4 et

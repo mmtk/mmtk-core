@@ -38,6 +38,8 @@ Currently, the core provides the following tracepoints.
     argument is the length of the string.
 -   `mmtk:alloc_slow_once_start()`: the allocation slow path starts.
 -   `mmtk:alloc_slow_once_end()`: the allocation slow path ends.
+-   `mmtk:plan_end_of_gc_begin()`: before executing `Plan::end_of_gc`.
+-   `mmtk:plan_end_of_gc_end()`: after executing `Plan::end_of_gc`.
 
 ## Tracing tools
 
