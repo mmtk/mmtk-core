@@ -139,7 +139,7 @@ In the following example, we assume a `MMTKBuilder` is created statically (Step 
 via `mmtk_set_heap_size()`. We will create an `MMTK` instance from the builder in `mmtk_init()` (Step 2). Step 3 is omitted, as we do not need it for NoGC.
 
 ### Runtime-side changes
-Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/header/mmtk.h) as an example.
+Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/dummyvm/include/mmtk.h) as an example.
 
 **Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
 
