@@ -320,6 +320,14 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         self.common.release_discontiguous_chunks(chunk);
     }
 
+    /// Release pages previously allocated by `alloc_pages`.
+    ///
+    /// Warning: This method acquires the mutex `self.sync`.  If multiple threads release pages
+    /// concurrently, the lock contention will become a performance bottleneck.  This is especially
+    /// problematic for plans that sweep objects in bulk in the `Release` stage.  Spaces except the
+    /// large object space are recommended to use [`BlockPageResource`] whenever possible.
+    ///
+    /// [`BlockPageResource`]: crate::util::heap::blockpageresource::BlockPageResource
     pub fn release_pages(&self, first: Address) {
         debug_assert!(conversions::is_page_aligned(first));
         let mut sync = self.sync.lock().unwrap();
