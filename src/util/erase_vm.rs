@@ -17,7 +17,8 @@ macro_rules! define_erased_vm_mut_ref {
         pub struct $new_type<'a>(usize, PhantomData<&'a ()>);
         impl<'a> $new_type<'a> {
             pub fn new<VM: VMBinding>(r: &'a mut $orig_type) -> Self {
-                Self(unsafe { std::mem::transmute(r) }, PhantomData)
+                let worker_as_usize: usize = unsafe { std::mem::transmute(r) };
+                Self(worker_as_usize, PhantomData)
             }
             pub fn into_mut<VM: VMBinding>(self) -> &'a mut $orig_type {
                 unsafe { std::mem::transmute(self.0) }

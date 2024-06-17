@@ -128,7 +128,7 @@ impl SFTRefStorage {
     }
 
     pub fn new(sft: SFTRawPointer) -> Self {
-        let val = unsafe { std::mem::transmute(sft) };
+        let val: u128 = unsafe { std::mem::transmute(sft) };
         Self(AtomicDoubleWord::new(val))
     }
 
@@ -140,7 +140,7 @@ impl SFTRefStorage {
 
     // Store a raw SFT pointer with the release ordering.
     pub fn store(&self, sft: SFTRawPointer) {
-        let val = unsafe { std::mem::transmute(sft) };
+        let val: u128 = unsafe { std::mem::transmute(sft) };
         self.0.store(val, Ordering::Release)
     }
 }
