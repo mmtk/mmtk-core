@@ -381,6 +381,14 @@
 <a href="#379" id="379">379</a>
 <a href="#380" id="380">380</a>
 <a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::PAGES_IN_CHUNK;
@@ -703,7 +711,15 @@
         </span><span class="self">self</span>.common.release_discontiguous_chunks(chunk);
     }
 
-    <span class="kw">pub fn </span>release_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, first: Address) {
+    <span class="doccomment">/// Release pages previously allocated by `alloc_pages`.
+    ///
+    /// Warning: This method acquires the mutex `self.sync`.  If multiple threads release pages
+    /// concurrently, the lock contention will become a performance bottleneck.  This is especially
+    /// problematic for plans that sweep objects in bulk in the `Release` stage.  Spaces except the
+    /// large object space are recommended to use [`BlockPageResource`] whenever possible.
+    ///
+    /// [`BlockPageResource`]: crate::util::heap::blockpageresource::BlockPageResource
+    </span><span class="kw">pub fn </span>release_pages(<span class="kw-2">&amp;</span><span class="self">self</span>, first: Address) {
         <span class="macro">debug_assert!</span>(conversions::is_page_aligned(first));
         <span class="kw">let </span><span class="kw-2">mut </span>sync = <span class="self">self</span>.sync.lock().unwrap();
         <span class="kw">let </span>page_offset = conversions::bytes_to_pages_up(first - sync.start);

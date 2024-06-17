@@ -401,6 +401,20 @@
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
 <a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::pageresource::{PRAllocFail, PRAllocResult};
 <span class="kw">use super</span>::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -411,10 +425,12 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec;
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span>atomic::Ordering;
 <span class="kw">use </span>spin::RwLock;
 <span class="kw">use </span>std::cell::UnsafeCell;
+<span class="kw">use </span>std::mem::MaybeUninit;
 <span class="kw">use </span>std::sync::atomic::AtomicUsize;
 <span class="kw">use </span>std::sync::Mutex;
 
@@ -582,17 +598,29 @@
 
 <span class="doccomment">/// A block list that supports fast lock-free push/pop operations
 </span><span class="kw">struct </span>BlockQueue&lt;B: Region&gt; {
-    cursor: AtomicUsize,
-    data: UnsafeCell&lt;Vec&lt;B&gt;&gt;,
+    <span class="doccomment">/// The number of elements in the queue.
+    </span>cursor: AtomicUsize,
+    <span class="doccomment">/// The underlying data storage.
+    ///
+    /// -   `UnsafeCell&lt;T&gt;`: It may be accessed by multiple threads.
+    /// -   `Box&lt;[T]&gt;`: It holds an array allocated on the heap.  It cannot be resized, but can be
+    ///     replaced with another array as a whole.
+    /// -   `MaybeUninit&lt;T&gt;`: It may contain uninitialized elements.
+    ///
+    /// The implementaiton of `BlockQueue` must ensure there is no data race, and it never reads
+    /// uninitialized elements.
+    </span>data: UnsafeCell&lt;Box&lt;[MaybeUninit&lt;B&gt;]&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;B: Region&gt; BlockQueue&lt;B&gt; {
     <span class="doccomment">/// Create an array
     </span><span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>default_block = B::from_aligned_address(Address::ZERO);
+        <span class="kw">let </span>zeroed_vec = <span class="kw">unsafe </span>{ new_zeroed_vec(<span class="self">Self</span>::CAPACITY) };
+        <span class="kw">let </span>boxed_slice = zeroed_vec.into_boxed_slice();
+        <span class="kw">let </span>data = UnsafeCell::new(boxed_slice);
         <span class="self">Self </span>{
             cursor: AtomicUsize::new(<span class="number">0</span>),
-            data: UnsafeCell::new(<span class="macro">vec!</span>[default_block; <span class="self">Self</span>::CAPACITY]),
+            data,
         }
     }
 }
@@ -602,14 +630,14 @@
 
     <span class="doccomment">/// Get an entry
     </span><span class="kw">fn </span>get_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) -&gt; B {
-        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i] }
+        <span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i].assume_init() }
     }
 
     <span class="doccomment">/// Set an entry.
     ///
     /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     </span><span class="kw">unsafe fn </span>set_entry(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize, block: B) {
-        (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i] = block
+        (<span class="kw-2">*</span><span class="self">self</span>.data.get())[i].write(block);
     }
 
     <span class="doccomment">/// Non-atomically push an element.

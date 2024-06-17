@@ -432,12 +432,17 @@
 <a href="#430" id="430">430</a>
 <a href="#431" id="431">431</a>
 <a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
 </pre></div><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">super</span>::BlockList;
 <span class="kw">use </span><span class="kw">super</span>::MarkSweepSpace;
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
@@ -482,6 +487,9 @@
 }
 
 <span class="kw">impl </span>Block {
+    <span class="doccomment">/// Log pages in block
+    </span><span class="kw">pub const </span>LOG_PAGES: usize = <span class="self">Self</span>::LOG_BYTES - LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
+
     <span class="kw">pub const </span>METADATA_SPECS: [SideMetadataSpec; <span class="number">7</span>] = [
         <span class="self">Self</span>::MARK_TABLE,
         <span class="self">Self</span>::NEXT_BLOCK_TABLE,

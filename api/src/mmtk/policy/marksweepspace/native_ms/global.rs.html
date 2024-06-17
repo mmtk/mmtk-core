@@ -439,6 +439,23 @@
 <a href="#437" id="437">437</a>
 <a href="#438" id="438">438</a>
 <a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
+<a href="#453" id="453">453</a>
+<a href="#454" id="454">454</a>
+<a href="#455" id="455">455</a>
+<a href="#456" id="456">456</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>atomic::Ordering;
@@ -448,7 +465,7 @@
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
-        heap::{FreeListPageResource, PageResource},
+        heap::{BlockPageResource, PageResource},
         metadata::{<span class="self">self</span>, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
@@ -505,7 +522,7 @@
 /// | GC - End of GC | -                                               | Merge the temp global lists                  | -         |
 </span><span class="kw">pub struct </span>MarkSweepSpace&lt;VM: VMBinding&gt; {
     <span class="kw">pub </span>common: CommonSpace&lt;VM&gt;,
-    pr: FreeListPageResource&lt;VM&gt;,
+    pr: BlockPageResource&lt;VM, Block&gt;,
     <span class="doccomment">/// Allocation status for all chunks in MS space
     </span>chunk_map: ChunkMap,
     <span class="doccomment">/// Work packet scheduler
@@ -520,6 +537,8 @@
     /// and will be moved to the abandoned lists above at the end of a GC.
     </span>abandoned_in_gc: Mutex&lt;AbandonedBlockLists&gt;,
 }
+
+<span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Sync <span class="kw">for </span>MarkSweepSpace&lt;VM&gt; {}
 
 <span class="kw">pub struct </span>AbandonedBlockLists {
     <span class="kw">pub </span>available: BlockLists,
@@ -719,9 +738,19 @@
         <span class="kw">let </span>common = CommonSpace::new(args.into_policy_args(<span class="bool-val">false</span>, <span class="bool-val">false</span>, local_specs));
         MarkSweepSpace {
             pr: <span class="kw">if </span>is_discontiguous {
-                FreeListPageResource::new_discontiguous(vm_map)
+                BlockPageResource::new_discontiguous(
+                    Block::LOG_PAGES,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             } <span class="kw">else </span>{
-                FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
+                BlockPageResource::new_contiguous(
+                    Block::LOG_PAGES,
+                    common.start,
+                    common.extent,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             },
             common,
             chunk_map: ChunkMap::new(),
@@ -788,6 +817,11 @@
 
         <span class="attr">#[cfg(debug_assertions)]
         </span>from.assert_empty();
+
+        <span class="comment">// BlockPageResource uses worker-local block queues to eliminate contention when releasing
+        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
+        // returning to the global pool.  We flush the BlockPageResource, too.
+        </span><span class="self">self</span>.pr.flush_all();
     }
 
     <span class="doccomment">/// Release a block.
@@ -795,7 +829,7 @@
         <span class="self">self</span>.block_clear_metadata(block);
 
         block.deinit();
-        <span class="self">self</span>.pr.release_pages(block.start());
+        <span class="self">self</span>.pr.release_block(block);
     }
 
     <span class="kw">pub fn </span>block_clear_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, block: Block) {
