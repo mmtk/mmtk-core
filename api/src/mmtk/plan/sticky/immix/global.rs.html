@@ -381,6 +381,7 @@
 <a href="#379" id="379">379</a>
 <a href="#380" id="380">380</a>
 <a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -712,6 +713,7 @@
                 // Along with the option above, we unlog them again during tracing.
                 </span>reset_log_bit_in_major_gc: <span class="bool-val">true</span>,
                 <span class="comment">// In StickyImmix, both young and old objects are allocated in the ImmixSpace.
+                </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>mixed_age: <span class="bool-val">true</span>,
             },
         );

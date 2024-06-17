@@ -249,7 +249,7 @@
         <span class="kw">let </span>top = end == vm_layout().heap_end;
         <span class="kw">if </span>vm_layout().force_use_contiguous_spaces {
             <span class="kw">let </span>space_index = <span class="kw">if </span>start &gt; vm_layout().heap_end {
-                ::std::usize::MAX
+                usize::MAX
             } <span class="kw">else </span>{
                 start &gt;&gt; vm_layout().space_shift_64()
             };

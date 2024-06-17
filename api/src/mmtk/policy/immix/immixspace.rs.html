@@ -1120,6 +1120,8 @@
 <a href="#1118" id="1118">1118</a>
 <a href="#1119" id="1119">1119</a>
 <a href="#1120" id="1120">1120</a>
+<a href="#1121" id="1121">1121</a>
+<a href="#1122" id="1122">1122</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1199,6 +1201,8 @@
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
+    </span><span class="comment">// Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
+    </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
     </span><span class="kw">pub </span>mixed_age: bool,
 }
 

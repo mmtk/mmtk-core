@@ -204,8 +204,8 @@
     <span class="kw">pub const </span>LOG_BITS_IN_LONG: u8 = LOG_BITS_IN_BYTE + LOG_BYTES_IN_LONG;
     <span class="kw">pub const </span>BITS_IN_LONG: usize = <span class="number">1 </span>&lt;&lt; LOG_BITS_IN_LONG;
 
-    <span class="kw">pub const </span>MAX_INT: usize = i32::max_value() <span class="kw">as </span>usize; <span class="comment">// 0x7fff_ffff
-    </span><span class="kw">pub const </span>MIN_INT: usize = i32::min_value() <span class="kw">as </span>u32 <span class="kw">as </span>usize; <span class="comment">// 0x8000_0000
+    <span class="kw">pub const </span>MAX_INT: usize = i32::MAX <span class="kw">as </span>usize; <span class="comment">// 0x7fff_ffff
+    </span><span class="kw">pub const </span>MIN_INT: usize = i32::MIN <span class="kw">as </span>u32 <span class="kw">as </span>usize; <span class="comment">// 0x8000_0000
 </span>}
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>java_specific_constants::<span class="kw-2">*</span>;
 

@@ -196,6 +196,7 @@
 <a href="#194" id="194">194</a>
 <a href="#195" id="195">195</a>
 <a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::ImmixGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
@@ -336,7 +337,8 @@
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: <span class="bool-val">false</span>,
                 unlog_object_when_traced: <span class="bool-val">false</span>,
-                mixed_age: <span class="bool-val">false</span>,
+                <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
+                </span>mixed_age: <span class="bool-val">false</span>,
             },
         )
     }

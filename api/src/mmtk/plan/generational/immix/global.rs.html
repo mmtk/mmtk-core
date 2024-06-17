@@ -273,6 +273,7 @@
 <a href="#271" id="271">271</a>
 <a href="#272" id="272">272</a>
 <a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext;
 <span class="kw">use </span><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext;
 <span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::CommonGenPlan;
@@ -526,6 +527,7 @@
                 // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
                 </span>unlog_object_when_traced: <span class="bool-val">false</span>,
                 <span class="comment">// In GenImmix, young objects are not allocated in ImmixSpace directly.
+                </span><span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>mixed_age: <span class="bool-val">false</span>,
             },
         );

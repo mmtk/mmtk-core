@@ -489,18 +489,6 @@
 <a href="#487" id="487">487</a>
 <a href="#488" id="488">488</a>
 <a href="#489" id="489">489</a>
-<a href="#490" id="490">490</a>
-<a href="#491" id="491">491</a>
-<a href="#492" id="492">492</a>
-<a href="#493" id="493">493</a>
-<a href="#494" id="494">494</a>
-<a href="#495" id="495">495</a>
-<a href="#496" id="496">496</a>
-<a href="#497" id="497">497</a>
-<a href="#498" id="498">498</a>
-<a href="#499" id="499">499</a>
-<a href="#500" id="500">500</a>
-<a href="#501" id="501">501</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::plan::barriers::Barrier;
@@ -654,13 +642,6 @@
 
     <span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMMutatorThread {
         <span class="self">self</span>.mutator_tls
-    }
-
-    <span class="doccomment">/// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
-    </span><span class="kw">unsafe fn </span>barrier_impl&lt;B: Barrier&lt;VM&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>B {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.barrier().is::&lt;B&gt;());
-        <span class="kw">let </span>(payload, _vptr) = std::mem::transmute::&lt;<span class="kw">_</span>, (<span class="kw-2">*mut </span>B, <span class="kw-2">*mut </span>())&gt;(<span class="self">self</span>.barrier());
-        <span class="kw-2">&amp;mut *</span>payload
     }
 
     <span class="kw">fn </span>barrier(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Barrier&lt;VM&gt; {
@@ -819,11 +800,6 @@
     </span><span class="kw">fn </span>get_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VMMutatorThread;
     <span class="doccomment">/// Get active barrier trait object
     </span><span class="kw">fn </span>barrier(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Barrier&lt;VM&gt;;
-    <span class="doccomment">/// Force cast the barrier trait object to a concrete implementation.
-    ///
-    /// # Safety
-    /// The safety of this function is ensured by a down-cast check.
-    </span><span class="kw">unsafe fn </span>barrier_impl&lt;B: Barrier&lt;VM&gt;&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>B;
 }
 
 <span class="doccomment">/// This is used for plans to indicate the number of allocators reserved for the plan.

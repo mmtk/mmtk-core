@@ -591,6 +591,10 @@
 <a href="#589" id="589">589</a>
 <a href="#590" id="590">590</a>
 <a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::sft::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -696,8 +700,12 @@
 /// see if 128 bits atomic instructions are available.
 </span><span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
 </span><span class="kw">type </span>AtomicDoubleWord = portable_atomic::AtomicU128;
+<span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
+</span><span class="kw">type </span>DoubleWord = u128;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">type </span>AtomicDoubleWord = portable_atomic::AtomicU64;
+<span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
+</span><span class="kw">type </span>DoubleWord = u64;
 
 <span class="doccomment">/// The type we store SFT raw pointer as. It basically just double word sized atomic integer.
 /// This type provides an abstraction so we can access SFT easily.
@@ -721,7 +729,7 @@
     }
 
     <span class="kw">pub fn </span>new(sft: SFTRawPointer) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>val = <span class="kw">unsafe </span>{ std::mem::transmute(sft) };
+        <span class="kw">let </span>val: DoubleWord = <span class="kw">unsafe </span>{ std::mem::transmute(sft) };
         <span class="self">Self</span>(AtomicDoubleWord::new(val))
     }
 
@@ -733,7 +741,7 @@
 
     <span class="comment">// Store a raw SFT pointer with the release ordering.
     </span><span class="kw">pub fn </span>store(<span class="kw-2">&amp;</span><span class="self">self</span>, sft: SFTRawPointer) {
-        <span class="kw">let </span>val = <span class="kw">unsafe </span>{ std::mem::transmute(sft) };
+        <span class="kw">let </span>val: DoubleWord = <span class="kw">unsafe </span>{ std::mem::transmute(sft) };
         <span class="self">self</span>.<span class="number">0</span>.store(val, Ordering::Release)
     }
 }

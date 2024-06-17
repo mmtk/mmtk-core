@@ -385,8 +385,9 @@
 <a href="#383" id="383">383</a>
 <a href="#384" id="384">384</a>
 <a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::freelist::<span class="kw-2">*</span>;
-<span class="kw">use </span>std::{mem, ptr::NonNull};
+<span class="kw">use </span>std::ptr::NonNull;
 
 <span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>IntArrayFreeList {
@@ -429,11 +430,12 @@
         iafl
     }
     <span class="kw">pub fn </span>from_parent(parent: <span class="kw-2">&amp;</span>IntArrayFreeList, ordinal: i32) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>parent_ptr = std::ptr::NonNull::from(parent);
         <span class="kw">let </span>iafl = IntArrayFreeList {
             head: -(<span class="number">1 </span>+ ordinal),
             heads: parent.heads,
             table: <span class="prelude-val">None</span>,
-            parent: <span class="prelude-val">Some</span>(<span class="kw">unsafe </span>{ mem::transmute(parent) }),
+            parent: <span class="prelude-val">Some</span>(parent_ptr),
         };
         <span class="macro">debug_assert!</span>(-iafl.head &lt;= iafl.heads);
         iafl

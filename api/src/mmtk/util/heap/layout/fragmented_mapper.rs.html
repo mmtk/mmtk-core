@@ -584,6 +584,17 @@
 <a href="#582" id="582">582</a>
 <a href="#583" id="583">583</a>
 <a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
@@ -595,7 +606,6 @@
 <span class="kw">use </span>std::cell::UnsafeCell;
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::io::Result;
-<span class="kw">use </span>std::mem::transmute;
 <span class="kw">use </span>std::sync::Mutex;
 
 <span class="kw">const </span>MMAP_NUM_CHUNKS: usize = <span class="number">1 </span>&lt;&lt; (<span class="number">33 </span>- LOG_MMAP_CHUNK_BYTES);
@@ -828,8 +838,20 @@
     }
 
     <span class="kw">fn </span>new_slab() -&gt; Box&lt;Slab&gt; {
-        <span class="kw">let </span>mapped: Box&lt;Slab&gt; =
-            Box::new(<span class="kw">unsafe </span>{ transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) });
+        <span class="comment">// Because AtomicU8 does not implement Copy, it is a compilation error to usen the
+        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
+        // copying.  We must define a constant for it.
+        //
+        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
+        // we bump MSRV to 1.79.
+
+        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
+        // Using inline const expression will eliminate this warning, but that is experimental until
+        // 1.79.  Fix it after we bump MSRV.
+        </span><span class="attr">#[allow(clippy::declare_interior_mutable_const)]
+        </span><span class="kw">const </span>INITIAL_ENTRY: Atomic&lt;MapState&gt; = Atomic::new(MapState::Unmapped);
+
+        <span class="kw">let </span>mapped: Box&lt;Slab&gt; = Box::new([INITIAL_ENTRY; MMAP_NUM_CHUNKS]);
         mapped
     }
 

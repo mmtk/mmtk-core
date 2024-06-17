@@ -397,6 +397,16 @@
 <a href="#395" id="395">395</a>
 <a href="#396" id="396">396</a>
 <a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -411,7 +421,6 @@
 
 <span class="kw">use </span>atomic::Atomic;
 <span class="kw">use </span>std::io::Result;
-<span class="kw">use </span>std::mem::transmute;
 
 <span class="kw">const </span>MMAP_NUM_CHUNKS: usize = <span class="kw">if </span>LOG_BYTES_IN_ADDRESS_SPACE == <span class="number">32 </span>{
     <span class="number">1 </span>&lt;&lt; (LOG_BYTES_IN_ADDRESS_SPACE <span class="kw">as </span>usize - LOG_MMAP_CHUNK_BYTES)
@@ -533,11 +542,22 @@
 
 <span class="kw">impl </span>ByteMapMmapper {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-        <span class="comment">// Hacky because AtomicU8 does not implement Copy
-        // Should be fiiine because AtomicXXX has the same bit representation as XXX
-        </span>ByteMapMmapper {
+        <span class="comment">// Because AtomicU8 does not implement Copy, it is a compilation error to usen the
+        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
+        // copying.  We must define a constant for it.
+        //
+        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
+        // we bump MSRV to 1.79.
+
+        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
+        // Using inline const expression will eliminate this warning, but that is experimental until
+        // 1.79.  Fix it after we bump MSRV.
+        </span><span class="attr">#[allow(clippy::declare_interior_mutable_const)]
+        </span><span class="kw">const </span>INITIAL_ENTRY: Atomic&lt;MapState&gt; = Atomic::new(MapState::Unmapped);
+
+        ByteMapMmapper {
             lock: Mutex::new(()),
-            mapped: <span class="kw">unsafe </span>{ transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) },
+            mapped: [INITIAL_ENTRY; MMAP_NUM_CHUNKS],
             strategy: Atomic::new(MmapStrategy::Normal),
         }
     }

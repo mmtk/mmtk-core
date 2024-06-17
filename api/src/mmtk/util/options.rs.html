@@ -1286,7 +1286,7 @@
 
 <span class="doccomment">/// The default stress factor. This is set to the max usize,
 /// which means we will never trigger a stress GC for the default value.
-</span><span class="kw">pub const </span>DEFAULT_STRESS_FACTOR: usize = usize::max_value();
+</span><span class="kw">pub const </span>DEFAULT_STRESS_FACTOR: usize = usize::MAX;
 
 <span class="doccomment">/// The zeroing approach to use for new object allocations.
 /// Affects each plan differently.

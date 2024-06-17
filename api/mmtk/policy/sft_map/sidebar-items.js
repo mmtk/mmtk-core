@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["create_sft_map"],"mod":["dense_chunk_map","space_map","sparse_chunk_map"],"struct":["SFTRefStorage"],"trait":["SFTMap"],"type":["AtomicDoubleWord","SFTRawPointer"]};
+window.SIDEBAR_ITEMS = {"fn":["create_sft_map"],"mod":["dense_chunk_map","space_map","sparse_chunk_map"],"struct":["SFTRefStorage"],"trait":["SFTMap"],"type":["AtomicDoubleWord","DoubleWord","SFTRawPointer"]};
