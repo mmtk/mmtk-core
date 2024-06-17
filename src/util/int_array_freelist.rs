@@ -1,5 +1,5 @@
 use super::freelist::*;
-use std::{mem, ptr::NonNull};
+use std::ptr::NonNull;
 
 #[derive(Debug)]
 pub struct IntArrayFreeList {
@@ -42,11 +42,12 @@ impl IntArrayFreeList {
         iafl
     }
     pub fn from_parent(parent: &IntArrayFreeList, ordinal: i32) -> Self {
+        let parent_ptr = std::ptr::NonNull::from(parent);
         let iafl = IntArrayFreeList {
             head: -(1 + ordinal),
             heads: parent.heads,
             table: None,
-            parent: Some(unsafe { mem::transmute(parent) }),
+            parent: Some(parent_ptr),
         };
         debug_assert!(-iafl.head <= iafl.heads);
         iafl
