@@ -4,6 +4,7 @@ use atomic::Ordering;
 
 use super::BlockList;
 use super::MarkSweepSpace;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::vm::ObjectModel;
@@ -48,6 +49,9 @@ impl Region for Block {
 }
 
 impl Block {
+    /// Log pages in block
+    pub const LOG_PAGES: usize = Self::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
+
     pub const METADATA_SPECS: [SideMetadataSpec; 7] = [
         Self::MARK_TABLE,
         Self::NEXT_BLOCK_TABLE,
