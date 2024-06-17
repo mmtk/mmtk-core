@@ -329,6 +329,7 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 // Along with the option above, we unlog them again during tracing.
                 reset_log_bit_in_major_gc: true,
                 // In StickyImmix, both young and old objects are allocated in the ImmixSpace.
+                #[cfg(feature = "vo_bit")]
                 mixed_age: true,
             },
         );

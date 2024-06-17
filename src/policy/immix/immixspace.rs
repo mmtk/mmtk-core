@@ -77,6 +77,8 @@ pub struct ImmixSpaceArgs {
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
+    // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
+    #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
 }
 
