@@ -9,7 +9,6 @@ use atomic::{Atomic, Ordering};
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::io::Result;
-use std::mem::transmute;
 use std::sync::Mutex;
 
 const MMAP_NUM_CHUNKS: usize = 1 << (33 - LOG_MMAP_CHUNK_BYTES);
@@ -242,8 +241,20 @@ impl FragmentedMapper {
     }
 
     fn new_slab() -> Box<Slab> {
-        let mapped: Box<Slab> =
-            Box::new(unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) });
+        // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
+        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
+        // copying.  We must define a constant for it.
+        //
+        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
+        // we bump MSRV to 1.79.
+
+        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
+        // Using inline const expression will eliminate this warning, but that is experimental until
+        // 1.79.  Fix it after we bump MSRV.
+        #[allow(clippy::declare_interior_mutable_const)]
+        const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
+
+        let mapped: Box<Slab> = Box::new([INITIAL_ENTRY; MMAP_NUM_CHUNKS]);
         mapped
     }
 

@@ -12,7 +12,6 @@ use std::sync::Mutex;
 
 use atomic::Atomic;
 use std::io::Result;
-use std::mem::transmute;
 
 const MMAP_NUM_CHUNKS: usize = if LOG_BYTES_IN_ADDRESS_SPACE == 32 {
     1 << (LOG_BYTES_IN_ADDRESS_SPACE as usize - LOG_MMAP_CHUNK_BYTES)
@@ -134,11 +133,22 @@ impl Mmapper for ByteMapMmapper {
 
 impl ByteMapMmapper {
     pub fn new() -> Self {
-        // Hacky because AtomicU8 does not implement Copy
-        // Should be fiiine because AtomicXXX has the same bit representation as XXX
+        // Because AtomicU8 does not implement Copy, it is a compilation error to usen the
+        // expression `[Atomic::new(MapState::Unmapped); MMAP_NUM_CHUNKS]` because that involves
+        // copying.  We must define a constant for it.
+        //
+        // TODO: Use the inline const expression `const { Atomic::new(MapState::Unmapped) }` after
+        // we bump MSRV to 1.79.
+
+        // If we declare a const Atomic, Clippy will warn about const items being interior mutable.
+        // Using inline const expression will eliminate this warning, but that is experimental until
+        // 1.79.  Fix it after we bump MSRV.
+        #[allow(clippy::declare_interior_mutable_const)]
+        const INITIAL_ENTRY: Atomic<MapState> = Atomic::new(MapState::Unmapped);
+
         ByteMapMmapper {
             lock: Mutex::new(()),
-            mapped: unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) },
+            mapped: [INITIAL_ENTRY; MMAP_NUM_CHUNKS],
             strategy: Atomic::new(MmapStrategy::Normal),
         }
     }
