@@ -138,6 +138,7 @@ impl<VM: VMBinding> Immix<VM> {
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
                 unlog_object_when_traced: false,
+                #[cfg(feature = "vo_bit")]
                 mixed_age: false,
             },
         )

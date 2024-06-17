@@ -153,13 +153,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         self.mutator_tls
     }
 
-    /// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
-    unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B {
-        debug_assert!(self.barrier().is::<B>());
-        let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
-        &mut *payload
-    }
-
     fn barrier(&mut self) -> &mut dyn Barrier<VM> {
         &mut *self.barrier
     }
@@ -316,11 +309,6 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn get_tls(&self) -> VMMutatorThread;
     /// Get active barrier trait object
     fn barrier(&mut self) -> &mut dyn Barrier<VM>;
-    /// Force cast the barrier trait object to a concrete implementation.
-    ///
-    /// # Safety
-    /// The safety of this function is ensured by a down-cast check.
-    unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B;
 }
 
 /// This is used for plans to indicate the number of allocators reserved for the plan.

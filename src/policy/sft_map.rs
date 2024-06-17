@@ -103,8 +103,12 @@ pub(crate) type SFTRawPointer = *const (dyn SFT + Sync + 'static);
 /// see if 128 bits atomic instructions are available.
 #[cfg(target_pointer_width = "64")]
 type AtomicDoubleWord = portable_atomic::AtomicU128;
+#[cfg(target_pointer_width = "64")]
+type DoubleWord = u128;
 #[cfg(target_pointer_width = "32")]
 type AtomicDoubleWord = portable_atomic::AtomicU64;
+#[cfg(target_pointer_width = "32")]
+type DoubleWord = u64;
 
 /// The type we store SFT raw pointer as. It basically just double word sized atomic integer.
 /// This type provides an abstraction so we can access SFT easily.
@@ -128,7 +132,7 @@ impl SFTRefStorage {
     }
 
     pub fn new(sft: SFTRawPointer) -> Self {
-        let val = unsafe { std::mem::transmute(sft) };
+        let val: DoubleWord = unsafe { std::mem::transmute(sft) };
         Self(AtomicDoubleWord::new(val))
     }
 
@@ -140,7 +144,7 @@ impl SFTRefStorage {
 
     // Store a raw SFT pointer with the release ordering.
     pub fn store(&self, sft: SFTRawPointer) {
-        let val = unsafe { std::mem::transmute(sft) };
+        let val: DoubleWord = unsafe { std::mem::transmute(sft) };
         self.0.store(val, Ordering::Release)
     }
 }
