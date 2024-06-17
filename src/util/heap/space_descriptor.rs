@@ -35,7 +35,7 @@ impl SpaceDescriptor {
         let top = end == vm_layout().heap_end;
         if vm_layout().force_use_contiguous_spaces {
             let space_index = if start > vm_layout().heap_end {
-                ::std::usize::MAX
+                usize::MAX
             } else {
                 start >> vm_layout().space_shift_64()
             };
