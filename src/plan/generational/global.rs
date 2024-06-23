@@ -152,7 +152,12 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
             .global_state
             .user_triggered_collection
             .load(Ordering::SeqCst)
-            && *self.common.base.options.full_heap_system_gc
+            && self
+                .common
+                .base
+                .global_state
+                .user_triggered_exhaustive_gc
+                .load(Ordering::SeqCst)
         {
             trace!("full heap: user triggered");
             // User triggered collection, and we force full heap for user triggered collection
