@@ -160,3 +160,23 @@ pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
     let side_mark_bit_spec = mark_bit_spec.extract_side_spec();
     VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
 }
+
+/// Search backwards from the given `start` address to find if there is any address with vo bit set.
+/// If so, return an address that is aligned to [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
+/// It searches back for `search_limit_bytes`. If no object is found in the range, it returns None.
+/// This function is used to find the base reference for internal references.
+pub fn search_vo_bit_before_addr<VM: VMBinding>(
+    start: Address,
+    search_limit_bytes: usize,
+) -> Option<Address> {
+    let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
+    let mut cur = start;
+    while cur > start.saturating_sub(search_limit_bytes) {
+        let res = is_vo_bit_set_for_addr::<VM>(cur);
+        if res.is_some() {
+            return res.map(|obj| obj.to_address::<VM>().align_down(region_bytes));
+        }
+        cur -= region_bytes;
+    }
+    None
+}

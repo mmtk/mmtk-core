@@ -630,6 +630,36 @@ pub fn is_mmtk_object(addr: Address) -> bool {
     SFT_MAP.get_checked(addr).is_mmtk_object(addr)
 }
 
+/// Find if there is an object with VO bit set for the given address range.
+/// This is used instead of [`is_mmtk_object`] for conservative stack scanning if
+/// the binding may have internal pointers on the stack.
+///
+/// The function cannot directly return an object reference. Instead, it returns
+/// an address that is aligned to [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`],
+/// and guarantees there is an object in `[return_address, return_address + VO_BIT_REGION_SIZE)`.
+/// The reason behind this is that we use the VO
+/// bit to represent a valid object for every 8 bytes. When we find a set VO bit,
+/// we only know that in the 8 bytes there is an object, and we cannot know where
+/// exactly the object is. The binding needs to use their knowledge about the alignment
+/// and offset for object reference to find out the object reference from the return value.
+/// See Case 2 in [`crate::memory_manager::is_mmtk_object`] for more explanation.
+///
+/// Argument:
+/// * `internal_ptr`: The internal pointer to start. We search backwards from this internal pointer to find the base reference.
+/// * `object_max_bytes`: The maximum of the possible object size. We will search for this many before deciding there is no object.
+///   The binding should keep this value low for better performance.
+#[cfg(feature = "is_mmtk_object")]
+pub fn find_object_from_internal_pointer<VM: VMBinding>(
+    internal_ptr: Address,
+    object_max_bytes: usize,
+) -> Option<Address> {
+    if !is_mapped_address(internal_ptr) {
+        return None;
+    }
+
+    crate::util::metadata::vo_bit::search_vo_bit_before_addr::<VM>(internal_ptr, object_max_bytes)
+}
+
 /// Return true if the `object` lies in a region of memory where
 /// -   only MMTk can allocate into, or
 /// -   only MMTk's delegated memory allocator (such as a malloc implementation) can allocate into

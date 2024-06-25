@@ -212,3 +212,68 @@ pub fn negative_offsets() {
         no_cleanup,
     )
 }
+
+#[test]
+pub fn internal_pointer_hit() {
+    with_mockvm(
+        default_setup,
+        || {
+            SINGLE_OBJECT.with_fixture(|fixture| {
+                let objref = fixture.objref;
+                // This is the aligned address we expect `find_object_from_internal_pointer` to return.
+                let start = objref.to_raw_address().align_down(VO_BIT_REGION_SIZE);
+                for offset in 0..fixture.objsize {
+                    let internal_ptr = objref.to_raw_address() + offset;
+                    let res = memory_manager::find_object_from_internal_pointer::<MockVM>(
+                        internal_ptr,
+                        fixture.objsize,
+                    );
+                    assert!(res.is_some());
+                    assert_eq!(res.unwrap(), start);
+                }
+            })
+        },
+        no_cleanup,
+    )
+}
+
+#[test]
+pub fn internal_pointer_miss() {
+    with_mockvm(
+        default_setup,
+        || {
+            SINGLE_OBJECT.with_fixture(|fixture| {
+                let objref = fixture.objref;
+                for offset in 0..fixture.objsize {
+                    // This is not an internal pointer
+                    let non_ptr = objref.to_raw_address() + offset + fixture.objsize;
+                    let res = memory_manager::find_object_from_internal_pointer::<MockVM>(
+                        non_ptr,
+                        fixture.objsize,
+                    );
+                    assert!(res.is_none());
+                }
+            })
+        },
+        no_cleanup,
+    )
+}
+
+#[test]
+pub fn internal_pointer_unmapped_memory() {
+    with_mockvm(
+        default_setup,
+        || {
+            SINGLE_OBJECT.with_fixture(|fixture| {
+                let objref = fixture.objref;
+                let start = objref.to_raw_address().align_down(VO_BIT_REGION_SIZE);
+                let res = memory_manager::find_object_from_internal_pointer::<MockVM>(
+                    start - 8,
+                    fixture.objsize,
+                );
+                assert!(res.is_none());
+            })
+        },
+        no_cleanup,
+    )
+}
