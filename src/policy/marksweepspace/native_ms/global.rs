@@ -546,7 +546,7 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
             // number of allocated blocks.
             let mut allocated_blocks = 0;
@@ -556,10 +556,12 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 .iter_region::<Block>()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
             {
+                assert!(block.get_state() == BlockState::Marked);
                 block.sweep::<VM>();
                 // We have released unmarked blocks in `ReleaseMarkSweepSpace` and `ReleaseMutator`.
                 allocated_blocks += 1;
             }
+            probe!(mmtk, sweep_chunk, allocated_blocks);
             // Set this chunk as free if there is not live blocks.
             if allocated_blocks == 0 {
                 self.space.chunk_map.set(self.chunk, ChunkState::Free)
