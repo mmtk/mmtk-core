@@ -160,3 +160,18 @@ pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
     let side_mark_bit_spec = mark_bit_spec.extract_side_spec();
     VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
 }
+
+pub fn search_vo_bit_for_addr<VM: VMBinding>(start: Address, search_limit_bytes: usize) -> Option<ObjectReference> {
+    let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
+    let aligned_hi= start.align_down(region_bytes);
+    let aligned_lo = (start - search_limit_bytes).align_down(region_bytes);
+    let mut cur = aligned_hi;
+    while cur > aligned_lo {
+        let res = is_vo_bit_set_for_addr::<VM>(cur);
+        if res.is_some() {
+            return res;
+        }
+        cur -= region_bytes;
+    }
+    None
+}

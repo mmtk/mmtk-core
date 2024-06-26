@@ -34,9 +34,14 @@ pub struct SideMetadataSpec {
 }
 
 impl SideMetadataSpec {
-    /// Is offset for this spec Address? (contiguous side metadata for 64 bits, and global specs in 32 bits)
-    pub const fn is_absolute_offset(&self) -> bool {
+    // Is this spec using contiguous side metadata? If not, it uses chunked side metadata.
+    pub const fn uses_contiguous_side_metadata(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
+    }
+
+    /// Is offset for this spec Address?
+    pub const fn is_absolute_offset(&self) -> bool {
+        self.uses_contiguous_side_metadata()
     }
 
     /// If offset for this spec relative? (chunked side metadata for local specs in 32 bits)
@@ -149,63 +154,121 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    /// This method is used for bulk updating side metadata for a data address range. As we cannot guarantee
+    /// This method is used for iterating side metadata for a data address range. As we cannot guarantee
     /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
     /// we need to mask and zero certain bits in a metadata byte. The end address and the end bit are exclusive.
     /// The end bit for update_bits could be 8, so overflowing needs to be taken care of.
-    pub(super) fn update_meta_bits(
+    ///
+    /// Returns true if we iterate through every bits in the range. Return false if we abort iteration early.
+    ///
+    /// Arguments:
+    /// * `forwards`: If true, we iterate forwards (from start/low address to end/high address). Otherwise,
+    ///               we iterate backwards (from end/high address to start/low address).
+    /// * `update_bytes`/`update_bits`: The closures returns whether the itertion is early terminated.
+    pub(super) fn iterate_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
         meta_end_bit: u8,
-        update_bytes: &impl Fn(Address, Address),
-        update_bits: &impl Fn(Address, u8, u8),
-    ) {
+        forwards: bool,
+        update_bytes: &impl Fn(Address, Address) -> bool,
+        update_bits: &impl Fn(Address, u8, u8) -> bool,
+    ) -> bool {
+        // println!("update_meta_bits: {} {}, {} {}", meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit);
         // Start/end is the same, we don't need to do anything.
         if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
-            return;
+            return false;
         }
 
         // zeroing bytes
         if meta_start_bit == 0 && meta_end_bit == 0 {
-            update_bytes(meta_start_addr, meta_end_addr);
-            return;
+            return update_bytes(meta_start_addr, meta_end_addr);
         }
 
         if meta_start_addr == meta_end_addr {
             // Update bits in the same byte between start and end bit
-            update_bits(meta_start_addr, meta_start_bit, meta_end_bit);
+            return update_bits(meta_start_addr, meta_start_bit, meta_end_bit);
         } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
             // Update bits in the same byte after the start bit (between start bit and 8)
-            update_bits(meta_start_addr, meta_start_bit, 8);
+            return update_bits(meta_start_addr, meta_start_bit, 8);
         } else {
-            // update bits in the first byte
-            Self::update_meta_bits(
-                meta_start_addr,
-                meta_start_bit,
-                meta_start_addr + 1usize,
-                0,
-                update_bytes,
-                update_bits,
-            );
-            // update bytes in the middle
-            Self::update_meta_bits(
-                meta_start_addr + 1usize,
-                0,
-                meta_end_addr,
-                0,
-                update_bytes,
-                update_bits,
-            );
-            // update bits in the last byte
-            Self::update_meta_bits(
-                meta_end_addr,
-                0,
-                meta_end_addr,
-                meta_end_bit,
-                update_bytes,
-                update_bits,
-            );
+            if forwards {
+                // update bits in the first byte
+                if Self::iterate_meta_bits(
+                    meta_start_addr,
+                    meta_start_bit,
+                    meta_start_addr + 1usize,
+                    0,
+                    forwards,
+                    update_bytes,
+                    update_bits,
+                ) {
+                    return true;
+                }
+                // update bytes in the middle
+                if Self::iterate_meta_bits(
+                    meta_start_addr + 1usize,
+                    0,
+                    meta_end_addr,
+                    0,
+                    forwards,
+                    update_bytes,
+                    update_bits,
+                ) {
+                    return true;
+                }
+                // update bits in the last byte
+                if Self::iterate_meta_bits(
+                    meta_end_addr,
+                    0,
+                    meta_end_addr,
+                    meta_end_bit,
+                    forwards,
+                    update_bytes,
+                    update_bits,
+                ) {
+                    return true;
+                }
+                false
+            } else {
+                // update bits in the last byte
+                if Self::iterate_meta_bits(
+                    meta_end_addr,
+                    0,
+                    meta_end_addr,
+                    meta_end_bit,
+                    forwards,
+                    update_bytes,
+                    update_bits,
+                ) {
+                    return true;
+                }
+                // update bytes in the middle
+                if Self::iterate_meta_bits(
+                    meta_start_addr + 1usize,
+                    0,
+                    meta_end_addr,
+                    0,
+                    forwards,
+                    update_bytes,
+                    update_bits,
+                ) {
+                    return true;
+                }
+                // update bits in the first byte
+                if Self::iterate_meta_bits(
+                    meta_start_addr,
+                    meta_start_bit,
+                    meta_start_addr + 1usize,
+                    0,
+                    forwards,
+                    update_bytes,
+                    update_bits,
+                ) {
+                    return true;
+                }
+                false
+            }
         }
     }
 
@@ -216,22 +279,25 @@ impl SideMetadataSpec {
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        let zero_bytes = |start: Address, end: Address| {
+        let mut zero_bytes = |start: Address, end: Address| -> bool {
             memory::zero(start, end - start);
+            false
         };
-        let zero_bits = |addr: Address, start_bit: u8, end_bit: u8| {
+        let mut zero_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
             // we are zeroing selected bits in one byte
             let mask: u8 =
                 u8::MAX.checked_shl(end_bit.into()).unwrap_or(0) | !(u8::MAX << start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
             unsafe { addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+            false
         };
-        Self::update_meta_bits(
+        Self::iterate_meta_bits(
             meta_start_addr,
             meta_start_bit,
             meta_end_addr,
             meta_end_bit,
-            &zero_bytes,
-            &zero_bits,
+            true,
+            &mut zero_bytes,
+            &mut zero_bits,
         );
     }
 
@@ -242,22 +308,25 @@ impl SideMetadataSpec {
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        let set_bytes = |start: Address, end: Address| {
+        let mut set_bytes = |start: Address, end: Address| -> bool {
             memory::set(start, 0xff, end - start);
+            false
         };
-        let set_bits = |addr: Address, start_bit: u8, end_bit: u8| {
+        let mut set_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
             // we are setting selected bits in one byte
             let mask: u8 =
                 !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
             unsafe { addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
+            false
         };
-        Self::update_meta_bits(
+        Self::iterate_meta_bits(
             meta_start_addr,
             meta_start_bit,
             meta_end_addr,
             meta_end_bit,
-            &set_bytes,
-            &set_bits,
+            true,
+            &mut set_bytes,
+            &mut set_bits,
         );
     }
 
@@ -420,14 +489,17 @@ impl SideMetadataSpec {
 
         debug_assert_eq!(dst_meta_start_bit, src_meta_start_bit);
 
-        let copy_bytes = |dst_start: Address, dst_end: Address| unsafe {
-            let byte_offset = dst_start - dst_meta_start_addr;
-            let src_start = src_meta_start_addr + byte_offset;
-            let size = dst_end - dst_start;
-            std::ptr::copy::<u8>(src_start.to_ptr(), dst_start.to_mut_ptr(), size);
+        let mut copy_bytes = |dst_start: Address, dst_end: Address| -> bool {
+            unsafe {
+                let byte_offset = dst_start - dst_meta_start_addr;
+                let src_start = src_meta_start_addr + byte_offset;
+                let size = dst_end - dst_start;
+                std::ptr::copy::<u8>(src_start.to_ptr(), dst_start.to_mut_ptr(), size);
+                false
+            }
         };
 
-        let copy_bits = |dst: Address, start_bit: u8, end_bit: u8| {
+        let mut copy_bits = |dst: Address, start_bit: u8, end_bit: u8| -> bool {
             let byte_offset = dst - dst_meta_start_addr;
             let src = src_meta_start_addr + byte_offset;
             // we are setting selected bits in one byte
@@ -437,15 +509,17 @@ impl SideMetadataSpec {
             let old_dst = unsafe { dst.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
             let new = (old_src & mask) | (old_dst & !mask);
             unsafe { dst.as_ref::<AtomicU8>() }.store(new, Ordering::Relaxed);
+            false
         };
 
-        Self::update_meta_bits(
+        Self::iterate_meta_bits(
             dst_meta_start_addr,
             dst_meta_start_bit,
             dst_meta_end_addr,
             dst_meta_end_bit,
-            &copy_bytes,
-            &copy_bits,
+            true,
+            &mut copy_bytes,
+            &mut copy_bits,
         );
     }
 
@@ -946,6 +1020,106 @@ impl SideMetadataSpec {
             },
         )
     }
+
+    /// Find for a data address that has a non zero value in the side metadata. The search starts from the given data address (including this address),
+    /// and iterates backwards for the given bytes before the data address.
+    /// `search_limit_bytes`: non inclusive
+    pub unsafe fn find_prev_non_zero_value<T: MetadataValue>(&self, data_addr: Address, search_limit_bytes: usize) -> Option<Address> {
+        debug_assert!(search_limit_bytes > 0);
+
+        if self.uses_contiguous_side_metadata() {
+            // Contiguous side metadata
+            self.find_prev_non_zero_value_fast::<T>(data_addr, search_limit_bytes)
+        } else {
+            // TODO: We may be able to optimize further for this case. However, we need to be careful that the side metadata
+            // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
+            self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes)
+        }
+    }
+
+    fn find_prev_non_zero_value_simple<T: MetadataValue>(&self, data_addr: Address, search_limit_bytes: usize) -> Option<Address> {
+        // We need to search back.
+        let start_addr = data_addr;
+        let end_addr = data_addr - search_limit_bytes;
+
+        let region_bytes = 1 << self.log_bytes_in_region;
+
+        let mut cursor = start_addr;
+        while cursor > end_addr {
+            let aligned_cursor = cursor.align_down(region_bytes);
+            println!("Check {}, aligned to {}", cursor, aligned_cursor);
+            if !unsafe { self.load::<T>(aligned_cursor).is_zero() } {
+                return Some(aligned_cursor);
+            }
+            cursor -= region_bytes;
+            println!("cursor = {}, end_addr = {}", cursor, end_addr);
+        }
+        None
+    }
+
+    fn find_prev_non_zero_value_fast<T: MetadataValue>(&self, data_addr: Address, search_limit_bytes: usize) -> Option<Address> {
+        debug_assert!(self.uses_contiguous_side_metadata());
+
+        // Quick check if the current data_addr has a non zero value.
+        if !unsafe { self.load::<T>(data_addr).is_zero() } {
+            return Some(data_addr.align_down(1 << self.log_bytes_in_region));
+        }
+
+        // We need to search back.
+        let start_addr = data_addr - search_limit_bytes + 1usize;
+        let end_addr = data_addr;
+
+        let start_meta_addr = address_to_contiguous_meta_address(self, start_addr);
+        let start_meta_shift = meta_byte_lshift(self, start_addr);
+
+        let end_meta_addr = address_to_contiguous_meta_address(self, end_addr);
+        let end_meta_shift = meta_byte_lshift(self, end_addr);
+
+        let mut res = std::cell::UnsafeCell::new(None);
+
+        let mut check_bytes_backwards = |start: Address, end: Address| -> bool {
+            unsafe {
+                let mut cur = end - 1;
+                while cur >= start {
+                    // println!("check byte at {}", cur);
+                    if cur.load::<u8>() != 0 {
+                        *res.get() = Some(contiguous_meta_address_to_address(self, cur, 0));
+                        return true;
+                    }
+                    cur -= 1;
+                }
+                false
+            }
+        };
+        let mut check_bits_backwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
+            println!("check_bits_backwards: {}, {}, {}", addr, start_bit, end_bit);
+            let byte = unsafe { addr.load::<u8>() };
+            for cur_bit in (start_bit..end_bit).rev() {
+                println!("check bit at {} {}", addr, cur_bit);
+                if (byte & (1 << cur_bit)) != 0 {
+                    unsafe { *res.get() = Some(contiguous_meta_address_to_address(self, addr, cur_bit).align_down(1 << self.log_bytes_in_region)) };
+                    return true;
+                }
+            }
+            false
+        };
+
+        Self::iterate_meta_bits(
+            start_meta_addr,
+            start_meta_shift,
+            end_meta_addr,
+            end_meta_shift,
+            false,
+            &check_bytes_backwards,
+            &check_bits_backwards,
+        );
+
+        let ret = res.into_inner();
+        if let Some(addr) = ret {
+            debug_assert!(addr.is_aligned_to(1 << self.log_bytes_in_region), "{} is not aligned to {}", addr, 1 << self.log_bytes_in_region);
+        }
+        ret
+    }
 }
 
 impl fmt::Debug for SideMetadataSpec {
@@ -1325,6 +1499,8 @@ mod tests {
     use crate::util::test_util::{serial_test, with_cleanup};
     use paste::paste;
 
+    const TEST_LOG_BYTES_IN_REGION: usize = 12;
+
     fn test_side_metadata(
         log_bits: usize,
         f: impl Fn(&SideMetadataSpec, Address, Address) + std::panic::RefUnwindSafe,
@@ -1335,7 +1511,7 @@ mod tests {
                 is_global: true,
                 offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                 log_num_of_bits: log_bits,
-                log_bytes_in_region: 12, // page size
+                log_bytes_in_region: TEST_LOG_BYTES_IN_REGION, // page size
             };
             let context = SideMetadataContext {
                 global: vec![spec],
@@ -1692,6 +1868,82 @@ mod tests {
                         assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value);
                         // Only the affected bits are set to 0
                         assert_eq!(unsafe { *meta_ptr }, <$type>::MAX);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_prev_non_zero_value_easy>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Store non zero value at data_addr
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        // Find the value starting from data_addr, at max 8 bytes.
+                        // We should find data_addr
+                        let res_addr = unsafe { spec.find_prev_non_zero_value::<$type>(data_addr, 8) };
+                        assert!(res_addr.is_some());
+                        assert_eq!(res_addr.unwrap(), data_addr);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_prev_non_zero_value_arbitrary_bytes>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Store non zero value at data_addr
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        // Start from data_addr, we offset arbitrary length, and search back to find data_addr
+                        let test_region = (1 << TEST_LOG_BYTES_IN_REGION);
+                        for len in 1..(test_region*4) {
+                            let start_addr = data_addr + len;
+                            // Use len+1, as len is non inclusive.
+                            println!("Set at {}, test with {} (len {})", data_addr, start_addr, len + 1);
+                            let res_addr = unsafe { spec.find_prev_non_zero_value::<$type>(start_addr, len + 1) };
+                            assert!(res_addr.is_some());
+                            assert_eq!(res_addr.unwrap(), data_addr);
+                        }
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_prev_non_zero_value_arbitrary_start>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        let max_value: $type = max_value($log_bits) as _;
+
+                        // data_addr has a non-aligned offset
+                        for offset in 0..7usize {
+                            // Apply offset and test with the new data addr
+                            let test_data_addr = data_addr + offset;
+                            println!("test_data_addr = {}", test_data_addr);
+                            spec.store_atomic::<$type>(test_data_addr, max_value, Ordering::SeqCst);
+
+                            // The return result should be aligned
+                            let res_addr = unsafe { spec.find_prev_non_zero_value::<$type>(test_data_addr, 4096) };
+                            assert!(res_addr.is_some());
+                            assert_eq!(res_addr.unwrap(), data_addr);
+
+                            // Clear whatever is set
+                            spec.store_atomic::<$type>(test_data_addr, 0, Ordering::SeqCst);
+                        }
+                    });
+                }
+
+                #[test]
+                fn [<$tname _find_prev_non_zero_value_no_find>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, _meta_addr| {
+                        // Store zero value at data_addr -- so we won't find anything
+                        spec.store_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
+
+                        // Start from data_addr, we offset arbitrary length, and search back
+                        let test_region = (1 << TEST_LOG_BYTES_IN_REGION);
+                        for len in 1..(test_region*4) {
+                            let start_addr = data_addr + len;
+                            // Use len+1, as len is non inclusive.
+                            println!("Set at {}, test with {} (len {})", data_addr, start_addr, len + 1);
+                            let res_addr = unsafe { spec.find_prev_non_zero_value::<$type>(start_addr, len + 1) };
+                            assert!(res_addr.is_none());
+                        }
                     });
                 }
             }

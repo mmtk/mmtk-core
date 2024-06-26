@@ -25,6 +25,132 @@ pub(super) fn address_to_contiguous_meta_address(
     }
 }
 
+/// Performs reverse address translation from congitugous metadata bits to data addresses.
+///
+/// Arguments:
+/// * `metadata_spec`: The side metadata spec. It should be contiguous side metadata.
+/// * `metadata_addr`; The metadata address. Returned by [`address_to_contiguous_meta_address`].
+/// * `shift`: The bit shift for the metadata. Returned by [`meta_byte_lshift`].
+pub(super) fn contiguous_meta_address_to_address(
+    metadata_spec: &SideMetadataSpec,
+    metadata_addr: Address,
+    shift: u8
+) -> Address {
+    let rshift = (LOG_BITS_IN_BYTE as i32) - metadata_spec.log_num_of_bits as i32;
+    let relative_meta_addr = metadata_addr - metadata_spec.get_absolute_offset();
+
+    let data_addr_intermediate = if rshift >= 0 {
+        relative_meta_addr << rshift
+    } else {
+        relative_meta_addr >> (-rshift)
+    };
+
+    let data_addr = (data_addr_intermediate << metadata_spec.log_bytes_in_region) + ((shift as usize) << (metadata_spec.log_bytes_in_region - metadata_spec.log_num_of_bits));
+
+    unsafe { Address::from_usize(data_addr) }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::util::metadata::side_metadata::*;
+    use super::*;
+
+    fn test_round_trip_conversion(spec: &SideMetadataSpec, test_data: &[Address]) {
+        for ref_addr in test_data {
+            let addr = *ref_addr;
+
+            // This is an aligned address. When we do roundtrip conversion, we will get back the original address.
+            {
+                assert!(addr.is_aligned_to(1 << spec.log_bytes_in_region));
+                let meta_addr = address_to_contiguous_meta_address(&spec, addr);
+                let shift = meta_byte_lshift(&spec, addr);
+                println!("meta_addr = {}, shift = {}", meta_addr, shift);
+                assert_eq!(contiguous_meta_address_to_address(&spec, meta_addr, shift), addr);
+            }
+
+            // This is an unaligned address. When we do roundtrip conversion, we will get the aligned address.
+            {
+                let next_addr = addr + 1usize;
+                let meta_addr = address_to_contiguous_meta_address(&spec, next_addr);
+                let shift = meta_byte_lshift(&spec, next_addr);
+                assert_eq!(contiguous_meta_address_to_address(&spec, meta_addr, shift), addr); // we get back addr (which is the aligned address)
+            }
+        }
+    }
+
+    const TEST_ADDRESS_8B_REGION: [Address; 8] = [
+        unsafe { Address::from_usize(0x8000_0000) },
+        unsafe { Address::from_usize(0x8000_0008) },
+        unsafe { Address::from_usize(0x8000_0010) },
+        unsafe { Address::from_usize(0x8000_0018) },
+        unsafe { Address::from_usize(0x8000_0020) },
+        unsafe { Address::from_usize(0x8001_0000) },
+        unsafe { Address::from_usize(0x8001_0008) },
+        unsafe { Address::from_usize(0xd000_0000) },
+    ];
+
+    #[test]
+    fn test_contiguous_metadata_conversion_0_3() {
+        let spec = SideMetadataSpec {
+            name: "ContiguousMetadataTestSpec",
+            is_global: true,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: 0,
+            log_bytes_in_region: 3,
+        };
+
+        test_round_trip_conversion(&spec, &TEST_ADDRESS_8B_REGION);
+    }
+
+    #[test]
+    fn test_contiguous_metadata_conversion_1_3() {
+        let spec = SideMetadataSpec {
+            name: "ContiguousMetadataTestSpec",
+            is_global: true,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: 1,
+            log_bytes_in_region: 3,
+        };
+
+        test_round_trip_conversion(&spec, &TEST_ADDRESS_8B_REGION);
+    }
+
+    const TEST_ADDRESS_4KB_REGION: [Address; 8] = [
+        unsafe { Address::from_usize(0x8000_0000) },
+        unsafe { Address::from_usize(0x8000_1000) },
+        unsafe { Address::from_usize(0x8000_2000) },
+        unsafe { Address::from_usize(0x8000_3000) },
+        unsafe { Address::from_usize(0x8000_4000) },
+        unsafe { Address::from_usize(0x8001_0000) },
+        unsafe { Address::from_usize(0x8001_1000) },
+        unsafe { Address::from_usize(0xd000_0000) },
+    ];
+
+    #[test]
+    fn test_contiguous_metadata_conversion_0_12() {
+        let spec = SideMetadataSpec {
+            name: "ContiguousMetadataTestSpec",
+            is_global: true,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: 0,
+            log_bytes_in_region: 12, // 4K
+        };
+
+        test_round_trip_conversion(&spec, &TEST_ADDRESS_4KB_REGION);
+    }
+
+    // #[test]
+    // fn test_contiguous_metadata_conversion_specific() {
+    //     let spec = SideMetadataSpec {
+    //         name: "ContiguousMetadataTestSpec",
+    //         is_global: true,
+    //         offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+    //         log_num_of_bits: 0,
+    //         log_bytes_in_region: 12, // 4K
+    //     };
+    // }
+}
+
 /// Unmaps the specified metadata range, or panics.
 #[cfg(test)]
 pub(crate) fn ensure_munmap_metadata(start: Address, size: usize) {
