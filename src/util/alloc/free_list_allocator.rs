@@ -421,12 +421,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         self.reset();
     }
 
-    /// Do we abandon allocator local blocks in reset?
-    /// We should do this for GC. Otherwise, blocks will be held by each allocator, and they cannot
-    /// be reused by other allocators. This is measured to cause up to 100% increase of the min heap size
-    /// for mark sweep.
-    const ABANDON_BLOCKS_IN_RESET: bool = true;
-
     /// Lazy sweeping. We just move all the blocks to the unswept block list.
     fn reset(&mut self) {
         trace!("reset");
@@ -434,11 +428,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
 
-            // If we abandon all the local blocks, we should have no unswept blocks here. Blocks should be either in available, or consumed.
-            debug_assert!(!Self::ABANDON_BLOCKS_IN_RESET || unswept.is_empty());
+            // If we do eager sweeping, we should have no unswept blocks, either.
+            debug_assert!(!cfg!(feature = "eager_sweeping") || unswept.is_empty());
 
             let mut sweep_later = |list: &mut BlockList| {
                 list.release_blocks(self.space);
+                // Note: when sweeping eagerly, we leave the blocks in the available and consumed
+                // block lists.  After sweeping, we will "recategorize" consumed blocks because some
+                // of them will become available again.
+                // When sweeping lazily, we move the blocks to the unswept list so that they will be
+                // swept by mutators.
                 if cfg!(not(feature = "eager_sweeping")) {
                     unswept.append(list);
                 }
@@ -449,12 +448,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             sweep_later(&mut self.consumed_blocks[bin]);
         }
 
-        if Self::ABANDON_BLOCKS_IN_RESET || cfg!(feature = "eager_sweeping") {
+        // Note: when sweeping eagerly, we abandon block lists immediately so that we don't need to
+        // go through all mutators after sweeping.
+        if cfg!(feature = "eager_sweeping") {
             let mut global = self.space.get_abandoned_block_lists_in_gc().lock().unwrap();
             self.abandon_blocks(&mut global);
-        }
-
-        if cfg!(feature = "eager_sweeping") {
             self.space.release_packet_done();
         }
     }
