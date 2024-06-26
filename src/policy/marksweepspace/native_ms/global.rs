@@ -101,25 +101,27 @@ impl AbandonedBlockLists {
         }
     }
 
-    fn release_blocks<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
-        for i in 0..MI_BIN_FULL {
-            // Release free blocks
-            self.available[i].release_blocks(space);
-            self.consumed[i].release_blocks(space);
-            self.unswept[i].release_blocks(space);
-        }
-    }
-
     fn sweep_later<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
         for i in 0..MI_BIN_FULL {
             // Release free blocks
             self.available[i].release_blocks(space);
             self.consumed[i].release_blocks(space);
-            self.unswept[i].release_blocks(space);
+            if cfg!(not(feature = "eager_sweeping")) {
+                self.unswept[i].release_blocks(space);
+            } else {
+                // If we do eager sweeping, we should have no unswept blocks.
+                debug_assert!(self.unswept[i].is_empty());
+            }
 
-            // Move remaining blocks to unswept
-            self.unswept[i].append(&mut self.available[i]);
-            self.unswept[i].append(&mut self.consumed[i]);
+            // For eager sweeping, that's it.  We just release unmarked blocks, and leave marked
+            // blocks to be swept later in the `SweepChunk` work packet.
+
+            // For lazy sweeping, we move blocks from available and consumed to unswept.  When an
+            // allocator tries to use them, they will sweep the block.
+            if cfg!(not(feature = "eager_sweeping")) {
+                self.unswept[i].append(&mut self.available[i]);
+                self.unswept[i].append(&mut self.consumed[i]);
+            }
         }
     }
 
@@ -507,18 +509,11 @@ struct ReleaseMarkSweepSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        if cfg!(feature = "eager_sweeping") {
-            // For eager sweeping, we release unmarked blocks, and leave marked blocks to be swept
-            // later in the `SweepChunk` work packet.
-            let mut abandoned = self.space.abandoned.lock().unwrap();
-            abandoned.release_blocks(self.space);
+        let mut abandoned = self.space.abandoned.lock().unwrap();
+        abandoned.sweep_later(self.space);
 
+        if cfg!(feature = "eager_sweeping") {
             self.space.release_packet_done();
-        } else {
-            // For lazy sweeping, we just move blocks from consumed to unswept. When an allocator tries
-            // to use them, they will sweep the block.
-            let mut abandoned = self.space.abandoned.lock().unwrap();
-            abandoned.sweep_later(self.space);
         }
     }
 }
