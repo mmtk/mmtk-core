@@ -362,7 +362,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             metadata_spec.set_zero_atomic(block.start(), Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::bzero_vo_bit(block.start(), Block::BYTES);
+        crate::util::metadata::side_metadata::bzero_vo_bit(block.start(), Block::BYTES);
     }
 
     pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {

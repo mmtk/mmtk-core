@@ -192,7 +192,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     #[cfg(feature = "vo_bit")]
     unsafe fn reset_vo_bit(&self) {
         for (start, size) in self.pr.iterate_allocated_regions() {
-            crate::util::metadata::vo_bit::bzero_vo_bit(start, size);
+            crate::util::metadata::side_metadata::bzero_vo_bit(start, size);
         }
     }
 

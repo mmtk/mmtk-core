@@ -357,7 +357,7 @@ impl Block {
 
                     // Clear VO bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "vo_bit")]
-                    crate::util::metadata::vo_bit::bzero_vo_bit(cell, cell_size);
+                    crate::util::metadata::side_metadata::bzero_vo_bit(cell, cell_size);
 
                     // store the previous cell to make the free list
                     debug_assert!(last.is_zero() || (last >= self.start() && last < self.end()));

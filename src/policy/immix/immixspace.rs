@@ -17,6 +17,8 @@ use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::side_metadata;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
@@ -1071,7 +1073,7 @@ impl<VM: VMBinding> GCWork<VM> for ClearVOBitsAfterPrepare {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         match self.scope {
             VOBitsClearingScope::FullGC => {
-                vo_bit::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
+                side_metadata::bzero_vo_bit(self.chunk.start(), Chunk::BYTES);
             }
             VOBitsClearingScope::BlockOnly => {
                 self.clear_blocks(None);
