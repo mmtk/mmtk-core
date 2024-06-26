@@ -658,10 +658,6 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
     internal_ptr: Address,
     max_search_bytes: usize,
 ) -> Option<(Address, Address)> {
-    if !is_mapped_address(internal_ptr) {
-        return None;
-    }
-
     crate::util::metadata::vo_bit::search_vo_bit_before_addr::<VM>(internal_ptr, max_search_bytes)
 }
 

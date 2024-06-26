@@ -164,6 +164,10 @@ pub fn search_vo_bit_before_addr<VM: VMBinding>(
     // Search from start, searching backwrads
     let mut cur = start;
     while cur > start.saturating_sub(max_search_bytes) {
+        // If the address is not mapped, we don't need to search further.
+        if !cur.is_mapped() {
+            return None;
+        }
         // Check if vo bit is set for addr
         if is_vo_bit_set_for_addr::<VM>(cur) {
             // This is the actual address we checked its vo bit.
