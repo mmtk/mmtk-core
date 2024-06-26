@@ -428,7 +428,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     const ABANDON_BLOCKS_IN_RESET: bool = true;
 
     /// Lazy sweeping. We just move all the blocks to the unswept block list.
-    #[cfg(not(feature = "eager_sweeping"))]
     fn reset(&mut self) {
         trace!("reset");
         // consumed and available are now unswept
@@ -440,7 +439,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
             let mut sweep_later = |list: &mut BlockList| {
                 list.release_blocks(self.space);
-                unswept.append(list);
+                if cfg!(not(feature = "eager_sweeping")) {
+                    unswept.append(list);
+                }
             };
 
             sweep_later(&mut self.available_blocks[bin]);
@@ -448,40 +449,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             sweep_later(&mut self.consumed_blocks[bin]);
         }
 
-        if Self::ABANDON_BLOCKS_IN_RESET {
+        if Self::ABANDON_BLOCKS_IN_RESET || cfg!(feature = "eager_sweeping") {
             let mut global = self.space.get_abandoned_block_lists_in_gc().lock().unwrap();
             self.abandon_blocks(&mut global);
         }
-    }
 
-    /// Eager sweeping. We sweep all the block lists, and move them to available block lists.
-    #[cfg(feature = "eager_sweeping")]
-    fn reset(&mut self) {
-        debug!("reset");
-        // sweep all blocks and push consumed onto available list
-        for bin in 0..MI_BIN_FULL {
-            // Sweep available blocks
-            self.available_blocks[bin].release_and_sweep_blocks(self.space);
-            self.available_blocks_stress[bin].release_and_sweep_blocks(self.space);
-
-            // Sweep consumed blocks, and also push the blocks back to the available list.
-            self.consumed_blocks[bin].release_and_sweep_blocks(self.space);
-            if *self.context.options.precise_stress
-                && self.context.options.is_stress_test_gc_enabled()
-            {
-                debug_assert!(*self.context.options.precise_stress);
-                self.available_blocks_stress[bin].append(&mut self.consumed_blocks[bin]);
-            } else {
-                self.available_blocks[bin].append(&mut self.consumed_blocks[bin]);
-            }
-
-            // For eager sweeping, we should not have unswept blocks
-            assert!(self.unswept_blocks[bin].is_empty());
-        }
-
-        if Self::ABANDON_BLOCKS_IN_RESET {
-            let mut global = self.space.get_abandoned_block_lists_in_gc().lock().unwrap();
-            self.abandon_blocks(&mut global);
+        if cfg!(feature = "eager_sweeping") {
+            self.space.release_packet_done();
         }
     }
 
