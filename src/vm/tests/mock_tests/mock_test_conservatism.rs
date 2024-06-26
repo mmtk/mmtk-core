@@ -220,16 +220,29 @@ pub fn internal_pointer_hit() {
         || {
             SINGLE_OBJECT.with_fixture(|fixture| {
                 let objref = fixture.objref;
-                // This is the aligned address we expect `find_object_from_internal_pointer` to return.
-                let start = objref.to_raw_address().align_down(VO_BIT_REGION_SIZE);
+                println!("obj {}", objref);
                 for offset in 0..fixture.objsize {
                     let internal_ptr = objref.to_raw_address() + offset;
+                    println!("internal_ptr {}", internal_ptr);
                     let res = memory_manager::find_object_from_internal_pointer::<MockVM>(
                         internal_ptr,
                         fixture.objsize,
                     );
+                    println!("res {:?}", res);
                     assert!(res.is_some());
-                    assert_eq!(res.unwrap(), start);
+                    let (objref_lower_bound, objref_upper_bound) = res.unwrap();
+                    assert!(
+                        objref_lower_bound <= objref.to_raw_address(),
+                        "{} is not in the range starting at {}",
+                        objref,
+                        objref_lower_bound
+                    );
+                    assert!(
+                        objref_upper_bound > objref.to_raw_address(),
+                        "{} is not in the range ending at {}",
+                        objref,
+                        objref_upper_bound
+                    );
                 }
             })
         },
@@ -261,6 +274,25 @@ pub fn internal_pointer_miss() {
 
 #[test]
 pub fn internal_pointer_unmapped_memory() {
+    with_mockvm(
+        default_setup,
+        || {
+            SINGLE_OBJECT.with_fixture(|fixture| {
+                let objref = fixture.objref;
+                let start = objref.to_raw_address().align_down(VO_BIT_REGION_SIZE);
+                let res = memory_manager::find_object_from_internal_pointer::<MockVM>(
+                    start - 8,
+                    fixture.objsize,
+                );
+                assert!(res.is_none());
+            })
+        },
+        no_cleanup,
+    )
+}
+
+#[test]
+pub fn internal_pointer_search_usize_max() {
     with_mockvm(
         default_setup,
         || {

@@ -98,45 +98,36 @@ pub fn is_vo_bit_set<VM: VMBinding>(object: ObjectReference) -> bool {
 }
 
 /// Check if an address can be turned directly into an object reference using the VO bit.
-/// If so, return `Some(object)`. Otherwise return `None`.
-pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
-    let potential_object = ObjectReference::from_raw_address(address)?;
-
-    let addr = potential_object.to_address::<VM>();
-
-    // If we haven't mapped VO bit for the address, it cannot be an object
-    if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
-        return None;
-    }
-
-    if VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(addr, Ordering::SeqCst) == 1 {
-        Some(potential_object)
-    } else {
-        None
-    }
+pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> bool {
+    _is_vo_bit_set::<true, VM>(address)
 }
 
 /// Check if an address can be turned directly into an object reference using the VO bit.
-/// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side
-/// metadata for the VO bit for the object is accessed by only one thread.
+/// The caller needs to ensure the side metadata for the VO bit for the object is accessed by only one thread.
 ///
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
-pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
-    let potential_object = ObjectReference::from_raw_address(address)?;
+pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> bool {
+    _is_vo_bit_set::<false, VM>(address)
+}
 
-    let addr = potential_object.to_address::<VM>();
+fn _is_vo_bit_set<const ATOMIC: bool, VM: VMBinding>(address: Address) -> bool {
+    if let Some(potential_object) = ObjectReference::from_raw_address(address) {
+        let addr = potential_object.to_address::<VM>();
 
-    // If we haven't mapped VO bit for the address, it cannot be an object
-    if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
-        return None;
-    }
+        // If we haven't mapped VO bit for the address, it cannot be an object
+        if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
+            return false;
+        }
 
-    if VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) == 1 {
-        Some(potential_object)
+        if ATOMIC {
+            VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(addr, Ordering::SeqCst) == 1
+        } else {
+            unsafe { VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) == 1 }
+        }
     } else {
-        None
+        false
     }
 }
 
@@ -163,18 +154,30 @@ pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
 
 /// Search backwards from the given `start` address to find if there is any address with vo bit set.
 /// If so, return an address that is aligned to [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-/// It searches back for `search_limit_bytes`. If no object is found in the range, it returns None.
+/// It searches back for `max_search_bytes`. If no object is found in the range, it returns None.
 /// This function is used to find the base reference for internal references.
 pub fn search_vo_bit_before_addr<VM: VMBinding>(
     start: Address,
-    search_limit_bytes: usize,
-) -> Option<Address> {
+    max_search_bytes: usize,
+) -> Option<(Address, Address)> {
     let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
+    // Search from start, searching backwrads
     let mut cur = start;
-    while cur > start.saturating_sub(search_limit_bytes) {
-        let res = is_vo_bit_set_for_addr::<VM>(cur);
-        if res.is_some() {
-            return res.map(|obj| obj.to_address::<VM>().align_down(region_bytes));
+    while cur > start.saturating_sub(max_search_bytes) {
+        // Check if vo bit is set for addr
+        if is_vo_bit_set_for_addr::<VM>(cur) {
+            // This is the actual address we checked its vo bit.
+            // Safety: addr has vo bit set, it cannot be null.
+            let vo_bit_addr_checked =
+                unsafe { ObjectReference::from_raw_address_unchecked(cur) }.to_address::<VM>();
+            // As we use 1 bit per 8 bytes for VO bit, we get the range that has the VO bit set.
+            let vo_bit_start = vo_bit_addr_checked.align_down(region_bytes);
+            let vo_bit_end = vo_bit_start + region_bytes;
+            // Then we deduce the possible range for the object reference.
+            let vo_bit_objref_lb =
+                ObjectReference::from_address::<VM>(vo_bit_start).to_raw_address();
+            let vo_bit_objref_ub = ObjectReference::from_address::<VM>(vo_bit_end).to_raw_address();
+            return Some((vo_bit_objref_lb, vo_bit_objref_ub));
         }
         cur -= region_bytes;
     }

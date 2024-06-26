@@ -167,7 +167,12 @@ pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<Obje
     if !is_meta_space_mapped_for_address(addr) {
         return None;
     }
-    vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+    if vo_bit::is_vo_bit_set_for_addr::<VM>(addr) {
+        // Safety: addr has vo bit set, it cannot be null.
+        Some(unsafe { ObjectReference::from_raw_address_unchecked(addr) })
+    } else {
+        None
+    }
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {
