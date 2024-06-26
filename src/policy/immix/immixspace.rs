@@ -79,6 +79,8 @@ pub struct ImmixSpaceArgs {
     /// instance contain young objects, their VO bits need to be updated during this GC.  Currently
     /// only StickyImmix is affected.  GenImmix allocates young objects in a separete CopySpace
     /// nursery and its VO bits can be cleared in bulk.
+    // Currently only used when "vo_bit" is enabled.  Using #[cfg(...)] to eliminate dead code warning.
+    #[cfg(feature = "vo_bit")]
     pub mixed_age: bool,
 }
 
@@ -843,10 +845,6 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
                 unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
-        // If the forwarding bits are on the side, we need to clear them, too.
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
-            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-        }
     }
 }
 
@@ -893,7 +891,7 @@ struct SweepChunk<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let mut histogram = self.space.defrag.new_histogram();
         if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
             let line_mark_state = if super::BLOCK_ONLY {
@@ -901,6 +899,9 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             } else {
                 Some(self.space.line_mark_state.load(Ordering::Acquire))
             };
+            // Hints for clearing side forwarding bits.
+            let is_moving_gc = mmtk.get_plan().current_gc_may_move_object();
+            let is_defrag_gc = self.space.defrag.in_defrag();
             // number of allocated blocks.
             let mut allocated_blocks = 0;
             // Iterate over all allocated blocks in this chunk.
@@ -909,6 +910,30 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 .iter_region::<Block>()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
             {
+                // Clear side forwarding bits.
+                // In the beginning of the next GC, no side forwarding bits shall be set.
+                // In this way, we can omit clearing forwarding bits when copying object.
+                // See `GCWorkerCopyContext::post_copy`.
+                // Note, `block.sweep()` overwrites `DEFRAG_STATE_TABLE` with the number of holes,
+                // but we need it to know if a block is a defrag source.
+                // We clear forwarding bits before `block.sweep()`.
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+                    if is_moving_gc {
+                        let objects_may_move = if is_defrag_gc {
+                            // If it is a defrag GC, we only clear forwarding bits for defrag sources.
+                            block.is_defrag_source()
+                        } else {
+                            // Otherwise, it must be a nursery GC of StickyImmix with copying nursery.
+                            // We don't have information about which block contains moved objects,
+                            // so we have to clear forwarding bits for all blocks.
+                            true
+                        };
+                        if objects_may_move {
+                            side.bzero_metadata(block.start(), Block::BYTES);
+                        }
+                    }
+                }
+
                 if !block.sweep(self.space, &mut histogram, line_mark_state) {
                     // Block is live. Increment the allocated block count.
                     allocated_blocks += 1;

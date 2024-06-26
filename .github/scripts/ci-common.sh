@@ -7,6 +7,8 @@ project_root=$(dirname "$0")/../..
 
 cargo_toml=$project_root/Cargo.toml
 
+dummyvm_toml=$project_root/docs/dummyvm/Cargo.toml
+
 # Repeat a command for all the features. Requires the command as one argument (with double quotes)
 for_all_features() {
     # without mutually exclusive features

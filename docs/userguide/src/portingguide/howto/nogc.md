@@ -15,7 +15,9 @@ You want to set up the binding repository/directory structure before starting th
 
   - `mmtk-X/mmtk`: The MMTk side of the binding. This includes the implementation of [the `VMBinding` trait](https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html),
     and any necessary Rust code to integrate MMTk with the VM code (e.g. exposing MMTk functions to native, allowing up-calls from the MMTk binding to the runtime, etc).
-    To start with, you can take a look at one of our officially maintained language bindings as an example: [OpenJDK](https://github.com/mmtk/mmtk-openjdk/tree/master/mmtk),
+    To start with, you can copy [the `DummyVM`](https://github.com/mmtk/mmtk-core/tree/master/docs/dummyvm) code and start from there.
+    `DummyVM` provides all the Rust boilerplates that you need to implement in the binding side.
+    You can also take a look at one of our officially maintained language bindings as an example: [OpenJDK](https://github.com/mmtk/mmtk-openjdk/tree/master/mmtk),
     [JikesRVM](https://github.com/mmtk/mmtk-jikesrvm/tree/master/mmtk), [V8](https://github.com/mmtk/mmtk-v8/tree/master/mmtk), [Julia](https://github.com/mmtk/mmtk-julia/tree/master/mmtk),
     [V8](https://github.com/mmtk/mmtk-v8/tree/master/mmtk).
   - `mmtk-X/X`: Runtime-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the runtime and the MMTk side of the binding. This is implemented in the runtime's implementation language. Often this will be one of C or C++.
@@ -64,8 +66,8 @@ The `VMBinding` trait is a "meta-trait" (i.e. a trait that encapsulates other tr
   3. [`ObjectModel`](https://docs.mmtk.io/api/mmtk/vm/trait.ObjectModel.html): This trait implements the runtime's object model. The object model includes object metadata such as mark-bits, forwarding-bits, etc.; constants regarding assumptions about object addresses; and functions to implement copying objects, querying object sizes, etc. You should ***carefully*** implement and understand this as it is a key trait on which many things depend. We will go into more detail about this trait in the [object model section](#object-model).
   4. [`ReferenceGlue`](https://docs.mmtk.io/api/mmtk/vm/trait.ReferenceGlue.html): This trait implements runtime-specific finalization and weak reference processing methods. Note that each runtime has its own way of dealing with finalization and reference processing, so this is often one of the trickiest traits to implement.
   5. [`Scanning`](https://docs.mmtk.io/api/mmtk/vm/trait.Scanning.html): This trait implements object scanning functions such as scanning mutator threads for root pointers, scanning a particular object for reference fields, etc.
-  6. [`Slot`](https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html): This trait implements what an edge in the object graph looks like in the runtime. This is useful as it can abstract over compressed or tagged pointers. If an edge in your runtime is indistinguishable from an arbitrary address, you may set it to the [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html) type.
-  7. [`MemorySlice`](https://docs.mmtk.io/api/mmtk/vm/edge_shape/trait.MemorySlice.html): This trait implements functions related to memory slices such as arrays. This is mainly used by generational collectors.
+  6. [`Slot`](https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html): This trait implements a slot in an object, on the stack or other places (such as global variables). If a slot in your runtime simply holds the address of an object (or 0 for NULL references), you may use the [`SimpleSlot`](https://docs.mmtk.io/api/mmtk/vm/slot/struct.SimpleSlot.html) type. But if your VM uses tagged pointers or compressed pointers, you will need to implement it manually.
+  7. [`MemorySlice`](https://docs.mmtk.io/api/mmtk/vm/slot/trait.MemorySlice.html): This trait implements functions related to memory slices such as arrays. This is mainly used by generational collectors.
 
 For the time-being we can implement all the above traits via `unimplemented!()` stubs. If you are using the Dummy VM binding as a starting point, you will have to edit some of the concrete implementations to `unimplemented!()`. Note that you should change the type that implements `VMBinding` from `DummyVM` to an appropriately named type for your runtime. For example, the OpenJDK binding defines the zero-struct [`OpenJDK`](https://github.com/mmtk/mmtk-openjdk/blob/54a249e877e1cbea147a71aafaafb8583f33843d/mmtk/src/lib.rs#L139-L162) which implements the `VMBinding` trait.
 
@@ -93,9 +95,11 @@ We recommend going through the [list of metadata specifications](https://docs.mm
 
 #### `ObjectReference` vs `Address`
 
-A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address.
+A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address. You might be interested in reading the *Demystifying Magic: High-level Low-level Programming* paper[^3] which describes the above in more detail.
 
-You might be interested in reading the *Demystifying Magic: High-level Low-level Programming* paper[^3] which describes the above in more detail.
+In MMTk, `ObjectReference` is a special address that represents an object. A binding may use tagged references, compressed pointers, etc.
+They need to deal with the encoding and the decoding in their [`Slot`](https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html) implementation,
+and always present plain `ObjectReference`s to MMTk. See [this test](https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs) for some `Slot` implementation examples.
 
 [^3]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
 
@@ -110,8 +114,32 @@ We recommend going through the [list of constants in the documentation](https://
 ## MMTk initialization
 Now that we have most of the boilerplate set up, the next step is to initialize MMTk so that we can start allocating objects.
 
+In short, MMTk uses the builder pattern. The binding needs to create an [`MMTKBuilder`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html),
+create an [`MMTK`](https://docs.mmtk.io/api/mmtk/mmtk/struct.MMTK.html) instance from the builder, and then initialize MMTk's collection
+when the runtime system is ready for GCs.
+The following steps describes details. In an actual binding implementation, the binding may choose to combine several
+steps into one function call to make things simpler.
+
+1. Create an `MMTKBuilder` using [`MMTKBuilder::new()`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html#method.new). You can set
+   runtime options via [`set_option()`](https://docs.mmtk.io/api/mmtk/struct.MMTKBuilder.html#method.set_option) for things like
+   the GC plan to use, heap sizes, etc. This is [a full list of runtime options](https://docs.mmtk.io/api/mmtk/util/options/struct.Options.html).
+   You can also set options by directly accessing the `options` in the builder, such as `builder.options.threads.set(4)`.
+   It is a common practice that the VM parses its command line arguments, then sets some GC-related options
+   to MMTk here. You can also set virtual memory layout for MMTk. Some runtimes may require special layouts, such as using compressed pointers
+   with a fixed heap range. However, both setting options and VM layouts are optional -- MMTk will use the default values if none is set.
+2. Create an `MMTK` instance via [`memory_manager::mmtk_init()`](https://docs.mmtk.io/api/mmtk/memory_manager/fn.mmtk_init.html). This
+   enables the binding to use most of the MMTk APIs in [`memory_manager`](https://docs.mmtk.io/api/mmtk/memory_manager/index.html), as most
+   APIs require a reference to `MMTK`.
+3. When the runtime is ready for GCs (including getting its thread system ready to spawn GC threads), it is expected to call [`memory_manager::initialize_collection`]
+   (https://docs.mmtk.io/api/mmtk/memory_manager/fn.initialize_collection.html). Once the function returns, MMTk may trigger a GC at any appropriate time.
+   In terms of getting NoGC to work, this step is optional, as NoGC will not trigger GCs.
+
+In practice, it greatly depends on the runtime about how to expose the MMTk's Rust API above to native, and when to call the native API in the runtime.
+In the following example, we assume a `MMTKBuilder` is created statically (Step 1), and expects a call from the runtime to set heap sizes to the builder
+via `mmtk_set_heap_size()`. We will create an `MMTK` instance from the builder in `mmtk_init()` (Step 2). Step 3 is omitted, as we do not need it for NoGC.
+
 ### Runtime-side changes
-Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/header/mmtk.h) as an example.
+Create a `mmtk.h` header file in the runtime folder of the binding (i.e. `mmtk-X/X`) which exposes the functions required to implement NoGC and `#include` it in the relevant runtime code. You can use the [example `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/docs/dummyvm/include/mmtk.h) as an example.
 
 **Note:** It is convention to prefix all MMTk API functions exposed with `mmtk_` in order to avoid name clashes. It is *highly* recommended that you follow this convention.
 

@@ -168,32 +168,26 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn prepare(&self, from_space: bool) {
         self.from_space.store(from_space, Ordering::SeqCst);
-        // Clear the metadata if we are using side forwarding status table. Otherwise
-        // objects may inherit forwarding status from the previous GC.
-        // TODO: Fix performance.
-        if let MetadataSpec::OnSide(side_forwarding_status_table) =
-            *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
-        {
-            side_forwarding_status_table
-                .bzero_metadata(self.common.start, self.pr.cursor() - self.common.start);
-        }
     }
 
     pub fn release(&self) {
-        unsafe {
-            #[cfg(feature = "vo_bit")]
-            self.reset_vo_bit();
-            self.pr.reset();
-        }
-        self.common.metadata.reset();
-        self.from_space.store(false, Ordering::SeqCst);
-    }
-
-    #[cfg(feature = "vo_bit")]
-    unsafe fn reset_vo_bit(&self) {
         for (start, size) in self.pr.iterate_allocated_regions() {
+            // Clear the forwarding bits if it is on the side.
+            if let MetadataSpec::OnSide(side_forwarding_status_table) =
+                *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
+            {
+                side_forwarding_status_table.bzero_metadata(start, size);
+            }
+
+            // Clear VO bits because all objects in the space are dead.
+            #[cfg(feature = "vo_bit")]
             crate::util::metadata::side_metadata::bzero_vo_bit(start, size);
         }
+
+        unsafe {
+            self.pr.reset();
+        }
+        self.from_space.store(false, Ordering::SeqCst);
     }
 
     fn is_from_space(&self) -> bool {

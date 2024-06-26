@@ -37,3 +37,6 @@ find ./src ./tests -type f -name "mock_test_*" | while read -r file; do
         env MMTK_PLAN=$MMTK_PLAN cargo test --features mock_test,"$FEATURES" -- $t;
     done
 done
+
+# Test the dummy VM
+cargo test --manifest-path $dummyvm_toml

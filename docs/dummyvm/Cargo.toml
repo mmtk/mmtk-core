@@ -1,0 +1,28 @@
+[package]
+name = "mmtk_dummyvm"
+version = "0.0.1"
+authors = [" <>"]
+edition = "2021"
+
+[lib]
+name = "mmtk_dummyvm"
+# be careful - LTO is only allowed for certain crate types
+# We know that cdylib should work for LTO.
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+
+[dependencies]
+# We use a local path as the MMTk dependency here, as we want to test the code with the current version.
+# Generally for a binding, you would like to use a specific version, or a git commit.
+# mmtk = "0.25.0"
+# mmtk = { git = "https://github.com/mmtk/mmtk-core.git", branch = "master" }
+mmtk = { path = "../../." }
+libc = "0.2"
+atomic = "0.6"
+
+[features]
+default = []
+is_mmtk_object = ["mmtk/is_mmtk_object"]
+malloc_counted_size = ["mmtk/malloc_counted_size"]

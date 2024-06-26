@@ -530,6 +530,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Tell GC trigger that GC ended - this happens before we resume mutators.
         mmtk.gc_trigger.policy.on_gc_end(mmtk);
 
+        // All other workers are parked, so it is safe to access the Plan instance mutably.
+        probe!(mmtk, plan_end_of_gc_begin);
+        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
+        plan_mut.end_of_gc(worker.tls);
+        probe!(mmtk, plan_end_of_gc_end);
+
         // Compute the elapsed time of the GC.
         let start_time = {
             let mut gc_start_time = worker.mmtk.state.gc_start_time.borrow_mut();
@@ -564,10 +570,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 mmtk.get_plan().get_used_pages()
             );
         }
-
-        // All other workers are parked, so it is safe to access the Plan instance mutably.
-        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { mmtk.get_plan_mut() };
-        plan_mut.end_of_gc(worker.tls);
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::slot_logger::should_check_duplicate_slots(mmtk.get_plan()) {

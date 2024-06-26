@@ -36,6 +36,8 @@
     - [Performance Tuning](portingguide/perf_tuning/prefix.md)
         - [Link Time Optimization](portingguide/perf_tuning/lto.md)
         - [Optimizing Allocation](portingguide/perf_tuning/alloc.md)
+- [API Migration Guide](migration/prefix.md)
+    - [Template (for mmtk-core developers)](migration/template.md)
 
 -----------
 

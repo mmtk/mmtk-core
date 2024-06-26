@@ -1,0 +1,10 @@
+/* Make the "show details" text on the third level smaller and keep the same indentation as the folded sub-list. */
+#api-migration-detail-body details.api-migration-level3-detail > summary {
+    padding-left: 2em;
+    font-size: small;
+}
+
+/* Hide the "show details" when open, to keep the text less cluttered. */
+#api-migration-detail-body details[open] > summary {
+    display: none;
+}

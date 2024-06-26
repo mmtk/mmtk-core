@@ -7,7 +7,7 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
-        heap::{FreeListPageResource, PageResource},
+        heap::{BlockPageResource, PageResource},
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
@@ -64,7 +64,7 @@ pub enum BlockAcquireResult {
 /// | GC - End of GC | -                                               | Merge the temp global lists                  | -         |
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>,
+    pr: BlockPageResource<VM, Block>,
     /// Allocation status for all chunks in MS space
     chunk_map: ChunkMap,
     /// Work packet scheduler
@@ -79,6 +79,8 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     /// and will be moved to the abandoned lists above at the end of a GC.
     abandoned_in_gc: Mutex<AbandonedBlockLists>,
 }
+
+unsafe impl<VM: VMBinding> Sync for MarkSweepSpace<VM> {}
 
 pub struct AbandonedBlockLists {
     pub available: BlockLists,
@@ -278,9 +280,19 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
         MarkSweepSpace {
             pr: if is_discontiguous {
-                FreeListPageResource::new_discontiguous(vm_map)
+                BlockPageResource::new_discontiguous(
+                    Block::LOG_PAGES,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
+                BlockPageResource::new_contiguous(
+                    Block::LOG_PAGES,
+                    common.start,
+                    common.extent,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             },
             common,
             chunk_map: ChunkMap::new(),
@@ -347,6 +359,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
         #[cfg(debug_assertions)]
         from.assert_empty();
+
+        // BlockPageResource uses worker-local block queues to eliminate contention when releasing
+        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
+        // returning to the global pool.  We flush the BlockPageResource, too.
+        self.pr.flush_all();
     }
 
     /// Release a block.
@@ -354,7 +371,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.block_clear_metadata(block);
 
         block.deinit();
-        self.pr.release_pages(block.start());
+        self.pr.release_block(block);
     }
 
     pub fn block_clear_metadata(&self, block: Block) {
@@ -432,9 +449,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
         } else {
             // Otherwise this chunk is occupied, and we reset the mark bit if it is on the side.
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                for chunk in self.space.chunk_map.all_chunks() {
-                    side.bzero_metadata(chunk.start(), Chunk::BYTES);
-                }
+                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
             }
         }
     }

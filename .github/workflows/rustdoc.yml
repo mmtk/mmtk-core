@@ -20,6 +20,9 @@ jobs:
         run: |
           sed -i 's/^version = "[0-9]\+.[0-9]\+.[0-9]\+/&-'${GITHUB_SHA}'/' Cargo.toml
       - name: Generate rustdoc
+        env:
+          # Override preprocessor.hide.hide in book.toml to hide some chapters.
+          MDBOOK_preprocessor__hide__hide: "true"
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
         # docs.mmtk.io is the root for github pages.

@@ -8,7 +8,7 @@ use strum_macros::EnumString;
 
 /// The default stress factor. This is set to the max usize,
 /// which means we will never trigger a stress GC for the default value.
-pub const DEFAULT_STRESS_FACTOR: usize = usize::max_value();
+pub const DEFAULT_STRESS_FACTOR: usize = usize::MAX;
 
 /// The zeroing approach to use for new object allocations.
 /// Affects each plan differently.

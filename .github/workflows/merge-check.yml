@@ -19,6 +19,7 @@ env:
       "ready-to-merge",
       "check-broken-links-in-docs",
       "check-public-api-changes",
+      "check-api-migration-update",
       "minimal-tests-core/x86_64-unknown-linux-gnu/stable",
       "minimal-tests-core/i686-unknown-linux-gnu/stable",
       "minimal-tests-core/x86_64-apple-darwin/stable",

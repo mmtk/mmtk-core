@@ -251,6 +251,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 // Any object is moved into the mature space, or is copied inside the mature space. We will unlog it.
                 unlog_object_when_traced: false,
                 // In GenImmix, young objects are not allocated in ImmixSpace directly.
+                #[cfg(feature = "vo_bit")]
                 mixed_age: false,
             },
         );

@@ -8,10 +8,12 @@ use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::vm::*;
 use atomic::Ordering;
 use spin::RwLock;
 use std::cell::UnsafeCell;
+use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
@@ -179,17 +181,29 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
 
 /// A block list that supports fast lock-free push/pop operations
 struct BlockQueue<B: Region> {
+    /// The number of elements in the queue.
     cursor: AtomicUsize,
-    data: UnsafeCell<Vec<B>>,
+    /// The underlying data storage.
+    ///
+    /// -   `UnsafeCell<T>`: It may be accessed by multiple threads.
+    /// -   `Box<[T]>`: It holds an array allocated on the heap.  It cannot be resized, but can be
+    ///     replaced with another array as a whole.
+    /// -   `MaybeUninit<T>`: It may contain uninitialized elements.
+    ///
+    /// The implementaiton of `BlockQueue` must ensure there is no data race, and it never reads
+    /// uninitialized elements.
+    data: UnsafeCell<Box<[MaybeUninit<B>]>>,
 }
 
 impl<B: Region> BlockQueue<B> {
     /// Create an array
     fn new() -> Self {
-        let default_block = B::from_aligned_address(Address::ZERO);
+        let zeroed_vec = unsafe { new_zeroed_vec(Self::CAPACITY) };
+        let boxed_slice = zeroed_vec.into_boxed_slice();
+        let data = UnsafeCell::new(boxed_slice);
         Self {
             cursor: AtomicUsize::new(0),
-            data: UnsafeCell::new(vec![default_block; Self::CAPACITY]),
+            data,
         }
     }
 }
@@ -199,14 +213,14 @@ impl<B: Region> BlockQueue<B> {
 
     /// Get an entry
     fn get_entry(&self, i: usize) -> B {
-        unsafe { (*self.data.get())[i] }
+        unsafe { (*self.data.get())[i].assume_init() }
     }
 
     /// Set an entry.
     ///
     /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     unsafe fn set_entry(&self, i: usize, block: B) {
-        (*self.data.get())[i] = block
+        (*self.data.get())[i].write(block);
     }
 
     /// Non-atomically push an element.

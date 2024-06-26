@@ -44,7 +44,12 @@ lazy_static! {
 // we do not store them for access after the mock method returns.
 macro_rules! lifetime {
     ($e: expr) => {
-        unsafe { std::mem::transmute($e) }
+        unsafe {
+            // The dynamic nature of this lifetime-removal macro makes it impossible to reason
+            // about the source and destination types of the `transmute`.
+            #[allow(clippy::missing_transmute_annotations)]
+            std::mem::transmute($e)
+        }
     };
 }
 
