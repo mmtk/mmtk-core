@@ -509,8 +509,10 @@ struct ReleaseMarkSweepSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        let mut abandoned = self.space.abandoned.lock().unwrap();
-        abandoned.sweep_later(self.space);
+        {
+            let mut abandoned = self.space.abandoned.lock().unwrap();
+            abandoned.sweep_later(self.space);
+        }
 
         if cfg!(feature = "eager_sweeping") {
             self.space.release_packet_done();
