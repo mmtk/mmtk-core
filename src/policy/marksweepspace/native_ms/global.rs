@@ -123,23 +123,6 @@ impl AbandonedBlockLists {
         }
     }
 
-    fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
-        for i in 0..MI_BIN_FULL {
-            self.available[i].release_and_sweep_blocks(space);
-            self.consumed[i].release_and_sweep_blocks(space);
-            self.unswept[i].release_and_sweep_blocks(space);
-
-            // As we have swept blocks, move blocks in the unswept list to available or consumed list.
-            while let Some(block) = self.unswept[i].pop() {
-                if block.has_free_cells() {
-                    self.available[i].push(block);
-                } else {
-                    self.consumed[i].push(block);
-                }
-            }
-        }
-    }
-
     fn recategorize_blocks(&mut self) {
         assert!(cfg!(feature = "eager_sweeping"));
         for i in 0..MI_BIN_FULL {
@@ -366,11 +349,15 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn release(&mut self) {
-        let num_mutators = VM::VMActivePlan::number_of_mutators();
-        // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
-        self.pending_release_packets
-            .store(num_mutators + 1, Ordering::SeqCst);
+        if cfg!(feature = "eager_sweeping") {
+            let num_mutators = VM::VMActivePlan::number_of_mutators();
+            // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
+            self.pending_release_packets
+                .store(num_mutators + 1, Ordering::SeqCst);
+        }
 
+        // Do work in separate work packet in order not to slow down the `Release` work packet which
+        // blocks all `ReleaseMutator` packets.
         let space = unsafe { &*(self as *const Self) };
         let work_packet = ReleaseMarkSweepSpace { space };
         self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
@@ -470,7 +457,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     fn recategorize_blocks(&self) {
-        // We should now have exclusive access to them.
         {
             let mut abandoned = self.abandoned.try_lock().unwrap();
             abandoned.recategorize_blocks();
@@ -523,7 +509,8 @@ struct ReleaseMarkSweepSpace<VM: VMBinding> {
 impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         if cfg!(feature = "eager_sweeping") {
-            // For eager sweeping, we have to sweep the lists that are abandoned to these global lists.
+            // For eager sweeping, we release unmarked blocks, and leave marked blocks to be swept
+            // later in the `SweepChunk` work packet.
             let mut abandoned = self.space.abandoned.lock().unwrap();
             abandoned.release_blocks(self.space);
 
@@ -537,7 +524,8 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
     }
 }
 
-/// Chunk sweeping work packet.
+/// Chunk sweeping work packet.  Only used by eager sweeping to sweep marked blocks after unmarked
+/// blocks have been released.
 struct SweepChunk<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,
     chunk: Chunk,
@@ -556,9 +544,10 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
                 .iter_region::<Block>()
                 .filter(|block| block.get_state() != BlockState::Unallocated)
             {
-                assert!(block.get_state() == BlockState::Marked);
-                block.sweep::<VM>();
                 // We have released unmarked blocks in `ReleaseMarkSweepSpace` and `ReleaseMutator`.
+                // We shouldn't see any unmarked blocks now.
+                debug_assert_eq!(block.get_state(), BlockState::Marked);
+                block.sweep::<VM>();
                 allocated_blocks += 1;
             }
             probe!(mmtk, sweep_chunk, allocated_blocks);
