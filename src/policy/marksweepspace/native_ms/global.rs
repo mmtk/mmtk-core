@@ -124,7 +124,6 @@ impl AbandonedBlockLists {
     }
 
     fn recategorize_blocks(&mut self) {
-        assert!(cfg!(feature = "eager_sweeping"));
         for i in 0..MI_BIN_FULL {
             for block in self.consumed[i].iter() {
                 if block.has_free_cells() {
