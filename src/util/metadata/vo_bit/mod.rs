@@ -140,11 +140,6 @@ pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<Ob
     }
 }
 
-/// Bulk zero the VO bit.
-pub fn bzero_vo_bit(start: Address, size: usize) {
-    VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
-}
-
 /// Bulk copy VO bits from side mark bits.
 /// Some VMs require the VO bits to be available during tracing.
 /// However, some GC algorithms (such as Immix) cannot clear VO bits for dead objects only.

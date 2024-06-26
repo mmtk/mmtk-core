@@ -12,6 +12,18 @@ use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
 
+#[cfg(feature = "vo_bit")]
+/// Bulk zero the VO bit.
+pub fn bzero_vo_bit(start: Address, size: usize) {
+    VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
+}
+#[cfg(feature = "vo_bit")]
+/// Bulk set the VO bit.
+pub fn bset_vo_bit(start: Address, size: usize) {
+    VO_BIT_SIDE_METADATA_SPEC.bset_metadata(start, size);
+}
+
+
 /// This struct stores the specification of a side metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
 ///

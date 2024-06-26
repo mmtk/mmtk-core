@@ -195,7 +195,7 @@ pub(crate) fn on_region_swept<VM: VMBinding, R: Region>(region: &R, is_occupied:
                 vo_bit::bcopy_vo_bit_from_mark_bit::<VM>(region.start(), R::BYTES);
             } else {
                 // If the block has no live objects, simply clear the VO bits.
-                vo_bit::bzero_vo_bit(region.start(), R::BYTES);
+                crate::util::metadata::side_metadata::bzero_vo_bit(region.start(), R::BYTES);
             }
         }
     }
