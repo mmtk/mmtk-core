@@ -509,6 +509,10 @@ impl ObjectReference {
     /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
     pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
+        debug_assert!(
+            addr.is_aligned_to(crate::util::constants::BYTES_IN_ADDRESS),
+            "ObjectReference is required to be word aligned"
+        );
         NonZeroUsize::new(addr.0).map(ObjectReference)
     }
 
@@ -522,6 +526,10 @@ impl ObjectReference {
     /// adding a positive offset to a non-zero address, we know the result must not be zero.
     pub unsafe fn from_raw_address_unchecked(addr: Address) -> ObjectReference {
         debug_assert!(!addr.is_zero());
+        debug_assert!(
+            addr.is_aligned_to(crate::util::constants::BYTES_IN_ADDRESS),
+            "ObjectReference is required to be word aligned"
+        );
         ObjectReference(NonZeroUsize::new_unchecked(addr.0))
     }
 
@@ -560,6 +568,11 @@ impl ObjectReference {
         use crate::vm::ObjectModel;
         let obj = VM::VMObjectModel::address_to_ref(addr);
         debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
+        debug_assert!(
+            obj.to_raw_address()
+                .is_aligned_to(crate::util::constants::BYTES_IN_ADDRESS),
+            "ObjectReference is required to be word aligned"
+        );
         obj
     }
 
