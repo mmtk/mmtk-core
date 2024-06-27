@@ -418,12 +418,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub(crate) fn prepare(&mut self) {}
 
     pub(crate) fn release(&mut self) {
-        self.reset();
-    }
-
-    /// Lazy sweeping. We just move all the blocks to the unswept block list.
-    fn reset(&mut self) {
-        trace!("reset");
         for bin in 0..MI_BIN_FULL {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
 
@@ -455,9 +449,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             self.abandon_blocks(&mut global);
         }
 
-        if cfg!(feature = "eager_sweeping") {
-            self.space.release_packet_done();
-        }
+        self.space.release_packet_done();
     }
 
     fn abandon_blocks(&mut self, global: &mut AbandonedBlockLists) {

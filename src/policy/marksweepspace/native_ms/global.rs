@@ -125,7 +125,7 @@ impl AbandonedBlockLists {
         }
     }
 
-    fn recategorize_blocks(&mut self) {
+    fn recycle_blocks(&mut self) {
         for i in 0..MI_BIN_FULL {
             for block in self.consumed[i].iter() {
                 if block.has_free_cells() {
@@ -350,32 +350,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn release(&mut self) {
-        if cfg!(feature = "eager_sweeping") {
-            let num_mutators = VM::VMActivePlan::number_of_mutators();
-            // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
-            self.pending_release_packets
-                .store(num_mutators + 1, Ordering::SeqCst);
-        }
+        let num_mutators = VM::VMActivePlan::number_of_mutators();
+        // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
+        self.pending_release_packets
+            .store(num_mutators + 1, Ordering::SeqCst);
 
         // Do work in separate work packet in order not to slow down the `Release` work packet which
         // blocks all `ReleaseMutator` packets.
         let space = unsafe { &*(self as *const Self) };
         let work_packet = ReleaseMarkSweepSpace { space };
         self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
-    }
-
-    pub fn end_of_gc(&mut self) {
-        let from = self.abandoned_in_gc.get_mut().unwrap();
-        let to = self.abandoned.get_mut().unwrap();
-        to.merge(from);
-
-        #[cfg(debug_assertions)]
-        from.assert_empty();
-
-        // BlockPageResource uses worker-local block queues to eliminate contention when releasing
-        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
-        // returning to the global pool.  We flush the BlockPageResource, too.
-        self.pr.flush_all();
     }
 
     /// Release a block.
@@ -435,14 +419,21 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn release_packet_done(&self) {
         let old = self.pending_release_packets.fetch_sub(1, Ordering::SeqCst);
         if old == 1 {
-            let work_packets = self.generate_sweep_tasks();
-            self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+            if cfg!(feature = "eager_sweeping") {
+                // When doing eager sweeping, we start sweeing now.
+                // After sweeping, we will recycle blocks.
+                let work_packets = self.generate_sweep_tasks();
+                self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+            } else {
+                // When doing lazy sweeping, we recycle blocks now.
+                self.recycle_blocks();
+            }
         }
     }
 
     fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
         let space = unsafe { &*(self as *const Self) };
-        let epilogue = Arc::new(RecategorizeBlocks {
+        let epilogue = Arc::new(RecycleBlocks {
             space,
             counter: AtomicUsize::new(0),
         });
@@ -457,15 +448,28 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         tasks
     }
 
-    fn recategorize_blocks(&self) {
+    fn recycle_blocks(&self) {
         {
             let mut abandoned = self.abandoned.try_lock().unwrap();
-            abandoned.recategorize_blocks();
-        }
-        {
             let mut abandoned_in_gc = self.abandoned_in_gc.try_lock().unwrap();
-            abandoned_in_gc.recategorize_blocks();
+
+            if cfg!(feature = "eager_sweeping") {
+                // When doing eager sweeping, previously consumed blocks may become available after
+                // sweeping.  We recycle them.
+                abandoned.recycle_blocks();
+                abandoned_in_gc.recycle_blocks();
+            }
+
+            abandoned.merge(&mut abandoned_in_gc);
+
+            #[cfg(debug_assertions)]
+            abandoned_in_gc.assert_empty();
         }
+
+        // BlockPageResource uses worker-local block queues to eliminate contention when releasing
+        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
+        // returning to the global pool.  We flush the BlockPageResource, too.
+        self.pr.flush_all();
     }
 }
 
@@ -514,9 +518,7 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
             abandoned.sweep_later(self.space);
         }
 
-        if cfg!(feature = "eager_sweeping") {
-            self.space.release_packet_done();
-        }
+        self.space.release_packet_done();
     }
 }
 
@@ -526,7 +528,7 @@ struct SweepChunk<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,
     chunk: Chunk,
     /// A destructor invoked when all `SweepChunk` packets are finished.
-    epilogue: Arc<RecategorizeBlocks<VM>>,
+    epilogue: Arc<RecycleBlocks<VM>>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
@@ -556,18 +558,15 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     }
 }
 
-struct RecategorizeBlocks<VM: VMBinding> {
+struct RecycleBlocks<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,
     counter: AtomicUsize,
 }
 
-impl<VM: VMBinding> RecategorizeBlocks<VM> {
-    /// Called after a related work packet is finished.
+impl<VM: VMBinding> RecycleBlocks<VM> {
     fn finish_one_work_packet(&self) {
         if 1 == self.counter.fetch_sub(1, Ordering::SeqCst) {
-            // We've finished releasing all the dead blocks to the BlockPageResource's thread-local queues.
-            // Now flush the BlockPageResource.
-            self.space.recategorize_blocks()
+            self.space.recycle_blocks()
         }
     }
 }
