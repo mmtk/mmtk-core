@@ -79,8 +79,8 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     /// these block lists in the space. These lists are only filled in the release phase,
     /// and will be moved to the abandoned lists above at the end of a GC.
     abandoned_in_gc: Mutex<AbandonedBlockLists>,
-    /// Count the number of pending release packets during the `Release` stage.
-    /// If all such packets are done, we can start sweeping chunks.
+    /// Count the number of pending `ReleaseMarkSweepSpace` and `ReleaseMutator` work packets during
+    /// the `Release` stage.
     pending_release_packets: AtomicUsize,
 }
 
