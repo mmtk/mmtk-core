@@ -217,6 +217,7 @@ unsafe impl Send for MutatorFixture {}
 
 pub struct SingleObject {
     pub objref: ObjectReference,
+    pub objsize: usize,
     mutator: MutatorFixture,
 }
 
@@ -235,7 +236,11 @@ impl FixtureContent for SingleObject {
         let objref = MockVM::address_to_ref(addr);
         memory_manager::post_alloc(&mut mutator.mutator, objref, size, semantics);
 
-        SingleObject { objref, mutator }
+        SingleObject {
+            objref,
+            objsize: size,
+            mutator,
+        }
     }
 }
 

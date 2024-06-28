@@ -49,7 +49,9 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std
                 unsafe { vo_bit::is_vo_bit_set_unsafe::<VM>(self.cursor) }
             };
 
-            if let Some(object) = is_object {
+            if is_object {
+                // Safety: addr has vo bit set, it cannot be null.
+                let object = unsafe { ObjectReference::from_raw_address_unchecked(self.cursor) };
                 self.cursor += S::size(object);
                 return Some(object);
             } else {
