@@ -95,6 +95,12 @@ class LogProcessor:
                     current["args"]["num_slots"] = int(rest[0])
                     current["args"]["is_roots"] = int(rest[1])
 
+            case "sweep_chunk":
+                current = self.get_current_work_packet(tid)
+                # eBPF may drop events.  Be conservative.
+                if current is not None:
+                    current["args"]["allocated_blocks"] = int(rest[0])
+
         if be != "meta":
             self.results.append(result)
 

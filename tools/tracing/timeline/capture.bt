@@ -91,4 +91,10 @@ usdt:$MMTK:mmtk:plan_end_of_gc_end {
     }
 }
 
+usdt:$MMTK:mmtk:sweep_chunk {
+    if (@enable_print) {
+        printf("sweep_chunk,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
+}
+
 // vim: ft=bpftrace ts=4 sw=4 sts=4 et
