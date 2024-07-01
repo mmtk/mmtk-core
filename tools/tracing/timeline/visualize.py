@@ -63,7 +63,20 @@ class LogProcessor:
             "ts": (ts - self.start_time) / 1000.0
         }
 
-        match name:
+        self.enrich_result(result)
+
+        if be != "meta":
+            self.results.append(result, rest)
+
+    def enrich_result(self, result, rest):
+        if result["ph"] == "meta":
+            current = self.get_current_work_packet(tid)
+            if current is not None:
+                # eBPF may drop events.  Be conservative.
+                self.enrich_meta(result["name"], current, result)
+            return
+
+        match result["name"]:
             case "GC":
                 # Put GC start/stop events in a virtual thread with tid=0
                 result["tid"] = 0
@@ -82,27 +95,20 @@ class LogProcessor:
                 result["args"] = {
                     "type_id": int(rest[0])
                 }
-                match be:
+                match result["ph"]:
                     case "B":
                         self.set_current_work_packet(tid, result)
                     case "E":
                         self.clear_current_work_packet(tid, result)
 
+    def enrich_meta(self, name, current, rest):
+        match name:
             case "process_slots":
-                current = self.get_current_work_packet(tid)
-                # eBPF may drop events.  Be conservative.
-                if current is not None:
-                    current["args"]["num_slots"] = int(rest[0])
-                    current["args"]["is_roots"] = int(rest[1])
+                current["args"]["num_slots"] = int(rest[0])
+                current["args"]["is_roots"] = int(rest[1])
 
             case "sweep_chunk":
-                current = self.get_current_work_packet(tid)
-                # eBPF may drop events.  Be conservative.
-                if current is not None:
-                    current["args"]["allocated_blocks"] = int(rest[0])
-
-        if be != "meta":
-            self.results.append(result)
+                current["args"]["allocated_blocks"] = int(rest[0])
 
     def set_current_work_packet(self, tid, result):
         self.tid_current_work_packet[tid] = result
@@ -127,29 +133,31 @@ class LogProcessor:
             "traceEvents": self.results,
         }, outfile)
 
+    def run(self, input_file):
+        print("Parsing lines...")
+        with open(args.input) as f:
+            start_time = None
+
+            for line in f.readlines():
+                line = line.strip()
+
+                log_processor.process_line(line)
+
+        output_name = args.input + ".json.gz"
+
+        print("Resolving work packet type names...")
+        log_processor.resolve_results()
+
+        print(f"Dumping JSON output to {output_name}")
+        with gzip.open(output_name, "wt") as f:
+            log_processor.output(f)
+
 
 def main():
     args = get_args()
-
     log_processor = LogProcessor()
+    log_processor.run(args.input)
 
-    print("Parsing lines...")
-    with open(args.input) as f:
-        start_time = None
-
-        for line in f.readlines():
-            line = line.strip()
-
-            log_processor.process_line(line)
-
-    output_name = args.input + ".json.gz"
-
-    print("Resolving work packet type names...")
-    log_processor.resolve_results()
-
-    print(f"Dumping JSON output to {output_name}")
-    with gzip.open(output_name, "wt") as f:
-        log_processor.output(f)
 
 if __name__ == '__main__':
     main()
