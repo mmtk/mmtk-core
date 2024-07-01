@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.25.0"
+version = "0.26.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
