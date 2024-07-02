@@ -28,7 +28,7 @@ use std::sync::Mutex;
 
 /// The offset between object reference and the allocation address if we use
 /// the default mock VM.
-pub const DEFAULT_OBJECT_REF_OFFSET: usize = 4;
+pub const DEFAULT_OBJECT_REF_OFFSET: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
 // To mock static methods, we have to create a static instance of `MockVM`.
 lazy_static! {

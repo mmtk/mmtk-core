@@ -38,7 +38,10 @@ pub fn max() {
             SINGLE_OBJECT.with_fixture(|_fixture| {
                 assert!(
                     !memory_manager::is_in_mmtk_spaces::<MockVM>(
-                        ObjectReference::from_raw_address(Address::MAX).unwrap()
+                        ObjectReference::from_raw_address(
+                            Address::MAX.align_down(crate::util::constants::BYTES_IN_ADDRESS)
+                        )
+                        .unwrap()
                     ),
                     "Address::MAX should not be in any MMTk spaces."
                 );
@@ -113,7 +116,10 @@ pub fn negative_offsets() {
                     // It's just a smoke test.  It is hard to predict if the addr is still in any space,
                     // but it must not crash.
                     let _ = memory_manager::is_in_mmtk_spaces::<MockVM>(
-                        ObjectReference::from_raw_address(addr).unwrap(),
+                        ObjectReference::from_raw_address(
+                            addr.align_down(crate::util::constants::BYTES_IN_ADDRESS),
+                        )
+                        .unwrap(),
                     );
                 }
             });
