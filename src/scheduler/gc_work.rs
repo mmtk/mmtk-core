@@ -835,12 +835,12 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         }
 
         let total_objects = objects_to_scan.len();
-        let node_enqueuing = scan_later.len();
+        let scan_and_trace = scan_later.len();
         probe!(
             mmtk,
             scan_objects,
             total_objects,
-            node_enqueuing
+            scan_and_trace,
         );
 
         // If any object does not support slot-enqueuing, we process them now.

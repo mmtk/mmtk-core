@@ -134,12 +134,12 @@ class LogProcessor:
 
             case "scan_objects":
                 total_scanned = int(rest[0])
-                node_enqueuing = int(rest[1])
-                slot_enqueuing = total_scanned - node_enqueuing
+                scan_and_trace = int(rest[1])
+                scan_for_slots = total_scanned - scan_and_trace
                 current["args"] |= {
                     "total_scanned": total_scanned,
-                    "slot_enqueuing": slot_enqueuing,
-                    "node_enqueuing": node_enqueuing,
+                    "scan_for_slots": scan_for_slots,
+                    "scan_and_trace": scan_and_trace,
                 }
 
             case "sweep_chunk":
@@ -149,7 +149,7 @@ class LogProcessor:
 
             case _:
                 if self.enrich_meta_extra is not None:
-                    self.enrich_meta_extra(self, name, tid, ts,     current, rest)
+                    self.enrich_meta_extra(self, name, tid, ts, current, rest)
 
     def set_current_work_packet(self, tid, result):
         self.tid_current_work_packet[tid] = result
