@@ -31,7 +31,7 @@ processed by the `./visualize.py` script.
                         help="Print the content of the bpftrace script")
     parser.add_argument("-e", "--every", metavar="N", type=int, default=1,
                         help="Only capture every N-th GC"),
-    parser.add_argument("-x", "--extra-script", metavar="S", type=str, action="append",
+    parser.add_argument("-x", "--extra", metavar="S", type=str, action="append",
                         help="Append script S after 'capture.bt'.  Use this option multiple times to append multiple scripts."),
     return parser.parse_args()
 
@@ -45,8 +45,9 @@ def main():
         raise f"MMTk binary {str(mmtk_bin)} not found."
 
     script_paths = [here / "capture.bt"]
-    for extra_script in args.extra_script:
-        script_paths.append(Path(extra_script))
+    if args.extra is not None:
+        for extra_script in args.extra:
+            script_paths.append(Path(extra_script))
     script_texts = []
     for script_path in script_paths:
         script_text = script_path.read_text()
