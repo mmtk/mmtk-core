@@ -54,7 +54,7 @@ class LogProcessor:
     def process_log_line(self, line):
         parts = line.split(",")
         try:
-            name, be, tid, ts = parts[:4]
+            name, ph, tid, ts = parts[:4]
         except:
             print("Abnormal line: {}".format(line))
             raise
@@ -65,7 +65,7 @@ class LogProcessor:
         if not self.start_time:
             self.start_time = ts
 
-        if be == "meta":
+        if ph == "meta":
             current = self.get_current_work_packet(tid)
             if current is not None:
                 # eBPF may drop events.  Be conservative.
@@ -73,18 +73,18 @@ class LogProcessor:
         else:
             result = {
                 "name": name,
-                "ph": be,
+                "ph": ph,
                 "tid": tid,
                 # https://github.com/google/perfetto/issues/274
                 "ts": (ts - self.start_time) / 1000.0,
                 "args": {},
             }
 
-            self.enrich_event(name, be, tid, ts, result, rest)
+            self.enrich_event(name, ph, tid, ts, result, rest)
 
             self.results.append(result)
 
-    def enrich_event(self, name, be, tid, ts, result, rest):
+    def enrich_event(self, name, ph, tid, ts, result, rest):
         match name:
             case "GC":
                 # Put GC start/stop events in a virtual thread with tid=0
@@ -93,7 +93,7 @@ class LogProcessor:
                 result["args"] |= {
                     "type_id": int(rest[0]),
                 }
-                match be:
+                match ph:
                     case "B":
                         self.set_current_work_packet(tid, result)
                     case "E":
@@ -106,7 +106,7 @@ class LogProcessor:
 
             case _:
                 if self.enrich_event_extra is not None:
-                    self.enrich_event_extra(self, name, be, tid, ts, result, rest)
+                    self.enrich_event_extra(self, name, ph, tid, ts, result, rest)
 
     def enrich_meta(self, name, tid, ts, current, rest):
         match name:
