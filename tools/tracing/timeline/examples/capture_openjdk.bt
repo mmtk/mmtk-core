@@ -8,6 +8,6 @@ usdt:$MMTK:mmtk_openjdk:hello {
 
 usdt:$MMTK:mmtk_openjdk:hello2 {
     if (@enable_print) {
-        printf("hello2,meta,%d,%lu  ,%lu\n", tid, nsecs, arg0);
+        printf("hello2,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
     }
 }
