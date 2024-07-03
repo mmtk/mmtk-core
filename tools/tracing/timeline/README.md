@@ -129,6 +129,12 @@ like this:
 
 ![Perfetto UI timeline](./perfetto-example.png)
 
+## Extending the timeline tool
+
+VM binding developers can insert USDT trace points, too, and our scripts `capture.py` and
+`visualize.py` provides mechanisms for extension.  Read [EXTENSION.md](EXTENSION.md) for more
+details.
+
 ## Known issues
 
 ### "(unknonwn:xxxx)" work packet names

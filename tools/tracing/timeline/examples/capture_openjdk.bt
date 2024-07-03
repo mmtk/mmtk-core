@@ -1,0 +1,13 @@
+// This is an example.  Read more details in ../EXTENSION.md
+
+usdt:$MMTK:mmtk_openjdk:hello {
+    if (@enable_print) {
+        printf("hello,i,%d,%lu,%lu\n", tid, nsecs, arg0);
+    }
+}
+
+usdt:$MMTK:mmtk_openjdk:hello2 {
+    if (@enable_print) {
+        printf("hello2,meta,%d,%lu  ,%lu\n", tid, nsecs, arg0);
+    }
+}
