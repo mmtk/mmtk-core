@@ -128,8 +128,12 @@ class LogProcessor:
 
             case "process_slots":
                 current["args"] |= {
-                    "num_slots": int(rest[0]),
-                    "is_roots": int(rest[1]),
+                    # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
+                    # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
+                    "process_slots": {
+                        "num_slots": int(rest[0]),
+                        "is_roots": int(rest[1]),
+                    },
                 }
 
             case "scan_objects":
@@ -137,9 +141,12 @@ class LogProcessor:
                 scan_and_trace = int(rest[1])
                 scan_for_slots = total_scanned - scan_and_trace
                 current["args"] |= {
-                    "total_scanned": total_scanned,
-                    "scan_for_slots": scan_for_slots,
-                    "scan_and_trace": scan_and_trace,
+                    # Put args in a group.  See comments in "process_slots".
+                    "scan_objects": {
+                        "total_scanned": total_scanned,
+                        "scan_for_slots": scan_for_slots,
+                        "scan_and_trace": scan_and_trace,
+                    }
                 }
 
             case "sweep_chunk":
