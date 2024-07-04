@@ -717,6 +717,15 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 }
 
+/// For USDT tracepoints for roots.
+/// Keep in sync with `tools/tracing/timeline/visualize.py`.
+#[repr(usize)]
+enum RootsKind {
+    NORMAL = 0,
+    PINNING = 1,
+    TPINNING = 2,
+}
+
 impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = VM>>
     RootsWorkFactory<VM::VMSlot> for ProcessEdgesWorkRootsWorkFactory<VM, DPE, PPE>
 {
@@ -729,7 +738,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
         // resulting machine code may not contain all three USDT trace points.  If they have
         // different names, and our `capture.bt` mentions all of them, `bpftrace` may complain that
         // it cannot find one or more of those USDT trace points in the binary.
-        probe!(mmtk, roots, 0, slots.len());
+        probe!(mmtk, roots, RootsKind::NORMAL, slots.len());
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
@@ -738,7 +747,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 
     fn create_process_pinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
-        probe!(mmtk, roots, 1, nodes.len());
+        probe!(mmtk, roots, RootsKind::PINNING, nodes.len());
         // Will process roots within the PinningRootsTrace bucket
         // And put work in the Closure bucket
         crate::memory_manager::add_work_packet(
@@ -749,7 +758,7 @@ impl<VM: VMBinding, DPE: ProcessEdgesWork<VM = VM>, PPE: ProcessEdgesWork<VM = V
     }
 
     fn create_process_tpinning_roots_work(&mut self, nodes: Vec<ObjectReference>) {
-        probe!(mmtk, roots, 2, nodes.len());
+        probe!(mmtk, roots, RootsKind::TPINNING, nodes.len());
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::TPinningClosure,
@@ -836,12 +845,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
         let total_objects = objects_to_scan.len();
         let scan_and_trace = scan_later.len();
-        probe!(
-            mmtk,
-            scan_objects,
-            total_objects,
-            scan_and_trace,
-        );
+        probe!(mmtk, scan_objects, total_objects, scan_and_trace);
 
         // If any object does not support slot-enqueuing, we process them now.
         if !scan_later.is_empty() {

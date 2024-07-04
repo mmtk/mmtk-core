@@ -6,10 +6,16 @@ import json
 import re
 import sys
 from collections import defaultdict
+from enum import Enum
 from importlib.machinery import SourceFileLoader
 
 RE_TYPE_ID = re.compile(r"\d+")
 UNKNOWN_TYPE = "(unknown)"
+
+class RootsKind(Enum):
+    NORMAL = 0
+    PINNING = 1
+    TPINNING = 2
 
 def get_args():
     parser = argparse.ArgumentParser(
@@ -148,11 +154,11 @@ class LogProcessor:
                     kind_id = int(args[0])
                     num = int(args[1])
                     match kind_id:
-                        case 0:
+                        case RootsKind.NORMAL.value:
                             root_dict = {"kind": "normal_roots", "num_slots": num}
-                        case 1:
+                        case RootsKind.PINNING.value:
                             root_dict = {"kind": "pinning_roots", "num_nodes": num}
-                        case 2:
+                        case RootsKind.TPINNING.value:
                             root_dict = {"kind": "tpinning_roots", "num_nodes": num}
 
                     roots_list.append(root_dict)
