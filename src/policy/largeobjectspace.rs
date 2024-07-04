@@ -86,6 +86,32 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
+    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
+        use crate::util::metadata::vo_bit;
+        // For large object space, it is a bit special. We only need to check VO bit for each page.
+        let mut cur_page = ptr.align_down(BYTES_IN_PAGE);
+        let low_page = ptr.saturating_sub(max_search_bytes).align_down(BYTES_IN_PAGE);
+        while cur_page > low_page {
+            // If the page start is not mapped, there can't be an object in it.
+            if !cur_page.is_mapped() {
+                return None;
+            }
+            if vo_bit::get_raw_vo_bit_word(cur_page) != 0 {
+                // Find the exact address that has vo bit set
+                for offset in 0..vo_bit::VO_BIT_WORD_TO_REGION {
+                    let addr = cur_page + offset;
+                    let potential_object = unsafe { vo_bit::is_vo_bit_set_unsafe::<VM>(addr) };
+                    if potential_object.is_some() {
+                        return potential_object;
+                    }
+                }
+                unreachable!("We found vo bit in the raw world, but we cannot find the exact address");
+            }
+
+            cur_page -= BYTES_IN_PAGE;
+        }
+        None
+    }
     fn sft_trace_object(
         &self,
         queue: &mut VectorObjectQueue,

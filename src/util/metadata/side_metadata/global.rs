@@ -530,7 +530,7 @@ impl SideMetadataSpec {
     /// * check if the side metadata memory is mapped.
     /// * check if the side metadata content is correct based on a sanity map (only for extreme assertions).
     #[allow(unused_variables)] // data_addr/input is not used in release build
-    fn side_metadata_access<T: MetadataValue, R: Copy, F: FnOnce() -> R, V: FnOnce(R)>(
+    fn side_metadata_access<const CHECK_VALUE: bool, T: MetadataValue, R: Copy, F: FnOnce() -> R, V: FnOnce(R)>(
         &self,
         data_addr: Address,
         input: Option<T>,
@@ -548,7 +548,9 @@ impl SideMetadataSpec {
         // A few checks
         #[cfg(debug_assertions)]
         {
-            self.assert_value_type::<T>(input);
+            if CHECK_VALUE {
+                self.assert_value_type::<T>(input);
+            }
             #[cfg(feature = "extreme_assertions")]
             self.assert_metadata_mapped(data_addr);
         }
@@ -557,7 +559,9 @@ impl SideMetadataSpec {
         let ret = access_func();
 
         // Verifying the side metadata: checks the result with the sanity table, or store some results to the sanity table
-        verify_func(ret);
+        if CHECK_VALUE {
+            verify_func(ret);
+        }
 
         ret
     }
@@ -571,7 +575,7 @@ impl SideMetadataSpec {
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
     pub unsafe fn load<T: MetadataValue>(&self, data_addr: Address) -> T {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             None,
             || {
@@ -603,7 +607,7 @@ impl SideMetadataSpec {
     /// 1. Concurrent access to this operation is undefined behaviour.
     /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
     pub unsafe fn store<T: MetadataValue>(&self, data_addr: Address, metadata: T) {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(metadata),
             || {
@@ -630,7 +634,7 @@ impl SideMetadataSpec {
     /// Loads a value from the side metadata for the given address.
     /// This method has similar semantics to `store` in Rust atomics.
     pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             None,
             || {
@@ -655,7 +659,7 @@ impl SideMetadataSpec {
     /// Store the given value to the side metadata for the given address.
     /// This method has similar semantics to `store` in Rust atomics.
     pub fn store_atomic<T: MetadataValue>(&self, data_addr: Address, metadata: T, order: Ordering) {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(metadata),
             || {
@@ -733,7 +737,7 @@ impl SideMetadataSpec {
                 // For extreme assertions, we only set 1 to the given address.
                 self.store_atomic::<u8>(data_addr, 1, order)
             } else {
-                self.side_metadata_access::<u8, _, _, _>(
+                self.side_metadata_access::<false, u8, _, _, _>(
                     data_addr,
                     Some(1u8),
                     || {
@@ -744,6 +748,48 @@ impl SideMetadataSpec {
                 )
             }
         }
+    }
+
+    /// Load the raw byte in the side metadata byte that is mapped to the data address.
+    ///
+    /// Safety
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
+    pub unsafe fn load_raw_byte(&self, data_addr: Address) -> u8 {
+        debug_assert!(self.log_num_of_bits < 3);
+        self.side_metadata_access::<false, u8, _, _, _>(
+            data_addr,
+            None,
+            || {
+                let meta_addr = address_to_meta_address(self, data_addr);
+                meta_addr.load::<u8>()
+            },
+            |_| {}
+        )
+    }
+
+    /// Load the raw word that includes the side metadata byte mapped to the data address.
+    ///
+    /// Safety
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
+    pub unsafe fn load_raw_word(&self, data_addr: Address) -> usize {
+        use crate::util::constants::*;
+        debug_assert!(self.log_num_of_bits < (LOG_BITS_IN_BYTE + LOG_BYTES_IN_ADDRESS) as usize);
+        self.side_metadata_access::<false, usize, _, _, _>(
+            data_addr,
+            None,
+            || {
+                let meta_addr = address_to_meta_address(self, data_addr);
+                let aligned_meta_addr = meta_addr.align_down(BYTES_IN_ADDRESS);
+                aligned_meta_addr.load::<usize>()
+            },
+            |_| {}
+        )
     }
 
     /// Stores the new value into the side metadata for the gien address if the current value is the same as the old value.
@@ -758,7 +804,7 @@ impl SideMetadataSpec {
         success_order: Ordering,
         failure_order: Ordering,
     ) -> std::result::Result<T, T> {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(new_metadata),
             || {
@@ -844,7 +890,7 @@ impl SideMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(val),
             || {
@@ -879,7 +925,7 @@ impl SideMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(val),
             || {
@@ -913,7 +959,7 @@ impl SideMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(val),
             || {
@@ -947,7 +993,7 @@ impl SideMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             Some(val),
             || {
@@ -982,7 +1028,7 @@ impl SideMetadataSpec {
         fetch_order: Ordering,
         mut f: F,
     ) -> std::result::Result<T, T> {
-        self.side_metadata_access::<T, _, _, _>(
+        self.side_metadata_access::<true, T, _, _, _>(
             data_addr,
             None,
             move || -> std::result::Result<T, T> {

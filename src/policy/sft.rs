@@ -78,6 +78,10 @@ pub trait SFT {
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> bool;
 
+    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
+        unimplemented!()
+    }
+
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 

@@ -100,20 +100,7 @@ pub fn is_vo_bit_set<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
 pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
-    let potential_object = ObjectReference::from_raw_address(address)?;
-
-    let addr = potential_object.to_address::<VM>();
-
-    // If we haven't mapped VO bit for the address, it cannot be an object
-    if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
-        return None;
-    }
-
-    if VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(addr, Ordering::SeqCst) == 1 {
-        Some(potential_object)
-    } else {
-        None
-    }
+    is_vo_bit_set_inner::<true, VM>(address)
 }
 
 /// Check if an address can be turned directly into an object reference using the VO bit.
@@ -124,6 +111,10 @@ pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> Option<ObjectR
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
 pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
+    is_vo_bit_set_inner::<false, VM>(address)
+}
+
+fn is_vo_bit_set_inner<const ATOMIC: bool, VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address)?;
 
     let addr = potential_object.to_address::<VM>();
@@ -133,7 +124,13 @@ pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<Ob
         return None;
     }
 
-    if VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) == 1 {
+    let vo_bit = if ATOMIC {
+        VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(addr, Ordering::SeqCst)
+    } else {
+        unsafe { VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) }
+    };
+
+    if vo_bit == 1 {
         Some(potential_object)
     } else {
         None
@@ -159,6 +156,15 @@ pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
     );
     let side_mark_bit_spec = mark_bit_spec.extract_side_spec();
     VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
+}
+
+use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
+
+pub const VO_BIT_WORD_TO_REGION: usize = 1 << (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region + LOG_BITS_IN_BYTE as usize + LOG_BYTES_IN_ADDRESS as usize - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
+
+// Bulk check if a VO bit word. Return true if there is any bit set in the word.
+pub fn get_raw_vo_bit_word(addr: Address) -> usize {
+    unsafe { VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
 }
 
 pub fn search_vo_bit_for_addr<VM: VMBinding>(start: Address, search_limit_bytes: usize) -> Option<ObjectReference> {

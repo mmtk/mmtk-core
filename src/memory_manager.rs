@@ -657,10 +657,9 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 pub fn find_object_from_internal_pointer<VM: VMBinding>(
     internal_ptr: Address,
     max_search_bytes: usize,
-) -> Option<(Address, Address)> {
-    // use crate::mmtk::SFT_MAP;
-    // SFT_MAP.get_checked(internal_ptr).find_object_from_internal_pointer(internal_ptr, max_search_bytes)
-    unimplemented!()
+) -> Option<ObjectReference> {
+    use crate::mmtk::SFT_MAP;
+    SFT_MAP.get_checked(internal_ptr).find_object_from_internal_pointer(internal_ptr, max_search_bytes)
 }
 
 /// Return true if the `object` lies in a region of memory where
