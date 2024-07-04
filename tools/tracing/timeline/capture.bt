@@ -73,6 +73,14 @@ usdt:$MMTK:mmtk:work {
     }
 }
 
+usdt:$MMTK:mmtk:gen_full_heap {
+    printf("gen_full_heap,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
+usdt:$MMTK:mmtk:immix_defrag {
+    printf("immix_defrag,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
 usdt:$MMTK:mmtk:roots {
     if (@enable_print) {
         printf("roots,meta,%d,%lu,%lu,%lu\n", tid, nsecs, arg0, arg1);

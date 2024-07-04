@@ -27,6 +27,11 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:gcworker_exit()`: a GC worker thread exits its work loop
 -   `mmtk:gc_start()`: a collection epoch starts
 -   `mmtk:gc_end()`: a collection epoch ends
+-   `mmtk:gen_full_heap(is_full_heap: bool)`: the generational plan has determined whether the current
+    GC is a full heap GC.  Only executed if the plan is generational.
+-   `mmtk:immix_defrag(is_defrag_gc: bool)`: the Immix-based plan has determined whether the current
+    GC is a defrag GC.  Only executed if the plan is Immix-based (i.e. Immix, GenImmix and
+    StickyImmix).  Will not be executed during nursery GCs (for GenImmix and StickyImmix).
 -   `mmtk:roots(kind: int, len: int)`: reporing roots to mmtk-core during root scanning.  `kind` can
     be 0, 1 or 2 for normal roots, pinning roots and transitively pinning roots, respectively.
     `len` is the number of slots or nodes reported.

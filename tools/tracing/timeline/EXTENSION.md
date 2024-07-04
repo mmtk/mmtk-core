@@ -47,7 +47,7 @@ dependency to the `probe` crate in `Cargo.toml`.
 probe = "0.5"
 ```
 
-Then add the following `probe!` macro in `scan_vm_specific_roots` in `scanning.rs`:
+Then add the following `probe!` macro in `stop_all_mutators` in `collection.rs`:
 
 ```rust
     probe!(mmtk_openjdk, hello);
@@ -70,9 +70,9 @@ and use the `-x` command line option while invoking `capture.py`:
 ```
 
 and run a benchmark with OpenJDK (such as `lusearch`).  Use the unmodified `visualize.py` to process
-the log, and you will see an arrow representing the "hello" event somewhere on the timeline.  It
-should be quite obvious because it will be a lone instant event right below the
-`ScanVMSpecificRoots` work packet.
+the log, and you will see many arrows representing the "hello" events on the timeline.  They should
+be quite obvious because each one will be a lone instant event right below a `StopMutators` work
+packet.
 
 ## Extending the visualization script
 
@@ -118,29 +118,42 @@ argument in the "Arguments" block on the right side of the "Current Selection" p
 
 The `capture.bt` script and its extensions can print events with type "meta" instead of the usual
 "B", "E", "i", etc.  "meta" is not a valid event type defined by the [Trace Event Format].  While
-going through the log, the `visualize.py` script remembers the current work packet each thread is
-executing.  When `visualize.py` sees a "meta" event, it will find the "B" event for the current work
-packet of the current thread, and modifies it, usually by adding more arguments to the event using
-information (arguments) provided by the "meta" event.  For example, the `process_slots` "meta" event
-will "patch" the work packet event with additional arguments to display the number of slots
-processed.
+going through the log, the `visualize.py` script remembers the current GC and the current work
+packet each thread is executing.  When `visualize.py` sees a "meta" event, it will find the
+previously created JSON objects for the beginning of the current GC and the beginning of the current
+work packet of the current thread, and modify them, usually by adding more arguments to the event
+using information (arguments) provided by the "meta" event.  For example, the `gen_full_heap` "meta"
+event adds an argument to the "GC" bar (on the timeline of "Thread 0") to display whether the
+current GC is a full-heap GC (as opposed to nursery GC), and the `process_slots` "meta" event
+patches the work packet event with additional arguments to display the number of slots processed and
+whether the slots are roots.
 
 Users can extend `visualize.py` and define the `enrich_meta_extra` function to handle "meta" events
 the `visualize.py` script doesn't recognize.
 
 For example, hack the mmtk-openjdk binding again, and add the following `probe!` macro into
-`scan_roots_in_mutator_thread` in `scanning.rs`:
+`scan_vm_specific_roots` in `scanning.rs`:
 
 ```rust
         probe!(mmtk_openjdk, hello2, 43);
+```
+
+and add the following `probe!` macro into `scan_roots_in_mutator_thread` in `scanning.rs`:
+
+```rust
+        probe!(mmtk_openjdk, hello3, 44);
 ```
 
 Capture the event in `capture_openjdk.bt`:
 
 ```c
 usdt:$MMTK:mmtk_openjdk:hello2 {
+    printf("hello2,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+}
+
+usdt:$MMTK:mmtk_openjdk:hello3 {
     if (@enable_print) {
-        printf("hello2,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
+        printf("hello3,meta,%d,%lu,%lu\n", tid, nsecs, arg0);
     }
 }
 ```
@@ -148,17 +161,28 @@ usdt:$MMTK:mmtk_openjdk:hello2 {
 Process the meta event in `visualize_openjdk.py`:
 
 ```python
-def enrich_meta_extra(log_processor, name, tid, ts, current, rest):
-    match name:
-        case "hello2":
-            current["args"] |= {
-                "the_number": int(rest[0]),
-            }
+def enrich_meta_extra(log_processor, name, tid, ts, gc, wp, rest):
+    if gc is not None:
+        match name:
+            case "hello2":
+                gc["args"] |= {
+                    "the_number": int(rest[0]),
+                }
+
+    if wp is not None:
+        match name:
+            case "hello3":
+                wp["args"] |= {
+                    "the_number": int(rest[0]),
+                }
 ```
 
 Run a benchmark, capture a log (with `-x capture_openjdk.bt`) and visualize it (with `-x
-visualize_openjdk.py`).  Open Perfetto UI and click on a `ScanMutatorRoots` work packet, and you
-will see the `the_number` argument.
+visualize_openjdk.py`).  Load it into Perfetto UI.  Select a `GC` bar and you should see the
+`the_number` argument being 43; select a `ScanMutatorRoots` work packet, and you will see the
+`the_number` argument being 44.  If you use `-e` to capture logs for every few GCs, you will find
+that the `the_number` argument also exists on GCs that don't record work packets.  That's because we
+don't have `if (@enable_print)` for "hello2" in `capture_openjdk.bt`.
 
 ## Notes
 

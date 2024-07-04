@@ -5,6 +5,7 @@ import gzip
 import json
 import re
 import sys
+from collections import defaultdict
 from importlib.machinery import SourceFileLoader
 
 RE_TYPE_ID = re.compile(r"\d+")
@@ -27,7 +28,8 @@ class LogProcessor:
         self.type_id_name = {}
         self.results = []
         self.start_time = None
-        self.tid_current_work_packet = {}
+        self.current_gc = None
+        self.current_work_packet = defaultdict(lambda: None)
         self.enrich_event_extra = None
         self.enrich_meta_extra = None
 
@@ -60,16 +62,15 @@ class LogProcessor:
             raise
         tid = int(tid)
         ts = int(ts)
-        rest = parts[4:]
+        args = parts[4:]
 
         if not self.start_time:
             self.start_time = ts
 
         if ph == "meta":
-            current = self.get_current_work_packet(tid)
-            if current is not None:
-                # eBPF may drop events.  Be conservative.
-                self.enrich_meta(name, tid, ts, current, rest)
+            gc = self.current_gc
+            wp = self.current_work_packet[tid]
+            self.enrich_meta(name, tid, ts, gc, wp, args)
         else:
             result = {
                 "name": name,
@@ -80,92 +81,119 @@ class LogProcessor:
                 "args": {},
             }
 
-            self.enrich_event(name, ph, tid, ts, result, rest)
+            self.enrich_event(name, ph, tid, ts, result, args)
 
             self.results.append(result)
 
-    def enrich_event(self, name, ph, tid, ts, result, rest):
+    def enrich_event(self, name, ph, tid, ts, result, args):
         match name:
             case "GC":
                 # Put GC start/stop events in a virtual thread with tid=0
                 result["tid"] = 0
+                match ph:
+                    case "B":
+                        self.current_gc = result
+                    case "E":
+                        self.current_gc = None
             case "WORK":
                 result["args"] |= {
-                    "type_id": int(rest[0]),
+                    "type_id": int(args[0]),
                 }
                 match ph:
                     case "B":
-                        self.set_current_work_packet(tid, result)
+                        self.current_work_packet[tid] = result
                     case "E":
-                        self.clear_current_work_packet(tid, result)
+                        self.current_work_packet[tid] = None
 
             case "BUCKET_OPEN":
                 result["args"] |= {
-                    "stage": int(rest[0]),
+                    "stage": int(args[0]),
                 }
 
             case _:
                 if self.enrich_event_extra is not None:
-                    self.enrich_event_extra(self, name, ph, tid, ts, result, rest)
+                    self.enrich_event_extra(self, name, ph, tid, ts, result, args)
 
-    def enrich_meta(self, name, tid, ts, current, rest):
-        match name:
-            case "roots":
-                if "roots" not in current["args"]:
-                    current["args"]["roots"] = []
-                roots_list = current["args"]["roots"]
-                kind_id = int(rest[0])
-                num = int(rest[1])
-                match kind_id:
-                    case 0:
-                        root_dict = {"kind": "normal_roots", "num_slots": num}
-                    case 1:
-                        root_dict = {"kind": "pinning_roots", "num_nodes": num}
-                    case 2:
-                        root_dict = {"kind": "tpinning_roots", "num_nodes": num}
+    def enrich_meta(self, name, tid, ts, gc, wp, args):
+        processed_for_gc = True
+        processed_for_wp = True
 
-                roots_list.append(root_dict)
-
-            case "process_slots":
-                current["args"] |= {
-                    # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
-                    # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
-                    "process_slots": {
-                        "num_slots": int(rest[0]),
-                        "is_roots": int(rest[1]),
-                    },
-                }
-
-            case "scan_objects":
-                total_scanned = int(rest[0])
-                scan_and_trace = int(rest[1])
-                scan_for_slots = total_scanned - scan_and_trace
-                current["args"] |= {
-                    # Put args in a group.  See comments in "process_slots".
-                    "scan_objects": {
-                        "total_scanned": total_scanned,
-                        "scan_for_slots": scan_for_slots,
-                        "scan_and_trace": scan_and_trace,
+        # bpftrace may drop events.  Be conservative.
+        if gc is not None:
+            match name:
+                case "gen_full_heap":
+                    gc["args"] |= {
+                        # Note: bool("0") == True
+                        #       bool(int(0)) == bool(0) == False
+                        "full_heap": bool(int(args[0])),
                     }
-                }
 
-            case "sweep_chunk":
-                current["args"] |= {
-                    "allocated_blocks": int(rest[0]),
-                }
+                case "immix_defrag":
+                    gc["args"] |= {
+                        "immix_is_defrag_gc": bool(int(args[0])),
+                    }
 
-            case _:
-                if self.enrich_meta_extra is not None:
-                    self.enrich_meta_extra(self, name, tid, ts, current, rest)
+                case _:
+                    processed_for_gc = False
+        else:
+            processed_for_gc = False
 
-    def set_current_work_packet(self, tid, result):
-        self.tid_current_work_packet[tid] = result
+        # bpftrace may drop events.  Be conservative.
+        if wp is not None:
+            match name:
+                case "roots":
+                    if "roots" not in wp["args"]:
+                        wp["args"]["roots"] = []
+                    roots_list = wp["args"]["roots"]
+                    kind_id = int(args[0])
+                    num = int(args[1])
+                    match kind_id:
+                        case 0:
+                            root_dict = {"kind": "normal_roots", "num_slots": num}
+                        case 1:
+                            root_dict = {"kind": "pinning_roots", "num_nodes": num}
+                        case 2:
+                            root_dict = {"kind": "tpinning_roots", "num_nodes": num}
 
-    def get_current_work_packet(self, tid):
-        return self.tid_current_work_packet[tid]
+                    roots_list.append(root_dict)
 
-    def clear_current_work_packet(self, tid, result):
-        self.tid_current_work_packet[tid] = None
+                case "process_slots":
+                    wp["args"] |= {
+                        # Group args by "process_slots" and "scan_objects" because a ProcessEdgesWork
+                        # work packet may do both if SCAN_OBJECTS_IMMEDIATELY is true.
+                        "process_slots": {
+                            "num_slots": int(args[0]),
+                            "is_roots": int(args[1]),
+                        },
+                    }
+
+                case "scan_objects":
+                    total_scanned = int(args[0])
+                    scan_and_trace = int(args[1])
+                    scan_for_slots = total_scanned - scan_and_trace
+                    wp["args"] |= {
+                        # Put args in a group.  See comments in "process_slots".
+                        "scan_objects": {
+                            "total_scanned": total_scanned,
+                            "scan_for_slots": scan_for_slots,
+                            "scan_and_trace": scan_and_trace,
+                        }
+                    }
+
+                case "sweep_chunk":
+                    wp["args"] |= {
+                        "allocated_blocks": int(args[0]),
+                    }
+
+                case _:
+                    processed_for_wp = False
+        else:
+            processed_for_wp = False
+
+        if not processed_for_gc and not processed_for_wp:
+            # If we haven't touched an event, we offload it to the extension.
+            if self.enrich_meta_extra is not None:
+                self.enrich_meta_extra(self, name, tid, ts, gc, wp, args)
 
     def resolve_results(self):
         for result in self.results:
