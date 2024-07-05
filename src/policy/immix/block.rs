@@ -8,6 +8,8 @@ use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
+#[cfg(feature = "vo_bit")]
+use crate::util::metadata::side_metadata;
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
@@ -280,7 +282,7 @@ impl Block {
                 match self.get_state() {
                     BlockState::Unmarked => {
                         // It may contain young objects.  Clear it.
-                        vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+                        side_metadata::bzero_vo_bit(self.start(), Self::BYTES);
                     }
                     BlockState::Marked => {
                         // It contains old objects.  Skip it.
@@ -293,7 +295,7 @@ impl Block {
                 for line in self.lines() {
                     if !line.is_marked(state) {
                         // It may contain young objects.  Clear it.
-                        vo_bit::bzero_vo_bit(line.start(), Line::BYTES);
+                        side_metadata::bzero_vo_bit(line.start(), Line::BYTES);
                     }
                 }
             }
