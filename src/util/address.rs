@@ -486,12 +486,18 @@ use crate::vm::VMBinding;
 /// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
 /// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
 ///
+/// Note that [`ObjectReference`] has to be word aligned.
+///
 /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
 pub struct ObjectReference(NonZeroUsize);
 
 impl ObjectReference {
+    /// The required minimal alignment for object reference. If the object reference's raw address is not aligned to this value,
+    /// you will see an assertion failure in the debug build.
+    pub const ALIGNMENT: usize = crate::util::constants::BYTES_IN_ADDRESS;
+
     /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
@@ -509,6 +515,10 @@ impl ObjectReference {
     /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
     pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
+        debug_assert!(
+            addr.is_aligned_to(Self::ALIGNMENT),
+            "ObjectReference is required to be word aligned"
+        );
         NonZeroUsize::new(addr.0).map(ObjectReference)
     }
 
@@ -522,6 +532,10 @@ impl ObjectReference {
     /// adding a positive offset to a non-zero address, we know the result must not be zero.
     pub unsafe fn from_raw_address_unchecked(addr: Address) -> ObjectReference {
         debug_assert!(!addr.is_zero());
+        debug_assert!(
+            addr.is_aligned_to(Self::ALIGNMENT),
+            "ObjectReference is required to be word aligned"
+        );
         ObjectReference(NonZeroUsize::new_unchecked(addr.0))
     }
 
@@ -560,6 +574,10 @@ impl ObjectReference {
         use crate::vm::ObjectModel;
         let obj = VM::VMObjectModel::address_to_ref(addr);
         debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
+        debug_assert!(
+            obj.to_raw_address().is_aligned_to(Self::ALIGNMENT),
+            "ObjectReference is required to be word aligned"
+        );
         obj
     }
 

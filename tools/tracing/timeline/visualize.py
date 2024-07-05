@@ -24,6 +24,7 @@ class LogProcessor:
         self.type_id_name = {}
         self.results = []
         self.start_time = None
+        self.tid_current_work_packet = {}
 
     def process_line(self, line):
         if line.startswith("@type_name"):
@@ -81,8 +82,30 @@ class LogProcessor:
                 result["args"] = {
                     "type_id": int(rest[0])
                 }
+                match be:
+                    case "B":
+                        self.set_current_work_packet(tid, result)
+                    case "E":
+                        self.clear_current_work_packet(tid, result)
 
-        self.results.append(result)
+            case "process_slots":
+                current = self.get_current_work_packet(tid)
+                # eBPF may drop events.  Be conservative.
+                if current is not None:
+                    current["args"]["num_slots"] = int(rest[0])
+                    current["args"]["is_roots"] = int(rest[1])
+
+        if be != "meta":
+            self.results.append(result)
+
+    def set_current_work_packet(self, tid, result):
+        self.tid_current_work_packet[tid] = result
+
+    def get_current_work_packet(self, tid):
+        return self.tid_current_work_packet[tid]
+
+    def clear_current_work_packet(self, tid, result):
+        self.tid_current_work_packet[tid] = None
 
     def resolve_results(self):
         for result in self.results:
