@@ -172,7 +172,6 @@ pub fn search_vo_bit_for_addr<VM: VMBinding>(start: Address, search_limit_bytes:
     let aligned_lo = start.saturating_sub(search_limit_bytes).align_down(region_bytes);
     let mut cur = aligned_hi;
     while cur > aligned_lo {
-        println!("Check {}", cur);
         // We encounter an unmapped address. We cannot see unmapped addr in an object. So this cannot be an internal pointer.
         if !cur.is_mapped() {
             return None;
