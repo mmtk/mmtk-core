@@ -109,6 +109,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         has_object_alloced_by_malloc::<VM>(addr).is_some()
     }
 
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::search_vo_bit_for_addr::<VM>(ptr, max_search_bytes)
+    }
+
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
         set_vo_bit::<VM>(object);

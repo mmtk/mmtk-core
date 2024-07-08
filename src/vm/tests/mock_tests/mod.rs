@@ -34,7 +34,11 @@ mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
 mod mock_test_init_fork;
 #[cfg(feature = "is_mmtk_object")]
+mod mock_test_internal_ptr_invalid;
+#[cfg(feature = "is_mmtk_object")]
 mod mock_test_internal_ptr_large_object;
+#[cfg(feature = "is_mmtk_object")]
+mod mock_test_internal_ptr_normal_object;
 mod mock_test_is_in_mmtk_spaces;
 mod mock_test_issue139_allocate_non_multiple_of_min_alignment;
 mod mock_test_issue867_allocate_unrealistically_large_object;

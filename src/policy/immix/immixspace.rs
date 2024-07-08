@@ -144,6 +144,12 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
+    #[cfg(feature = "is_mmtk_object")]
+    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
+        // We don't need to search more than the max object size in the immix space.
+        let search_bytes = usize::min(super::MAX_IMMIX_OBJECT_SIZE, max_search_bytes);
+        crate::util::metadata::vo_bit::search_vo_bit_for_addr::<VM>(ptr, search_bytes)
+    }
     fn sft_trace_object(
         &self,
         _queue: &mut VectorObjectQueue,

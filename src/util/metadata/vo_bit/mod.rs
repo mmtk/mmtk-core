@@ -115,9 +115,7 @@ pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<Ob
 }
 
 fn is_vo_bit_set_inner<const ATOMIC: bool, VM: VMBinding>(address: Address) -> Option<ObjectReference> {
-    let potential_object = ObjectReference::from_raw_address(address)?;
-
-    let addr = potential_object.to_address::<VM>();
+    let addr = get_in_object_address_for_potential_object::<VM>(address);
 
     // If we haven't mapped VO bit for the address, it cannot be an object
     if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
@@ -131,7 +129,8 @@ fn is_vo_bit_set_inner<const ATOMIC: bool, VM: VMBinding>(address: Address) -> O
     };
 
     if vo_bit == 1 {
-        Some(potential_object)
+        let obj = get_object_ref_for_vo_addr::<VM>(addr);
+        Some(obj)
     } else {
         None
     }
@@ -170,14 +169,48 @@ pub fn get_raw_vo_bit_word(addr: Address) -> usize {
 pub fn search_vo_bit_for_addr<VM: VMBinding>(start: Address, search_limit_bytes: usize) -> Option<ObjectReference> {
     let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
     let aligned_hi= start.align_down(region_bytes);
-    let aligned_lo = (start - search_limit_bytes).align_down(region_bytes);
+    let aligned_lo = start.saturating_sub(search_limit_bytes).align_down(region_bytes);
     let mut cur = aligned_hi;
     while cur > aligned_lo {
-        let res = is_vo_bit_set_for_addr::<VM>(cur);
-        if res.is_some() {
-            return res;
+        println!("Check {}", cur);
+        // We encounter an unmapped address. We cannot see unmapped addr in an object. So this cannot be an internal pointer.
+        if !cur.is_mapped() {
+            return None;
+        }
+        if is_vo_addr(cur) {
+            return is_internal_ptr_from_vo_bit::<VM>(cur, start);
         }
         cur -= region_bytes;
     }
     None
+}
+
+fn get_in_object_address_for_potential_object<VM: VMBinding>(potential_obj: Address) -> Address {
+    let obj_ref: ObjectReference = unsafe { std::mem::transmute(potential_obj) };
+    obj_ref.to_address::<VM>()
+}
+
+fn get_object_ref_for_vo_addr<VM: VMBinding>(vo_addr: Address) -> ObjectReference {
+    let addr = <VM::VMObjectModel as ObjectModel<VM>>::address_to_ref(vo_addr).to_raw_address();
+    let aligned = addr.align_up(ObjectReference::ALIGNMENT);
+    unsafe { ObjectReference::from_raw_address_unchecked(aligned) }
+}
+
+fn is_internal_ptr<VM: VMBinding>(obj: ObjectReference, internal_ptr: Address) -> bool {
+    let obj_start = obj.to_object_start::<VM>();
+    let obj_size = VM::VMObjectModel::get_current_size(obj);
+    internal_ptr < obj_start + obj_size
+}
+
+pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(vo_addr: Address, internal_ptr: Address) -> Option<ObjectReference> {
+    let obj = get_object_ref_for_vo_addr::<VM>(vo_addr);
+    if is_internal_ptr::<VM>(obj, internal_ptr) {
+        Some(obj)
+    } else {
+        None
+    }
+}
+
+pub fn is_vo_addr(addr: Address) -> bool {
+    unsafe { VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) != 0 }
 }

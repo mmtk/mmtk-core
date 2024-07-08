@@ -86,6 +86,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_mmtk_object(&self, addr: Address) -> bool {
         crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
     }
+    #[cfg(feature = "is_mmtk_object")]
     fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
         use crate::util::metadata::vo_bit;
         // For large object space, it is a bit special. We only need to check VO bit for each page.
@@ -96,13 +97,21 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             if !cur_page.is_mapped() {
                 return None;
             }
+            println!("cur_page = {}", cur_page);
             if vo_bit::get_raw_vo_bit_word(cur_page) != 0 {
                 // Find the exact address that has vo bit set
                 for offset in 0..vo_bit::VO_BIT_WORD_TO_REGION {
                     let addr = cur_page + offset;
-                    let potential_object = unsafe { vo_bit::is_vo_bit_set_unsafe::<VM>(addr) };
-                    if potential_object.is_some() {
-                        return potential_object;
+                    println!("check addr {} (offset {})", addr, offset);
+                    if vo_bit::is_vo_addr(addr) {
+                        println!("vo bit is set for {}", addr);
+                        let obj = vo_bit::is_internal_ptr_from_vo_bit::<VM>(addr, ptr);
+                        println!("obj = {:?}", obj);
+                        if obj.is_some() {
+                            return obj;
+                        } else {
+                            return None;
+                        }
                     }
                 }
                 unreachable!("We found vo bit in the raw world, but we cannot find the exact address");
