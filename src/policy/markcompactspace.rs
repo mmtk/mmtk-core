@@ -80,7 +80,11 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[cfg(feature = "is_mmtk_object")]
-    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
         crate::util::metadata::vo_bit::search_vo_bit_for_addr::<VM>(ptr, max_search_bytes)
     }
 

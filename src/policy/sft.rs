@@ -79,7 +79,11 @@ pub trait SFT {
     fn is_mmtk_object(&self, addr: Address) -> bool;
 
     #[cfg(feature = "is_mmtk_object")]
-    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference>;
+    fn find_object_from_internal_pointer(
+        &self,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -> Option<ObjectReference>;
 
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
@@ -161,7 +165,11 @@ impl SFT for EmptySpaceSFT {
         false
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn find_object_from_internal_pointer(&self, ptr: Address, max_search_bytes: usize) -> Option<ObjectReference> {
+    fn find_object_from_internal_pointer(
+        &self,
+        _ptr: Address,
+        _max_search_bytes: usize,
+    ) -> Option<ObjectReference> {
         None
     }
 

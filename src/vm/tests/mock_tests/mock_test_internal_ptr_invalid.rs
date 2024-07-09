@@ -3,11 +3,7 @@
 
 use super::mock_test_prelude::*;
 
-use crate::util::constants::LOG_BITS_IN_WORD;
-use crate::util::is_mmtk_object::VO_BIT_REGION_SIZE;
 use crate::util::*;
-use crate::AllocationSemantics;
-use crate::vm::ObjectModel;
 
 #[test]
 pub fn interior_poiner_invalid() {
@@ -15,10 +11,14 @@ pub fn interior_poiner_invalid() {
     with_mockvm(
         default_setup,
         || {
-            let mut fixture = MutatorFixture::create_with_heapsize(10 * MB);
+            // Set up MMTk even if we don't use it.
+            let _ = MutatorFixture::create_with_heapsize(10 * MB);
 
-            let mut assert_no_object = |addr: Address| {
-                let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(addr, usize::MAX);
+            let assert_no_object = |addr: Address| {
+                let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
+                    addr,
+                    usize::MAX,
+                );
                 assert!(base_ref.is_none());
             };
 
@@ -34,6 +34,6 @@ pub fn interior_poiner_invalid() {
                 assert_no_object(addr);
             }
         },
-        no_cleanup
+        no_cleanup,
     )
 }

@@ -7,7 +7,7 @@ use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
-use num_traits::{FromPrimitive, PrimInt};
+use num_traits::FromPrimitive;
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -187,11 +187,14 @@ impl SideMetadataSpec {
 
         if meta_start_addr == meta_end_addr {
             // Update bits in the same byte between start and end bit
-            return update_bits(meta_start_addr, meta_start_bit, meta_end_bit);
+            update_bits(meta_start_addr, meta_start_bit, meta_end_bit)
         } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
             // Update bits in the same byte after the start bit (between start bit and 8)
-            return update_bits(meta_start_addr, meta_start_bit, 8);
+            update_bits(meta_start_addr, meta_start_bit, 8)
         } else {
+            // Update each segments.
+            // Clippy wants to move this if block up as a else-if block. But I think this is logically more clear. So disable the clippy warning.
+            #[allow(clippy::collapsible_else_if)]
             if forwards {
                 // update bits in the first byte
                 if Self::iterate_meta_bits(
@@ -279,11 +282,11 @@ impl SideMetadataSpec {
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        let mut zero_bytes = |start: Address, end: Address| -> bool {
+        let zero_bytes = |start: Address, end: Address| -> bool {
             memory::zero(start, end - start);
             false
         };
-        let mut zero_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
+        let zero_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
             // we are zeroing selected bits in one byte
             let mask: u8 =
                 u8::MAX.checked_shl(end_bit.into()).unwrap_or(0) | !(u8::MAX << start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
@@ -296,8 +299,8 @@ impl SideMetadataSpec {
             meta_end_addr,
             meta_end_bit,
             true,
-            &mut zero_bytes,
-            &mut zero_bits,
+            &zero_bytes,
+            &zero_bits,
         );
     }
 
@@ -308,11 +311,11 @@ impl SideMetadataSpec {
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        let mut set_bytes = |start: Address, end: Address| -> bool {
+        let set_bytes = |start: Address, end: Address| -> bool {
             memory::set(start, 0xff, end - start);
             false
         };
-        let mut set_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
+        let set_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
             // we are setting selected bits in one byte
             let mask: u8 =
                 !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
@@ -325,8 +328,8 @@ impl SideMetadataSpec {
             meta_end_addr,
             meta_end_bit,
             true,
-            &mut set_bytes,
-            &mut set_bits,
+            &set_bytes,
+            &set_bits,
         );
     }
 
@@ -489,7 +492,7 @@ impl SideMetadataSpec {
 
         debug_assert_eq!(dst_meta_start_bit, src_meta_start_bit);
 
-        let mut copy_bytes = |dst_start: Address, dst_end: Address| -> bool {
+        let copy_bytes = |dst_start: Address, dst_end: Address| -> bool {
             unsafe {
                 let byte_offset = dst_start - dst_meta_start_addr;
                 let src_start = src_meta_start_addr + byte_offset;
@@ -499,7 +502,7 @@ impl SideMetadataSpec {
             }
         };
 
-        let mut copy_bits = |dst: Address, start_bit: u8, end_bit: u8| -> bool {
+        let copy_bits = |dst: Address, start_bit: u8, end_bit: u8| -> bool {
             let byte_offset = dst - dst_meta_start_addr;
             let src = src_meta_start_addr + byte_offset;
             // we are setting selected bits in one byte
@@ -518,8 +521,8 @@ impl SideMetadataSpec {
             dst_meta_end_addr,
             dst_meta_end_bit,
             true,
-            &mut copy_bytes,
-            &mut copy_bits,
+            &copy_bytes,
+            &copy_bits,
         );
     }
 
@@ -530,7 +533,13 @@ impl SideMetadataSpec {
     /// * check if the side metadata memory is mapped.
     /// * check if the side metadata content is correct based on a sanity map (only for extreme assertions).
     #[allow(unused_variables)] // data_addr/input is not used in release build
-    fn side_metadata_access<const CHECK_VALUE: bool, T: MetadataValue, R: Copy, F: FnOnce() -> R, V: FnOnce(R)>(
+    fn side_metadata_access<
+        const CHECK_VALUE: bool,
+        T: MetadataValue,
+        R: Copy,
+        F: FnOnce() -> R,
+        V: FnOnce(R),
+    >(
         &self,
         data_addr: Address,
         input: Option<T>,
@@ -752,7 +761,7 @@ impl SideMetadataSpec {
 
     /// Load the raw byte in the side metadata byte that is mapped to the data address.
     ///
-    /// Safety
+    /// # Safety
     /// This is unsafe because:
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
@@ -766,13 +775,13 @@ impl SideMetadataSpec {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 meta_addr.load::<u8>()
             },
-            |_| {}
+            |_| {},
         )
     }
 
     /// Load the raw word that includes the side metadata byte mapped to the data address.
     ///
-    /// Safety
+    /// # Safety
     /// This is unsafe because:
     ///
     /// 1. Concurrent access to this operation is undefined behaviour.
@@ -788,7 +797,7 @@ impl SideMetadataSpec {
                 let aligned_meta_addr = meta_addr.align_down(BYTES_IN_ADDRESS);
                 aligned_meta_addr.load::<usize>()
             },
-            |_| {}
+            |_| {},
         )
     }
 
@@ -1068,93 +1077,116 @@ impl SideMetadataSpec {
     }
 
     /// Find for a data address that has a non zero value in the side metadata. The search starts from the given data address (including this address),
-    /// and iterates backwards for the given bytes before the data address.
-    /// `search_limit_bytes`: non inclusive
-    pub unsafe fn find_prev_non_zero_value<T: MetadataValue>(&self, data_addr: Address, search_limit_bytes: usize) -> Option<Address> {
+    /// and iterates backwards for the given bytes (non inclusive) before the data address.
+    ///
+    /// The data_addr and the corresponding side metadata address may not be mapped. Thus when this function checks the given data address, and
+    /// when it searches back, it needs to check if the address is mapped or not to avoid loading from an unmapped address.
+    ///
+    /// This function returns an address that is aligned to the region of this side metadata (`log_bytes_per_region`), and the side metadata
+    /// for the address is non zero.
+    ///
+    /// # Safety
+    ///
+    /// This function uses non-atomic load for the side metadata. The user needs to make sure
+    /// that there is no other thread that is mutating the side metadata.
+    pub unsafe fn find_prev_non_zero_value<T: MetadataValue>(
+        &self,
+        data_addr: Address,
+        search_limit_bytes: usize,
+    ) -> Option<Address> {
         debug_assert!(search_limit_bytes > 0);
 
         if self.uses_contiguous_side_metadata() {
             // Contiguous side metadata
             self.find_prev_non_zero_value_fast::<T>(data_addr, search_limit_bytes)
         } else {
-            // TODO: We may be able to optimize further for this case. However, we need to be careful that the side metadata
+            // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
             // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
+            // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
+            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
             self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes)
         }
     }
 
-    fn find_prev_non_zero_value_simple<T: MetadataValue>(&self, data_addr: Address, search_limit_bytes: usize) -> Option<Address> {
-        // We need to search back.
-        let start_addr = data_addr;
-        let end_addr = data_addr - search_limit_bytes;
-
+    fn find_prev_non_zero_value_simple<T: MetadataValue>(
+        &self,
+        data_addr: Address,
+        search_limit_bytes: usize,
+    ) -> Option<Address> {
         let region_bytes = 1 << self.log_bytes_in_region;
+        // Figure out the range that we need to search.
+        let start_addr = data_addr.align_down(region_bytes);
+        let end_addr = data_addr
+            .saturating_sub(search_limit_bytes)
+            .align_down(region_bytes);
 
         let mut cursor = start_addr;
         while cursor > end_addr {
-            let aligned_cursor = cursor.align_down(region_bytes);
-            println!("Check {}, aligned to {}", cursor, aligned_cursor);
-            if !unsafe { self.load::<T>(aligned_cursor).is_zero() } {
-                return Some(aligned_cursor);
+            // We encounter an unmapped address. Just return None.
+            if !cursor.is_mapped() {
+                return None;
+            }
+            // If we find non-zero value, just return it.
+            if !unsafe { self.load::<T>(cursor).is_zero() } {
+                return Some(cursor);
             }
             cursor -= region_bytes;
-            println!("cursor = {}, end_addr = {}", cursor, end_addr);
         }
         None
     }
 
-    fn find_prev_non_zero_value_fast<T: MetadataValue>(&self, data_addr: Address, search_limit_bytes: usize) -> Option<Address> {
+    #[allow(clippy::let_and_return)]
+    fn find_prev_non_zero_value_fast<T: MetadataValue>(
+        &self,
+        data_addr: Address,
+        search_limit_bytes: usize,
+    ) -> Option<Address> {
         debug_assert!(self.uses_contiguous_side_metadata());
 
+        // Quick check if the data address is mapped at all.
+        if !data_addr.is_mapped() {
+            return None;
+        }
         // Quick check if the current data_addr has a non zero value.
         if !unsafe { self.load::<T>(data_addr).is_zero() } {
             return Some(data_addr.align_down(1 << self.log_bytes_in_region));
         }
 
-        // We need to search back.
+        // Figure out the start and end data address.
         let start_addr = data_addr.saturating_sub(search_limit_bytes) + 1usize;
         let end_addr = data_addr;
 
+        // Then figure out the start and end metadata address and bits.
         let start_meta_addr = address_to_contiguous_meta_address(self, start_addr);
         let start_meta_shift = meta_byte_lshift(self, start_addr);
-
         let end_meta_addr = address_to_contiguous_meta_address(self, end_addr);
         let end_meta_shift = meta_byte_lshift(self, end_addr);
 
-        let mut res = std::cell::UnsafeCell::new(None);
+        // The result will be set by one of the following closures.
+        // Use Cell so it doesn't need to be mutably borrowed by the two closures which Rust will complain.
+        let res = std::cell::Cell::new(None);
 
-        // let mut check_bytes_backwards = |start: Address, end: Address| -> bool {
-        //     unsafe {
-        //         let mut cur = end - 1;
-        //         while cur >= start {
-        //             if !cur.is_mapped() {
-        //                 return false;
-        //             }
-        //             // println!("check byte at {}", cur);
-        //             if cur.load::<u8>() != 0 {
-        //                 *res.get() = Some(contiguous_meta_address_to_address(self, cur, 0));
-        //                 return true;
-        //             }
-        //             cur -= 1;
-        //         }
-        //         false
-        //     }
-        // };
-        let mut check_bytes_backwards = |start: Address, end: Address| -> bool {
+        // Check and find the last bit that is set. We try load words where possible, and fall back to load bytes.
+        let check_bytes_backwards = |start: Address, end: Address| -> bool {
             use crate::util::constants::BYTES_IN_ADDRESS;
             unsafe {
                 let mut cur = end;
                 while cur > start {
-                    let step = if cur.is_aligned_to(BYTES_IN_ADDRESS) && cur.align_down(BYTES_IN_ADDRESS) >= start {
+                    // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
+                    let step = if cur.is_aligned_to(BYTES_IN_ADDRESS)
+                        && cur.align_down(BYTES_IN_ADDRESS) >= start
+                    {
                         BYTES_IN_ADDRESS
                     } else {
                         1
                     };
-
+                    // Move to the address so we can load from it
                     cur -= step;
 
+                    // We have to always check if the metadata address is mapped or not.
                     if !cur.is_mapped() {
-                        return false;
+                        // Return true for early abort. If we see an unmapped metadata address, there is no point to keep checking.
+                        return true;
                     }
 
                     if step == BYTES_IN_ADDRESS {
@@ -1168,7 +1200,9 @@ impl SideMetadataSpec {
                             if byte_value != 0 {
                                 let bit = byte_value.trailing_zeros();
                                 debug_assert!(bit < 8);
-                                *res.get() = Some(contiguous_meta_address_to_address(self, byte_addr, bit as u8));
+                                res.set(Some(contiguous_meta_address_to_address(
+                                    self, byte_addr, bit as u8,
+                                )));
                                 return true;
                             }
                         }
@@ -1178,7 +1212,9 @@ impl SideMetadataSpec {
                         if value != 0 {
                             let bit = value.trailing_zeros();
                             debug_assert!(bit < 8);
-                            *res.get() = Some(contiguous_meta_address_to_address(self, cur, bit as u8));
+                            res.set(Some(contiguous_meta_address_to_address(
+                                self, cur, bit as u8,
+                            )));
                             return true;
                         }
                     }
@@ -1186,16 +1222,19 @@ impl SideMetadataSpec {
                 false
             }
         };
-        let mut check_bits_backwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
+        // Check and find the last non-zero bit in the same byte.
+        let check_bits_backwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
+            // If the address is not mapped, return true for early termination.
             if !addr.is_mapped() {
-                return false;
+                return true;
             }
-            // println!("check_bits_backwards: {}, {}, {}", addr, start_bit, end_bit);
             let byte = unsafe { addr.load::<u8>() };
             for cur_bit in (start_bit..end_bit).rev() {
-                // println!("check bit at {} {}", addr, cur_bit);
                 if (byte & (1 << cur_bit)) != 0 {
-                    unsafe { *res.get() = Some(contiguous_meta_address_to_address(self, addr, cur_bit).align_down(1 << self.log_bytes_in_region)) };
+                    res.set(Some(
+                        contiguous_meta_address_to_address(self, addr, cur_bit)
+                            .align_down(1 << self.log_bytes_in_region),
+                    ));
                     return true;
                 }
             }
@@ -1212,10 +1251,16 @@ impl SideMetadataSpec {
             &check_bits_backwards,
         );
 
-        let ret = res.into_inner();
-        if let Some(addr) = ret {
-            debug_assert!(addr.is_aligned_to(1 << self.log_bytes_in_region), "{} is not aligned to {}", addr, 1 << self.log_bytes_in_region);
-        }
+        let ret = res.get();
+        #[cfg(debug_assertions)]
+        ret.inspect(|addr| {
+            debug_assert!(
+                addr.is_aligned_to(1 << self.log_bytes_in_region),
+                "{} is not aligned to {}",
+                addr,
+                1 << self.log_bytes_in_region
+            )
+        });
         ret
     }
 }
@@ -1619,6 +1664,8 @@ mod tests {
             sanity.verify_metadata_context("TestPolicy", &context);
 
             let data_addr = vm_layout::vm_layout().heap_start;
+            // Make sure the address is mapped.
+            crate::MMAPPER.ensure_mapped(data_addr, 1).unwrap();
             let meta_addr = address_to_meta_address(&spec, data_addr);
             with_cleanup(
                 || {
@@ -1975,10 +2022,12 @@ mod tests {
                         let max_value: $type = max_value($log_bits) as _;
                         // Store non zero value at data_addr
                         spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                        println!("data_addr {}", data_addr);
 
                         // Find the value starting from data_addr, at max 8 bytes.
                         // We should find data_addr
                         let res_addr = unsafe { spec.find_prev_non_zero_value::<$type>(data_addr, 8) };
+                        println!("res_addr = {:?}", res_addr);
                         assert!(res_addr.is_some());
                         assert_eq!(res_addr.unwrap(), data_addr);
                     });

@@ -114,7 +114,9 @@ pub unsafe fn is_vo_bit_set_unsafe<VM: VMBinding>(address: Address) -> Option<Ob
     is_vo_bit_set_inner::<false, VM>(address)
 }
 
-fn is_vo_bit_set_inner<const ATOMIC: bool, VM: VMBinding>(address: Address) -> Option<ObjectReference> {
+fn is_vo_bit_set_inner<const ATOMIC: bool, VM: VMBinding>(
+    address: Address,
+) -> Option<ObjectReference> {
     let addr = get_in_object_address_for_potential_object::<VM>(address);
 
     // If we haven't mapped VO bit for the address, it cannot be an object
@@ -159,35 +161,30 @@ pub fn bcopy_vo_bit_from_mark_bit<VM: VMBinding>(start: Address, size: usize) {
 
 use crate::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
 
-pub const VO_BIT_WORD_TO_REGION: usize = 1 << (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region + LOG_BITS_IN_BYTE as usize + LOG_BYTES_IN_ADDRESS as usize - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
+/// How many data memory bytes does 1 word in the VO bit side metadata represents?
+pub const VO_BIT_WORD_TO_REGION: usize = 1
+    << (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
+        + LOG_BITS_IN_BYTE as usize
+        + LOG_BYTES_IN_ADDRESS as usize
+        - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
 
-// Bulk check if a VO bit word. Return true if there is any bit set in the word.
+/// Bulk check if a VO bit word. Return true if there is any bit set in the word.
 pub fn get_raw_vo_bit_word(addr: Address) -> usize {
     unsafe { VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
 }
 
-pub fn search_vo_bit_for_addr<VM: VMBinding>(start: Address, search_limit_bytes: usize) -> Option<ObjectReference> {
-    // let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
-    // let aligned_hi= start.align_down(region_bytes);
-    // let aligned_lo = start.saturating_sub(search_limit_bytes).align_down(region_bytes);
-    // let mut cur = aligned_hi;
-    // while cur > aligned_lo {
-    //     // We encounter an unmapped address. We cannot see unmapped addr in an object. So this cannot be an internal pointer.
-    //     if !cur.is_mapped() {
-    //         return None;
-    //     }
-    //     if is_vo_addr(cur) {
-    //         return is_internal_ptr_from_vo_bit::<VM>(cur, start);
-    //     }
-    //     cur -= region_bytes;
-    // }
-    // None
+pub fn search_vo_bit_for_addr<VM: VMBinding>(
+    start: Address,
+    search_limit_bytes: usize,
+) -> Option<ObjectReference> {
     if !start.is_mapped() {
         return None;
     }
 
-    if let Some(vo_addr) = unsafe { VO_BIT_SIDE_METADATA_SPEC.find_prev_non_zero_value::<u8>(start, search_limit_bytes) } {
-        return is_internal_ptr_from_vo_bit::<VM>(vo_addr, start);
+    if let Some(vo_addr) = unsafe {
+        VO_BIT_SIDE_METADATA_SPEC.find_prev_non_zero_value::<u8>(start, search_limit_bytes)
+    } {
+        is_internal_ptr_from_vo_bit::<VM>(vo_addr, start)
     } else {
         None
     }
@@ -210,7 +207,10 @@ fn is_internal_ptr<VM: VMBinding>(obj: ObjectReference, internal_ptr: Address) -
     internal_ptr < obj_start + obj_size
 }
 
-pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(vo_addr: Address, internal_ptr: Address) -> Option<ObjectReference> {
+pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
+    vo_addr: Address,
+    internal_ptr: Address,
+) -> Option<ObjectReference> {
     let obj = get_object_ref_for_vo_addr::<VM>(vo_addr);
     if is_internal_ptr::<VM>(obj, internal_ptr) {
         Some(obj)

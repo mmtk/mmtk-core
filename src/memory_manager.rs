@@ -659,7 +659,12 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
     max_search_bytes: usize,
 ) -> Option<ObjectReference> {
     use crate::mmtk::SFT_MAP;
-    SFT_MAP.get_checked(internal_ptr).find_object_from_internal_pointer(internal_ptr, max_search_bytes)
+    let ret = SFT_MAP
+        .get_checked(internal_ptr)
+        .find_object_from_internal_pointer(internal_ptr, max_search_bytes);
+    #[cfg(debug_assertions)]
+    ret.inspect(|obj| debug_assert!(is_mmtk_object(obj.to_raw_address())));
+    ret
 }
 
 /// Return true if the `object` lies in a region of memory where

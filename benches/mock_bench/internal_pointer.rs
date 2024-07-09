@@ -1,13 +1,13 @@
 use criterion::Criterion;
 
-use mmtk::memory_manager;
+#[cfg(feature = "is_mmtk_object")]
 use mmtk::util::test_util::fixtures::*;
 use mmtk::util::test_util::mock_method::*;
 use mmtk::util::test_util::mock_vm::{write_mockvm, MockVM};
-use mmtk::AllocationSemantics;
 
 pub fn bench(c: &mut Criterion) {
     // Setting a larger heap, although the GC should be disabled in the MockVM
+    #[cfg(feature = "is_mmtk_object")]
     let mut fixture = MutatorFixture::create_with_heapsize(1 << 30);
 
     // Normal objects
@@ -21,16 +21,32 @@ pub fn bench(c: &mut Criterion) {
         }
     });
 
-    c.bench_function("internal pointer - normal objects", |b| {
+    c.bench_function("internal pointer - normal objects", |_b| {
         #[cfg(feature = "is_mmtk_object")]
         {
+            use mmtk::memory_manager;
             use mmtk::vm::ObjectModel;
-            let addr = memory_manager::alloc(&mut fixture.mutator, NORMAL_OBJECT_SIZE, 8, 0, AllocationSemantics::Default);
+            use mmtk::AllocationSemantics;
+            let addr = memory_manager::alloc(
+                &mut fixture.mutator,
+                NORMAL_OBJECT_SIZE,
+                8,
+                0,
+                AllocationSemantics::Default,
+            );
             let obj_ref = MockVM::address_to_ref(addr);
-            memory_manager::post_alloc(&mut fixture.mutator, obj_ref, NORMAL_OBJECT_SIZE, AllocationSemantics::Default);
+            memory_manager::post_alloc(
+                &mut fixture.mutator,
+                obj_ref,
+                NORMAL_OBJECT_SIZE,
+                AllocationSemantics::Default,
+            );
             let obj_end = addr + NORMAL_OBJECT_SIZE;
-            b.iter(|| {
-                memory_manager::find_object_from_internal_pointer::<MockVM>(obj_end - 1, NORMAL_OBJECT_SIZE);
+            _b.iter(|| {
+                memory_manager::find_object_from_internal_pointer::<MockVM>(
+                    obj_end - 1,
+                    NORMAL_OBJECT_SIZE,
+                );
             })
         }
         #[cfg(not(feature = "is_mmtk_object"))]
@@ -47,16 +63,32 @@ pub fn bench(c: &mut Criterion) {
             ..MockVM::default()
         }
     });
-    c.bench_function("internal pointer - large objects", |b| {
+    c.bench_function("internal pointer - large objects", |_b| {
         #[cfg(feature = "is_mmtk_object")]
         {
+            use mmtk::memory_manager;
             use mmtk::vm::ObjectModel;
-            let addr = memory_manager::alloc(&mut fixture.mutator, LARGE_OBJECT_SIZE, 8, 0, AllocationSemantics::Los);
+            use mmtk::AllocationSemantics;
+            let addr = memory_manager::alloc(
+                &mut fixture.mutator,
+                LARGE_OBJECT_SIZE,
+                8,
+                0,
+                AllocationSemantics::Los,
+            );
             let obj_ref = MockVM::address_to_ref(addr);
-            memory_manager::post_alloc(&mut fixture.mutator, obj_ref, LARGE_OBJECT_SIZE, AllocationSemantics::Los);
+            memory_manager::post_alloc(
+                &mut fixture.mutator,
+                obj_ref,
+                LARGE_OBJECT_SIZE,
+                AllocationSemantics::Los,
+            );
             let obj_end = addr + LARGE_OBJECT_SIZE;
-            b.iter(|| {
-                memory_manager::find_object_from_internal_pointer::<MockVM>(obj_end - 1, LARGE_OBJECT_SIZE);
+            _b.iter(|| {
+                memory_manager::find_object_from_internal_pointer::<MockVM>(
+                    obj_end - 1,
+                    LARGE_OBJECT_SIZE,
+                );
             })
         }
         #[cfg(not(feature = "is_mmtk_object"))]
