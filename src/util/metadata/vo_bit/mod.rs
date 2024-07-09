@@ -167,21 +167,30 @@ pub fn get_raw_vo_bit_word(addr: Address) -> usize {
 }
 
 pub fn search_vo_bit_for_addr<VM: VMBinding>(start: Address, search_limit_bytes: usize) -> Option<ObjectReference> {
-    let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
-    let aligned_hi= start.align_down(region_bytes);
-    let aligned_lo = start.saturating_sub(search_limit_bytes).align_down(region_bytes);
-    let mut cur = aligned_hi;
-    while cur > aligned_lo {
-        // We encounter an unmapped address. We cannot see unmapped addr in an object. So this cannot be an internal pointer.
-        if !cur.is_mapped() {
-            return None;
-        }
-        if is_vo_addr(cur) {
-            return is_internal_ptr_from_vo_bit::<VM>(cur, start);
-        }
-        cur -= region_bytes;
+    // let region_bytes = 1 << VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
+    // let aligned_hi= start.align_down(region_bytes);
+    // let aligned_lo = start.saturating_sub(search_limit_bytes).align_down(region_bytes);
+    // let mut cur = aligned_hi;
+    // while cur > aligned_lo {
+    //     // We encounter an unmapped address. We cannot see unmapped addr in an object. So this cannot be an internal pointer.
+    //     if !cur.is_mapped() {
+    //         return None;
+    //     }
+    //     if is_vo_addr(cur) {
+    //         return is_internal_ptr_from_vo_bit::<VM>(cur, start);
+    //     }
+    //     cur -= region_bytes;
+    // }
+    // None
+    if !start.is_mapped() {
+        return None;
     }
-    None
+
+    if let Some(vo_addr) = unsafe { VO_BIT_SIDE_METADATA_SPEC.find_prev_non_zero_value::<u8>(start, search_limit_bytes) } {
+        return is_internal_ptr_from_vo_bit::<VM>(vo_addr, start);
+    } else {
+        None
+    }
 }
 
 fn get_in_object_address_for_potential_object<VM: VMBinding>(potential_obj: Address) -> Address {

@@ -7,7 +7,7 @@ use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, PrimInt};
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -1112,7 +1112,7 @@ impl SideMetadataSpec {
         }
 
         // We need to search back.
-        let start_addr = data_addr - search_limit_bytes + 1usize;
+        let start_addr = data_addr.saturating_sub(search_limit_bytes) + 1usize;
         let end_addr = data_addr;
 
         let start_meta_addr = address_to_contiguous_meta_address(self, start_addr);
@@ -1123,25 +1123,77 @@ impl SideMetadataSpec {
 
         let mut res = std::cell::UnsafeCell::new(None);
 
+        // let mut check_bytes_backwards = |start: Address, end: Address| -> bool {
+        //     unsafe {
+        //         let mut cur = end - 1;
+        //         while cur >= start {
+        //             if !cur.is_mapped() {
+        //                 return false;
+        //             }
+        //             // println!("check byte at {}", cur);
+        //             if cur.load::<u8>() != 0 {
+        //                 *res.get() = Some(contiguous_meta_address_to_address(self, cur, 0));
+        //                 return true;
+        //             }
+        //             cur -= 1;
+        //         }
+        //         false
+        //     }
+        // };
         let mut check_bytes_backwards = |start: Address, end: Address| -> bool {
+            use crate::util::constants::BYTES_IN_ADDRESS;
             unsafe {
-                let mut cur = end - 1;
-                while cur >= start {
-                    // println!("check byte at {}", cur);
-                    if cur.load::<u8>() != 0 {
-                        *res.get() = Some(contiguous_meta_address_to_address(self, cur, 0));
-                        return true;
+                let mut cur = end;
+                while cur > start {
+                    let step = if cur.is_aligned_to(BYTES_IN_ADDRESS) && cur.align_down(BYTES_IN_ADDRESS) >= start {
+                        BYTES_IN_ADDRESS
+                    } else {
+                        1
+                    };
+
+                    cur -= step;
+
+                    if !cur.is_mapped() {
+                        return false;
                     }
-                    cur -= 1;
+
+                    if step == BYTES_IN_ADDRESS {
+                        // Load and check a usize word
+                        let value = cur.load::<usize>();
+                        if value != 0 {
+                            // Find the exact non-zero byte within the usize using bitwise operations
+                            let byte_offset = (value.trailing_zeros() / 8) as usize;
+                            let byte_addr = cur + byte_offset;
+                            let byte_value = (value >> (byte_offset * 8)) & 0xFF;
+                            if byte_value != 0 {
+                                let bit = byte_value.trailing_zeros();
+                                debug_assert!(bit < 8);
+                                *res.get() = Some(contiguous_meta_address_to_address(self, byte_addr, bit as u8));
+                                return true;
+                            }
+                        }
+                    } else {
+                        // Load and check a byte
+                        let value = cur.load::<u8>();
+                        if value != 0 {
+                            let bit = value.trailing_zeros();
+                            debug_assert!(bit < 8);
+                            *res.get() = Some(contiguous_meta_address_to_address(self, cur, bit as u8));
+                            return true;
+                        }
+                    }
                 }
                 false
             }
         };
         let mut check_bits_backwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
-            println!("check_bits_backwards: {}, {}, {}", addr, start_bit, end_bit);
+            if !addr.is_mapped() {
+                return false;
+            }
+            // println!("check_bits_backwards: {}, {}, {}", addr, start_bit, end_bit);
             let byte = unsafe { addr.load::<u8>() };
             for cur_bit in (start_bit..end_bit).rev() {
-                println!("check bit at {} {}", addr, cur_bit);
+                // println!("check bit at {} {}", addr, cur_bit);
                 if (byte & (1 << cur_bit)) != 0 {
                     unsafe { *res.get() = Some(contiguous_meta_address_to_address(self, addr, cur_bit).align_down(1 << self.log_bytes_in_region)) };
                     return true;
