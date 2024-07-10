@@ -59,6 +59,6 @@ pub fn bzero_pin_bit<VM: VMBinding>(start: Address, size: usize) {
         // If the pin bit is not in side metadata, we cannot bulk zero.
         // We will probably have to clear it for new objects, which means
         // that we do not need to clear it at sweeping.
-        unimplemented!("We cannot bulk zero unlogged bit.")
+        unimplemented!("We cannot bulk zero pin bit.")
     }
 }
