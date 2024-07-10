@@ -1,3 +1,5 @@
+#[cfg(feature = "object_pinning")]
+use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::vm::VMLocalPinningBitSpec;
@@ -41,5 +43,22 @@ impl VMLocalPinningBitSpec {
         }
 
         false
+    }
+}
+
+/// Bulk zero the pin bit.
+#[cfg(feature = "object_pinning")]
+pub fn bzero_pin_bit<VM: VMBinding>(start: Address, size: usize) {
+    use crate::util::metadata::MetadataSpec;
+    use crate::vm::object_model::ObjectModel;
+
+    if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC {
+        // We zero all the pin bits for the address range.
+        side.bzero_metadata(start, size);
+    } else {
+        // If the pin bit is not in side metadata, we cannot bulk zero.
+        // We will probably have to clear it for new objects, which means
+        // that we do not need to clear it at sweeping.
+        unimplemented!("We cannot bulk zero unlogged bit.")
     }
 }

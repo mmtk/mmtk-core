@@ -201,6 +201,9 @@ impl Block {
                     #[cfg(feature = "vo_bit")]
                     vo_bit::helper::on_region_swept::<VM, _>(self, false);
 
+                    #[cfg(feature = "object_pinning")]
+                    crate::util::metadata::pin_bit::bzero_pin_bit::<VM>(self.start(), Block::BYTES);
+
                     // Release the block if it is allocated but not marked by the current GC.
                     space.release_block(*self);
                     true
@@ -232,6 +235,10 @@ impl Block {
 
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);
+
+                    // We need to clear the pin bit as this line can be reused
+                    #[cfg(feature = "object_pinning")]
+                    crate::util::metadata::pin_bit::bzero_pin_bit::<VM>(line.start(), Line::BYTES);
 
                     prev_line_is_marked = false;
                 }
