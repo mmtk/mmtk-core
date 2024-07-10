@@ -32,6 +32,8 @@ impl VMBinding for DummyVM {
     const MAX_ALIGNMENT: usize = 1 << 6;
 }
 
+use mmtk::util::{Address, ObjectReference};
+
 impl DummyVM {
     pub fn object_start_to_ref(start: Address) -> ObjectReference {
         // Safety: start is the allocation result, and it should not be zero with an offset.
