@@ -80,9 +80,8 @@ use crate::vm::VMBinding;
 ///
 /// As the object reference address may be outside the allocated memory, and calculating the object start address may
 /// be complex, MMTk requires a fixed and efficient in-object address for each object. The in-object address should be a constant
-/// offset from the object reference address, and should be inside the allocated memory. MMTk requires the conversion
-/// from the object reference to the in-object address ([`ObjectModel::ref_to_address`]) and from the in-object address
-/// to the object reference ([`ObjectModel::address_to_ref`]).
+/// offset from the object reference address, and should be inside the allocated memory. MMTk requires the binding to
+/// specify the offset from the object reference to the in-object address by [`ObjectModel::IN_OBJECT_ADDRESS_OFFSET`].
 ///
 /// ### Object header address
 ///
@@ -433,8 +432,12 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// If this is true, the binding guarantees that an object reference's raw address is always equal to the return value of the `ref_to_address` method
-    /// and the return value of the `ref_to_object_start` method. This is a very strong guarantee, but it is also helpful for MMTk to
+    /// If this is true, the binding guarantees that the object reference's raw address,
+    /// the in-object address, and the object start is always the same address. To be precise,
+    /// 1. an object reference's raw address is always equal to the return value of the `ref_to_object_start` method,
+    /// 2. `IN_OBJECT_ADDRESS_OFFSET` is 0.
+    ///
+    /// This is a very strong guarantee, but it is also helpful for MMTk to
     /// make some assumptions and optimize for this case.
     /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
     /// if any assertion catches this error, but may also fail silently.
@@ -467,35 +470,10 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: The object to be queried.
     fn ref_to_header(object: ObjectReference) -> Address;
 
-    /// Return an address guaranteed to be inside the storage associated
-    /// with an object. The returned address needs to be deterministic
-    /// for an given object. For a given object, the returned address
-    /// *must* be a constant offset from the object reference address.
-    ///
-    /// Note that MMTk may forge an arbitrary address
-    /// directly into a potential object reference, and call this method on the 'object reference'.
-    /// In that case, the argument `object` may not be a valid object reference,
-    /// and the implementation of this method should not use any object metadata.
-    ///
-    /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
-    ///
-    /// Arguments:
-    /// * `object`: The object to be queried.
-    fn ref_to_address(object: ObjectReference) -> Address;
-
-    /// Return an object for a given address returned by `ref_to_address()`.
-    /// This does exactly the opposite of `ref_to_address()`. The returned
-    /// object reference address *must* be a constant offset from the given address.
-    ///
-    /// Note that MMTk may forge an address and call this method with the address.
-    /// Thus the returned object reference may not always be valid. The binding
-    /// should simply apply a constant offset the given address, and return
-    /// it as an object reference, and should not assume the returned object reference
-    /// is always valid. MMTk is reponsible for using the returned object reference.
-    ///
-    /// Arguments:
-    /// * `addr`: An in-object address.
-    fn address_to_ref(addr: Address) -> ObjectReference;
+    /// The offset from the object reference to an in-object address.
+    /// The binding needs to guarantee that obj_ref.to_raw_address() + IN_OBJECT_ADDRESS_OFFSET
+    /// is inside the storage associated with the object.
+    const IN_OBJECT_ADDRESS_OFFSET: isize;
 
     /// Dump debugging information for an object.
     ///

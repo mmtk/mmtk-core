@@ -212,6 +212,11 @@ impl Address {
         Address(self.0 - size)
     }
 
+    /// Apply an signed offset to the address.
+    pub const fn offset(self, offset: isize) -> Address {
+        Address((self.0 as isize).wrapping_add(offset) as usize)
+    }
+
     /// Bitwise 'and' with a mask.
     pub const fn and(self, mask: usize) -> usize {
         self.0 & mask
@@ -502,7 +507,7 @@ impl ObjectReference {
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
-    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
+    /// setting object metadata, MMTk should use [`crate::util::ObjectReference::to_address`] or [`crate::util::ObjectReference::to_header`].
     pub fn to_raw_address(self) -> Address {
         Address(self.0.get())
     }
@@ -512,8 +517,8 @@ impl ObjectReference {
     ///
     /// If `addr` is 0, the result is `None`.
     ///
-    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
-    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::util::ObjectReference::from_address`]
+    /// to turn addresses that are from [`crate::util::ObjectReference::to_address`] back to object.
     pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
         debug_assert!(
             addr.is_aligned_to(Self::ALIGNMENT),
@@ -540,12 +545,11 @@ impl ObjectReference {
     }
 
     /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
-    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
-    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    /// for an object reference.
     pub fn to_address<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
-        let to_address = VM::VMObjectModel::ref_to_address(self);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, to_address);
+        let to_address = Address(self.0.get()).offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, in-object addr is {}", self, to_address);
         to_address
     }
 
@@ -563,17 +567,19 @@ impl ObjectReference {
     pub fn to_object_start<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, object_start);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}", self, object_start);
         object_start
     }
 
-    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
-    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
-    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`].
     pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
         use crate::vm::ObjectModel;
-        let obj = VM::VMObjectModel::address_to_ref(addr);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
+        let obj = unsafe {
+            ObjectReference::from_raw_address_unchecked(
+                addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET),
+            )
+        };
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, the object reference is {}", addr, obj);
         debug_assert!(
             obj.to_raw_address().is_aligned_to(Self::ALIGNMENT),
             "ObjectReference is required to be word aligned"

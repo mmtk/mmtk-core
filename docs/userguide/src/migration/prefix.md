@@ -30,6 +30,22 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.27.0
+
+### Introduce `ObjectModel::IN_OBJECT_ADDRESS_OFFSET`
+
+```admonish tldr
+We used to have `ObjectModel::ref_to_address` and `ObjectModel::address_to_ref`, and require
+the object reference and the in-object address to have a constant offset. Now, the two methods
+are removed, and replaced with a constant `ObjectModel::IN_OBJECT_ADDRESS_OFFSET`.
+```
+
+API changes:
+* trait `ObjectModel`
+  - The methods `ref_to_address` and `address_to_ref` are removed.
+  - Users are required to specify `IN_OBJECT_ADDRESS_OFFSET` instead, which is the offset from the object
+    reference to the in-object address (which was returned in the old `ref_to_address()`).
+
 ## 0.26.0
 
 ### Rename "edge" to "slot"
