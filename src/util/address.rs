@@ -500,7 +500,7 @@ pub struct ObjectReference(NonZeroUsize);
 
 impl ObjectReference {
     /// The required minimal alignment for object reference. If the object reference's raw address is not aligned to this value,
-    /// you will see an assertion failure in the debug build.
+    /// you will see an assertion failure in the debug build when constructing an object reference instance.
     pub const ALIGNMENT: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
     /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.

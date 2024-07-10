@@ -64,28 +64,28 @@ use crate::vm::VMBinding;
 /// Instead, MMTk only uses the following addresses for an object. If you find the MMTk's approach does not work for your language in practice, you are welcome to submit an issue
 /// or engage with MMTk team on Zulip to disucss further.
 ///
-/// ### Object Reference
+/// ## Object Reference
 ///
 /// See [`crate::util::address::ObjectReference`]. This is a special address that represents the object.
 /// MMTk refers to an object by its object reference. An object reference cannot be NULL, and has to be
 /// word aligned ([`crate::util::address::ObjectReference::ALIGNMENT`]). It is allowed that an object
 /// reference is not in the allocated memory for the object.
 ///
-/// ### Object Start Address
+/// ## Object Start Address
 ///
-/// The address is returned by an allocation call [`crate::memory_manager::alloc`]. This is the start of the address range of the allocation.
+/// This address is returned by an allocation call [`crate::memory_manager::alloc`]. This is the start of the address range of the allocation.
 /// [`ObjectModel::ref_to_object_start`] should return this address for a given object.
 ///
-/// ### In-object Address
+/// ## In-object Address
 ///
 /// As the object reference address may be outside the allocated memory, and calculating the object start address may
-/// be complex, MMTk requires a fixed and efficient in-object address for each object. The in-object address should be a constant
-/// offset from the object reference address, and should be inside the allocated memory. MMTk requires the binding to
+/// be complex, MMTk requires a fixed and efficient in-object address for each object. The in-object address must be a constant
+/// offset from the object reference address, and must be inside the allocated memory. MMTk requires the binding to
 /// specify the offset from the object reference to the in-object address by [`ObjectModel::IN_OBJECT_ADDRESS_OFFSET`].
 ///
-/// ### Object header address
+/// ## Object header address
 ///
-/// If a binding allows MMTk to use its header bits for object metadata, they need to supply an object header
+/// If a binding allows MMTk to use its header bits for object metadata, it needs to supply an object header
 /// address ([`ObjectModel::ref_to_header`]). MMTk will access header bits using this address.
 pub trait ObjectModel<VM: VMBinding> {
     // Per-object Metadata Spec definitions go here
