@@ -670,7 +670,9 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
         .get_checked(internal_ptr)
         .find_object_from_internal_pointer(internal_ptr, max_search_bytes);
     #[cfg(debug_assertions)]
-    ret.inspect(|obj| debug_assert!(is_mmtk_object(obj.to_raw_address())));
+    if let Some(obj) = ret {
+        debug_assert!(is_mmtk_object(obj.to_raw_address()))
+    }
     ret
 }
 

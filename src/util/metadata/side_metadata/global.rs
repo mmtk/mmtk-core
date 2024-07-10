@@ -1253,14 +1253,14 @@ impl SideMetadataSpec {
 
         let ret = res.get();
         #[cfg(debug_assertions)]
-        ret.inspect(|addr| {
+        if let Some(addr) = ret {
             debug_assert!(
                 addr.is_aligned_to(1 << self.log_bytes_in_region),
                 "{} is not aligned to {}",
                 addr,
                 1 << self.log_bytes_in_region
             )
-        });
+        };
         ret
     }
 }
