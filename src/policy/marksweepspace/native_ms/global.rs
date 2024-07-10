@@ -196,7 +196,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     ) -> Option<ObjectReference> {
         // We don't need to search more than the max object size in the mark sweep space.
         let search_bytes = usize::min(MAX_OBJECT_SIZE, max_search_bytes);
-        crate::util::metadata::vo_bit::search_vo_bit_for_addr::<VM>(ptr, search_bytes)
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(ptr, search_bytes)
     }
 
     fn sft_trace_object(

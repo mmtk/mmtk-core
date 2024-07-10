@@ -84,7 +84,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         ptr: Address,
         max_search_bytes: usize,
     ) -> Option<ObjectReference> {
-        crate::util::metadata::vo_bit::search_vo_bit_for_addr::<VM>(ptr, max_search_bytes)
+        crate::util::metadata::vo_bit::find_object_from_internal_pointer::<VM>(
+            ptr,
+            max_search_bytes,
+        )
     }
 
     fn sft_trace_object(

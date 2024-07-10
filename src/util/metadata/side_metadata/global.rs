@@ -34,7 +34,7 @@ pub struct SideMetadataSpec {
 }
 
 impl SideMetadataSpec {
-    // Is this spec using contiguous side metadata? If not, it uses chunked side metadata.
+    /// Is this spec using contiguous side metadata? If not, it uses chunked side metadata.
     pub const fn uses_contiguous_side_metadata(&self) -> bool {
         self.is_global || cfg!(target_pointer_width = "64")
     }

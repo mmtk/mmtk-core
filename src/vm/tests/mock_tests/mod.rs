@@ -34,6 +34,10 @@ mod mock_test_handle_mmap_conflict;
 mod mock_test_handle_mmap_oom;
 mod mock_test_init_fork;
 #[cfg(feature = "is_mmtk_object")]
+mod mock_test_internal_ptr_before_in_object_addr;
+#[cfg(feature = "is_mmtk_object")]
+mod mock_test_internal_ptr_before_object_ref;
+#[cfg(feature = "is_mmtk_object")]
 mod mock_test_internal_ptr_invalid;
 #[cfg(feature = "is_mmtk_object")]
 mod mock_test_internal_ptr_large_object;

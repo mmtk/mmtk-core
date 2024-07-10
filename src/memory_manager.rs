@@ -644,9 +644,16 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// and offset for object references to find out the object reference from the return value.
 /// See Case 2 in [`crate::memory_manager::is_mmtk_object`] for more explanation.
 ///
+/// Note that, we only consider pointers that points to an address that is equal or after the in-object addresss
+/// (i.e. the address returned from [`crate::vm::ObjectModel::ref_to_address`]), and within the allocation
+/// as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
+/// `[ObjectModel::ref_to_address(obj_ref), ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
+/// If a binding defines internal pointers differently, calling this method is undefined behavior.
+/// If this is the case for you, please submit an issue or engage us on Zulip to discuss more.
+///
 /// Note that, in the similar situation as [`crate::memory_manager::is_mmtk_object`], the binding should filter
-/// out obvious non-pointers (e.g. alignment check, bound check, etc) before calling this function.
-/// This method is costly.
+/// out obvious non-pointers (e.g. alignment check, bound check, etc) before calling this function to avoid unnecessary
+/// cost. This method is not cheap.
 ///
 /// To minimize the cost, the user should also use a small `max_search_bytes`.
 ///
