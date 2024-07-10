@@ -433,7 +433,7 @@ pub trait ObjectModel<VM: VMBinding> {
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
     /// If this is true, the binding guarantees that the object reference's raw address,
-    /// the in-object address, and the object start is always the same address. To be precise,
+    /// the in-object address, and the object start are always the same address. To be precise,
     /// 1. an object reference's raw address is always equal to the return value of the `ref_to_object_start` method,
     /// 2. `IN_OBJECT_ADDRESS_OFFSET` is 0.
     ///

@@ -214,7 +214,7 @@ impl Address {
 
     /// Apply an signed offset to the address.
     pub const fn offset(self, offset: isize) -> Address {
-        Address((self.0 as isize).wrapping_add(offset) as usize)
+        Address(self.0.wrapping_add_signed(offset))
     }
 
     /// Bitwise 'and' with a mask.
