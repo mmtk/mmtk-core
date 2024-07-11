@@ -25,7 +25,6 @@ pub fn bench(c: &mut Criterion) {
         #[cfg(feature = "is_mmtk_object")]
         {
             use mmtk::memory_manager;
-            use mmtk::vm::ObjectModel;
             use mmtk::AllocationSemantics;
             let addr = memory_manager::alloc(
                 &mut fixture.mutator,
@@ -34,7 +33,7 @@ pub fn bench(c: &mut Criterion) {
                 0,
                 AllocationSemantics::Default,
             );
-            let obj_ref = MockVM::address_to_ref(addr);
+            let obj_ref = MockVM::object_start_to_ref(addr);
             memory_manager::post_alloc(
                 &mut fixture.mutator,
                 obj_ref,
@@ -67,7 +66,6 @@ pub fn bench(c: &mut Criterion) {
         #[cfg(feature = "is_mmtk_object")]
         {
             use mmtk::memory_manager;
-            use mmtk::vm::ObjectModel;
             use mmtk::AllocationSemantics;
             let addr = memory_manager::alloc(
                 &mut fixture.mutator,
@@ -76,7 +74,7 @@ pub fn bench(c: &mut Criterion) {
                 0,
                 AllocationSemantics::Los,
             );
-            let obj_ref = MockVM::address_to_ref(addr);
+            let obj_ref = MockVM::object_start_to_ref(addr);
             memory_manager::post_alloc(
                 &mut fixture.mutator,
                 obj_ref,
