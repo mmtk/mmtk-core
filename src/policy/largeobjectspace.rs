@@ -80,11 +80,22 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 
         #[cfg(feature = "vo_bit")]
         crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
+        #[cfg(all(feature = "is_mmtk_object", debug_assertions))]
+        {
+            use crate::util::constants::LOG_BYTES_IN_PAGE;
+            let vo_addr = object.to_address::<VM>();
+            let offset_from_page_start = vo_addr & ((1 << LOG_BYTES_IN_PAGE) - 1) as usize;
+            debug_assert!(
+                offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
+                "The in-object address is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
+            );
+        }
+
         self.treadmill.add_to_treadmill(object, alloc);
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr).is_some()
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
     }
     #[cfg(feature = "is_mmtk_object")]
     fn find_object_from_internal_pointer(
@@ -98,11 +109,15 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         let low_page = ptr
             .saturating_sub(max_search_bytes)
             .align_down(BYTES_IN_PAGE);
-        while cur_page > low_page {
+        while cur_page >= low_page {
             // If the page start is not mapped, there can't be an object in it.
             if !cur_page.is_mapped() {
                 return None;
             }
+            // For performance, we only check the first word which maps to the first 512 bytes in the page.
+            // In almost all the cases, it should be sufficient.
+            // However, if the in-object address is not in the first 512 bytes, this won't work.
+            // We assert this when we set VO bit for LOS.
             if vo_bit::get_raw_vo_bit_word(cur_page) != 0 {
                 // Find the exact address that has vo bit set
                 for offset in 0..vo_bit::VO_BIT_WORD_TO_REGION {

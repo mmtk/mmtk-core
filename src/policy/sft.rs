@@ -76,7 +76,7 @@ pub trait SFT {
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool;
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference>;
 
     #[cfg(feature = "is_mmtk_object")]
     fn find_object_from_internal_pointer(
@@ -161,8 +161,8 @@ impl SFT for EmptySpaceSFT {
         false
     }
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, _addr: Address) -> bool {
-        false
+    fn is_mmtk_object(&self, _addr: Address) -> Option<ObjectReference> {
+        None
     }
     #[cfg(feature = "is_mmtk_object")]
     fn find_object_from_internal_pointer(

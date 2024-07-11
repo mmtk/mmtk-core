@@ -193,16 +193,12 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
 
 /// Turning a potential object reference into its in-object address (the ref_to_address address) where the metadata is set for.
 fn get_in_object_address_for_potential_object<VM: VMBinding>(potential_obj: Address) -> Address {
-    // This is hacky: the address could be unaligned, and we will see an assertion failure if we
-    // create the 'object reference' in the normal way.
-    let obj_ref: ObjectReference = unsafe { std::mem::transmute(potential_obj) };
-    obj_ref.to_address::<VM>()
+    potential_obj.offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET)
 }
 
 /// Get the object reference from an aligned address where VO bit is set.
 fn get_object_ref_for_vo_addr<VM: VMBinding>(vo_addr: Address) -> ObjectReference {
-    // This is also hacky: address_to_ref may create an unaligned object reference.
-    let addr = <VM::VMObjectModel as ObjectModel<VM>>::address_to_ref(vo_addr).to_raw_address();
+    let addr = vo_addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
     let aligned = addr.align_up(ObjectReference::ALIGNMENT);
     unsafe { ObjectReference::from_raw_address_unchecked(aligned) }
 }

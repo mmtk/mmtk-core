@@ -4,11 +4,10 @@
 use super::mock_test_prelude::*;
 
 use crate::util::*;
-use crate::vm::ObjectModel;
 use crate::AllocationSemantics;
 
 #[test]
-pub fn interior_poiner_in_normal_object() {
+pub fn interior_pointer_in_normal_object() {
     const MB: usize = 1024 * 1024;
     const OBJECT_SIZE: usize = 16;
     with_mockvm(
@@ -31,7 +30,7 @@ pub fn interior_poiner_in_normal_object() {
                 );
                 assert!(!addr.is_zero());
 
-                let obj = MockVM::address_to_ref(addr);
+                let obj = MockVM::object_start_to_ref(addr);
                 println!(
                     "start = {}, end = {}, obj = {}, in-obj addr = {}",
                     addr,
@@ -65,6 +64,13 @@ pub fn interior_poiner_in_normal_object() {
                         assert_eq!(base_ref.unwrap(), obj);
                     }
                 };
+
+                let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
+                    obj.to_raw_address(),
+                    OBJECT_SIZE,
+                );
+                assert!(base_ref.is_some());
+                assert_eq!(base_ref.unwrap(), obj);
 
                 // Test with the first 16 bytes as offset in the object
                 for offset in 0..16usize {

@@ -6,7 +6,7 @@ use super::mock_test_prelude::*;
 use crate::util::*;
 
 #[test]
-pub fn interior_poiner_invalid() {
+pub fn interior_pointer_invalid() {
     const MB: usize = 1024 * 1024;
     with_mockvm(
         default_setup,

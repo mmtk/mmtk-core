@@ -355,9 +355,10 @@ pub struct BasePlan<VM: VMBinding> {
     /// If VM space is present, it has some special interaction with the
     /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
     ///
-    /// -   The `is_mmtk_object` funciton requires the valid object (VO) bit side metadata to identify objects,
-    ///     but currently we do not require the boot image to provide it, so it will not work if the
-    ///     address argument is in the VM space.
+    /// -   The functions `is_mmtk_object` and `find_object_from_internal_pointer` require
+    ///     the valid object (VO) bit side metadata to identify objects.
+    ///     If the binding maintains the VO bit for objects in VM spaces, those functions will work accordingly.
+    ///     Otherwise, calling them is undefined behavior.
     ///
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.

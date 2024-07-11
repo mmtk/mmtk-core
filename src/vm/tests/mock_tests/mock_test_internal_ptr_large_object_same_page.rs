@@ -6,9 +6,11 @@ use super::mock_test_prelude::*;
 use crate::AllocationSemantics;
 
 #[test]
-pub fn interior_pointer_before_object_ref() {
+pub fn interior_pointer_in_large_object_same_page() {
     const MB: usize = 1024 * 1024;
-    const OBJECT_SIZE: usize = 16;
+    // Usually we will not see allocation in large object space that is smaller than a page.
+    // But let's allow it for the page protect plan.
+    const OBJECT_SIZE: usize = 256;
     with_mockvm(
         || -> MockVM {
             MockVM {
@@ -24,7 +26,7 @@ pub fn interior_pointer_before_object_ref() {
                 OBJECT_SIZE,
                 8,
                 0,
-                AllocationSemantics::Default,
+                AllocationSemantics::Los,
             );
             assert!(!addr.is_zero());
 
@@ -36,27 +38,37 @@ pub fn interior_pointer_before_object_ref() {
                 obj,
                 obj.to_address::<MockVM>()
             );
+
             memory_manager::post_alloc(
                 &mut fixture.mutator,
                 obj,
                 OBJECT_SIZE,
-                AllocationSemantics::Default,
+                AllocationSemantics::Los,
             );
 
-            // Forge a pointer that points before the object reference, but after in-object address. MMTk should still find the base reference properly.
-
-            let before_obj_ref = addr;
-            assert!(before_obj_ref < obj.to_raw_address());
-            assert!(before_obj_ref >= obj.to_address::<MockVM>());
-
-            println!("Check {:?}", before_obj_ref);
+            let ptr = obj.to_raw_address();
             let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
-                before_obj_ref,
-                usize::MAX,
+                ptr,
+                OBJECT_SIZE,
             );
-            println!("base_ref {:?}", base_ref);
+            println!("{:?}", base_ref);
             assert!(base_ref.is_some());
             assert_eq!(base_ref.unwrap(), obj);
+
+            let ptr = obj.to_raw_address() + OBJECT_SIZE / 2;
+            let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
+                ptr,
+                OBJECT_SIZE,
+            );
+            assert!(base_ref.is_some());
+            assert_eq!(base_ref.unwrap(), obj);
+
+            let ptr = obj.to_raw_address() + OBJECT_SIZE;
+            let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
+                ptr,
+                OBJECT_SIZE,
+            );
+            assert!(base_ref.is_none());
         },
         no_cleanup,
     )

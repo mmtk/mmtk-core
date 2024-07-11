@@ -102,11 +102,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     /// For malloc space, we just use the side metadata.
     #[cfg(feature = "is_mmtk_object")]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
+    fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc::<VM>(addr).is_some()
+        has_object_alloced_by_malloc::<VM>(addr)
     }
 
     #[cfg(feature = "is_mmtk_object")]

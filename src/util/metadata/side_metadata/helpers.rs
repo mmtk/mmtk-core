@@ -25,7 +25,7 @@ pub(super) fn address_to_contiguous_meta_address(
     }
 }
 
-/// Performs reverse address translation from congitugous metadata bits to data addresses.
+/// Performs reverse address translation from contiguous metadata bits to data addresses.
 ///
 /// Arguments:
 /// * `metadata_spec`: The side metadata spec. It should be contiguous side metadata.
@@ -161,6 +161,101 @@ pub(super) fn meta_byte_mask(metadata_spec: &SideMetadataSpec) -> u8 {
     ((1usize << (1usize << bits_num_log)) - 1) as u8
 }
 
+/// The result type for find meta bits functions.
+pub enum FindMetaBitResult {
+    Found { addr: Address, bit: u8 },
+    NotFound,
+    UnmappedMetadata,
+}
+
+// Check and find the last bit that is set. We try load words where possible, and fall back to load bytes.
+pub fn find_last_non_zero_bit_in_metadata_bytes(
+    meta_start: Address,
+    meta_end: Address,
+) -> FindMetaBitResult {
+    use crate::util::constants::BYTES_IN_ADDRESS;
+    use crate::util::heap::vm_layout::MMAP_CHUNK_BYTES;
+
+    let mut cur = meta_end;
+    // We need to check if metadata address is mapped or not. But we only check at chunk granularity.
+    // This records the start of a chunk that is tested to be mapped.
+    let mut mapped_chunk = Address::MAX;
+    while cur > meta_start {
+        // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
+        let step = if cur.is_aligned_to(BYTES_IN_ADDRESS)
+            && cur.align_down(BYTES_IN_ADDRESS) >= meta_start
+        {
+            BYTES_IN_ADDRESS
+        } else {
+            1
+        };
+        // Move to the address so we can load from it
+        cur -= step;
+
+        // If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.
+        if cur < mapped_chunk {
+            if cur.is_mapped() {
+                // This is mapped. No need to check for this chunk.
+                mapped_chunk = cur.align_down(MMAP_CHUNK_BYTES);
+            } else {
+                return FindMetaBitResult::UnmappedMetadata;
+            }
+        }
+
+        if step == BYTES_IN_ADDRESS {
+            // Load and check a usize word
+            let value = unsafe { cur.load::<usize>() };
+            if value != 0 {
+                // Find the exact non-zero byte within the usize using bitwise operations
+                let byte_offset = (value.trailing_zeros() / 8) as usize;
+                let byte_addr = cur + byte_offset;
+                let byte_value: u8 = ((value >> (byte_offset * 8)) & 0xFF) as u8;
+                if let Some(bit) = find_last_non_zero_bit_in_u8(byte_value) {
+                    return FindMetaBitResult::Found {
+                        addr: byte_addr,
+                        bit,
+                    };
+                }
+            }
+        } else {
+            // Load and check a byte
+            let value = unsafe { cur.load::<u8>() };
+            if let Some(bit) = find_last_non_zero_bit_in_u8(value) {
+                return FindMetaBitResult::Found { addr: cur, bit };
+            }
+        }
+    }
+    FindMetaBitResult::NotFound
+}
+
+// Check and find the last non-zero bit in the same byte.
+pub fn find_last_non_zero_bit_in_metadata_bits(
+    addr: Address,
+    start_bit: u8,
+    end_bit: u8,
+) -> FindMetaBitResult {
+    if !addr.is_mapped() {
+        return FindMetaBitResult::UnmappedMetadata;
+    }
+    let byte = unsafe { addr.load::<u8>() };
+    for cur_bit in (start_bit..end_bit).rev() {
+        if (byte & (1 << cur_bit)) != 0 {
+            return FindMetaBitResult::Found { addr, bit: cur_bit };
+        }
+    }
+    FindMetaBitResult::NotFound
+}
+
+fn find_last_non_zero_bit_in_u8(byte_value: u8) -> Option<u8> {
+    if byte_value != 0 {
+        let bit = byte_value.trailing_zeros();
+        debug_assert!(bit < 8);
+        Some(bit as u8)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,7 +270,6 @@ mod tests {
                 assert!(addr.is_aligned_to(1 << spec.log_bytes_in_region));
                 let meta_addr = address_to_contiguous_meta_address(spec, addr);
                 let shift = meta_byte_lshift(spec, addr);
-                println!("meta_addr = {}, shift = {}", meta_addr, shift);
                 assert_eq!(
                     contiguous_meta_address_to_address(spec, meta_addr, shift),
                     addr

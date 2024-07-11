@@ -588,30 +588,17 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Concretely:
 /// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
 ///     object in any space in MMTk.
-/// 2.  Also return true if there exists an `objref: ObjectReference` such that
-///     -   `objref` is a valid object reference to an object in any space in MMTk, and
-///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
-///         -   `hi = lo + VO_BIT_REGION_SIZE` and
-///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///             It is the byte granularity of the valid object (VO) bit.
+/// 2.  Also return true if there exists an `objref: ObjectReference` for the address.
 /// 3.  Return false otherwise.  This function never panics.
-///
-/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
-/// For space efficiency, each bit of the bitmap governs a small region of memory.
-/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
-/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
-/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
-/// The alignment of a region is also the region size.
-/// If a VO bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
-/// is the valid object reference.
-/// Therefore, if this method returns true, the binding can compute the object reference by
-/// `(addr + IN_OBJECT_ADDRESS_OFFSET).align_up(ObjectReference::ALIGNMENT)` ([`crate::vm::ObjectModel::IN_OBJECT_ADDRESS_OFFSET`]).
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
 /// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the
 /// word is really a reference.
+///
+/// This function does not handle internal pointers. If a binding may have internal pointers on
+/// the stack, and requires identifying the base reference for an internal pointer, they should use
+/// [`find_object_from_internal_pointer`] instead.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
 /// is present.  See `crate::plan::global::BasePlan::vm_space`.
@@ -619,7 +606,7 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Argument:
 /// * `addr`: An arbitrary address.
 #[cfg(feature = "is_mmtk_object")]
-pub fn is_mmtk_object(addr: Address) -> bool {
+pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
     use crate::mmtk::SFT_MAP;
     SFT_MAP.get_checked(addr).is_mmtk_object(addr)
 }
@@ -628,20 +615,10 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// This should be used instead of [`crate::memory_manager::is_mmtk_object`] for conservative stack scanning if
 /// the binding may have internal pointers on the stack.
 ///
-/// The function cannot directly return an object reference. Instead, it returns
-/// an address range and guarantees the object ference is in the range.
-/// The reason behind this is that we use the VO
-/// bit to represent a valid object for every 8 bytes ([`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`]).
-/// We use VO bits to find the object for an internal pointer.
-/// When we find a set VO bit, we only know that in the 8 bytes there is an object, and we cannot know where
-/// exactly the object is. The binding needs to use their knowledge about the alignment
-/// and offset for object references to find out the object reference from the return value.
-/// See Case 2 in [`crate::memory_manager::is_mmtk_object`] for more explanation.
-///
-/// Note that, we only consider pointers that points to an address that is equal or after the in-object addresss
+/// Note that, we only consider pointers that point to addresses that are equal or greater than the in-object addresss
 /// (i.e. the address returned from [`crate::vm::ObjectModel::ref_to_address`]), and within the allocation
 /// as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
-/// `[ObjectModel::ref_to_address(obj_ref), ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
+/// `[obj_ref + ObjectModel::IN_OBJECT_ADDRESS_OFFSET, ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
 /// If a binding defines internal pointers differently, calling this method is undefined behavior.
 /// If this is the case for you, please submit an issue or engage us on Zulip to discuss more.
 ///
@@ -651,9 +628,12 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 ///
 /// To minimize the cost, the user should also use a small `max_search_bytes`.
 ///
+/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
+///
 /// Argument:
-/// * `internal_ptr`: The internal pointer to start. We search backwards from this internal pointer to find the base reference.
-/// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set.
+/// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
+/// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
 #[cfg(feature = "is_mmtk_object")]
 pub fn find_object_from_internal_pointer<VM: VMBinding>(
     internal_ptr: Address,
@@ -665,7 +645,8 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
         .find_object_from_internal_pointer(internal_ptr, max_search_bytes);
     #[cfg(debug_assertions)]
     if let Some(obj) = ret {
-        debug_assert!(is_mmtk_object(obj.to_raw_address()))
+        let obj = is_mmtk_object(obj.to_raw_address());
+        debug_assert_eq!(obj, ret);
     }
     ret
 }
