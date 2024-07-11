@@ -27,9 +27,9 @@ use crate::vm::VMBinding;
 ///
 /// Note that depending on the selected GC plan, only a subset of the methods provided here will be used.
 ///
-/// Side Specs Layout
+/// # Side Specs Layout
 ///
-/// Short version
+/// ## Short version
 ///
 /// * For *global* side metadata:
 ///   * The first spec: VMGlobalXXXSpec::side_first()
@@ -38,7 +38,7 @@ use crate::vm::VMBinding;
 ///   * The first spec: VMLocalXXXSpec::side_first()
 ///   * The following specs: VMLocalXXXSpec::side_after(FIRST_LOCAL.as_spec())
 ///
-/// Detailed explanation
+/// ## Detailed explanation
 ///
 /// There are two types of side metadata layout in MMTk:
 ///
@@ -57,6 +57,36 @@ use crate::vm::VMBinding;
 /// and for a third SideMetadataSpec (`LS3`), the `offset` will be `BASE(LS2) + required_metadata_space_per_chunk(LS2)`.
 ///
 /// For all other policies, the `offset` starts from zero. This is safe because no two policies ever manage one chunk, so there will be no overlap.
+///
+/// # Object Layout Addresses
+///
+/// MMTk tries to be general to cope with different language implementations and different object models. Thus it does not assume the internal of the object model.
+/// Instead, MMTk only uses the following addresses for an object. If you find the MMTk's approach does not work for your language in practice, you are welcome to submit an issue
+/// or engage with MMTk team on Zulip to disucss further.
+///
+/// ## Object Reference
+///
+/// See [`crate::util::address::ObjectReference`]. This is a special address that represents the object.
+/// MMTk refers to an object by its object reference. An object reference cannot be NULL, and has to be
+/// word aligned ([`crate::util::address::ObjectReference::ALIGNMENT`]). It is allowed that an object
+/// reference is not in the allocated memory for the object.
+///
+/// ## Object Start Address
+///
+/// This address is returned by an allocation call [`crate::memory_manager::alloc`]. This is the start of the address range of the allocation.
+/// [`ObjectModel::ref_to_object_start`] should return this address for a given object.
+///
+/// ## In-object Address
+///
+/// As the object reference address may be outside the allocated memory, and calculating the object start address may
+/// be complex, MMTk requires a fixed and efficient in-object address for each object. The in-object address must be a constant
+/// offset from the object reference address, and must be inside the allocated memory. MMTk requires the binding to
+/// specify the offset from the object reference to the in-object address by [`ObjectModel::IN_OBJECT_ADDRESS_OFFSET`].
+///
+/// ## Object header address
+///
+/// If a binding allows MMTk to use its header bits for object metadata, it needs to supply an object header
+/// address ([`ObjectModel::ref_to_header`]). MMTk will access header bits using this address.
 pub trait ObjectModel<VM: VMBinding> {
     // Per-object Metadata Spec definitions go here
     //
@@ -402,8 +432,12 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// If this is true, the binding guarantees that an object reference's raw address is always equal to the return value of the `ref_to_address` method
-    /// and the return value of the `ref_to_object_start` method. This is a very strong guarantee, but it is also helpful for MMTk to
+    /// If this is true, the binding guarantees that the object reference's raw address,
+    /// the in-object address, and the object start are always the same address. To be precise,
+    /// 1. an object reference's raw address is always equal to the return value of the `ref_to_object_start` method,
+    /// 2. `IN_OBJECT_ADDRESS_OFFSET` is 0.
+    ///
+    /// This is a very strong guarantee, but it is also helpful for MMTk to
     /// make some assumptions and optimize for this case.
     /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
     /// if any assertion catches this error, but may also fail silently.
@@ -436,30 +470,10 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: The object to be queried.
     fn ref_to_header(object: ObjectReference) -> Address;
 
-    /// Return an address guaranteed to be inside the storage associated
-    /// with an object. The returned address needs to be deterministic
-    /// for an given object. For a given object, the returned address
-    /// should be a constant offset from the object reference address.
-    ///
-    /// Note that MMTk may forge an arbitrary address
-    /// directly into a potential object reference, and call this method on the 'object reference'.
-    /// In that case, the argument `object` may not be a valid object reference,
-    /// and the implementation of this method should not use any object metadata.
-    ///
-    /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
-    ///
-    /// Arguments:
-    /// * `object`: The object to be queried.
-    fn ref_to_address(object: ObjectReference) -> Address;
-
-    /// Return an object for a given address returned by `ref_to_address()`.
-    /// This does exactly the opposite of `ref_to_address()`. The argument `addr` has
-    /// to be an address that is previously returned from `ref_to_address()`. Invoking this method
-    /// with an unexpected address is undefined behavior.
-    ///
-    /// Arguments:
-    /// * `addr`: An address that is returned from `ref_to_address()`
-    fn address_to_ref(addr: Address) -> ObjectReference;
+    /// The offset from the object reference to an in-object address.
+    /// The binding needs to guarantee that obj_ref.to_raw_address() + IN_OBJECT_ADDRESS_OFFSET
+    /// is inside the storage associated with the object.
+    const IN_OBJECT_ADDRESS_OFFSET: isize;
 
     /// Dump debugging information for an object.
     ///

@@ -28,7 +28,7 @@ use std::sync::Mutex;
 
 /// The offset between object reference and the allocation address if we use
 /// the default mock VM.
-pub const DEFAULT_OBJECT_REF_OFFSET: usize = 4;
+pub const DEFAULT_OBJECT_REF_OFFSET: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
 // To mock static methods, we have to create a static instance of `MockVM`.
 lazy_static! {
@@ -231,8 +231,6 @@ pub struct MockVM {
         MockMethod<(ObjectReference, Address), ObjectReference>,
     pub ref_to_object_start: MockMethod<ObjectReference, Address>,
     pub ref_to_header: MockMethod<ObjectReference, Address>,
-    pub ref_to_address: MockMethod<ObjectReference, Address>,
-    pub address_to_ref: MockMethod<Address, ObjectReference>,
     pub dump_object: MockMethod<ObjectReference, ()>,
     // reference glue
     pub weakref_clear_referent: MockMethod<ObjectReference, ()>,
@@ -304,12 +302,6 @@ impl Default for MockVM {
                 object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
             })),
             ref_to_header: MockMethod::new_fixed(Box::new(|object| object.to_raw_address())),
-            ref_to_address: MockMethod::new_fixed(Box::new(|object| {
-                object.to_raw_address().sub(DEFAULT_OBJECT_REF_OFFSET)
-            })),
-            address_to_ref: MockMethod::new_fixed(Box::new(|addr| {
-                ObjectReference::from_raw_address(addr.add(DEFAULT_OBJECT_REF_OFFSET)).unwrap()
-            })),
             dump_object: MockMethod::new_unimplemented(),
 
             weakref_clear_referent: MockMethod::new_unimplemented(),
@@ -531,13 +523,8 @@ impl crate::vm::ObjectModel<MockVM> for MockVM {
         mock!(ref_to_header(object))
     }
 
-    fn ref_to_address(object: ObjectReference) -> Address {
-        mock!(ref_to_address(object))
-    }
-
-    fn address_to_ref(addr: Address) -> ObjectReference {
-        mock!(address_to_ref(addr))
-    }
+    // TODO: This is not mocked. We need a way to deal with it.
+    const IN_OBJECT_ADDRESS_OFFSET: isize = -(DEFAULT_OBJECT_REF_OFFSET as isize);
 
     fn dump_object(object: ObjectReference) {
         mock!(dump_object(object))
@@ -627,5 +614,11 @@ impl crate::vm::Scanning<MockVM> for MockVM {
     ) {
         let worker: &'static mut GCWorker<Self> = lifetime!(worker);
         mock_any!(forward_weak_refs(worker, tracer_context))
+    }
+}
+
+impl MockVM {
+    pub fn object_start_to_ref(start: Address) -> ObjectReference {
+        ObjectReference::from_raw_address(start + DEFAULT_OBJECT_REF_OFFSET).unwrap()
     }
 }
