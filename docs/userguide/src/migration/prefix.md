@@ -44,7 +44,10 @@ API changes:
 * trait `ObjectModel`
   - The methods `ref_to_address` and `address_to_ref` are removed.
   - Users are required to specify `IN_OBJECT_ADDRESS_OFFSET` instead, which is the offset from the object
-    reference to the in-object address (which was returned in the old `ref_to_address()`).
+    reference to the in-object address (the in-object address was the return value for the old `ref_to_address()`).
+* type `ObjectReference`
+  - Add a constant `ALIGNMENT` which equals to the word size. All object references should be at least aligned
+    to the word size. This is checked in debug builds when an `ObjectReference` is constructed.
 
 ## 0.26.0
 
