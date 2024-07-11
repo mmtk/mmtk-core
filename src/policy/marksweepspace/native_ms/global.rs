@@ -1,17 +1,18 @@
-use std::sync::Arc;
-
-use atomic::Ordering;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use crate::{
     policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef},
-    scheduler::{GCWorkScheduler, GCWorker},
+    scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         copy::CopySemantics,
         heap::{BlockPageResource, PageResource},
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
-    vm::VMBinding,
+    vm::{ActivePlan, VMBinding},
 };
 
 #[cfg(feature = "is_mmtk_object")]
@@ -78,6 +79,9 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     /// these block lists in the space. These lists are only filled in the release phase,
     /// and will be moved to the abandoned lists above at the end of a GC.
     abandoned_in_gc: Mutex<AbandonedBlockLists>,
+    /// Count the number of pending `ReleaseMarkSweepSpace` and `ReleaseMutator` work packets during
+    /// the `Release` stage.
+    pending_release_packets: AtomicUsize,
 }
 
 unsafe impl<VM: VMBinding> Sync for MarkSweepSpace<VM> {}
@@ -102,26 +106,31 @@ impl AbandonedBlockLists {
             // Release free blocks
             self.available[i].release_blocks(space);
             self.consumed[i].release_blocks(space);
-            self.unswept[i].release_blocks(space);
+            if cfg!(not(feature = "eager_sweeping")) {
+                self.unswept[i].release_blocks(space);
+            } else {
+                // If we do eager sweeping, we should have no unswept blocks.
+                debug_assert!(self.unswept[i].is_empty());
+            }
 
-            // Move remaining blocks to unswept
-            self.unswept[i].append(&mut self.available[i]);
-            self.unswept[i].append(&mut self.consumed[i]);
+            // For eager sweeping, that's it.  We just release unmarked blocks, and leave marked
+            // blocks to be swept later in the `SweepChunk` work packet.
+
+            // For lazy sweeping, we move blocks from available and consumed to unswept.  When an
+            // allocator tries to use them, they will sweep the block.
+            if cfg!(not(feature = "eager_sweeping")) {
+                self.unswept[i].append(&mut self.available[i]);
+                self.unswept[i].append(&mut self.consumed[i]);
+            }
         }
     }
 
-    fn sweep<VM: VMBinding>(&mut self, space: &MarkSweepSpace<VM>) {
+    fn recycle_blocks(&mut self) {
         for i in 0..MI_BIN_FULL {
-            self.available[i].release_and_sweep_blocks(space);
-            self.consumed[i].release_and_sweep_blocks(space);
-            self.unswept[i].release_and_sweep_blocks(space);
-
-            // As we have swept blocks, move blocks in the unswept list to available or consumed list.
-            while let Some(block) = self.unswept[i].pop() {
+            for block in self.consumed[i].iter() {
                 if block.has_free_cells() {
+                    self.consumed[i].remove(block);
                     self.available[i].push(block);
-                } else {
-                    self.consumed[i].push(block);
                 }
             }
         }
@@ -310,6 +319,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             scheduler,
             abandoned: Mutex::new(AbandonedBlockLists::new()),
             abandoned_in_gc: Mutex::new(AbandonedBlockLists::new()),
+            pending_release_packets: AtomicUsize::new(0),
         }
     }
 
@@ -351,30 +361,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn release(&mut self) {
-        if cfg!(feature = "eager_sweeping") {
-            // For eager sweeping, we have to sweep the lists that are abandoned to these global lists.
-            let mut abandoned = self.abandoned.lock().unwrap();
-            abandoned.sweep(self);
-        } else {
-            // For lazy sweeping, we just move blocks from consumed to unswept. When an allocator tries
-            // to use them, they will sweep the block.
-            let mut abandoned = self.abandoned.lock().unwrap();
-            abandoned.sweep_later(self);
-        }
-    }
+        let num_mutators = VM::VMActivePlan::number_of_mutators();
+        // all ReleaseMutator work packets plus the ReleaseMarkSweepSpace packet
+        self.pending_release_packets
+            .store(num_mutators + 1, Ordering::SeqCst);
 
-    pub fn end_of_gc(&mut self) {
-        let from = self.abandoned_in_gc.get_mut().unwrap();
-        let to = self.abandoned.get_mut().unwrap();
-        to.merge(from);
-
-        #[cfg(debug_assertions)]
-        from.assert_empty();
-
-        // BlockPageResource uses worker-local block queues to eliminate contention when releasing
-        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
-        // returning to the global pool.  We flush the BlockPageResource, too.
-        self.pr.flush_all();
+        // Do work in separate work packet in order not to slow down the `Release` work packet which
+        // blocks all `ReleaseMutator` packets.
+        let space = unsafe { &*(self as *const Self) };
+        let work_packet = ReleaseMarkSweepSpace { space };
+        self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
     }
 
     /// Release a block.
@@ -430,6 +426,62 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn get_abandoned_block_lists_in_gc(&self) -> &Mutex<AbandonedBlockLists> {
         &self.abandoned_in_gc
     }
+
+    pub fn release_packet_done(&self) {
+        let old = self.pending_release_packets.fetch_sub(1, Ordering::SeqCst);
+        if old == 1 {
+            if cfg!(feature = "eager_sweeping") {
+                // When doing eager sweeping, we start sweeing now.
+                // After sweeping, we will recycle blocks.
+                let work_packets = self.generate_sweep_tasks();
+                self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+            } else {
+                // When doing lazy sweeping, we recycle blocks now.
+                self.recycle_blocks();
+            }
+        }
+    }
+
+    fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        let space = unsafe { &*(self as *const Self) };
+        let epilogue = Arc::new(RecycleBlocks {
+            space,
+            counter: AtomicUsize::new(0),
+        });
+        let tasks = self.chunk_map.generate_tasks(|chunk| {
+            Box::new(SweepChunk {
+                space,
+                chunk,
+                epilogue: epilogue.clone(),
+            })
+        });
+        epilogue.counter.store(tasks.len(), Ordering::SeqCst);
+        tasks
+    }
+
+    fn recycle_blocks(&self) {
+        {
+            let mut abandoned = self.abandoned.try_lock().unwrap();
+            let mut abandoned_in_gc = self.abandoned_in_gc.try_lock().unwrap();
+
+            if cfg!(feature = "eager_sweeping") {
+                // When doing eager sweeping, previously consumed blocks may become available after
+                // sweeping.  We recycle them.
+                abandoned.recycle_blocks();
+                abandoned_in_gc.recycle_blocks();
+            }
+
+            abandoned.merge(&mut abandoned_in_gc);
+
+            #[cfg(debug_assertions)]
+            abandoned_in_gc.assert_empty();
+        }
+
+        // BlockPageResource uses worker-local block queues to eliminate contention when releasing
+        // blocks, similar to how the MarkSweepSpace caches blocks in `abandoned_in_gc` before
+        // returning to the global pool.  We flush the BlockPageResource, too.
+        self.pr.flush_all();
+    }
 }
 
 use crate::scheduler::GCWork;
@@ -462,6 +514,70 @@ impl<VM: VMBinding> GCWork<VM> for PrepareChunkMap<VM> {
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
                 side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
             }
+        }
+    }
+}
+
+struct ReleaseMarkSweepSpace<VM: VMBinding> {
+    space: &'static MarkSweepSpace<VM>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for ReleaseMarkSweepSpace<VM> {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        {
+            let mut abandoned = self.space.abandoned.lock().unwrap();
+            abandoned.sweep_later(self.space);
+        }
+
+        self.space.release_packet_done();
+    }
+}
+
+/// Chunk sweeping work packet.  Only used by eager sweeping to sweep marked blocks after unmarked
+/// blocks have been released.
+struct SweepChunk<VM: VMBinding> {
+    space: &'static MarkSweepSpace<VM>,
+    chunk: Chunk,
+    /// A destructor invoked when all `SweepChunk` packets are finished.
+    epilogue: Arc<RecycleBlocks<VM>>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        assert_eq!(self.space.chunk_map.get(self.chunk), ChunkState::Allocated);
+
+        // number of allocated blocks.
+        let mut allocated_blocks = 0;
+        // Iterate over all allocated blocks in this chunk.
+        for block in self
+            .chunk
+            .iter_region::<Block>()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            // We have released unmarked blocks in `ReleaseMarkSweepSpace` and `ReleaseMutator`.
+            // We shouldn't see any unmarked blocks now.
+            debug_assert_eq!(block.get_state(), BlockState::Marked);
+            block.sweep::<VM>();
+            allocated_blocks += 1;
+        }
+        probe!(mmtk, sweep_chunk, allocated_blocks);
+        // Set this chunk as free if there is not live blocks.
+        if allocated_blocks == 0 {
+            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+        }
+        self.epilogue.finish_one_work_packet();
+    }
+}
+
+struct RecycleBlocks<VM: VMBinding> {
+    space: &'static MarkSweepSpace<VM>,
+    counter: AtomicUsize,
+}
+
+impl<VM: VMBinding> RecycleBlocks<VM> {
+    fn finish_one_work_packet(&self) {
+        if 1 == self.counter.fetch_sub(1, Ordering::SeqCst) {
+            self.space.recycle_blocks()
         }
     }
 }

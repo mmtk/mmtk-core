@@ -30,6 +30,9 @@ Currently, the core provides the following tracepoints.
 -   `mmtk:process_slots(num_slots: int, is_roots: bool)`: an invocation of the `process_slots`
     method. The first argument is the number of slots to be processed, and the second argument is
     whether these slots are root slots.
+-   `mmtk:sweep_chunk(allocated_blocks: int)`: an execution of the `SweepChunk` work packet (for
+    both `MarkSweepSpace` and `ImmixSpace`).  `allocated_blocks` is the number of allocated blocks
+    in the chunk processed by the work packet.
 -   `mmtk:bucket_opened(id: int)`: a work bucket opened. The first argument is the numerical
     representation of `enum WorkBucketStage`.
 -   `mmtk:work_poll()`: a work packet is to be polled.
