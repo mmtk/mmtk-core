@@ -222,7 +222,6 @@ pub struct SingleObject {
 
 impl FixtureContent for SingleObject {
     fn create() -> Self {
-        use crate::vm::object_model::ObjectModel;
         let mut mutator = MutatorFixture::create();
 
         // A relatively small object, typical for Ruby.
@@ -232,7 +231,7 @@ impl FixtureContent for SingleObject {
         let addr = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
         assert!(!addr.is_zero());
 
-        let objref = MockVM::address_to_ref(addr);
+        let objref = MockVM::object_start_to_ref(addr);
         memory_manager::post_alloc(&mut mutator.mutator, objref, size, semantics);
 
         SingleObject { objref, mutator }
@@ -257,7 +256,6 @@ pub struct TwoObjects {
 
 impl FixtureContent for TwoObjects {
     fn create() -> Self {
-        use crate::vm::object_model::ObjectModel;
         let mut mutator = MutatorFixture::create();
 
         let size = 128;
@@ -266,13 +264,13 @@ impl FixtureContent for TwoObjects {
         let addr1 = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
         assert!(!addr1.is_zero());
 
-        let objref1 = MockVM::address_to_ref(addr1);
+        let objref1 = MockVM::object_start_to_ref(addr1);
         memory_manager::post_alloc(&mut mutator.mutator, objref1, size, semantics);
 
         let addr2 = memory_manager::alloc(&mut mutator.mutator, size, 8, 0, semantics);
         assert!(!addr2.is_zero());
 
-        let objref2 = MockVM::address_to_ref(addr2);
+        let objref2 = MockVM::object_start_to_ref(addr2);
         memory_manager::post_alloc(&mut mutator.mutator, objref2, size, semantics);
 
         TwoObjects {

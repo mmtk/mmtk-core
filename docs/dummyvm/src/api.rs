@@ -259,7 +259,6 @@ pub extern "C" fn mmtk_get_malloc_bytes() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mmtk::vm::ObjectModel;
     use std::ffi::CString;
 
     #[test]
@@ -293,8 +292,8 @@ mod tests {
         let addr = mmtk_alloc(mutator, 16, 8, 0, mmtk::AllocationSemantics::Default);
         assert!(!addr.is_zero());
 
-        // Turn the allocation address into the object reference
-        let obj = crate::object_model::VMObjectModel::address_to_ref(addr);
+        // Turn the allocation address into the object reference.
+        let obj = DummyVM::object_start_to_ref(addr);
 
         // Post allocation
         mmtk_post_alloc(mutator, obj, 16, mmtk::AllocationSemantics::Default);
