@@ -32,6 +32,22 @@ Notes for the mmtk-core developers:
 
 ## 0.27.0
 
+### `is_mmtk_object` returns `Option<ObjectReference>
+
+```admonish tldr
+`memory_manager::is_mmtk_object` now returns `Option<ObjectReference>` instead of `bool`.
+Bindings can use the returned object reference instead of computing the object reference at the binding side.
+```
+
+API changes:
+* module `memory_manager`
+  - `is_mmtk_object` now returns `Option<ObjectReference>`.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1165>
+-   Example: <https://github.com/mmtk/mmtk-ruby/pull/86>
+
 ### Introduce `ObjectModel::IN_OBJECT_ADDRESS_OFFSET`
 
 ```admonish tldr
@@ -48,6 +64,11 @@ API changes:
 * type `ObjectReference`
   - Add a constant `ALIGNMENT` which equals to the word size. All object references should be at least aligned
     to the word size. This is checked in debug builds when an `ObjectReference` is constructed.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/pull/1159>
+-   Example: <https://github.com/mmtk/mmtk-openjdk/pull/283>
 
 ## 0.26.0
 
