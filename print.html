@@ -2119,14 +2119,45 @@ Notes for the mmtk-core developers:
 -->
 <div id="api-migration-detail-body"><!-- We use JavaScript to process things within this div. -->
 <!-- Insert new versions here -->
-<h2 id="0260"><a class="header" href="#0260">0.26.0</a></h2>
-<h3 id="rename-edge-to-slot"><a class="header" href="#rename-edge-to-slot">Rename "edge" to "slot"</a></h3>
+<h2 id="0270"><a class="header" href="#0270">0.27.0</a></h2>
+<h3 id="introduce-objectmodelin_object_address_offset"><a class="header" href="#introduce-objectmodelin_object_address_offset">Introduce <code>ObjectModel::IN_OBJECT_ADDRESS_OFFSET</code></a></h3>
 <div id="admonition-tldr" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-title">
 <div class="admonition-title">
 <div id="admonition-tldr-title">
 <p>TL;DR</p>
 </div>
 <a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr"></a>
+</div>
+<div>
+<p>We used to have <code>ObjectModel::ref_to_address</code> and <code>ObjectModel::address_to_ref</code>, and require
+the object reference and the in-object address to have a constant offset. Now, the two methods
+are removed, and replaced with a constant <code>ObjectModel::IN_OBJECT_ADDRESS_OFFSET</code>.</p>
+</div>
+</div>
+<p>API changes:</p>
+<ul>
+<li>trait <code>ObjectModel</code>
+<ul>
+<li>The methods <code>ref_to_address</code> and <code>address_to_ref</code> are removed.</li>
+<li>Users are required to specify <code>IN_OBJECT_ADDRESS_OFFSET</code> instead, which is the offset from the object
+reference to the in-object address (the in-object address was the return value for the old <code>ref_to_address()</code>).</li>
+</ul>
+</li>
+<li>type <code>ObjectReference</code>
+<ul>
+<li>Add a constant <code>ALIGNMENT</code> which equals to the word size. All object references should be at least aligned
+to the word size. This is checked in debug builds when an <code>ObjectReference</code> is constructed.</li>
+</ul>
+</li>
+</ul>
+<h2 id="0260"><a class="header" href="#0260">0.26.0</a></h2>
+<h3 id="rename-edge-to-slot"><a class="header" href="#rename-edge-to-slot">Rename "edge" to "slot"</a></h3>
+<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div class="admonition-title">
+<div id="admonition-tldr-1-title">
+<p>TL;DR</p>
+</div>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-1"></a>
 </div>
 <div>
 <p>The word "edge" <strong>in many identifiers</strong> have been changed to "slot" if it actaully means slot.
@@ -2195,12 +2226,12 @@ the refactoring/renaming tools in IDEs should be helpful.</p>
 </ul>
 <h2 id="0250"><a class="header" href="#0250">0.25.0</a></h2>
 <h3 id="objectreference-is-no-longer-nullable"><a class="header" href="#objectreference-is-no-longer-nullable"><code>ObjectReference</code> is no longer nullable</a></h3>
-<div id="admonition-tldr-1" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-1-title">
+<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
 <div class="admonition-title">
-<div id="admonition-tldr-1-title">
+<div id="admonition-tldr-2-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-1"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-2"></a>
 </div>
 <div>
 <p><code>ObjectReference</code> can no longer represent a NULL reference.  Some methods of <code>ObjectReference</code> and
@@ -2339,12 +2370,12 @@ by wrapping them into <code>extern "C"</code> functions that return <code>Object
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/273">https://github.com/mmtk/mmtk-openjdk/pull/273</a> (for write barriers)</li>
 </ul>
 <h3 id="instance-methods-of-objectreference-changed"><a class="header" href="#instance-methods-of-objectreference-changed">Instance methods of <code>ObjectReference</code> changed</a></h3>
-<div id="admonition-tldr-2" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-2-title">
+<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
 <div class="admonition-title">
-<div id="admonition-tldr-2-title">
+<div id="admonition-tldr-3-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-2"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-3"></a>
 </div>
 <div>
 <p>Some methods of <code>ObjectReference</code> now have a type parameter <code>&lt;VM&gt;</code>.  <code>ObjectReference::value()</code> is
@@ -2379,12 +2410,12 @@ removed.</p>
 <li>Example: <a href="https://github.com/mmtk/mmtk-openjdk/pull/272">https://github.com/mmtk/mmtk-openjdk/pull/272</a></li>
 </ul>
 <h3 id="the-gc-controller-aka-coordinator-is-removed"><a class="header" href="#the-gc-controller-aka-coordinator-is-removed">The GC controller (a.k.a. coordinator) is removed</a></h3>
-<div id="admonition-tldr-3" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-3-title">
+<div id="admonition-tldr-4" class="admonition admonish-abstract" role="note" aria-labelledby="admonition-tldr-4-title">
 <div class="admonition-title">
-<div id="admonition-tldr-3-title">
+<div id="admonition-tldr-4-title">
 <p>TL;DR</p>
 </div>
-<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-3"></a>
+<a class="admonition-anchor-link" href="migration/prefix.html#admonition-tldr-4"></a>
 </div>
 <div>
 <p>The GC controller thread is removed from MMTk core.  The VM binding needs to re-implement

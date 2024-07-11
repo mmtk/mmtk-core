@@ -625,6 +625,30 @@
 <a href="#623" id="623">623</a>
 <a href="#624" id="624">624</a>
 <a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+<a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic_traits::Atomic;
 <span class="kw">use </span>bytemuck::NoUninit;
 
@@ -837,6 +861,11 @@
     </span><span class="doccomment">/// Subtract an offset from the address.
     </span><span class="kw">pub const fn </span>sub(<span class="self">self</span>, size: usize) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0 </span>- size)
+    }
+
+    <span class="doccomment">/// Apply an signed offset to the address.
+    </span><span class="kw">pub const fn </span>offset(<span class="self">self</span>, offset: isize) -&gt; Address {
+        Address(<span class="self">self</span>.<span class="number">0</span>.wrapping_add_signed(offset))
     }
 
     <span class="doccomment">/// Bitwise 'and' with a mask.
@@ -1113,17 +1142,23 @@
 /// `usize`.  For the convenience of passing `Option&lt;ObjectReference&gt;` to and from native (C/C++)
 /// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
 ///
+/// Note that [`ObjectReference`] has to be word aligned.
+///
 /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 </span><span class="attr">#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
 </span><span class="kw">pub struct </span>ObjectReference(NonZeroUsize);
 
 <span class="kw">impl </span>ObjectReference {
+    <span class="doccomment">/// The required minimal alignment for object reference. If the object reference's raw address is not aligned to this value,
+    /// you will see an assertion failure in the debug build when constructing an object reference instance.
+    </span><span class="kw">pub const </span>ALIGNMENT: usize = <span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS;
+
     <span class="doccomment">/// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
     /// MMTk should not make any assumption on the actual location of the address with the object reference.
     /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
-    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
+    /// setting object metadata, MMTk should use [`crate::util::ObjectReference::to_address`] or [`crate::util::ObjectReference::to_header`].
     </span><span class="kw">pub fn </span>to_raw_address(<span class="self">self</span>) -&gt; Address {
         Address(<span class="self">self</span>.<span class="number">0</span>.get())
     }
@@ -1133,9 +1168,13 @@
     ///
     /// If `addr` is 0, the result is `None`.
     ///
-    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
-    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::util::ObjectReference::from_address`]
+    /// to turn addresses that are from [`crate::util::ObjectReference::to_address`] back to object.
     </span><span class="kw">pub fn </span>from_raw_address(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="macro">debug_assert!</span>(
+            addr.is_aligned_to(<span class="self">Self</span>::ALIGNMENT),
+            <span class="string">"ObjectReference is required to be word aligned"
+        </span>);
         NonZeroUsize::new(addr.<span class="number">0</span>).map(ObjectReference)
     }
 
@@ -1149,16 +1188,19 @@
     /// adding a positive offset to a non-zero address, we know the result must not be zero.
     </span><span class="kw">pub unsafe fn </span>from_raw_address_unchecked(addr: Address) -&gt; ObjectReference {
         <span class="macro">debug_assert!</span>(!addr.is_zero());
+        <span class="macro">debug_assert!</span>(
+            addr.is_aligned_to(<span class="self">Self</span>::ALIGNMENT),
+            <span class="string">"ObjectReference is required to be word aligned"
+        </span>);
         ObjectReference(NonZeroUsize::new_unchecked(addr.<span class="number">0</span>))
     }
 
     <span class="doccomment">/// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
-    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
-    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    /// for an object reference.
     </span><span class="kw">pub fn </span>to_address&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
-        <span class="kw">let </span>to_address = VM::VMObjectModel::ref_to_address(<span class="self">self</span>);
-        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == <span class="self">self</span>.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}"</span>, <span class="self">self</span>, to_address);
+        <span class="kw">let </span>to_address = Address(<span class="self">self</span>.<span class="number">0</span>.get()).offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
+        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == <span class="self">self</span>.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for object reference {}, in-object addr is {}"</span>, <span class="self">self</span>, to_address);
         to_address
     }
 
@@ -1176,17 +1218,23 @@
     </span><span class="kw">pub fn </span>to_object_start&lt;VM: VMBinding&gt;(<span class="self">self</span>) -&gt; Address {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
         <span class="kw">let </span>object_start = VM::VMObjectModel::ref_to_object_start(<span class="self">self</span>);
-        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == <span class="self">self</span>.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}"</span>, <span class="self">self</span>, object_start);
+        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == <span class="self">self</span>.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}"</span>, <span class="self">self</span>, object_start);
         object_start
     }
 
-    <span class="doccomment">/// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
-    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
-    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    <span class="doccomment">/// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`].
     </span><span class="kw">pub fn </span>from_address&lt;VM: VMBinding&gt;(addr: Address) -&gt; ObjectReference {
         <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
-        <span class="kw">let </span>obj = VM::VMObjectModel::address_to_ref(addr);
-        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for address {}, address_to_ref() returns {}"</span>, addr, obj);
+        <span class="kw">let </span>obj = <span class="kw">unsafe </span>{
+            ObjectReference::from_raw_address_unchecked(
+                addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET),
+            )
+        };
+        <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for address {}, the object reference is {}"</span>, addr, obj);
+        <span class="macro">debug_assert!</span>(
+            obj.to_raw_address().is_aligned_to(<span class="self">Self</span>::ALIGNMENT),
+            <span class="string">"ObjectReference is required to be word aligned"
+        </span>);
         obj
     }
 
