@@ -176,7 +176,10 @@ impl SideMetadataSpec {
     ) -> bool {
         trace!(
             "iterate_meta_bits: {} {}, {} {}",
-            meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit
+            meta_start_addr,
+            meta_start_bit,
+            meta_end_addr,
+            meta_end_bit
         );
         // Start/end is the same, we don't need to do anything.
         if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
