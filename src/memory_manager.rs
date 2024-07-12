@@ -616,8 +616,8 @@ pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
 /// the binding may have internal pointers on the stack.
 ///
 /// Note that, we only consider pointers that point to addresses that are equal or greater than the in-object addresss
-/// (i.e. the address returned from [`crate::vm::ObjectModel::ref_to_address`]), and within the allocation
-/// as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
+/// (i.e. [`crate::util::ObjectReference::to_address()`] which is the same as `object_ref.to_raw_address() + ObjectModel::IN_OBJECT_ADDRESS_OFFSET`),
+/// and within the allocation as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
 /// `[obj_ref + ObjectModel::IN_OBJECT_ADDRESS_OFFSET, ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
 /// If a binding defines internal pointers differently, calling this method is undefined behavior.
 /// If this is the case for you, please submit an issue or engage us on Zulip to discuss more.
