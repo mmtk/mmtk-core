@@ -47,7 +47,7 @@ binary.  It will affect the extended script, too.
 [template strings]: https://docs.python.org/3/library/string.html#template-strings
 
 For example, you can hack the [mmtk-openjdk](https://github.com/mmtk/mmtk-openjdk) binding and add a
-dependency to the `probe` crate in `Cargo.toml`.
+dependency to the `probe` crate in `Cargo.toml` if it doesn't already have one.
 
 ```toml
 probe = "0.5"
@@ -59,7 +59,7 @@ Then add the following `probe!` macro in `stop_all_mutators` in `collection.rs`:
     probe!(mmtk_openjdk, hello);
 ```
 
-and create a bpftrace script `capture_openjdk.bt`:
+and create a bpftrace script `capture_openjdk_example.bt`:
 
 ```c
 usdt:$MMTK:mmtk_openjdk:hello {
@@ -72,7 +72,7 @@ usdt:$MMTK:mmtk_openjdk:hello {
 and use the `-x` command line option while invoking `capture.py`:
 
 ```shell
-./capture.py -x capture_openjdk.bt -m /path/to/libmmtk_openjdk.so ... > output.log
+./capture.py -x capture_openjdk_example.bt -m /path/to/libmmtk_openjdk.so ... > output.log
 ```
 
 and run a benchmark with OpenJDK (such as `lusearch`).  Use the unmodified `visualize.py` to process
@@ -94,13 +94,13 @@ For example, modify the `probe!` macro and add an argument:
     probe!(mmtk_openjdk, hello, 42);
 ```
 
-and modify `capture_openjdk.bt` to print `arg0` in the CSV:
+and modify `capture_openjdk_example.bt` to print `arg0` in the CSV:
 
 ```c
         printf("hello,i,%d,%lu,%lu\n", tid, nsecs, arg0);
 ```
 
-and create a Python script `visualize_openjdk.py`:
+and create a Python script `visualize_openjdk_example.py`:
 
 ```python
 def enrich_event_extra(log_processor, name, ph, tid, ts, result, rest):
@@ -114,7 +114,7 @@ def enrich_event_extra(log_processor, name, ph, tid, ts, result, rest):
 Process the log with `visualize.py`, adding a `-x` option:
 
 ```shell
-./visualize.py -x visualize_openjdk.py output.log
+./visualize.py -x visualize_openjdk_example.py output.log
 ```
 
 Load the output into Perfetto UI and select the hello event, and you shall see the "the_number"
@@ -150,7 +150,7 @@ and add the following `probe!` macro into `scan_roots_in_mutator_thread` in `sca
         probe!(mmtk_openjdk, hello3, 44);
 ```
 
-Capture the event in `capture_openjdk.bt`:
+Capture the event in `capture_openjdk_example.bt`:
 
 ```c
 usdt:$MMTK:mmtk_openjdk:hello2 {
@@ -164,7 +164,7 @@ usdt:$MMTK:mmtk_openjdk:hello3 {
 }
 ```
 
-Process the meta event in `visualize_openjdk.py`:
+Process the meta event in `visualize_openjdk_example.py`:
 
 ```python
 def enrich_meta_extra(log_processor, name, tid, ts, gc, wp, rest):
@@ -183,12 +183,12 @@ def enrich_meta_extra(log_processor, name, tid, ts, gc, wp, rest):
                 }
 ```
 
-Run a benchmark, capture a log (with `-x capture_openjdk.bt`) and visualize it (with `-x
-visualize_openjdk.py`).  Load it into Perfetto UI.  Select a `GC` bar and you should see the
+Run a benchmark, capture a log (with `-x capture_openjdk_example.bt`) and visualize it (with `-x
+visualize_openjdk_example.py`).  Load it into Perfetto UI.  Select a `GC` bar and you should see the
 `the_number` argument being 43; select a `ScanMutatorRoots` work packet, and you will see the
 `the_number` argument being 44.  If you use `-e` to capture logs for every few GCs, you will find
 that the `the_number` argument also exists on GCs that don't record work packets.  That's because we
-don't have `if (@enable_print)` for "hello2" in `capture_openjdk.bt`.
+don't have `if (@enable_print)` for "hello2" in `capture_openjdk_example.bt`.
 
 ## Notes
 
