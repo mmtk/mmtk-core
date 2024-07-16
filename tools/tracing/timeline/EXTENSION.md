@@ -190,12 +190,30 @@ visualize_openjdk_example.py`).  Load it into Perfetto UI.  Select a `GC` bar an
 that the `the_number` argument also exists on GCs that don't record work packets.  That's because we
 don't have `if (@enable_print)` for "hello2" in `capture_openjdk_example.bt`.
 
-## Notes
+## Notes on dropped events
 
 bpftrace may drop events, so it may fail to record the beginning of some work packets.  This affects
 work packets defined in both mmtk-core and the VM binding.  If this happens, `visualize.py` may see
 some "meta" events on threads which are apparently not executing any work packets.  Such "meta"
 events are silently ignored.
+
+## Advanced usage
+
+The `enrich_event_extra` and `enrich_meta_extra` have the `LogProcessor` instance as their first
+parameters.  This allows the functions to use the `LogProcessor` instance to store states that
+persist across multiple invocations of `enrich_event_extra` and `enrich_meta_extra`.  For example,
+the VM binding can define its own duration events (those with "B" and "E" events and shown as a bar
+on the timeline).  The extension script can exploit the dynamic nature of Python, and use instance
+variables of the `LogProcessor` instance to record the "current" event, and let subsequent "meta"
+events patch those "current" events.
+
+The `LogProcessor` parameter also allows the extension script to hack into the internals of the log
+processor, just in case the extension mechanism is not flexible enough.  This is not elegant in
+terms of encapsulation and API design, but the tools are designed to be practical and not getting in
+the user's ways.  Since MMTk is a free open-source software, feel free to hack those tools to suit
+your specific needs, and discuss with MMTk developers in our official [Zulip channel].
+
+[Zulip channel]: https://mmtk.zulipchat.com/
 
 <!--
 vim: ts=4 sw=4 sts=4 et tw=100
