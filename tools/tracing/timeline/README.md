@@ -1,10 +1,11 @@
 # MMTk GC visualization
 
-This directory contains tools for visualizing the execution time of each work packet on a timeline. 
+This directory contains tools for visualizing the execution time of each work packet on a timeline.
 
 ## Before Running
 
-Before running, you should make sure the [bpftrace] command line utility is installed.
+Before running, you should make sure the [bpftrace] command line utility is installed.  You also
+need Python 3.10 or later.
 
 [bpftrace]: https://github.com/iovisor/bpftrace
 

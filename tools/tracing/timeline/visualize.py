@@ -40,6 +40,12 @@ class LogProcessor:
         self.enrich_meta_extra = None
 
     def set_extra_handler(self, extra_handler):
+        """
+        Set a Python module `extra_handler` as the handler of unrecognized events. The
+        `LogProcessor` will call the top-level functions ``enrich_event_extra`` and the
+        ``enrich_meta_extra`` defined in `extra_handler` when encountering unrecognized non-meta and
+        meta events, respectively.
+        """
         self.enrich_event_extra = getattr(extra_handler, "enrich_event_extra", None)
         self.enrich_meta_extra = getattr(extra_handler, "enrich_meta_extra", None)
 
@@ -60,24 +66,31 @@ class LogProcessor:
         self.type_id_name[type_id] = type_name
 
     def process_log_line(self, line):
-        parts = line.split(",")
+        """
+        Process a line in the log that represents an event in the form of comma-separated values.
+        """
+        parts = line.split(",") # Split by comma.
         try:
-            name, ph, tid, ts = parts[:4]
+            name, ph, tid, ts = parts[:4] # Extract the first four columns.
         except:
             print("Abnormal line: {}".format(line))
             raise
         tid = int(tid)
         ts = int(ts)
-        args = parts[4:]
+        args = parts[4:] # `args` will hold other columns.
 
         if not self.start_time:
             self.start_time = ts
 
         if ph == "meta":
+            # Find the current GC and the current work packet, and call `enrich_meta`.
+            # Will not generate any JSON object.
             gc = self.current_gc
             wp = self.current_work_packet[tid]
             self.enrich_meta(name, tid, ts, gc, wp, args)
         else:
+            # Construct a JSON object with basic information, and call `enrich_event`.
+            # The JSON object will be added to the results.
             result = {
                 "name": name,
                 "ph": ph,
@@ -92,6 +105,23 @@ class LogProcessor:
             self.results.append(result)
 
     def enrich_event(self, name, ph, tid, ts, result, args):
+        """
+        This function is called for every non-meta event the log processor encounters.
+
+        `name`, `ph`, `tid` and `ts` are the first four columns in a comma-separated line in the
+        output of `capture.py`.  `name` and `ph` are strings, while `tid` and `ts` integers. `args`
+        is a list of strings that contains other columns.
+
+        `result` is the JSON object (represented as a Python `dict`) that represents the event in
+        the Trace Event Format.  This function can modify its contents for the concrete event.
+        Specifically, ``result["args"]`` can be modified to display additional human-readable
+        information in the Perfetto UI.
+
+        Unrecognized events will be off-loaded to the ``enrich_event_extra`` function defined in the
+        extension script (specified by ``-x`` on the command line).  It will be called with all
+        parameters of this function, including `self` as the first argument.
+        """
+
         match name:
             case "GC":
                 # Put GC start/stop events in a virtual thread with tid=0
@@ -118,9 +148,28 @@ class LogProcessor:
 
             case _:
                 if self.enrich_event_extra is not None:
+                    # Call ``enrich_event_extra`` in the extension script if defined.
                     self.enrich_event_extra(self, name, ph, tid, ts, result, args)
 
     def enrich_meta(self, name, tid, ts, gc, wp, args):
+        """
+        This function is called for every meta event the log processor encounters.
+
+        `name`, `tid` and `ts` are the first, third and fourth columns in a comma-separated line in
+        the output of `capture.py`.  (The second column must be "meta" and is omitted.)  `name`is a
+        string, while `tid` and `ts` integers. `args` is a list of strings that contains other
+        columns after `ts`.
+
+        `gc` and `wp` are the JSON objects (represented as Python `dict`) that represent the
+        beginning of the current GC and the current work packet, respectively.  This function
+        usually adds more contents to ``gc["args"]`` or ``wp["args"]`` to display additional
+        human-readable information in the Perfetto UI.
+
+        Unrecognized meta events will be off-loaded to the ``enrich_meta_extra`` function defined in
+        the extension script (specified by ``-x`` on the command line).  It will be called with all
+        parameters of this function, including `self` as the first argument.
+        """
+
         processed_for_gc = True
         processed_for_wp = True
 
@@ -199,6 +248,7 @@ class LogProcessor:
         if not processed_for_gc and not processed_for_wp:
             # If we haven't touched an event, we offload it to the extension.
             if self.enrich_meta_extra is not None:
+                # Call ``enrich_meta_extra`` in the extension script if defined.
                 self.enrich_meta_extra(self, name, tid, ts, gc, wp, args)
 
     def resolve_results(self):
@@ -241,6 +291,7 @@ def main():
     log_processor = LogProcessor()
 
     if args.extra is not None:
+        # Load the extension script.
         sfl = SourceFileLoader("extrahandler", args.extra)
         extra_handler_module = sfl.load_module()
         log_processor.set_extra_handler(extra_handler_module)

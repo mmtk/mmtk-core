@@ -35,10 +35,16 @@ human-readable, and can be displayed on Perfetto UI.
 ## Extending the capturing script
 
 VM binding developers may insert custom USDT trace points into the VM binding.  They need to be
-captured by bpftrace.
+captured by bpftrace to be displayed on the timeline.
 
 The `capture.py` can use the `-x` command line option to append a script after `capture.bt` which is
-the base bpftrace script used by `capture.py`.
+the base bpftrace script used by `capture.py`.  Because the extended script is simply appended to
+`capture.bt`, it has access to all "map" variables (`@`) defined in `capture.bt`, such as
+`@harness`, `@enable_print`, etc.  The Python script `capture.py` also uses [template strings] to
+replace things starting with `$`.  Specifically, `$MMTK` will be replaced with the path to the MMTk
+binary.  It will affect the extended script, too.
+
+[template strings]: https://docs.python.org/3/library/string.html#template-strings
 
 For example, you can hack the [mmtk-openjdk](https://github.com/mmtk/mmtk-openjdk) binding and add a
 dependency to the `probe` crate in `Cargo.toml`.
