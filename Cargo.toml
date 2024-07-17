@@ -88,6 +88,12 @@ mock_test = []
 # If a binding would need to trace/scan objects that is allocated and managed by the VM, `ActivePlan::vm_trace_object()` is an alternative.
 vm_space = []
 
+# Bulk set unlog bits for all objects inside the VM space. A binding can use
+# this in case they do not have a way to iterate through objects in the
+# bootimage to set the unlog bit. Note that this will set the unlog bit for
+# addresses that may not correspond to valid objects.
+set_unlog_bits_vm_space = []
+
 # A readonly space.
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and do not guarantee read-only semantics.
 ro_space = []
