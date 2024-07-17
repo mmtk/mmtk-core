@@ -260,6 +260,17 @@
 <a href="#258" id="258">258</a>
 <a href="#259" id="259">259</a>
 <a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -271,6 +282,8 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::BYTES_IN_CHUNK;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::PageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::mark_bit::MarkState;
+<span class="attr">#[cfg(feature = <span class="string">"set_unlog_bits_vm_space"</span>)]
+</span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{ObjectModel, VMBinding};
@@ -486,6 +499,15 @@
             start: start.align_down(BYTES_IN_PAGE),
             end: end.align_up(BYTES_IN_PAGE),
         });
+
+        <span class="attr">#[cfg(feature = <span class="string">"set_unlog_bits_vm_space"</span>)]
+        </span><span class="kw">if </span><span class="self">self</span>.common.needs_log_bit {
+            <span class="comment">// Bulk set unlog bits for all addresses in the VM space. This ensures that any
+            // modification to the bootimage is logged
+            </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                side.bset_metadata(start, size);
+            }
+        }
     }
 
     <span class="kw">pub fn </span>prepare(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
