@@ -214,6 +214,7 @@
 <a href="#212" id="212">212</a>
 <a href="#213" id="213">213</a>
 <a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::{
     block::{Block, BlockState},
     line::Line,
@@ -295,6 +296,7 @@
                 || <span class="kw">super</span>::STRESS_DEFRAG
                 || (collect_whole_heap &amp;&amp; user_triggered &amp;&amp; full_heap_system_gc));
         <span class="macro">info!</span>(<span class="string">"Defrag: {}"</span>, in_defrag);
+        <span class="macro">probe!</span>(mmtk, immix_defrag, in_defrag);
         <span class="self">self</span>.in_defrag_collection
             .store(in_defrag, Ordering::Release)
     }

@@ -382,6 +382,7 @@
 <a href="#380" id="380">380</a>
 <a href="#381" id="381">381</a>
 <a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::generational::global::GenerationalPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -471,6 +472,7 @@
     <span class="kw">fn </span>schedule_collection(<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="self">self</span>, scheduler: <span class="kw-2">&amp;</span><span class="kw">crate</span>::scheduler::GCWorkScheduler&lt;<span class="self">Self</span>::VM&gt;) {
         <span class="kw">let </span>is_full_heap = <span class="self">self</span>.requires_full_heap_collection();
         <span class="self">self</span>.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
+        <span class="macro">probe!</span>(mmtk, gen_full_heap, is_full_heap);
 
         <span class="kw">if </span>!is_full_heap {
             <span class="macro">info!</span>(<span class="string">"Nursery GC"</span>);
