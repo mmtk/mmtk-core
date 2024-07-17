@@ -87,6 +87,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.requires_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
+        probe!(mmtk, gen_full_heap, is_full_heap);
 
         if !is_full_heap {
             info!("Nursery GC");
