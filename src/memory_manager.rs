@@ -588,8 +588,7 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Concretely:
 /// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
 ///     object in any space in MMTk.
-/// 2.  Also return true if there exists an `objref: ObjectReference` for the address.
-/// 3.  Return false otherwise.  This function never panics.
+/// 2.  Return false otherwise.
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses

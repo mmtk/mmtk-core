@@ -16,12 +16,12 @@ pub(super) fn address_to_contiguous_meta_address(
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
     let log_bytes_in_region = metadata_spec.log_bytes_in_region;
 
-    let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
+    let shift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
-    if rshift >= 0 {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> rshift)
+    if shift >= 0 {
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> shift)
     } else {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-rshift))
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-shift))
     }
 }
 
@@ -30,23 +30,28 @@ pub(super) fn address_to_contiguous_meta_address(
 /// Arguments:
 /// * `metadata_spec`: The side metadata spec. It should be contiguous side metadata.
 /// * `metadata_addr`; The metadata address. Returned by [`address_to_contiguous_meta_address`].
-/// * `shift`: The bit shift for the metadata. Returned by [`meta_byte_lshift`].
+/// * `bit`: The bit shift for the metadata. Returned by [`meta_byte_lshift`].
 pub(super) fn contiguous_meta_address_to_address(
     metadata_spec: &SideMetadataSpec,
     metadata_addr: Address,
-    shift: u8,
+    bit: u8,
 ) -> Address {
-    let rshift = (LOG_BITS_IN_BYTE as i32) - metadata_spec.log_num_of_bits as i32;
+    let shift = (LOG_BITS_IN_BYTE as i32) - metadata_spec.log_num_of_bits as i32;
     let relative_meta_addr = metadata_addr - metadata_spec.get_absolute_offset();
 
-    let data_addr_intermediate = if rshift >= 0 {
-        relative_meta_addr << rshift
+    let data_addr_intermediate = if shift >= 0 {
+        relative_meta_addr << shift
     } else {
-        relative_meta_addr >> (-rshift)
+        relative_meta_addr >> (-shift)
+    };
+    let data_addr_bit_shift = if shift >= 0 {
+        metadata_spec.log_bytes_in_region - metadata_spec.log_num_of_bits
+    } else {
+        metadata_spec.log_bytes_in_region
     };
 
     let data_addr = (data_addr_intermediate << metadata_spec.log_bytes_in_region)
-        + ((shift as usize) << (metadata_spec.log_bytes_in_region - metadata_spec.log_num_of_bits));
+        + ((bit as usize) << data_addr_bit_shift);
 
     unsafe { Address::from_usize(data_addr) }
 }
@@ -210,12 +215,11 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
                 let byte_offset = (value.trailing_zeros() / 8) as usize;
                 let byte_addr = cur + byte_offset;
                 let byte_value: u8 = ((value >> (byte_offset * 8)) & 0xFF) as u8;
-                if let Some(bit) = find_last_non_zero_bit_in_u8(byte_value) {
-                    return FindMetaBitResult::Found {
-                        addr: byte_addr,
-                        bit,
-                    };
-                }
+                let bit = find_last_non_zero_bit_in_u8(byte_value).unwrap();
+                return FindMetaBitResult::Found {
+                    addr: byte_addr,
+                    bit,
+                };
             }
         } else {
             // Load and check a byte
@@ -238,9 +242,9 @@ pub fn find_last_non_zero_bit_in_metadata_bits(
         return FindMetaBitResult::UnmappedMetadata;
     }
     let byte = unsafe { addr.load::<u8>() };
-    for cur_bit in (start_bit..end_bit).rev() {
-        if (byte & (1 << cur_bit)) != 0 {
-            return FindMetaBitResult::Found { addr, bit: cur_bit };
+    if let Some(bit) = find_last_non_zero_bit_in_u8(byte) {
+        if bit >= start_bit && bit < end_bit {
+            return FindMetaBitResult::Found { addr, bit };
         }
     }
     FindMetaBitResult::NotFound
@@ -320,6 +324,32 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 1,
+            log_bytes_in_region: 3,
+        };
+
+        test_round_trip_conversion(&spec, &TEST_ADDRESS_8B_REGION);
+    }
+
+    #[test]
+    fn test_contiguous_metadata_conversion_4_3() {
+        let spec = SideMetadataSpec {
+            name: "ContiguousMetadataTestSpec",
+            is_global: true,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: 4,
+            log_bytes_in_region: 3,
+        };
+
+        test_round_trip_conversion(&spec, &TEST_ADDRESS_8B_REGION);
+    }
+
+    #[test]
+    fn test_contiguous_metadata_conversion_5_3() {
+        let spec = SideMetadataSpec {
+            name: "ContiguousMetadataTestSpec",
+            is_global: true,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits: 5,
             log_bytes_in_region: 3,
         };
 

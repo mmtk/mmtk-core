@@ -100,6 +100,10 @@ pub fn is_vo_bit_set<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
 pub fn is_vo_bit_set_for_addr<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
+    // if the address is not aligned, it cannot be an object reference.
+    if !address.is_aligned_to(ObjectReference::ALIGNMENT) {
+        return None;
+    }
     is_vo_bit_set_inner::<true, VM>(address)
 }
 
