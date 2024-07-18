@@ -606,8 +606,7 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// * `addr`: An arbitrary address.
 #[cfg(feature = "is_mmtk_object")]
 pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
-    use crate::mmtk::SFT_MAP;
-    SFT_MAP.get_checked(addr).is_mmtk_object(addr)
+    crate::util::is_mmtk_object::check_object_reference(addr)
 }
 
 /// Find if there is an object with VO bit set for the given address range.
@@ -638,16 +637,7 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
     internal_ptr: Address,
     max_search_bytes: usize,
 ) -> Option<ObjectReference> {
-    use crate::mmtk::SFT_MAP;
-    let ret = SFT_MAP
-        .get_checked(internal_ptr)
-        .find_object_from_internal_pointer(internal_ptr, max_search_bytes);
-    #[cfg(debug_assertions)]
-    if let Some(obj) = ret {
-        let obj = is_mmtk_object(obj.to_raw_address());
-        debug_assert_eq!(obj, ret);
-    }
-    ret
+    crate::util::is_mmtk_object::check_internal_reference(internal_ptr, max_search_bytes)
 }
 
 /// Return true if the `object` lies in a region of memory where
