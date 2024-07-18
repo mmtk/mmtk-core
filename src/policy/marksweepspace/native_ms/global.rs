@@ -354,6 +354,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn prepare(&mut self) {
+        if self.common.needs_log_bit && full_heap {
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                for chunk in self.chunk_map.all_chunks() {
+                    side.bzero_metadata(chunk.start(), Chunk::BYTES);
+                }
+            } else {
+                unimplemented!("in header log bit is not supported");
+            }
+        }
+
         #[cfg(debug_assertions)]
         self.abandoned_in_gc.lock().unwrap().assert_empty();
 
