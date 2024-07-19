@@ -19,10 +19,19 @@ pub mod constants;
 pub mod conversions;
 /// The copy allocators for a GC worker.
 pub mod copy;
+/// Heap implementation, including page resource, mmapper, etc.
+pub mod heap;
+/// Checking if an address is an valid MMTk object.
+#[cfg(feature = "is_mmtk_object")]
+pub mod is_mmtk_object;
 /// Linear scan through a heap range
 pub mod linear_scan;
+/// Various malloc implementations (conditionally compiled by features)
+pub mod malloc;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
+/// Metadata (OnSide or InHeader) implementation.
+pub mod metadata;
 /// Opaque pointers used in MMTk, e.g. VMThread.
 pub mod opaque_pointer;
 /// MMTk command line options.
@@ -39,17 +48,8 @@ pub(crate) mod analysis;
 pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
-/// Heap implementation, including page resource, mmapper, etc.
-pub mod heap;
-/// Checking if an address is an valid MMTk object.
-#[cfg(feature = "is_mmtk_object")]
-pub mod is_mmtk_object;
 /// Logger initialization
 pub(crate) mod logger;
-/// Various malloc implementations (conditionally compiled by features)
-pub mod malloc;
-/// Metadata (OnSide or InHeader) implementation.
-pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
 /// Reference processing implementation.

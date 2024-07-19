@@ -27,6 +27,7 @@ pub fn bench_main(_c: &mut Criterion) {
     match std::env::var("MMTK_BENCH") {
         Ok(bench) => match bench.as_str() {
             "alloc" => mock_bench::alloc::bench(_c),
+            "internal_pointer" => mock_bench::internal_pointer::bench(_c),
             "sft" => mock_bench::sft::bench(_c),
             _ => panic!("Unknown benchmark {:?}", bench),
         },

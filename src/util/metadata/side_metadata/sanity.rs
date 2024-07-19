@@ -651,10 +651,6 @@ pub fn verify_update<T: MetadataValue>(
     // truncate the new_val if metadata's bits is fewer than the type's bits
     let new_val_wrapped =
         truncate_value::<T>(metadata_spec.log_num_of_bits, new_val.to_u64().unwrap());
-    println!(
-        "verify_update old = {} new = {} wrapped = {:x}",
-        old_val, new_val, new_val_wrapped
-    );
 
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
