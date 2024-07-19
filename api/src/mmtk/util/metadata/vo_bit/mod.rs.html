@@ -162,6 +162,83 @@
 <a href="#160" id="160">160</a>
 <a href="#161" id="161">161</a>
 <a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Valid object bit (VO bit)
 //!
 //! The valid object bit, or "VO bit" for short", is a global per-address metadata.  It is set at
@@ -264,20 +341,11 @@
 <span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
 </span><span class="kw">pub fn </span>is_vo_bit_set_for_addr&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-    <span class="kw">let </span>potential_object = ObjectReference::from_raw_address(address)<span class="question-mark">?</span>;
-
-    <span class="kw">let </span>addr = potential_object.to_address::&lt;VM&gt;();
-
-    <span class="comment">// If we haven't mapped VO bit for the address, it cannot be an object
-    </span><span class="kw">if </span>!VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
+    <span class="comment">// if the address is not aligned, it cannot be an object reference.
+    </span><span class="kw">if </span>!address.is_aligned_to(ObjectReference::ALIGNMENT) {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
-
-    <span class="kw">if </span>VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(addr, Ordering::SeqCst) == <span class="number">1 </span>{
-        <span class="prelude-val">Some</span>(potential_object)
-    } <span class="kw">else </span>{
-        <span class="prelude-val">None
-    </span>}
+    is_vo_bit_set_inner::&lt;<span class="bool-val">true</span>, VM&gt;(address)
 }
 
 <span class="doccomment">/// Check if an address can be turned directly into an object reference using the VO bit.
@@ -288,17 +356,28 @@
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
 </span><span class="kw">pub unsafe fn </span>is_vo_bit_set_unsafe&lt;VM: VMBinding&gt;(address: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
-    <span class="kw">let </span>potential_object = ObjectReference::from_raw_address(address)<span class="question-mark">?</span>;
+    is_vo_bit_set_inner::&lt;<span class="bool-val">false</span>, VM&gt;(address)
+}
 
-    <span class="kw">let </span>addr = potential_object.to_address::&lt;VM&gt;();
+<span class="kw">fn </span>is_vo_bit_set_inner&lt;<span class="kw">const </span>ATOMIC: bool, VM: VMBinding&gt;(
+    address: Address,
+) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">let </span>addr = get_in_object_address_for_potential_object::&lt;VM&gt;(address);
 
     <span class="comment">// If we haven't mapped VO bit for the address, it cannot be an object
     </span><span class="kw">if </span>!VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
 
-    <span class="kw">if </span>VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) == <span class="number">1 </span>{
-        <span class="prelude-val">Some</span>(potential_object)
+    <span class="kw">let </span>vo_bit = <span class="kw">if </span>ATOMIC {
+        VO_BIT_SIDE_METADATA_SPEC.load_atomic::&lt;u8&gt;(addr, Ordering::SeqCst)
+    } <span class="kw">else </span>{
+        <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) }
+    };
+
+    <span class="kw">if </span>vo_bit == <span class="number">1 </span>{
+        <span class="kw">let </span>obj = get_object_ref_for_vo_addr::&lt;VM&gt;(addr);
+        <span class="prelude-val">Some</span>(obj)
     } <span class="kw">else </span>{
         <span class="prelude-val">None
     </span>}
@@ -324,4 +403,79 @@
     <span class="kw">let </span>side_mark_bit_spec = mark_bit_spec.extract_side_spec();
     VO_BIT_SIDE_METADATA_SPEC.bcopy_metadata_contiguous(start, size, side_mark_bit_spec);
 }
+
+<span class="kw">use </span><span class="kw">crate</span>::util::constants::{LOG_BITS_IN_BYTE, LOG_BYTES_IN_ADDRESS};
+
+<span class="doccomment">/// How many data memory bytes does 1 word in the VO bit side metadata represents?
+</span><span class="kw">pub const </span>VO_BIT_WORD_TO_REGION: usize = <span class="number">1
+    </span>&lt;&lt; (VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region
+        + LOG_BITS_IN_BYTE <span class="kw">as </span>usize
+        + LOG_BYTES_IN_ADDRESS <span class="kw">as </span>usize
+        - VO_BIT_SIDE_METADATA_SPEC.log_num_of_bits);
+
+<span class="doccomment">/// Bulk check if a VO bit word. Return true if there is any bit set in the word.
+</span><span class="kw">pub fn </span>get_raw_vo_bit_word(addr: Address) -&gt; usize {
+    <span class="kw">unsafe </span>{ VO_BIT_SIDE_METADATA_SPEC.load_raw_word(addr) }
+}
+
+<span class="doccomment">/// Find the base reference to the object from a potential internal pointer.
+</span><span class="kw">pub fn </span>find_object_from_internal_pointer&lt;VM: VMBinding&gt;(
+    start: Address,
+    search_limit_bytes: usize,
+) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">if </span>!start.is_mapped() {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
+
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(vo_addr) = <span class="kw">unsafe </span>{
+        VO_BIT_SIDE_METADATA_SPEC.find_prev_non_zero_value::&lt;u8&gt;(start, search_limit_bytes)
+    } {
+        is_internal_ptr_from_vo_bit::&lt;VM&gt;(vo_addr, start)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>}
+}
+
+<span class="doccomment">/// Turning a potential object reference into its in-object address (the ref_to_address address) where the metadata is set for.
+</span><span class="kw">fn </span>get_in_object_address_for_potential_object&lt;VM: VMBinding&gt;(potential_obj: Address) -&gt; Address {
+    potential_obj.offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET)
+}
+
+<span class="doccomment">/// Get the object reference from an aligned address where VO bit is set.
+</span><span class="kw">fn </span>get_object_ref_for_vo_addr&lt;VM: VMBinding&gt;(vo_addr: Address) -&gt; ObjectReference {
+    <span class="kw">let </span>addr = vo_addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
+    <span class="kw">let </span>aligned = addr.align_up(ObjectReference::ALIGNMENT);
+    <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(aligned) }
+}
+
+<span class="doccomment">/// Check if the address could be an internal pointer in the object.
+</span><span class="kw">fn </span>is_internal_ptr&lt;VM: VMBinding&gt;(obj: ObjectReference, internal_ptr: Address) -&gt; bool {
+    <span class="kw">let </span>obj_start = obj.to_object_start::&lt;VM&gt;();
+    <span class="kw">let </span>obj_size = VM::VMObjectModel::get_current_size(obj);
+    internal_ptr &lt; obj_start + obj_size
+}
+
+<span class="doccomment">/// Check if the address could be an internal pointer based on where VO bit is set.
+</span><span class="kw">pub fn </span>is_internal_ptr_from_vo_bit&lt;VM: VMBinding&gt;(
+    vo_addr: Address,
+    internal_ptr: Address,
+) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="comment">// VO bit should be set on the address.
+    </span><span class="macro">debug_assert!</span>(<span class="kw">unsafe </span>{ is_vo_addr(vo_addr) });
+
+    <span class="kw">let </span>obj = get_object_ref_for_vo_addr::&lt;VM&gt;(vo_addr);
+    <span class="kw">if </span>is_internal_ptr::&lt;VM&gt;(obj, internal_ptr) {
+        <span class="prelude-val">Some</span>(obj)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>}
+}
+
+<span class="doccomment">/// Non-atomically check if the VO bit is set for this address.
+///
+/// # Safety
+/// The caller needs to make sure that no one is modifying VO bit.
+</span><span class="kw">pub unsafe fn </span>is_vo_addr(addr: Address) -&gt; bool {
+    VO_BIT_SIDE_METADATA_SPEC.load::&lt;u8&gt;(addr) != <span class="number">0
+</span>}
 </code></pre></div></section></main></body></html>

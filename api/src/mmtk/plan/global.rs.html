@@ -754,6 +754,7 @@
 <a href="#752" id="752">752</a>
 <a href="#753" id="753">753</a>
 <a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
@@ -1111,9 +1112,10 @@ BasePlan should contain all plan-related state and functions that are _fundament
     /// If VM space is present, it has some special interaction with the
     /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
     ///
-    /// -   The `is_mmtk_object` funciton requires the valid object (VO) bit side metadata to identify objects,
-    ///     but currently we do not require the boot image to provide it, so it will not work if the
-    ///     address argument is in the VM space.
+    /// -   The functions `is_mmtk_object` and `find_object_from_internal_pointer` require
+    ///     the valid object (VO) bit side metadata to identify objects.
+    ///     If the binding maintains the VO bit for objects in VM spaces, those functions will work accordingly.
+    ///     Otherwise, calling them is undefined behavior.
     ///
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.

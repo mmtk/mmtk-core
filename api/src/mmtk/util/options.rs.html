@@ -1303,7 +1303,7 @@
 }
 
 <span class="doccomment">/// Select a GC plan for MMTk.
-</span><span class="attr">#[derive(Copy, Clone, EnumString, Debug)]
+</span><span class="attr">#[derive(Copy, Clone, EnumString, Debug, PartialEq, Eq)]
 </span><span class="kw">pub enum </span>PlanSelector {
     <span class="doccomment">/// Allocation only without a collector. This is usually used for debugging.
     /// Similar to OpenJDK epsilon (&lt;https://openjdk.org/jeps/318&gt;).

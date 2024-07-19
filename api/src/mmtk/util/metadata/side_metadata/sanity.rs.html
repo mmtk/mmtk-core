@@ -855,10 +855,6 @@
 <a href="#853" id="853">853</a>
 <a href="#854" id="854">854</a>
 <a href="#855" id="855">855</a>
-<a href="#856" id="856">856</a>
-<a href="#857" id="857">857</a>
-<a href="#858" id="858">858</a>
-<a href="#859" id="859">859</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::io::{Error, ErrorKind, <span class="prelude-ty">Result</span>};
@@ -1512,10 +1508,6 @@
     <span class="comment">// truncate the new_val if metadata's bits is fewer than the type's bits
     </span><span class="kw">let </span>new_val_wrapped =
         truncate_value::&lt;T&gt;(metadata_spec.log_num_of_bits, new_val.to_u64().unwrap());
-    <span class="macro">println!</span>(
-        <span class="string">"verify_update old = {} new = {} wrapped = {:x}"</span>,
-        old_val, new_val, new_val_wrapped
-    );
 
     <span class="kw">let </span>sanity_map = <span class="kw-2">&amp;mut </span>CONTENT_SANITY_MAP.write().unwrap();
     <span class="kw">match </span>sanity_map.get_mut(metadata_spec) {

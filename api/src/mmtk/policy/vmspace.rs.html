@@ -271,6 +271,17 @@
 <a href="#269" id="269">269</a>
 <a href="#270" id="270">270</a>
 <a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -339,8 +350,19 @@
         </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
+    }
+    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">crate</span>::util::metadata::vo_bit::find_object_from_internal_pointer::&lt;VM&gt;(
+            ptr,
+            max_search_bytes,
+        )
     }
     <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,

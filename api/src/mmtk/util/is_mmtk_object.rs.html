@@ -4,8 +4,54 @@
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
+<a href="#5" id="5">5</a>
+<a href="#6" id="6">6</a>
+<a href="#7" id="7">7</a>
+<a href="#8" id="8">8</a>
+<a href="#9" id="9">9</a>
+<a href="#10" id="10">10</a>
+<a href="#11" id="11">11</a>
+<a href="#12" id="12">12</a>
+<a href="#13" id="13">13</a>
+<a href="#14" id="14">14</a>
+<a href="#15" id="15">15</a>
+<a href="#16" id="16">16</a>
+<a href="#17" id="17">17</a>
+<a href="#18" id="18">18</a>
+<a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
+<a href="#23" id="23">23</a>
+<a href="#24" id="24">24</a>
+<a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
 </pre></div><pre class="rust"><code><span class="doccomment">/// The region size (in bytes) of the `VO_BIT` side metadata.
 /// The VM can use this to check if an object is properly aligned.
 </span><span class="kw">pub const </span>VO_BIT_REGION_SIZE: usize =
     <span class="number">1usize </span>&lt;&lt; <span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
+
+<span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>check_object_reference(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
+    SFT_MAP.get_checked(addr).is_mmtk_object(addr)
+}
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>check_internal_reference(
+    addr: Address,
+    max_search_bytes: usize,
+) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
+    <span class="kw">let </span>ret = SFT_MAP
+        .get_checked(addr)
+        .find_object_from_internal_pointer(addr, max_search_bytes);
+    <span class="attr">#[cfg(debug_assertions)]
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(obj) = ret {
+        <span class="kw">let </span>obj = check_object_reference(obj.to_raw_address());
+        <span class="macro">debug_assert_eq!</span>(obj, ret);
+    }
+    ret
+}
 </code></pre></div></section></main></body></html>

@@ -103,10 +103,19 @@
 </span><span class="kw">pub mod </span>conversions;
 <span class="doccomment">/// The copy allocators for a GC worker.
 </span><span class="kw">pub mod </span>copy;
+<span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.
+</span><span class="kw">pub mod </span>heap;
+<span class="doccomment">/// Checking if an address is an valid MMTk object.
+</span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+</span><span class="kw">pub mod </span>is_mmtk_object;
 <span class="doccomment">/// Linear scan through a heap range
 </span><span class="kw">pub mod </span>linear_scan;
+<span class="doccomment">/// Various malloc implementations (conditionally compiled by features)
+</span><span class="kw">pub mod </span>malloc;
 <span class="doccomment">/// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 </span><span class="kw">pub mod </span>memory;
+<span class="doccomment">/// Metadata (OnSide or InHeader) implementation.
+</span><span class="kw">pub mod </span>metadata;
 <span class="doccomment">/// Opaque pointers used in MMTk, e.g. VMThread.
 </span><span class="kw">pub mod </span>opaque_pointer;
 <span class="doccomment">/// MMTk command line options.
@@ -123,17 +132,8 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>erase_vm;
 <span class="doccomment">/// Finalization implementation.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>finalizable_processor;
-<span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.
-</span><span class="kw">pub mod </span>heap;
-<span class="doccomment">/// Checking if an address is an valid MMTk object.
-</span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-</span><span class="kw">pub mod </span>is_mmtk_object;
 <span class="doccomment">/// Logger initialization
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>logger;
-<span class="doccomment">/// Various malloc implementations (conditionally compiled by features)
-</span><span class="kw">pub mod </span>malloc;
-<span class="doccomment">/// Metadata (OnSide or InHeader) implementation.
-</span><span class="kw">pub mod </span>metadata;
 <span class="doccomment">/// Forwarding word in object copying.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_forwarding;
 <span class="doccomment">/// Reference processing implementation.

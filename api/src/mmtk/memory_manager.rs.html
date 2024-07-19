@@ -884,6 +884,22 @@
 <a href="#882" id="882">882</a>
 <a href="#883" id="883">883</a>
 <a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
+<a href="#893" id="893">893</a>
+<a href="#894" id="894">894</a>
+<a href="#895" id="895">895</a>
+<a href="#896" id="896">896</a>
+<a href="#897" id="897">897</a>
+<a href="#898" id="898">898</a>
+<a href="#899" id="899">899</a>
+<a href="#900" id="900">900</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.
 //!
 //! This module provides a safe Rust API for mmtk-core.
@@ -1474,30 +1490,16 @@
 /// Concretely:
 /// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
 ///     object in any space in MMTk.
-/// 2.  Also return true if there exists an `objref: ObjectReference` such that
-///     -   `objref` is a valid object reference to an object in any space in MMTk, and
-///     -   `lo &lt;= objref.to_address() &lt; hi`, where
-///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
-///         -   `hi = lo + VO_BIT_REGION_SIZE` and
-///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///             It is the byte granularity of the valid object (VO) bit.
-/// 3.  Return false otherwise.  This function never panics.
-///
-/// This function uses the "valid object (VO) bits" side metadata, i.e. a bitmap.
-/// For space efficiency, each bit of the bitmap governs a small region of memory.
-/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
-/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
-/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
-/// The alignment of a region is also the region size.
-/// If a VO bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
-/// is the valid object reference.
-/// Therefore, if this method returns true, the binding can compute the object reference by
-/// aligning the address to [`crate::util::ObjectReference::ALIGNMENT`].
+/// 2.  Return false otherwise.
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
 /// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the
 /// word is really a reference.
+///
+/// This function does not handle internal pointers. If a binding may have internal pointers on
+/// the stack, and requires identifying the base reference for an internal pointer, they should use
+/// [`find_object_from_internal_pointer`] instead.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
 /// is present.  See `crate::plan::global::BasePlan::vm_space`.
@@ -1505,9 +1507,39 @@
 /// Argument:
 /// * `addr`: An arbitrary address.
 </span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-</span><span class="kw">pub fn </span>is_mmtk_object(addr: Address) -&gt; bool {
-    <span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
-    SFT_MAP.get_checked(addr).is_mmtk_object(addr)
+</span><span class="kw">pub fn </span>is_mmtk_object(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">crate</span>::util::is_mmtk_object::check_object_reference(addr)
+}
+
+<span class="doccomment">/// Find if there is an object with VO bit set for the given address range.
+/// This should be used instead of [`crate::memory_manager::is_mmtk_object`] for conservative stack scanning if
+/// the binding may have internal pointers on the stack.
+///
+/// Note that, we only consider pointers that point to addresses that are equal or greater than the in-object addresss
+/// (i.e. [`crate::util::ObjectReference::to_address()`] which is the same as `object_ref.to_raw_address() + ObjectModel::IN_OBJECT_ADDRESS_OFFSET`),
+/// and within the allocation as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
+/// `[obj_ref + ObjectModel::IN_OBJECT_ADDRESS_OFFSET, ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
+/// If a binding defines internal pointers differently, calling this method is undefined behavior.
+/// If this is the case for you, please submit an issue or engage us on Zulip to discuss more.
+///
+/// Note that, in the similar situation as [`crate::memory_manager::is_mmtk_object`], the binding should filter
+/// out obvious non-pointers (e.g. alignment check, bound check, etc) before calling this function to avoid unnecessary
+/// cost. This method is not cheap.
+///
+/// To minimize the cost, the user should also use a small `max_search_bytes`.
+///
+/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
+///
+/// Argument:
+/// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
+/// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
+</span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+</span><span class="kw">pub fn </span>find_object_from_internal_pointer&lt;VM: VMBinding&gt;(
+    internal_ptr: Address,
+    max_search_bytes: usize,
+) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+    <span class="kw">crate</span>::util::is_mmtk_object::check_internal_reference(internal_ptr, max_search_bytes)
 }
 
 <span class="doccomment">/// Return true if the `object` lies in a region of memory where

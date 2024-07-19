@@ -204,6 +204,17 @@
 <a href="#202" id="202">202</a>
 <a href="#203" id="203">203</a>
 <a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
@@ -270,8 +281,19 @@
         </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
+    }
+    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">crate</span>::util::metadata::vo_bit::find_object_from_internal_pointer::&lt;VM&gt;(
+            ptr,
+            max_search_bytes,
+        )
     }
     <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,

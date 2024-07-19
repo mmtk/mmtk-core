@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["VO_BIT_REGION_SIZE"]};
+window.SIDEBAR_ITEMS = {"constant":["VO_BIT_REGION_SIZE"],"fn":["check_internal_reference","check_object_reference"]};

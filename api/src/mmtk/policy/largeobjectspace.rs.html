@@ -312,6 +312,60 @@
 <a href="#310" id="310">310</a>
 <a href="#311" id="311">311</a>
 <a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -394,12 +448,66 @@
 
         <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
         </span><span class="kw">crate</span>::util::metadata::vo_bit::set_vo_bit::&lt;VM&gt;(object);
+        <span class="attr">#[cfg(all(feature = <span class="string">"is_mmtk_object"</span>, debug_assertions))]
+        </span>{
+            <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
+            <span class="kw">let </span>vo_addr = object.to_address::&lt;VM&gt;();
+            <span class="kw">let </span>offset_from_page_start = vo_addr &amp; ((<span class="number">1 </span>&lt;&lt; LOG_BYTES_IN_PAGE) - <span class="number">1</span>) <span class="kw">as </span>usize;
+            <span class="macro">debug_assert!</span>(
+                offset_from_page_start &lt; <span class="kw">crate</span>::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
+                <span class="string">"The in-object address is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
+            </span>);
+        }
+
         <span class="self">self</span>.treadmill.add_to_treadmill(object, alloc);
     }
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
     }
+    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
+        <span class="comment">// For large object space, it is a bit special. We only need to check VO bit for each page.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>cur_page = ptr.align_down(BYTES_IN_PAGE);
+        <span class="kw">let </span>low_page = ptr
+            .saturating_sub(max_search_bytes)
+            .align_down(BYTES_IN_PAGE);
+        <span class="kw">while </span>cur_page &gt;= low_page {
+            <span class="comment">// If the page start is not mapped, there can't be an object in it.
+            </span><span class="kw">if </span>!cur_page.is_mapped() {
+                <span class="kw">return </span><span class="prelude-val">None</span>;
+            }
+            <span class="comment">// For performance, we only check the first word which maps to the first 512 bytes in the page.
+            // In almost all the cases, it should be sufficient.
+            // However, if the in-object address is not in the first 512 bytes, this won't work.
+            // We assert this when we set VO bit for LOS.
+            </span><span class="kw">if </span>vo_bit::get_raw_vo_bit_word(cur_page) != <span class="number">0 </span>{
+                <span class="comment">// Find the exact address that has vo bit set
+                </span><span class="kw">for </span>offset <span class="kw">in </span><span class="number">0</span>..vo_bit::VO_BIT_WORD_TO_REGION {
+                    <span class="kw">let </span>addr = cur_page + offset;
+                    <span class="kw">if unsafe </span>{ vo_bit::is_vo_addr(addr) } {
+                        <span class="kw">let </span>obj = vo_bit::is_internal_ptr_from_vo_bit::&lt;VM&gt;(addr, ptr);
+                        <span class="kw">if </span>obj.is_some() {
+                            <span class="kw">return </span>obj;
+                        } <span class="kw">else </span>{
+                            <span class="kw">return </span><span class="prelude-val">None</span>;
+                        }
+                    }
+                }
+                <span class="macro">unreachable!</span>(
+                    <span class="string">"We found vo bit in the raw word, but we cannot find the exact address"
+                </span>);
+            }
+
+            cur_page -= BYTES_IN_PAGE;
+        }
+        <span class="prelude-val">None
+    </span>}
     <span class="kw">fn </span>sft_trace_object(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         queue: <span class="kw-2">&amp;mut </span>VectorObjectQueue,

@@ -572,6 +572,17 @@
 <a href="#570" id="570">570</a>
 <a href="#571" id="571">571</a>
 <a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -767,8 +778,19 @@
     }
 
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool {
-        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr).is_some()
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="kw">crate</span>::util::metadata::vo_bit::is_vo_bit_set_for_addr::&lt;VM&gt;(addr)
+    }
+
+    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="comment">// We don't need to search more than the max object size in the mark sweep space.
+        </span><span class="kw">let </span>search_bytes = usize::min(MAX_OBJECT_SIZE, max_search_bytes);
+        <span class="kw">crate</span>::util::metadata::vo_bit::find_object_from_internal_pointer::&lt;VM&gt;(ptr, search_bytes)
     }
 
     <span class="kw">fn </span>sft_trace_object(

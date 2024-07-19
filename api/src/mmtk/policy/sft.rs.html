@@ -180,6 +180,21 @@
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::VectorObjectQueue;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::<span class="kw-2">*</span>;
@@ -258,7 +273,14 @@
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
     </span><span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; bool;
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;;
+
+    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        ptr: Address,
+        max_search_bytes: usize,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt;;
 
     <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).
     </span><span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, alloc: bool);
@@ -336,8 +358,16 @@
         <span class="bool-val">false
     </span>}
     <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
-    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; bool {
-        <span class="bool-val">false
+    </span><span class="kw">fn </span>is_mmtk_object(<span class="kw-2">&amp;</span><span class="self">self</span>, _addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="prelude-val">None
+    </span>}
+    <span class="attr">#[cfg(feature = <span class="string">"is_mmtk_object"</span>)]
+    </span><span class="kw">fn </span>find_object_from_internal_pointer(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _ptr: Address,
+        _max_search_bytes: usize,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
+        <span class="prelude-val">None
     </span>}
 
     <span class="kw">fn </span>initialize_object_metadata(<span class="kw-2">&amp;</span><span class="self">self</span>, object: ObjectReference, _alloc: bool) {
