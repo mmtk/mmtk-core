@@ -633,9 +633,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // forwarding status and return the unmoved object
             object_forwarding::clear_forwarding_bits::<VM>(object);
 
-            if !super::MARK_LINE_AT_SCAN_TIME {
-                self.mark_lines(object);
-            }
 
             object
         } else {
