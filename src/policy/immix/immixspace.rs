@@ -632,8 +632,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
             object_forwarding::clear_forwarding_bits::<VM>(object);
-
-
             object
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
