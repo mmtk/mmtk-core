@@ -632,6 +632,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
             object_forwarding::clear_forwarding_bits::<VM>(object);
+
+            if !super::MARK_LINE_AT_SCAN_TIME {
+                self.mark_lines(object);
+            }
+            
             object
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
@@ -646,6 +651,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_marked::<VM>(object);
 
+                if !super::MARK_LINE_AT_SCAN_TIME {
+                    self.mark_lines(object);
+                }
+                
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
