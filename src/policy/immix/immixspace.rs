@@ -636,7 +636,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if !super::MARK_LINE_AT_SCAN_TIME {
                 self.mark_lines(object);
             }
-            
+
             object
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
@@ -654,7 +654,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 if !super::MARK_LINE_AT_SCAN_TIME {
                     self.mark_lines(object);
                 }
-                
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should
