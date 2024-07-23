@@ -178,7 +178,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
         false
     }
 
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
         false
     }
 
