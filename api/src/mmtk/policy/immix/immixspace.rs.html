@@ -1133,6 +1133,10 @@
 <a href="#1131" id="1131">1131</a>
 <a href="#1132" id="1132">1132</a>
 <a href="#1133" id="1133">1133</a>
+<a href="#1134" id="1134">1134</a>
+<a href="#1135" id="1135">1135</a>
+<a href="#1136" id="1136">1136</a>
+<a href="#1137" id="1137">1137</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1780,6 +1784,10 @@
 
                 <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
                 </span>vo_bit::helper::on_object_marked::&lt;VM&gt;(object);
+
+                <span class="kw">if </span>!<span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME {
+                    <span class="self">self</span>.mark_lines(object);
+                }
 
                 object
             } <span class="kw">else </span>{
