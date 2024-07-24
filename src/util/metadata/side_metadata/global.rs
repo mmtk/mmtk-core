@@ -8,6 +8,7 @@ use crate::util::metadata::metadata_val_traits::*;
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
 use num_traits::FromPrimitive;
+use std::cell::RefCell;
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -1210,6 +1211,95 @@ impl SideMetadataSpec {
 
         res.get()
             .map(|addr| addr.align_down(1 << self.log_bytes_in_region))
+    }
+
+    pub fn scan_non_zero_values<T: MetadataValue>(
+        &self,
+        data_start_addr: Address,
+        data_end_addr: Address,
+        visit_data: impl FnMut(Address),
+    ) {
+        if self.uses_contiguous_side_metadata() {
+            // Contiguous side metadata
+            self.scan_non_zero_values_fast::<T>(data_start_addr, data_end_addr, visit_data);
+        } else {
+            // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
+            // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
+            // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
+            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
+            self.scan_non_zero_values_simple::<T>(data_start_addr, data_end_addr, visit_data);
+        }
+    }
+
+    pub fn scan_non_zero_values_simple<T: MetadataValue>(
+        &self,
+        data_start_addr: Address,
+        data_end_addr: Address,
+        mut visit_data: impl FnMut(Address),
+    ) {
+        let region_bytes = 1usize << self.log_bytes_in_region;
+
+        let mut cursor = data_start_addr;
+        while cursor < data_end_addr {
+            debug_assert!(cursor.is_mapped());
+
+            // If we find non-zero value, just call back.
+            if !unsafe { self.load::<T>(cursor).is_zero() } {
+                visit_data(cursor);
+            }
+            cursor += region_bytes;
+        }
+    }
+
+    pub fn scan_non_zero_values_fast<T: MetadataValue>(
+        &self,
+        data_start_addr: Address,
+        data_end_addr: Address,
+        visit_data: impl FnMut(Address),
+    ) {
+        debug_assert!(self.uses_contiguous_side_metadata());
+
+        // Then figure out the start and end metadata address and bits.
+        let start_meta_addr = address_to_contiguous_meta_address(self, data_start_addr);
+        let start_meta_shift = meta_byte_lshift(self, data_start_addr);
+        let end_meta_addr = address_to_contiguous_meta_address(self, data_end_addr);
+        let end_meta_shift = meta_byte_lshift(self, data_end_addr);
+
+        // FIXME: This is probably not going to perform well.  We need to refactor
+        // `iterate_meta_bits` to change from two callbacks to one.
+        let cell = RefCell::new(visit_data);
+
+        let check_bytes_forwards = |start: Address, end: Address| -> bool {
+            helpers::scan_non_zero_bits_in_metadata_bytes(start, end, &mut |addr, bit| {
+                (cell.borrow_mut())(helpers::contiguous_meta_address_to_address(
+                    self, addr, bit as u8,
+                ));
+            });
+            false
+        };
+        let check_bits_forwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
+            helpers::scan_non_zero_bits_in_metadata_bits(
+                addr,
+                start_bit as u32,
+                end_bit as u32,
+                &mut |addr, bit| {
+                    (cell.borrow_mut())(helpers::contiguous_meta_address_to_address(
+                        self, addr, bit as u8,
+                    ));
+                },
+            );
+            false
+        };
+
+        Self::iterate_meta_bits(
+            start_meta_addr,
+            start_meta_shift,
+            end_meta_addr,
+            end_meta_shift,
+            false,
+            &check_bytes_forwards,
+            &check_bits_forwards,
+        );
     }
 }
 

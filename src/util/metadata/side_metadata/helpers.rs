@@ -260,6 +260,59 @@ fn find_last_non_zero_bit_in_u8(byte_value: u8) -> Option<u8> {
     }
 }
 
+pub fn scan_non_zero_bits_in_metadata_bytes(
+    meta_start: Address,
+    meta_end: Address,
+    visit_bit: &mut impl FnMut(Address, u32),
+) {
+    use crate::util::constants::BYTES_IN_ADDRESS;
+
+    let mut cursor = meta_start;
+    while cursor < meta_end && !cursor.is_aligned_to(BYTES_IN_ADDRESS) {
+        let byte = unsafe { cursor.load::<u8>() };
+        scan_non_zero_bits_in_metadata_word(cursor, byte as usize, visit_bit);
+        cursor += 1usize;
+    }
+
+    while cursor + BYTES_IN_ADDRESS < meta_end {
+        let word = unsafe { cursor.load::<usize>() };
+        scan_non_zero_bits_in_metadata_word(cursor, word, visit_bit);
+        cursor += BYTES_IN_ADDRESS;
+    }
+
+    while cursor < meta_end {
+        let byte = unsafe { cursor.load::<u8>() };
+        scan_non_zero_bits_in_metadata_word(cursor, byte as usize, visit_bit);
+        cursor += 1usize;
+    }
+}
+
+pub fn scan_non_zero_bits_in_metadata_word(
+    meta_addr: Address,
+    mut word: usize,
+    visit_bit: &mut impl FnMut(Address, u32),
+) {
+    while word != 0 {
+        let bit = word.trailing_zeros();
+        visit_bit(meta_addr, bit);
+        word = word & (word - 1);
+    }
+}
+
+pub fn scan_non_zero_bits_in_metadata_bits(
+    meta_addr: Address,
+    bit_start: u32,
+    bit_end: u32,
+    visit_bit: &mut impl FnMut(Address, u32),
+) {
+    let byte = unsafe { meta_addr.load::<u8>() };
+    for bit in bit_start..bit_end {
+        if byte & (1 << bit) != 0 {
+            visit_bit(meta_addr, bit);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

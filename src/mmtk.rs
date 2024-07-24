@@ -481,7 +481,7 @@ impl<VM: VMBinding> MMTK<VM> {
     {
         use crate::util::object_enum;
 
-        let mut enumerator = object_enum::ClosureObjectEnumerator::new(f);
+        let mut enumerator = object_enum::ClosureObjectEnumerator::<_, VM>::new(f);
         let plan = self.get_plan();
         plan.for_each_space(&mut |space| {
             space.enumerate_objects(&mut enumerator);

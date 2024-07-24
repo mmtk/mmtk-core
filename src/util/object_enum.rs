@@ -1,14 +1,14 @@
 //! Helper types for object enumeration
 
+use std::marker::PhantomData;
+
 use crate::vm::VMBinding;
 
 use super::{
     heap::{
         chunk_map::{ChunkMap, ChunkState},
         MonotonePageResource,
-    },
-    linear_scan::Region,
-    Address, ObjectReference,
+    }, linear_scan::Region, metadata::side_metadata::spec_defs::VO_BIT, Address, ObjectReference
 };
 
 /// A trait for enumerating objects in spaces.
@@ -27,32 +27,42 @@ pub trait ObjectEnumerator {
 }
 
 /// An implementation of `ObjectEnumerator` that wraps a callback.
-pub struct ClosureObjectEnumerator<F>
+pub struct ClosureObjectEnumerator<F, VM>
 where
     F: FnMut(ObjectReference),
+    VM: VMBinding,
 {
     object_callback: F,
+    phantom_data: PhantomData<VM>,
 }
 
-impl<F> ClosureObjectEnumerator<F>
+impl<F, VM> ClosureObjectEnumerator<F, VM>
 where
     F: FnMut(ObjectReference),
+    VM: VMBinding,
 {
     pub fn new(object_callback: F) -> Self {
-        Self { object_callback }
+        Self {
+            object_callback,
+            phantom_data: PhantomData,
+        }
     }
 }
 
-impl<F> ObjectEnumerator for ClosureObjectEnumerator<F>
+impl<F, VM> ObjectEnumerator for ClosureObjectEnumerator<F, VM>
 where
     F: FnMut(ObjectReference),
+    VM: VMBinding,
 {
     fn visit_object(&mut self, object: ObjectReference) {
         (self.object_callback)(object);
     }
 
     fn visit_address_range(&mut self, addr_range: std::ops::Range<Address>) {
-        todo!()
+        VO_BIT.scan_non_zero_values::<u8>(addr_range.start, addr_range.end, |address| {
+            let object = ObjectReference::from_address::<VM>(address);
+            (self.object_callback)(object);
+        })
     }
 }
 
