@@ -5,8 +5,32 @@ use crate::vm::{Collection, VMBinding};
 use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
-use sysinfo::MemoryRefreshKind;
-use sysinfo::{RefreshKind, System};
+use sysinfo::{RefreshKind, System, SystemExt};
+
+#[allow(unused)]
+const PROT_RW:  libc::c_int = PROT_READ | PROT_WRITE;
+#[allow(unused)]
+const PROT_RX:  libc::c_int = PROT_READ | PROT_EXEC;
+#[allow(unused)]
+const PROT_RWX: libc::c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
+
+#[cfg(not(feature = "code_space"))]
+const DEFAULT_PROT: libc::c_int = PROT_RW;
+#[cfg(feature = "code_space")]
+const DEFAULT_PROT: libc::c_int = PROT_RWX;
+
+#[cfg(target_os = "linux")]
+const MMAP_PROT: libc::c_int = DEFAULT_PROT;
+#[cfg(target_os = "macos")]
+// PROT_EXEC cannot be used with PROT_READ on Apple Silicon
+const MMAP_PROT: libc::c_int = PROT_RW;
+
+#[cfg(target_os = "linux")]
+// MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+#[cfg(target_os = "macos")]
+// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
 
 /// Check the result from an mmap function in this module.
 /// Return true if the mmap has failed due to an existing conflicting mapping.
@@ -50,19 +74,6 @@ pub unsafe fn dzmmap(start: Address, size: usize, strategy: MmapStrategy) -> Res
     }
     ret
 }
-
-#[cfg(target_os = "linux")]
-// MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
-#[cfg(target_os = "macos")]
-// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
-const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-
-#[cfg(target_os = "linux")]
-const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
-#[cfg(target_os = "macos")]
-// PROT_EXEC cannot be used with PROT_READ on Apple Silicon
-const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE;
 
 /// Strategy for performing mmap
 ///
@@ -174,6 +185,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
         }
         _ => {}
     }
+    println!("{}", get_process_memory_maps());
     panic!("Unexpected mmap failure: {:?}", error)
 }
 
@@ -182,7 +194,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 /// Be very careful about using this function.
 #[cfg(target_os = "linux")]
 pub(crate) fn panic_if_unmapped(start: Address, size: usize) {
-    let prot = PROT_READ | PROT_WRITE;
+    let prot = PROT_RW;
     let flags = MMAP_FLAGS;
     match mmap_fixed(start, size, prot, flags, MmapStrategy::Normal) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
@@ -208,8 +220,9 @@ pub(crate) fn panic_if_unmapped(_start: Address, _size: usize) {
 
 /// Unprotect the given memory (in page granularity) to allow access (PROT_READ/WRITE/EXEC).
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
+    let prot = MMAP_PROT;
     wrap_libc_call(
-        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) },
+        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot) },
         0,
     )
 }
