@@ -9,9 +9,9 @@ use sysinfo::MemoryRefreshKind;
 use sysinfo::{RefreshKind, System};
 
 #[allow(unused)]
-const PROT_RW:  libc::c_int = PROT_READ | PROT_WRITE;
+const PROT_RW: libc::c_int = PROT_READ | PROT_WRITE;
 #[allow(unused)]
-const PROT_RX:  libc::c_int = PROT_READ | PROT_EXEC;
+const PROT_RX: libc::c_int = PROT_READ | PROT_EXEC;
 #[allow(unused)]
 const PROT_RWX: libc::c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
 
