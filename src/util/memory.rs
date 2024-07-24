@@ -5,7 +5,8 @@ use crate::vm::{Collection, VMBinding};
 use bytemuck::NoUninit;
 use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::io::{Error, Result};
-use sysinfo::{RefreshKind, System, SystemExt};
+use sysinfo::MemoryRefreshKind;
+use sysinfo::{RefreshKind, System};
 
 #[allow(unused)]
 const PROT_RW:  libc::c_int = PROT_READ | PROT_WRITE;
