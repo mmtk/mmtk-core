@@ -13,7 +13,6 @@ use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::heap::layout::{self, Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
-use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
@@ -21,6 +20,7 @@ use crate::util::sanity::sanity_checker::SanityChecker;
 #[cfg(feature = "extreme_assertions")]
 use crate::util::slot_logger::SlotLogger;
 use crate::util::statistics::stats::Stats;
+use crate::util::{opaque_pointer::*, ObjectReference};
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::cell::UnsafeCell;
@@ -470,5 +470,21 @@ impl<VM: VMBinding> MMTK<VM> {
     /// Get the run time options.
     pub fn get_options(&self) -> &Options {
         &self.options
+    }
+
+    /// Enumerate objects in all spaces in this MMTK instance.
+    /// The call-back function `f` is called for every object.
+    #[cfg(feature = "vo_bit")]
+    pub fn enumerate_objects<F>(&self, f: F)
+    where
+        F: FnMut(ObjectReference),
+    {
+        use crate::util::object_enum;
+
+        let mut enumerator = object_enum::ClosureObjectEnumerator::new(f);
+        let plan = self.get_plan();
+        plan.for_each_space(&mut |space| {
+            space.enumerate_objects(&mut enumerator);
+        })
     }
 }

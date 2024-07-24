@@ -9,7 +9,6 @@ use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::copy::*;
 use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
@@ -18,7 +17,9 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
+use crate::util::{copy::*, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
@@ -188,6 +189,10 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("We do not use SFT to trace objects for Immix. set_copy_context() cannot be used.")
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
 }
 

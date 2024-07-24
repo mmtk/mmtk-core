@@ -50,6 +50,7 @@ pub(crate) mod erase_vm;
 pub(crate) mod finalizable_processor;
 /// Logger initialization
 pub(crate) mod logger;
+pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
 /// Reference processing implementation.

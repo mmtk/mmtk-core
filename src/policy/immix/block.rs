@@ -10,6 +10,7 @@ use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpe
 use crate::util::metadata::vo_bit;
 #[cfg(feature = "object_pinning")]
 use crate::util::metadata::MetadataSpec;
+use crate::util::object_enum::BlockMayHaveObjects;
 use crate::util::Address;
 use crate::vm::*;
 use std::sync::atomic::Ordering;
@@ -83,6 +84,12 @@ impl Region for Block {
 
     fn start(&self) -> Address {
         self.0
+    }
+}
+
+impl BlockMayHaveObjects for Block {
+    fn may_have_objects(&self) -> bool {
+        self.get_state() != BlockState::Unallocated
     }
 }
 

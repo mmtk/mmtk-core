@@ -5,6 +5,7 @@ use crate::util::conversions::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
@@ -348,6 +349,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
+
+    /// Enumerate ranges of addresses that may contain objects.  Used for enumerating objects in the
+    /// space.  Implementors should call `f` for each address range that may contain objects, and
+    /// may ignore address ranges that are guaranteed not to include objects.  The address range
+    /// will then be linearly scanned.
+    ///
+    /// # Implementation consideration
+    ///
+    /// Because `Space` is a trait object type and `f` is a `dyn` reference, each invocation of `f`
+    /// involves a dynamic dispatching.  The overhead is OK if we call it a block at a time, but it
+    /// will be too costly if we call a `dyn` callback for each object.
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
 }
 
 /// Print the VM map for a space.

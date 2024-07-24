@@ -10,6 +10,7 @@ use crate::{
         copy::CopySemantics,
         heap::{BlockPageResource, PageResource},
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
+        object_enum::{self, ObjectEnumerator},
         ObjectReference,
     },
     vm::{ActivePlan, VMBinding},
@@ -245,6 +246,10 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: crate::util::Address) {
         todo!()
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
 }
 

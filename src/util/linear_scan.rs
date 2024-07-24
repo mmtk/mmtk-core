@@ -108,6 +108,10 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     fn end(&self) -> Address {
         self.start() + Self::BYTES
     }
+    /// Return the address range of the region.
+    fn as_range(&self) -> std::ops::Range<Address> {
+        self.start()..self.end()
+    }
     /// Return the next region after this one.
     fn next(&self) -> Self {
         self.next_nth(1)
