@@ -76,17 +76,23 @@ impl<VM: VMBinding> GCTrigger<VM> {
             .policy
             .is_gc_required(space_full, space.map(|s| SpaceStats::new(s)), plan)
         {
-            info!(
-                "[POLL] {}{} ({}/{} pages)",
-                if let Some(space) = space {
-                    format!("{}: ", space.get_name())
-                } else {
-                    "".to_string()
-                },
-                "Triggering collection",
-                plan.get_reserved_pages(),
-                plan.get_total_pages(),
-            );
+            if !plan.constraints().collects_garbage {
+                unreachable!("User ran out of space and the plan does not support collecting garbage.");
+            }
+            else {
+                info!(
+                    "[POLL] {}{} ({}/{} pages)",
+                    if let Some(space) = space {
+                        format!("{}: ", space.get_name())
+                    } else {
+                        "".to_string()
+                    },
+                    "Triggering collection",
+                    plan.get_reserved_pages(),
+                    plan.get_total_pages(),
+                );
+            }
+
             self.gc_requester.request();
             return true;
         }
