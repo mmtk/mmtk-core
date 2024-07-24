@@ -186,7 +186,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
         }
         _ => {}
     }
-    println!("{}", get_process_memory_maps());
+    eprintln!("{}", get_process_memory_maps());
     panic!("Unexpected mmap failure: {:?}", error)
 }
 
