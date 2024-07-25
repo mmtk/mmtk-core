@@ -59,10 +59,6 @@ pub enum MmapProtection {
     ReadWrite,
     /// Allow read + write + code execution
     ReadWriteExec,
-    /// Allow read + code executiojn
-    ReadExec,
-    /// Allow read only
-    ReadOnly,
     /// Do not allow any access
     NoAccess,
 }
@@ -72,9 +68,7 @@ impl MmapProtection {
     pub fn into_native_flags(self) -> libc::c_int {
         match self {
             Self::ReadWrite => PROT_READ | PROT_WRITE,
-            Self::ReadWriteExec => PROT_READ | PROT_EXEC,
-            Self::ReadExec => PROT_READ | PROT_WRITE | PROT_EXEC,
-            Self::ReadOnly => PROT_READ,
+            Self::ReadWriteExec => PROT_READ | PROT_WRITE | PROT_EXEC,
             Self::NoAccess => PROT_NONE,
         }
     }
