@@ -1588,6 +1588,7 @@ mod tests {
 
     use crate::util::heap::layout::vm_layout;
     use crate::util::test_util::{serial_test, with_cleanup};
+    use memory::MmapStrategy;
     use paste::paste;
 
     const TEST_LOG_BYTES_IN_REGION: usize = 12;
@@ -1613,7 +1614,9 @@ mod tests {
 
             let data_addr = vm_layout::vm_layout().heap_start;
             // Make sure the address is mapped.
-            crate::MMAPPER.ensure_mapped(data_addr, 1).unwrap();
+            crate::MMAPPER
+                .ensure_mapped(data_addr, 1, MmapStrategy::test_strategy())
+                .unwrap();
             let meta_addr = address_to_meta_address(&spec, data_addr);
             with_cleanup(
                 || {

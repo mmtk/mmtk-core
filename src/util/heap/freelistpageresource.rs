@@ -27,7 +27,7 @@ pub struct FreeListPageResource<VM: VMBinding> {
     sync: Mutex<FreeListPageResourceSync>,
     _p: PhantomData<VM>,
     /// Protect memory on release, and unprotect on re-allocate.
-    pub(crate) protect_memory_on_release: bool,
+    pub(crate) protect_memory_on_release: Option<memory::MmapProtection>,
 }
 
 unsafe impl<VM: VMBinding> Send for FreeListPageResource<VM> {}
@@ -111,7 +111,7 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         let rtn = sync.start + conversions::pages_to_bytes(page_offset as _);
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
-        if self.protect_memory_on_release {
+        if self.protect_memory_on_release.is_some() {
             if !new_chunk {
                 // This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
                 // See https://github.com/mmtk/mmtk-core/issues/400.
@@ -168,7 +168,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
-            protect_memory_on_release: false,
+            protect_memory_on_release: None,
         }
     }
 
@@ -206,7 +206,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
-            protect_memory_on_release: false,
+            protect_memory_on_release: None,
         }
     }
 
@@ -218,7 +218,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         // > the total number of mappings with distinct attributes
         // > (e.g., read versus read/write protection) exceeding the
         // > allowed maximum.
-        assert!(self.protect_memory_on_release);
+        assert!(self.protect_memory_on_release.is_some());
         // We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
         // may protect memory that is still in use.
         if let Err(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
@@ -231,8 +231,12 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
 
     /// Unprotect the memory
     fn munprotect(&self, start: Address, pages: usize) {
-        assert!(self.protect_memory_on_release);
-        if let Err(e) = memory::munprotect(start, conversions::pages_to_bytes(pages)) {
+        assert!(self.protect_memory_on_release.is_some());
+        if let Err(e) = memory::munprotect(
+            start,
+            conversions::pages_to_bytes(pages),
+            self.protect_memory_on_release.unwrap(),
+        ) {
             panic!(
                 "Failed at unprotecting memory (starting at {}): {:?}",
                 start, e
@@ -337,7 +341,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
 
-        if self.protect_memory_on_release {
+        if self.protect_memory_on_release.is_some() {
             self.mprotect(first, pages as _);
         }
 

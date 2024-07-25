@@ -195,8 +195,12 @@ impl<VM: VMBinding> MarkCompact<VM> {
             global_side_metadata_specs,
         };
 
-        let mc_space =
-            MarkCompactSpace::new(plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
+        let mc_space = MarkCompactSpace::new(plan_args.get_space_args(
+            "mc",
+            true,
+            false,
+            VMRequest::discontiguous(),
+        ));
 
         let res = MarkCompact {
             mc_space,

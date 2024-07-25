@@ -18,8 +18,11 @@ pub fn test_handle_mmap_oom() {
                 let start = unsafe { Address::from_usize(0x100_0000) };
                 // mmap 1 terabyte memory - we expect this will fail due to out of memory.
                 // If that's not the case, increase the size we mmap.
-                let mmap_res =
-                    memory::dzmmap_noreplace(start, LARGE_SIZE, memory::MmapStrategy::Normal);
+                let mmap_res = memory::dzmmap_noreplace(
+                    start,
+                    LARGE_SIZE,
+                    memory::MmapStrategy::test_strategy(),
+                );
 
                 memory::handle_mmap_error::<MockVM>(
                     mmap_res.err().unwrap(),

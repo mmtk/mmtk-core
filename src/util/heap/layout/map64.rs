@@ -100,7 +100,7 @@ impl VMMap for Map64 {
             units as _,
             grain,
             heads,
-            MmapStrategy::Normal,
+            MmapStrategy::internal_memory_strategy(),
         ));
 
         /* Adjust the base address and highwater to account for the allocated chunks for the map */

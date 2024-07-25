@@ -57,7 +57,6 @@ struct InnerFragmentedMapper {
     free_slabs: Vec<Option<Box<Slab>>>,
     slab_table: Vec<Option<Box<Slab>>>,
     slab_map: Vec<Address>,
-    strategy: Atomic<MmapStrategy>,
 }
 
 impl fmt::Debug for FragmentedMapper {
@@ -67,10 +66,6 @@ impl fmt::Debug for FragmentedMapper {
 }
 
 impl Mmapper for FragmentedMapper {
-    fn set_mmap_strategy(&self, strategy: MmapStrategy) {
-        self.inner().strategy.store(strategy, Ordering::Relaxed);
-    }
-
     fn eagerly_mmap_all_spaces(&self, _space_map: &[Address]) {}
 
     fn mark_as_mapped(&self, mut start: Address, bytes: usize) {
@@ -94,7 +89,12 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
-    fn quarantine_address_range(&self, mut start: Address, pages: usize) -> Result<()> {
+    fn quarantine_address_range(
+        &self,
+        mut start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -> Result<()> {
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
 
         let end = start + conversions::pages_to_bytes(pages);
@@ -139,14 +139,19 @@ impl Mmapper for FragmentedMapper {
             MapState::bulk_transition_to_quarantined(
                 state_slices.as_slice(),
                 mmap_start,
-                self.inner().strategy.load(Ordering::Relaxed),
+                strategy,
             )?;
         }
 
         Ok(())
     }
 
-    fn ensure_mapped(&self, mut start: Address, pages: usize) -> Result<()> {
+    fn ensure_mapped(
+        &self,
+        mut start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered
         while start < end {
@@ -171,11 +176,7 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                MapState::transition_to_mapped(
-                    entry,
-                    mmap_start,
-                    self.inner().strategy.load(Ordering::Relaxed),
-                )?;
+                MapState::transition_to_mapped(entry, mmap_start, strategy)?;
             }
             start = high;
         }
@@ -235,7 +236,6 @@ impl FragmentedMapper {
                 free_slabs: (0..MAX_SLABS).map(|_| Some(Self::new_slab())).collect(),
                 slab_table: (0..SLAB_TABLE_SIZE).map(|_| None).collect(),
                 slab_map: vec![SENTINEL; SLAB_TABLE_SIZE],
-                strategy: Atomic::new(MmapStrategy::Normal),
             }),
         }
     }
@@ -445,7 +445,9 @@ mod tests {
             with_cleanup(
                 || {
                     let mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -471,7 +473,9 @@ mod tests {
             with_cleanup(
                 || {
                     let mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -498,7 +502,9 @@ mod tests {
             with_cleanup(
                 || {
                     let mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
                     for i in 0..chunks {
@@ -527,7 +533,11 @@ mod tests {
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * 2,
+                            MmapStrategy::test_strategy(),
+                        )
                         .unwrap();
 
                     // protect 1 chunk
@@ -558,7 +568,11 @@ mod tests {
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * 2,
+                            MmapStrategy::test_strategy(),
+                        )
                         .unwrap();
 
                     // protect 1 chunk
@@ -575,7 +589,11 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2)
+                        .ensure_mapped(
+                            FIXED_ADDRESS,
+                            pages_per_chunk * 2,
+                            MmapStrategy::test_strategy(),
+                        )
                         .unwrap();
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),

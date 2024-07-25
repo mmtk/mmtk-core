@@ -41,7 +41,7 @@ pub struct CommonGenPlan<VM: VMBinding> {
 impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
         let nursery = CopySpace::new(
-            args.get_space_args("nursery", true, VMRequest::discontiguous()),
+            args.get_space_args("nursery", true, false, VMRequest::discontiguous()),
             true,
         );
         let full_heap_gc_count = args
