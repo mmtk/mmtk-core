@@ -533,11 +533,7 @@ mod tests {
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            pages_per_chunk * 2,
-                            MmapStrategy::TEST,
-                        )
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, MmapStrategy::TEST)
                         .unwrap();
 
                     // protect 1 chunk
@@ -568,11 +564,7 @@ mod tests {
                     let mmapper = FragmentedMapper::new();
                     let pages_per_chunk = MMAP_CHUNK_BYTES >> LOG_BYTES_IN_PAGE as usize;
                     mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            pages_per_chunk * 2,
-                            MmapStrategy::TEST,
-                        )
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, MmapStrategy::TEST)
                         .unwrap();
 
                     // protect 1 chunk
@@ -589,11 +581,7 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            pages_per_chunk * 2,
-                            MmapStrategy::TEST,
-                        )
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * 2, MmapStrategy::TEST)
                         .unwrap();
                     assert_eq!(
                         get_chunk_map_state(&mmapper, FIXED_ADDRESS),

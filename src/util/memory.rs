@@ -346,12 +346,10 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
-                    let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                 },
                 || {
@@ -385,8 +383,7 @@ mod tests {
             with_cleanup(
                 || {
                     // Make sure we mmapped the memory
-                    let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
                     let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST);
@@ -407,8 +404,7 @@ mod tests {
                     let res = mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_ok());
                     // Try reserve it
-                    let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                 },
                 || {
@@ -440,10 +436,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    assert!(
-                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST)
-                            .is_ok()
-                    );
+                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST).is_ok());
                     panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
@@ -461,10 +454,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(
-                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST)
-                            .is_ok()
-                    );
+                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST).is_ok());
 
                     // check if the next page is mapped - which should panic
                     panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE);
@@ -486,10 +476,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(
-                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST)
-                            .is_ok()
-                    );
+                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST).is_ok());
 
                     // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
                     panic_if_unmapped(START, BYTES_IN_PAGE * 2);

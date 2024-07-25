@@ -329,11 +329,7 @@ mod tests {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            test_memory_pages,
-                            MmapStrategy::TEST,
-                        )
+                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages, MmapStrategy::TEST)
                         .unwrap();
 
                     // protect 1 chunk
@@ -368,11 +364,7 @@ mod tests {
                     // map 2 chunks
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            test_memory_pages,
-                            MmapStrategy::TEST,
-                        )
+                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages, MmapStrategy::TEST)
                         .unwrap();
 
                     // protect 1 chunk
@@ -390,11 +382,7 @@ mod tests {
 
                     // ensure mapped - this will unprotect the previously protected chunk
                     mmapper
-                        .ensure_mapped(
-                            FIXED_ADDRESS,
-                            protect_memory_pages_2,
-                            MmapStrategy::TEST,
-                        )
+                        .ensure_mapped(FIXED_ADDRESS, protect_memory_pages_2, MmapStrategy::TEST)
                         .unwrap();
                     assert_eq!(
                         mmapper.mapped[chunk].load(Ordering::Relaxed),
