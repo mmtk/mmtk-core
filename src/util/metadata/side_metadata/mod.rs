@@ -1,8 +1,8 @@
 //! This module provides an implementation of side table metadata.
 // For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
-mod grain;
 mod constants;
+mod grain;
 mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;

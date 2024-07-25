@@ -7,12 +7,9 @@
 //! The `std::simd` module is still a nightly feature as of Rust 1.79.  When it stablizes, we can
 //! allow the granularity to be a SIMD vector, too.
 
-use num_traits::{Num, PrimInt};
+use num_traits::PrimInt;
 
-use crate::util::{
-    constants::{BITS_IN_BYTE, LOG_BITS_IN_BYTE},
-    Address,
-};
+use crate::util::{constants::LOG_BITS_IN_BYTE, Address};
 
 /// Offset of bits in a grain.
 type BitOffset = usize;
@@ -33,7 +30,7 @@ impl Granularity {
         }
     }
 
-    pub const fn of_type<T: Num>() -> Self {
+    pub const fn of_type<T: PrimInt>() -> Self {
         let bytes = std::mem::size_of::<T>();
         let log_bytes = bytes.ilog2() as usize;
         Self::of_log_bytes(log_bytes)
@@ -57,7 +54,7 @@ impl Granularity {
 }
 
 /// Bit address within a grain.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BitAddress {
     pub addr: Address,
     pub bit: BitOffset,
@@ -73,9 +70,16 @@ impl BitAddress {
     }
 
     pub fn normalize(&self, granularity: Granularity) -> Self {
-        let addr = self.addr.align_down(granularity.bytes());
-        let rem_bytes = addr.as_usize() % granularity.bytes();
-        let bit = self.bit + rem_bytes * BITS_IN_BYTE;
+        // Transfer unaligned bytes from addr to bits
+        let aligned_addr = self.addr.align_down(granularity.bytes());
+        let rem_bytes = self.addr - aligned_addr;
+        let rem_bits = self.bit + (rem_bytes << LOG_BITS_IN_BYTE);
+
+        // Transfer bits outside granularity back to addr
+        let bit = rem_bits % granularity.bits();
+        let carry_bits = rem_bits - bit;
+        let addr = aligned_addr + (carry_bits >> LOG_BITS_IN_BYTE);
+
         Self { addr, bit }
     }
 
@@ -213,196 +217,246 @@ mod tests {
         }
     }
 
+    const G8BIT: Granularity = Granularity::of_log_bytes(0);
     const G64BIT: Granularity = Granularity::of_log_bytes(3);
+    const GS: [Granularity; 2] = [G8BIT, G64BIT];
+
+    #[test]
+    fn test_grain_alignment() {
+        assert!(mk_ba(0x1000, 0).is_grain_aligned(G64BIT));
+        assert!(!mk_ba(0x1000, 1).is_grain_aligned(G64BIT));
+        assert!(!mk_ba(0x1001, 0).is_grain_aligned(G64BIT));
+        assert!(!mk_ba(0x1001, 3).is_grain_aligned(G64BIT));
+
+        assert!(mk_ba(0x1001, 0).is_grain_aligned(G8BIT));
+        assert!(!mk_ba(0x1001, 3).is_grain_aligned(G8BIT));
+    }
+
+    #[test]
+    fn test_is_normalized() {
+        assert!(mk_ba(0x1000, 0).is_normalized(G64BIT));
+        assert!(mk_ba(0x1000, 63).is_normalized(G64BIT));
+        assert!(!mk_ba(0x1000, 64).is_normalized(G64BIT));
+        assert!(!mk_ba(0x1001, 0).is_normalized(G64BIT));
+        assert!(!mk_ba(0x1007, 0).is_normalized(G64BIT));
+        assert!(!mk_ba(0x1007, 63).is_normalized(G64BIT));
+        assert!(mk_ba(0x1008, 0).is_normalized(G64BIT));
+
+        assert!(mk_ba(0x1000, 0).is_normalized(G8BIT));
+        assert!(mk_ba(0x1000, 7).is_normalized(G8BIT));
+        assert!(!mk_ba(0x1000, 8).is_normalized(G8BIT));
+        assert!(mk_ba(0x1001, 0).is_normalized(G8BIT));
+    }
+
+    #[test]
+    fn test_normalize() {
+        assert_eq!(mk_ba(0x1000, 0).normalize(G64BIT), mk_ba(0x1000, 0));
+        assert_eq!(mk_ba(0x1000, 63).normalize(G64BIT), mk_ba(0x1000, 63));
+        assert_eq!(mk_ba(0x1000, 64).normalize(G64BIT), mk_ba(0x1008, 0));
+        assert_eq!(mk_ba(0x1000, 65).normalize(G64BIT), mk_ba(0x1008, 1));
+        assert_eq!(mk_ba(0x1001, 0).normalize(G64BIT), mk_ba(0x1000, 8));
+        assert_eq!(mk_ba(0x1007, 0).normalize(G64BIT), mk_ba(0x1000, 56));
+        assert_eq!(mk_ba(0x1007, 7).normalize(G64BIT), mk_ba(0x1000, 63));
+        assert_eq!(mk_ba(0x1007, 8).normalize(G64BIT), mk_ba(0x1008, 0));
+        assert_eq!(mk_ba(0x1007, 9).normalize(G64BIT), mk_ba(0x1008, 1));
+    }
 
     #[test]
     fn test_empty_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        for bit in 0..g.bits() {
-            let ba = mk_ba(base, bit);
-            let result = break_range(g, ba, ba);
-            assert!(
-                result.is_empty(),
-                "Not empty. bit: {bit}, result: {result:?}"
-            );
+        for g in GS {
+            let base = 0x1000;
+            for bit in 0..g.bits() {
+                let ba = mk_ba(base, bit);
+                let result = break_range(g, ba, ba);
+                assert!(
+                    result.is_empty(),
+                    "Not empty. bit: {bit}, result: {result:?}"
+                );
+            }
         }
     }
 
     #[test]
     fn test_subgrain_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        for bit0 in 0..g.bits() {
-            let ba0 = mk_ba(base, bit0);
-            for bit1 in (bit0 + 1)..g.bits() {
-                let ba1 = mk_ba(base, bit1);
-                let result = break_range(g, ba0, ba1);
-                assert_eq!(
-                    result,
-                    vec![VisitRange::SubGrain {
-                        addr: mk_addr(base),
-                        bit_start: bit0,
-                        bit_end: bit1
-                    }],
-                    "Not equal.  bit0: {bit0}, bit1: {bit1}",
-                );
+        for g in GS {
+            let base = 0x1000;
+            for bit0 in 0..g.bits() {
+                let ba0 = mk_ba(base, bit0);
+                for bit1 in (bit0 + 1)..g.bits() {
+                    let ba1 = mk_ba(base, bit1);
+                    let result = break_range(g, ba0, ba1);
+                    assert_eq!(
+                        result,
+                        vec![VisitRange::SubGrain {
+                            addr: mk_addr(base),
+                            bit_start: bit0,
+                            bit_end: bit1
+                        }],
+                        "Not equal.  bit0: {bit0}, bit1: {bit1}",
+                    );
+                }
             }
         }
     }
 
     #[test]
     fn test_end_grain_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        let ba1 = mk_ba(base + g.bytes(), 0);
-        for bit0 in 1..g.bits() {
-            let ba0 = mk_ba(base, bit0);
-            let result = break_range(g, ba0, ba1);
-            assert_eq!(
-                result,
-                vec![VisitRange::SubGrain {
-                    addr: mk_addr(base),
-                    bit_start: bit0,
-                    bit_end: g.bits()
-                }],
-                "Not equal.  bit0: {bit0}",
-            );
+        for g in GS {
+            let base = 0x1000;
+            let ba1 = mk_ba(base + g.bytes(), 0);
+            for bit0 in 1..g.bits() {
+                let ba0 = mk_ba(base, bit0);
+                let result = break_range(g, ba0, ba1);
+                assert_eq!(
+                    result,
+                    vec![VisitRange::SubGrain {
+                        addr: mk_addr(base),
+                        bit_start: bit0,
+                        bit_end: g.bits()
+                    }],
+                    "Not equal.  bit0: {bit0}",
+                );
+            }
         }
     }
 
     #[test]
     fn test_adjacent_grain_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        for bit0 in 1..g.bits() {
-            let ba0 = mk_ba(base, bit0);
-            for bit1 in 1..g.bits() {
-                let ba1 = mk_ba(base + g.bytes(), bit1);
-                let result = break_range(g, ba0, ba1);
-                assert_eq!(
-                    result,
-                    vec![
-                        VisitRange::SubGrain {
-                            addr: mk_addr(base),
-                            bit_start: bit0,
-                            bit_end: g.bits(),
-                        },
-                        VisitRange::SubGrain {
-                            addr: mk_addr(base + g.bytes()),
-                            bit_start: 0,
-                            bit_end: bit1,
-                        },
-                    ],
-                    "Not equal.  bit0: {bit0}, bit1: {bit1}",
-                );
+        for g in GS {
+            let base = 0x1000;
+            for bit0 in 1..g.bits() {
+                let ba0 = mk_ba(base, bit0);
+                for bit1 in 1..g.bits() {
+                    let ba1 = mk_ba(base + g.bytes(), bit1);
+                    let result = break_range(g, ba0, ba1);
+                    assert_eq!(
+                        result,
+                        vec![
+                            VisitRange::SubGrain {
+                                addr: mk_addr(base),
+                                bit_start: bit0,
+                                bit_end: g.bits(),
+                            },
+                            VisitRange::SubGrain {
+                                addr: mk_addr(base + g.bytes()),
+                                bit_start: 0,
+                                bit_end: bit1,
+                            },
+                        ],
+                        "Not equal.  bit0: {bit0}, bit1: {bit1}",
+                    );
+                }
             }
         }
     }
 
     #[test]
     fn test_left_and_whole_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        for bit0 in 1..g.bits() {
-            let ba0 = mk_ba(base, bit0);
-            for word1 in 2..8 {
-                let ba1 = mk_ba(base + word1 * g.bytes(), 0);
-                let result = break_range(g, ba0, ba1);
-                assert_eq!(
-                    result,
-                    vec![
-                        VisitRange::SubGrain {
-                            addr: mk_addr(base),
-                            bit_start: bit0,
-                            bit_end: g.bits(),
-                        },
-                        VisitRange::WholeGrain {
-                            start: mk_addr(base + g.bytes()),
-                            end: mk_addr(base + word1 * g.bytes()),
-                        },
-                    ],
-                    "Not equal.  bit0: {bit0}, word1: {word1}",
-                );
+        for g in GS {
+            let base = 0x1000;
+            for bit0 in 1..g.bits() {
+                let ba0 = mk_ba(base, bit0);
+                for word1 in 2..8 {
+                    let ba1 = mk_ba(base + word1 * g.bytes(), 0);
+                    let result = break_range(g, ba0, ba1);
+                    assert_eq!(
+                        result,
+                        vec![
+                            VisitRange::SubGrain {
+                                addr: mk_addr(base),
+                                bit_start: bit0,
+                                bit_end: g.bits(),
+                            },
+                            VisitRange::WholeGrain {
+                                start: mk_addr(base + g.bytes()),
+                                end: mk_addr(base + word1 * g.bytes()),
+                            },
+                        ],
+                        "Not equal.  bit0: {bit0}, word1: {word1}",
+                    );
+                }
             }
         }
     }
 
     #[test]
     fn test_whole_and_right_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        for word0 in 1..8 {
-            let ba0 = mk_ba(base - word0 * g.bytes(), 0);
-            for bit1 in 1..g.bits() {
-                let ba1 = mk_ba(base, bit1);
-                let result = break_range(g, ba0, ba1);
-                assert_eq!(
-                    result,
-                    vec![
-                        VisitRange::WholeGrain {
-                            start: mk_addr(base - word0 * g.bytes()),
-                            end: mk_addr(base),
-                        },
-                        VisitRange::SubGrain {
-                            addr: mk_addr(base),
-                            bit_start: 0,
-                            bit_end: bit1,
-                        },
-                    ],
-                    "Not equal.  word0: {word0}, bit1: {bit1}",
-                );
+        for g in GS {
+            let base = 0x1000;
+            for word0 in 1..8 {
+                let ba0 = mk_ba(base - word0 * g.bytes(), 0);
+                for bit1 in 1..g.bits() {
+                    let ba1 = mk_ba(base, bit1);
+                    let result = break_range(g, ba0, ba1);
+                    assert_eq!(
+                        result,
+                        vec![
+                            VisitRange::WholeGrain {
+                                start: mk_addr(base - word0 * g.bytes()),
+                                end: mk_addr(base),
+                            },
+                            VisitRange::SubGrain {
+                                addr: mk_addr(base),
+                                bit_start: 0,
+                                bit_end: bit1,
+                            },
+                        ],
+                        "Not equal.  word0: {word0}, bit1: {bit1}",
+                    );
+                }
             }
         }
     }
 
     #[test]
     fn test_whole_range() {
-        let g = G64BIT;
-        let base = 0x1000;
-        let ba0 = mk_ba(base, 0);
-        let ba1 = mk_ba(base + 42 * g.bytes(), 0);
-        let result = break_range(g, ba0, ba1);
-        assert_eq!(
-            result,
-            vec![VisitRange::WholeGrain {
-                start: mk_addr(base),
-                end: mk_addr(base + 42 * g.bytes()),
-            },],
-        );
+        for g in GS {
+            let base = 0x1000;
+            let ba0 = mk_ba(base, 0);
+            let ba1 = mk_ba(base + 42 * g.bytes(), 0);
+            let result = break_range(g, ba0, ba1);
+            assert_eq!(
+                result,
+                vec![VisitRange::WholeGrain {
+                    start: mk_addr(base),
+                    end: mk_addr(base + 42 * g.bytes()),
+                },],
+            );
+        }
     }
 
     #[test]
     fn test_left_whole_right_range() {
-        let g = G64BIT;
-        let base0 = 0x1000;
-        let base1 = 0x2000;
+        for g in GS {
+            let base0 = 0x1000;
+            let base1 = 0x2000;
 
-        for bit0 in 1..g.bits() {
-            let ba0 = mk_ba(base0 - g.bytes(), bit0);
-            for bit1 in 1..g.bits() {
-                let ba1 = mk_ba(base1, bit1);
-                let result = break_range(g, ba0, ba1);
-                assert_eq!(
-                    result,
-                    vec![
-                        VisitRange::SubGrain {
-                            addr: mk_addr(base0 - g.bytes()),
-                            bit_start: bit0,
-                            bit_end: g.bits(),
-                        },
-                        VisitRange::WholeGrain {
-                            start: mk_addr(base0),
-                            end: mk_addr(base1),
-                        },
-                        VisitRange::SubGrain {
-                            addr: mk_addr(base1),
-                            bit_start: 0,
-                            bit_end: bit1,
-                        },
-                    ],
-                    "Not equal.  bit0: {bit0}, bit1: {bit1}",
-                );
+            for bit0 in 1..g.bits() {
+                let ba0 = mk_ba(base0 - g.bytes(), bit0);
+                for bit1 in 1..g.bits() {
+                    let ba1 = mk_ba(base1, bit1);
+                    let result = break_range(g, ba0, ba1);
+                    assert_eq!(
+                        result,
+                        vec![
+                            VisitRange::SubGrain {
+                                addr: mk_addr(base0 - g.bytes()),
+                                bit_start: bit0,
+                                bit_end: g.bits(),
+                            },
+                            VisitRange::WholeGrain {
+                                start: mk_addr(base0),
+                                end: mk_addr(base1),
+                            },
+                            VisitRange::SubGrain {
+                                addr: mk_addr(base1),
+                                bit_start: 0,
+                                bit_end: bit1,
+                            },
+                        ],
+                        "Not equal.  bit0: {bit0}, bit1: {bit1}",
+                    );
+                }
             }
         }
     }
