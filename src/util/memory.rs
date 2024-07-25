@@ -144,10 +144,10 @@ pub fn dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -> 
 /// This function does not reserve swap space for this mapping, which means there is no guarantee that writes to the
 /// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
-pub fn mmap_noreserve(start: Address, size: usize, mut options: MmapStrategy) -> Result<()> {
-    options.prot = MmapProtection::NoAccess;
+pub fn mmap_noreserve(start: Address, size: usize, mut strategy: MmapStrategy) -> Result<()> {
+    strategy.prot = MmapProtection::NoAccess;
     let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
-    mmap_fixed(start, size, flags, options)
+    mmap_fixed(start, size, flags, strategy)
 }
 
 fn mmap_fixed(
