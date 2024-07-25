@@ -38,26 +38,17 @@ impl MmapStrategy {
     }
 
     /// The strategy for MMTk's own internal memory
-    pub fn internal_memory_strategy() -> Self {
-        Self {
-            huge_page: HugePageSupport::No,
-            prot: MmapProtection::ReadWrite,
-        }
-    }
+    pub const INTERNAL_MEMORY: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::ReadWrite,
+    };
 
     /// The strategy for MMTk side metadata
-    pub fn side_metadata_strategy() -> Self {
-        Self::internal_memory_strategy()
-    }
+    pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
 
     /// The strategy for MMTk's test memory
     #[cfg(test)]
-    pub(crate) fn test_strategy() -> Self {
-        Self {
-            huge_page: HugePageSupport::No,
-            prot: MmapProtection::ReadWrite,
-        }
-    }
+    pub const TEST: Self = Self::INTERNAL_MEMORY;
 }
 
 /// The protection flags for Mmap
@@ -89,11 +80,7 @@ impl MmapProtection {
     }
 }
 
-/// Strategy for performing mmap
-///
-/// This currently supports switching between different huge page allocation
-/// methods. However, this can later be refactored to reduce other code
-/// repetition.
+/// Support for huge pages
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, NoUninit)]
 pub enum HugePageSupport {
@@ -360,11 +347,11 @@ mod tests {
             with_cleanup(
                 || {
                     let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::test_strategy()) };
+                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
                     let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::test_strategy()) };
+                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                 },
                 || {
@@ -379,7 +366,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::test_strategy());
+                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_ok());
                     let res = munmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
@@ -399,10 +386,10 @@ mod tests {
                 || {
                     // Make sure we mmapped the memory
                     let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::test_strategy()) };
+                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
-                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::test_strategy());
+                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_err());
                 },
                 || {
@@ -417,11 +404,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::test_strategy());
+                    let res = mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_ok());
                     // Try reserve it
                     let res =
-                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::test_strategy()) };
+                        unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                 },
                 || {
@@ -454,7 +441,7 @@ mod tests {
             with_cleanup(
                 || {
                     assert!(
-                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::test_strategy())
+                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST)
                             .is_ok()
                     );
                     panic_if_unmapped(START, BYTES_IN_PAGE);
@@ -475,7 +462,7 @@ mod tests {
                 || {
                     // map 1 page from START
                     assert!(
-                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::test_strategy())
+                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST)
                             .is_ok()
                     );
 
@@ -500,7 +487,7 @@ mod tests {
                 || {
                     // map 1 page from START
                     assert!(
-                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::test_strategy())
+                        dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST)
                             .is_ok()
                     );
 

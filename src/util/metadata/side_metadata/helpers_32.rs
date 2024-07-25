@@ -184,13 +184,13 @@ pub(super) fn try_mmap_metadata_chunk(
         MMAPPER.ensure_mapped(
             policy_meta_start,
             pages,
-            memory::MmapStrategy::side_metadata_strategy(),
+            memory::MmapStrategy::SIDE_METADATA,
         )
     } else {
         MMAPPER.quarantine_address_range(
             policy_meta_start,
             pages,
-            memory::MmapStrategy::side_metadata_strategy(),
+            memory::MmapStrategy::SIDE_METADATA,
         )
     }
 }

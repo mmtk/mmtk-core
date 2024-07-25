@@ -109,13 +109,13 @@ pub(super) fn try_mmap_contiguous_metadata_space(
             MMAPPER.ensure_mapped(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::side_metadata_strategy(),
+                MmapStrategy::SIDE_METADATA,
             )
         } else {
             MMAPPER.quarantine_address_range(
                 mmap_start,
                 mmap_size >> LOG_BYTES_IN_PAGE,
-                MmapStrategy::side_metadata_strategy(),
+                MmapStrategy::SIDE_METADATA,
             )
         }
         .map(|_| mmap_size)

@@ -237,7 +237,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
                         .unwrap();
 
                     for chunk in start_chunk..end_chunk {
@@ -266,7 +266,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
                         .unwrap();
 
                     for chunk in start_chunk..end_chunk {
@@ -295,7 +295,7 @@ mod tests {
                 || {
                     let mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
                         .unwrap();
 
                     let start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
@@ -332,7 +332,7 @@ mod tests {
                         .ensure_mapped(
                             FIXED_ADDRESS,
                             test_memory_pages,
-                            MmapStrategy::test_strategy(),
+                            MmapStrategy::TEST,
                         )
                         .unwrap();
 
@@ -371,7 +371,7 @@ mod tests {
                         .ensure_mapped(
                             FIXED_ADDRESS,
                             test_memory_pages,
-                            MmapStrategy::test_strategy(),
+                            MmapStrategy::TEST,
                         )
                         .unwrap();
 
@@ -393,7 +393,7 @@ mod tests {
                         .ensure_mapped(
                             FIXED_ADDRESS,
                             protect_memory_pages_2,
-                            MmapStrategy::test_strategy(),
+                            MmapStrategy::TEST,
                         )
                         .unwrap();
                     assert_eq!(

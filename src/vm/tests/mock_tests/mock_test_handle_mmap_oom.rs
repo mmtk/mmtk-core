@@ -21,7 +21,7 @@ pub fn test_handle_mmap_oom() {
                 let mmap_res = memory::dzmmap_noreplace(
                     start,
                     LARGE_SIZE,
-                    memory::MmapStrategy::test_strategy(),
+                    memory::MmapStrategy::TEST,
                 );
 
                 memory::handle_mmap_error::<MockVM>(

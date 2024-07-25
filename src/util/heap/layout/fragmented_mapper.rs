@@ -446,7 +446,7 @@ mod tests {
                 || {
                     let mmapper = FragmentedMapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -474,7 +474,7 @@ mod tests {
                 || {
                     let mmapper = FragmentedMapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -503,7 +503,7 @@ mod tests {
                 || {
                     let mmapper = FragmentedMapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::test_strategy())
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
                         .unwrap();
 
                     let chunks = pages_to_chunks_up(pages);
@@ -536,7 +536,7 @@ mod tests {
                         .ensure_mapped(
                             FIXED_ADDRESS,
                             pages_per_chunk * 2,
-                            MmapStrategy::test_strategy(),
+                            MmapStrategy::TEST,
                         )
                         .unwrap();
 
@@ -571,7 +571,7 @@ mod tests {
                         .ensure_mapped(
                             FIXED_ADDRESS,
                             pages_per_chunk * 2,
-                            MmapStrategy::test_strategy(),
+                            MmapStrategy::TEST,
                         )
                         .unwrap();
 
@@ -592,7 +592,7 @@ mod tests {
                         .ensure_mapped(
                             FIXED_ADDRESS,
                             pages_per_chunk * 2,
-                            MmapStrategy::test_strategy(),
+                            MmapStrategy::TEST,
                         )
                         .unwrap();
                     assert_eq!(

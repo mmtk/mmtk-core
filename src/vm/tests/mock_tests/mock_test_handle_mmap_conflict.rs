@@ -14,7 +14,7 @@ pub fn test_handle_mmap_conflict() {
             let mmap1_res = memory::dzmmap_noreplace(
                 start,
                 one_megabyte,
-                memory::MmapStrategy::test_strategy(),
+                memory::MmapStrategy::TEST,
             );
             assert!(mmap1_res.is_ok());
 
@@ -22,7 +22,7 @@ pub fn test_handle_mmap_conflict() {
                 let mmap2_res = memory::dzmmap_noreplace(
                     start,
                     one_megabyte,
-                    memory::MmapStrategy::test_strategy(),
+                    memory::MmapStrategy::TEST,
                 );
                 assert!(mmap2_res.is_err());
                 memory::handle_mmap_error::<MockVM>(
