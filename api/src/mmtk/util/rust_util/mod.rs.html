@@ -196,24 +196,24 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">"nightly"</span>)]
-</span><span class="kw">use </span>core::intrinsics::{likely, unlikely};
+<span class="attr">#[rustversion::nightly]
+</span><span class="kw">pub use </span>core::intrinsics::{likely, unlikely};
 
 <span class="comment">// likely() and unlikely() compiler hints in stable Rust
 // [1]: https://github.com/rust-lang/hashbrown/blob/a41bd76de0a53838725b997c6085e024c47a0455/src/raw/mod.rs#L48-L70
 // [2]: https://users.rust-lang.org/t/compiler-hint-for-unlikely-likely-for-if-branches/62102/3
-</span><span class="attr">#[cfg(not(feature = <span class="string">"nightly"</span>))]
+</span><span class="attr">#[rustversion::not(nightly)]
 #[cold]
 </span><span class="kw">fn </span>cold() {}
 
-<span class="attr">#[cfg(not(feature = <span class="string">"nightly"</span>))]
+<span class="attr">#[rustversion::not(nightly)]
 </span><span class="kw">pub fn </span>likely(b: bool) -&gt; bool {
     <span class="kw">if </span>!b {
         cold();
     }
     b
 }
-<span class="attr">#[cfg(not(feature = <span class="string">"nightly"</span>))]
+<span class="attr">#[rustversion::not(nightly)]
 </span><span class="kw">pub fn </span>unlikely(b: bool) -&gt; bool {
     <span class="kw">if </span>b {
         cold();

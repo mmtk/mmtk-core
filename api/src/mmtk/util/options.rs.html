@@ -1501,7 +1501,7 @@
             ///
             /// Arguments:
             /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
-            /// or `threads=1,stress_factor=4096`
+            ///   or `threads=1,stress_factor=4096`
             </span><span class="kw">pub fn </span>set_bulk_from_command_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>, options: <span class="kw-2">&amp;</span>str) -&gt; bool {
                 <span class="kw">for </span>opt <span class="kw">in </span>options.replace(<span class="string">","</span>, <span class="string">" "</span>).split_ascii_whitespace() {
                     <span class="kw">let </span>kv_pair: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = opt.split(<span class="string">'='</span>).collect();

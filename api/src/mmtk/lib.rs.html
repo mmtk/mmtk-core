@@ -64,8 +64,6 @@
 <a href="#62" id="62">62</a>
 <a href="#63" id="63">63</a>
 <a href="#64" id="64">64</a>
-<a href="#65" id="65">65</a>
-<a href="#66" id="66">66</a>
 </pre></div><pre class="rust"><code><span class="comment">// Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
 // According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
 // with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
@@ -101,8 +99,6 @@
 </span><span class="kw">extern crate </span>lazy_static;
 <span class="attr">#[macro_use]
 </span><span class="kw">extern crate </span>log;
-<span class="attr">#[cfg(target = <span class="string">"x86_64-unknown-linux-gnu"</span>)]
-</span><span class="kw">extern crate </span>atomic;
 <span class="kw">extern crate </span>atomic_traits;
 <span class="kw">extern crate </span>crossbeam;
 <span class="kw">extern crate </span>num_cpus;

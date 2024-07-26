@@ -488,7 +488,7 @@
             sync.cursor, sync.sentinel, sync.current_chunk
         );
 
-        <span class="kw">if </span><span class="macro">cfg!</span>(debug = <span class="string">"true"</span>) {
+        <span class="kw">if </span><span class="macro">cfg!</span>(debug_assertions) {
             <span class="comment">/*
              * Cursor should always be zero, or somewhere in the current chunk.  If we have just
              * allocated exactly enough pages to exhaust the current chunk, then cursor can point
