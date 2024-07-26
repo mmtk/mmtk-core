@@ -77,10 +77,6 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: usize) -> (Addres
         debug_assert!(address.is_aligned_to(align));
     } else if align > 16 && offset == 0 {
         address = align_alloc(size, align);
-        #[cfg(feature = "malloc_hoard")]
-        {
-            is_offset_malloc = true;
-        }
         debug_assert!(
             address.is_aligned_to(align),
             "Address: {:x} is not aligned to the given alignment: {}",

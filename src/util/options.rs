@@ -222,7 +222,7 @@ macro_rules! options {
             ///
             /// Arguments:
             /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
-            /// or `threads=1,stress_factor=4096`
+            ///   or `threads=1,stress_factor=4096`
             pub fn set_bulk_from_command_line(&mut self, options: &str) -> bool {
                 for opt in options.replace(",", " ").split_ascii_whitespace() {
                     let kv_pair: Vec<&str> = opt.split('=').collect();
