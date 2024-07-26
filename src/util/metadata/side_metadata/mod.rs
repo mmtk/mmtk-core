@@ -2,7 +2,7 @@
 // For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
 mod constants;
-mod grain;
+pub mod grain;
 mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;

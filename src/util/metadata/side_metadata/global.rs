@@ -7,9 +7,8 @@ use crate::util::metadata::metadata_val_traits::*;
 #[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
-use atomic::Atomic;
-use grain::{AddressToBitAddress, BitAddress, Granularity};
-use num_traits::FromPrimitive;
+use grain::{AddressToBitAddress, BitAddress, Granularity, VisitRange};
+use num_traits::{FromPrimitive, PrimInt};
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -283,6 +282,28 @@ impl SideMetadataSpec {
         }
     }
 
+    pub fn iterate_meta_bits_modern<const CALLBACK: bool>(
+        meta_start: BitAddress,
+        meta_end: BitAddress,
+        granularity: Granularity,
+        visitor: &mut impl FnMut(VisitRange) -> bool,
+    ) {
+        //let meta_start = meta_start.normalize(granularity);
+        //let meta_end = meta_end.normalize(granularity);
+
+        if meta_start == meta_end {
+            panic!("Empty range?");
+        }
+
+        if CALLBACK {
+            grain::break_range_callback(granularity, meta_start, meta_end, true, visitor);
+        } else {
+            for range in grain::break_range(granularity, meta_start, meta_end) {
+                visitor(range);
+            }
+        }
+    }
+
     /// This method is used for bulk zeroing side metadata for a data address range.
     pub fn zero_meta_bits_classic(
         meta_start_addr: Address,
@@ -320,81 +341,39 @@ impl SideMetadataSpec {
     ) {
         let meta_start = meta_start_addr.with_bit_offset(meta_start_bit as usize);
         let meta_end = meta_end_addr.with_bit_offset(meta_end_bit as usize);
-        Self::zero_meta_bits_inner(meta_start, meta_end);
+        Self::zero_meta_bits_modern_inner::<usize, true>(meta_start, meta_end);
     }
 
-    pub fn zero_meta_bits_callback(
-        meta_start_addr: Address,
-        meta_start_bit: u8,
-        meta_end_addr: Address,
-        meta_end_bit: u8,
+    pub fn zero_meta_bits_modern_inner<Grain: PrimInt + MetadataValue, const CALLBACK: bool>(
+        meta_start: BitAddress,
+        meta_end: BitAddress,
     ) {
-        let meta_start = meta_start_addr.with_bit_offset(meta_start_bit as usize);
-        let meta_end = meta_end_addr.with_bit_offset(meta_end_bit as usize);
-        Self::zero_meta_bits_inner_callback(meta_start, meta_end);
-    }
-
-    pub(super) fn zero_meta_bits_inner(meta_start: BitAddress, meta_end: BitAddress) {
-        // eprintln!("zero_meta_bits({meta_start:?}, {meta_end:?})");
-
-        type Grain = usize;
         let granularity = Granularity::of_type::<Grain>();
-        let meta_start = meta_start.normalize(granularity);
-        let meta_end = meta_end.normalize(granularity);
-
-        if meta_start == meta_end {
-            panic!("Empty range?");
-        }
-
-        for range in grain::break_range(granularity, meta_start, meta_end) {
-            // eprintln!("  range: {range:?}");
-            match range {
-                grain::VisitRange::WholeGrain { start, end } => {
-                    memory::zero(start, end - start);
+        Self::iterate_meta_bits_modern::<CALLBACK>(
+            meta_start,
+            meta_end,
+            granularity,
+            &mut |range| {
+                // eprintln!("  range: {range:?}");
+                match range {
+                    grain::VisitRange::WholeGrain { start, end } => {
+                        memory::zero(start, end - start);
+                    }
+                    grain::VisitRange::SubGrain {
+                        addr,
+                        bit_start,
+                        bit_end,
+                    } => {
+                        let mask = grain::bit_mask::<Grain>(granularity, bit_start, bit_end);
+                        // eprintln!("  mask: {mask:b}");
+                        unsafe {
+                            Grain::fetch_and(addr, !mask, Ordering::SeqCst);
+                        }
+                    }
                 }
-                grain::VisitRange::SubGrain {
-                    addr,
-                    bit_start,
-                    bit_end,
-                } => {
-                    let mask = grain::bit_mask::<Grain>(granularity, bit_start, bit_end);
-                    // eprintln!("  mask: {mask:b}");
-                    unsafe { addr.as_ref::<Atomic<Grain>>() }.fetch_and(!mask, Ordering::SeqCst);
-                }
-            }
-        }
-    }
-
-    pub(super) fn zero_meta_bits_inner_callback(meta_start: BitAddress, meta_end: BitAddress) {
-        // eprintln!("zero_meta_bits({meta_start:?}, {meta_end:?})");
-
-        type Grain = usize;
-        let granularity = Granularity::of_type::<Grain>();
-        let meta_start = meta_start.normalize(granularity);
-        let meta_end = meta_end.normalize(granularity);
-
-        if meta_start == meta_end {
-            panic!("Empty range?");
-        }
-
-        grain::break_range_callback(granularity, meta_start, meta_end, true, &mut |range| {
-            // eprintln!("  range: {range:?}");
-            match range {
-                grain::VisitRange::WholeGrain { start, end } => {
-                    memory::zero(start, end - start);
-                }
-                grain::VisitRange::SubGrain {
-                    addr,
-                    bit_start,
-                    bit_end,
-                } => {
-                    let mask = grain::bit_mask::<Grain>(granularity, bit_start, bit_end);
-                    // eprintln!("  mask: {mask:b}");
-                    unsafe { addr.as_ref::<Atomic<Grain>>() }.fetch_and(!mask, Ordering::SeqCst);
-                }
-            }
-            false
-        });
+                false
+            },
+        );
     }
 
     /// This method is used for bulk setting side metadata for a data address range.
@@ -434,78 +413,42 @@ impl SideMetadataSpec {
     ) {
         let meta_start = meta_start_addr.with_bit_offset(meta_start_bit as usize);
         let meta_end = meta_end_addr.with_bit_offset(meta_end_bit as usize);
-        Self::set_meta_bits_inner(meta_start, meta_end);
+        Self::set_meta_bits_modern_inner::<usize, true>(meta_start, meta_end);
     }
 
-    pub fn set_meta_bits_callback(
-        meta_start_addr: Address,
-        meta_start_bit: u8,
-        meta_end_addr: Address,
-        meta_end_bit: u8,
+    pub fn set_meta_bits_modern_inner<
+        Grain: PrimInt + MetadataValue,
+        const CALLBACK: bool,
+    >(
+        meta_start: BitAddress,
+        meta_end: BitAddress,
     ) {
-        let meta_start = meta_start_addr.with_bit_offset(meta_start_bit as usize);
-        let meta_end = meta_end_addr.with_bit_offset(meta_end_bit as usize);
-        Self::set_meta_bits_inner_callback(meta_start, meta_end);
-    }
-
-    pub(super) fn set_meta_bits_inner(meta_start: BitAddress, meta_end: BitAddress) {
-        // eprintln!("set_meta_bits({meta_start:?}, {meta_end:?})");
-
-        type Grain = usize;
         let granularity = Granularity::of_type::<Grain>();
-        let meta_start = meta_start.normalize(granularity);
-        let meta_end = meta_end.normalize(granularity);
-
-        if meta_start == meta_end {
-            panic!("Empty range?");
-        }
-
-        for range in grain::break_range(granularity, meta_start, meta_end) {
-            // eprintln!("  range: {range:?}");
-            match range {
-                grain::VisitRange::WholeGrain { start, end } => {
-                    memory::set(start, 0xffu8, end - start);
+        Self::iterate_meta_bits_modern::<CALLBACK>(
+            meta_start,
+            meta_end,
+            granularity,
+            &mut |range| {
+                // eprintln!("  range: {range:?}");
+                match range {
+                    grain::VisitRange::WholeGrain { start, end } => {
+                        memory::set(start, 0xffu8, end - start);
+                    }
+                    grain::VisitRange::SubGrain {
+                        addr,
+                        bit_start,
+                        bit_end,
+                    } => {
+                        let mask = grain::bit_mask::<Grain>(granularity, bit_start, bit_end);
+                        // eprintln!("  mask: {mask:b}");
+                        unsafe {
+                            Grain::fetch_or(addr, mask, Ordering::SeqCst);
+                        }
+                    }
                 }
-                grain::VisitRange::SubGrain {
-                    addr,
-                    bit_start,
-                    bit_end,
-                } => {
-                    let mask = grain::bit_mask::<Grain>(granularity, bit_start, bit_end);
-                    // eprintln!("  mask: {mask:b}");
-                    unsafe { addr.as_ref::<Atomic<Grain>>() }.fetch_or(mask, Ordering::SeqCst);
-                }
-            }
-        }
-    }
-
-    pub(super) fn set_meta_bits_inner_callback(meta_start: BitAddress, meta_end: BitAddress) {
-        type Grain = usize;
-        let granularity = Granularity::of_type::<Grain>();
-        let meta_start = meta_start.normalize(granularity);
-        let meta_end = meta_end.normalize(granularity);
-
-        if meta_start == meta_end {
-            panic!("Empty range?");
-        }
-
-        grain::break_range_callback(granularity, meta_start, meta_end, true, &mut |range| {
-            match range {
-                grain::VisitRange::WholeGrain { start, end } => {
-                    memory::set(start, 0xffu8, end - start);
-                }
-                grain::VisitRange::SubGrain {
-                    addr,
-                    bit_start,
-                    bit_end,
-                } => {
-                    let mask = grain::bit_mask::<Grain>(granularity, bit_start, bit_end);
-                    // eprintln!("  mask: {mask:b}");
-                    unsafe { addr.as_ref::<Atomic<Grain>>() }.fetch_or(mask, Ordering::SeqCst);
-                }
-            }
-            false
-        });
+                false
+            },
+        );
     }
 
     /// This method does bulk update for the given data range. It calculates the metadata bits for the given data range,

@@ -70,6 +70,10 @@ impl BitAddress {
     }
 
     pub fn normalize(&self, granularity: Granularity) -> Self {
+        if self.is_normalized(granularity) {
+            return *self;
+        }
+
         // Transfer unaligned bytes from addr to bits
         let aligned_addr = self.addr.align_down(granularity.bytes());
         let rem_bytes = self.addr - aligned_addr;
