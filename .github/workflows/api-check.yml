@@ -35,9 +35,9 @@ jobs:
       - run: cargo +nightly --version
 
       - name: Install cargo-public-api
-        run: cargo install cargo-public-api
+        run: cargo +nightly install cargo-public-api
       - name: API Diff
-        run: cargo public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all
+        run: cargo +nightly public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all
 
   check-api-migration-update:
     needs: check-public-api-changes
