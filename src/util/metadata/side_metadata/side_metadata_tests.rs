@@ -715,6 +715,43 @@ mod tests {
     }
 
     #[test]
+    fn test_side_metadata_set_meta_bits() {
+        let size = 4usize;
+        let allocate_u32 = || -> Address {
+            let ptr = unsafe {
+                std::alloc::alloc_zeroed(std::alloc::Layout::from_size_align(size, 4).unwrap())
+            };
+            Address::from_mut_ptr(ptr)
+        };
+        let fill_0 = |addr: Address| unsafe {
+            addr.store(0u32);
+        };
+
+        let start = allocate_u32();
+        let end = start + size;
+
+        fill_0(start);
+        // set the word
+        SideMetadataSpec::set_meta_bits(start, 0, end, 0);
+        assert_eq!(unsafe { start.load::<u32>() }, 0b1111_1111_1111_1111_1111_1111_1111_1111);
+
+        fill_0(start);
+        // set first 2 bits
+        SideMetadataSpec::set_meta_bits(start, 0, start, 2);
+        assert_eq!(unsafe { start.load::<u32>() }, 0b0000_0000_0000_0000_0000_0000_0000_0011);
+
+        fill_0(start);
+        // set last 2 bits
+        SideMetadataSpec::set_meta_bits(end - 1, 6, end, 0);
+        assert_eq!(unsafe { start.load::<u32>() }, 0b1100_0000_0000_0000_0000_0000_0000_0000);
+
+        fill_0(start);
+        // set everything except first 2 bits and last 2 bits
+        SideMetadataSpec::set_meta_bits(start, 2, end - 1, 6);
+        assert_eq!(unsafe { start.load::<u32>() }, 0b0011_1111_1111_1111_1111_1111_1111_1100);
+    }
+
+    #[test]
     fn test_side_metadata_bcopy_metadata_contiguous() {
         serial_test(|| {
             with_cleanup(
