@@ -19,7 +19,7 @@ pub fn test_handle_mmap_oom() {
                 // mmap 1 terabyte memory - we expect this will fail due to out of memory.
                 // If that's not the case, increase the size we mmap.
                 let mmap_res =
-                    memory::dzmmap_noreplace(start, LARGE_SIZE, memory::MmapStrategy::Normal);
+                    memory::dzmmap_noreplace(start, LARGE_SIZE, memory::MmapStrategy::TEST);
 
                 memory::handle_mmap_error::<MockVM>(
                     mmap_res.err().unwrap(),

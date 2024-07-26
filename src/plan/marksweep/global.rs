@@ -109,6 +109,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
             ms: MarkSweepSpace::new(plan_args.get_space_args(
                 "ms",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             common: CommonPlan::new(plan_args),

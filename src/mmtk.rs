@@ -203,10 +203,6 @@ impl<VM: VMBinding> MMTK<VM> {
             },
         );
 
-        if *options.transparent_hugepages {
-            MMAPPER.set_mmap_strategy(crate::util::memory::MmapStrategy::TransparentHugePages);
-        }
-
         MMTK {
             options,
             state,

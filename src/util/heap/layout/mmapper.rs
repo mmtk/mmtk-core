@@ -8,9 +8,6 @@ use std::io::Result;
 
 /// Generic mmap and protection functionality
 pub trait Mmapper: Sync {
-    /// Set mmap strategy
-    fn set_mmap_strategy(&self, strategy: MmapStrategy);
-
     /// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///
@@ -35,7 +32,12 @@ pub trait Mmapper: Sync {
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
     /// * `bytes`: Number of bytes to quarantine from the start
-    fn quarantine_address_range(&self, start: Address, pages: usize) -> Result<()>;
+    fn quarantine_address_range(
+        &self,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -> Result<()>;
 
     /// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
@@ -47,7 +49,7 @@ pub trait Mmapper: Sync {
     // NOTE: There is a monotonicity assumption so that only updates require lock
     // acquisition.
     // TODO: Fix the above to support unmapping.
-    fn ensure_mapped(&self, start: Address, pages: usize) -> Result<()>;
+    fn ensure_mapped(&self, start: Address, pages: usize, strategy: MmapStrategy) -> Result<()>;
 
     /// Is the page pointed to by this address mapped? Returns true if
     /// the page at the given address is mapped.
@@ -94,7 +96,7 @@ impl MapState {
         );
         let res = match state.load(Ordering::Relaxed) {
             MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy),
-            MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES),
+            MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES, strategy.prot),
             MapState::Quarantined => unsafe { dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy) },
             // might have become MapState::Mapped here
             MapState::Mapped => Ok(()),
