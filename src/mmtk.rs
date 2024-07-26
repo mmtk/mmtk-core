@@ -261,13 +261,13 @@ impl<VM: VMBinding> MMTK<VM> {
     /// requires the users to do some preparation before calling it.
     ///
     /// -   **Multi-threading**:  If `fork()` is called when the process has multiple threads, it
-    /// will only duplicate the current thread into the child process, and the child process can
-    /// only call async-signal-safe functions, notably `exec()`.  For VMs that that use
-    /// multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
-    /// exist in the process.
+    ///     will only duplicate the current thread into the child process, and the child process can
+    ///     only call async-signal-safe functions, notably `exec()`.  For VMs that that use
+    ///     multi-process concurrency, it is imperative that when calling `fork()`, only one thread may
+    ///     exist in the process.
     ///
     /// -   **File descriptors**: The child process inherits copies of the parent's set of open
-    /// file descriptors.  This may or may not be desired depending on use cases.
+    ///     file descriptors.  This may or may not be desired depending on use cases.
     ///
     /// This function helps VMs that use `fork()` for multi-process concurrency.  It instructs all
     /// GC threads to save their contexts and return from their entry-point functions.  Currently,

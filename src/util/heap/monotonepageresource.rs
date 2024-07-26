@@ -85,7 +85,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             sync.cursor, sync.sentinel, sync.current_chunk
         );
 
-        if cfg!(debug = "true") {
+        if cfg!(debug_assertions) {
             /*
              * Cursor should always be zero, or somewhere in the current chunk.  If we have just
              * allocated exactly enough pages to exhaust the current chunk, then cursor can point
