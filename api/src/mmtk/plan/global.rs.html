@@ -755,6 +755,14 @@
 <a href="#753" id="753">753</a>
 <a href="#754" id="754">754</a>
 <a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.
 
 </span><span class="kw">use </span><span class="kw">super</span>::PlanConstraints;
@@ -1153,11 +1161,13 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
         zeroed: bool,
+        permission_exec: bool,
         vmrequest: VMRequest,
     ) -&gt; PlanCreateSpaceArgs&lt;VM&gt; {
         PlanCreateSpaceArgs {
             name,
             zeroed,
+            permission_exec,
             vmrequest,
             global_side_metadata_specs: <span class="self">self</span>.global_side_metadata_specs.clone(),
             vm_map: <span class="self">self</span>.global_args.vm_map,
@@ -1166,7 +1176,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
             constraints: <span class="self">self</span>.constraints,
             gc_trigger: <span class="self">self</span>.global_args.gc_trigger.clone(),
             scheduler: <span class="self">self</span>.global_args.scheduler.clone(),
-            options: <span class="kw-2">&amp;</span><span class="self">self</span>.global_args.options,
+            options: <span class="self">self</span>.global_args.options.clone(),
             global_state: <span class="self">self</span>.global_args.state.clone(),
         }
     }
@@ -1180,11 +1190,13 @@ BasePlan should contain all plan-related state and functions that are _fundament
             </span>code_space: ImmortalSpace::new(args.get_space_args(
                 <span class="string">"code_space"</span>,
                 <span class="bool-val">true</span>,
+                <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
             <span class="attr">#[cfg(feature = <span class="string">"code_space"</span>)]
             </span>code_lo_space: ImmortalSpace::new(args.get_space_args(
                 <span class="string">"code_lo_space"</span>,
+                <span class="bool-val">true</span>,
                 <span class="bool-val">true</span>,
                 VMRequest::discontiguous(),
             )),
@@ -1192,13 +1204,15 @@ BasePlan should contain all plan-related state and functions that are _fundament
             </span>ro_space: ImmortalSpace::new(args.get_space_args(
                 <span class="string">"ro_space"</span>,
                 <span class="bool-val">true</span>,
+                <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
             <span class="attr">#[cfg(feature = <span class="string">"vm_space"</span>)]
             </span>vm_space: VMSpace::new(args.get_space_args(
                 <span class="string">"vm_space"</span>,
                 <span class="bool-val">false</span>,
-                VMRequest::discontiguous(),
+                <span class="bool-val">false</span>, <span class="comment">// it doesn't matter -- we are not mmapping for VM space.
+                </span>VMRequest::discontiguous(),
             )),
 
             global_state: args.global_args.state.clone(),
@@ -1342,15 +1356,17 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             immortal: ImmortalSpace::new(args.get_space_args(
                 <span class="string">"immortal"</span>,
                 <span class="bool-val">true</span>,
+                <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
             los: LargeObjectSpace::new(
-                args.get_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+                args.get_space_args(<span class="string">"los"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
                 <span class="bool-val">false</span>,
             ),
             nonmoving: ImmortalSpace::new(args.get_space_args(
                 <span class="string">"nonmoving"</span>,
                 <span class="bool-val">true</span>,
+                <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
             base: BasePlan::new(args),

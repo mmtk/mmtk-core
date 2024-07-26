@@ -366,6 +366,10 @@
 <a href="#364" id="364">364</a>
 <a href="#365" id="365">365</a>
 <a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -580,7 +584,11 @@
         } <span class="kw">else </span>{
             FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
-        pr.protect_memory_on_release = protect_memory_on_release;
+        pr.protect_memory_on_release = <span class="kw">if </span>protect_memory_on_release {
+            <span class="prelude-val">Some</span>(common.mmap_strategy().prot)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>};
         LargeObjectSpace {
             pr,
             common,

@@ -1276,6 +1276,7 @@
 <a href="#1274" id="1274">1274</a>
 <a href="#1275" id="1275">1275</a>
 <a href="#1276" id="1276">1276</a>
+<a href="#1277" id="1277">1277</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::scheduler::affinity::{get_total_num_cpus, CoreId};
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -2140,7 +2141,8 @@
     <span class="doccomment">/// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
     </span>gc_trigger:             GCTriggerSelector    [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>] [|v: <span class="kw-2">&amp;</span>GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((<span class="kw">crate</span>::util::memory::get_system_total_memory() <span class="kw">as </span>f64 * <span class="number">0.5f64</span>) <span class="kw">as </span>usize),
-    <span class="doccomment">/// Enable transparent hugepage support via madvise (only Linux is supported)
+    <span class="doccomment">/// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
+    /// This only affects the memory for MMTk spaces.
     </span>transparent_hugepages: bool                  [env_var: <span class="bool-val">true</span>, command_line: <span class="bool-val">true</span>]  [|v: <span class="kw-2">&amp;</span>bool| !v || <span class="macro">cfg!</span>(target_os = <span class="string">"linux"</span>)] = <span class="bool-val">false
 </span>}
 

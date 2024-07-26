@@ -219,6 +219,8 @@
 <a href="#217" id="217">217</a>
 <a href="#218" id="218">218</a>
 <a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::rust_util::rev_group::RevisitableGroupByForIterator;
@@ -229,9 +231,6 @@
 
 <span class="doccomment">/// Generic mmap and protection functionality
 </span><span class="kw">pub trait </span>Mmapper: Sync {
-    <span class="doccomment">/// Set mmap strategy
-    </span><span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy);
-
     <span class="doccomment">/// Given an address array describing the regions of virtual memory to be used
     /// by MMTk, demand zero map all of them if they are not already mapped.
     ///
@@ -256,7 +255,12 @@
     /// Arguments:
     /// * `start`: Address of the first page to be quarantined
     /// * `bytes`: Number of bytes to quarantine from the start
-    </span><span class="kw">fn </span>quarantine_address_range(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
+    </span><span class="kw">fn </span>quarantine_address_range(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
 
     <span class="doccomment">/// Ensure that a range of pages is mmapped (or equivalent).  If the
     /// pages are not yet mapped, demand-zero map them. Note that mapping
@@ -268,7 +272,7 @@
     </span><span class="comment">// NOTE: There is a monotonicity assumption so that only updates require lock
     // acquisition.
     // TODO: Fix the above to support unmapping.
-    </span><span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
+    </span><span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize, strategy: MmapStrategy) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt;;
 
     <span class="doccomment">/// Is the page pointed to by this address mapped? Returns true if
     /// the page at the given address is mapped.
@@ -315,7 +319,7 @@
         );
         <span class="kw">let </span>res = <span class="kw">match </span>state.load(Ordering::Relaxed) {
             MapState::Unmapped =&gt; dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES, strategy),
-            MapState::Protected =&gt; munprotect(mmap_start, MMAP_CHUNK_BYTES),
+            MapState::Protected =&gt; munprotect(mmap_start, MMAP_CHUNK_BYTES, strategy.prot),
             MapState::Quarantined =&gt; <span class="kw">unsafe </span>{ dzmmap(mmap_start, MMAP_CHUNK_BYTES, strategy) },
             <span class="comment">// might have become MapState::Mapped here
             </span>MapState::Mapped =&gt; <span class="prelude-val">Ok</span>(()),

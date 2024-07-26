@@ -389,6 +389,10 @@
 <a href="#387" id="387">387</a>
 <a href="#388" id="388">388</a>
 <a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{Mutex, MutexGuard};
 
 <span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::PAGES_IN_CHUNK;
@@ -418,7 +422,7 @@
     sync: Mutex&lt;FreeListPageResourceSync&gt;,
     _p: PhantomData&lt;VM&gt;,
     <span class="doccomment">/// Protect memory on release, and unprotect on re-allocate.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) protect_memory_on_release: bool,
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) protect_memory_on_release: <span class="prelude-ty">Option</span>&lt;memory::MmapProtection&gt;,
 }
 
 <span class="kw">unsafe impl</span>&lt;VM: VMBinding&gt; Send <span class="kw">for </span>FreeListPageResource&lt;VM&gt; {}
@@ -502,7 +506,7 @@
         <span class="kw">let </span>rtn = sync.start + conversions::pages_to_bytes(page_offset <span class="kw">as _</span>);
         <span class="comment">// The meta-data portion of reserved Pages was committed above.
         </span><span class="self">self</span>.commit_pages(reserved_pages, required_pages, tls);
-        <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release {
+        <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release.is_some() {
             <span class="kw">if </span>!new_chunk {
                 <span class="comment">// This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
                 // See https://github.com/mmtk/mmtk-core/issues/400.
@@ -559,7 +563,7 @@
                 highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
-            protect_memory_on_release: <span class="bool-val">false</span>,
+            protect_memory_on_release: <span class="prelude-val">None</span>,
         }
     }
 
@@ -597,7 +601,7 @@
                 highwater_mark: UNINITIALIZED_WATER_MARK,
             }),
             _p: PhantomData,
-            protect_memory_on_release: <span class="bool-val">false</span>,
+            protect_memory_on_release: <span class="prelude-val">None</span>,
         }
     }
 
@@ -609,7 +613,7 @@
         // &gt; the total number of mappings with distinct attributes
         // &gt; (e.g., read versus read/write protection) exceeding the
         // &gt; allowed maximum.
-        </span><span class="macro">assert!</span>(<span class="self">self</span>.protect_memory_on_release);
+        </span><span class="macro">assert!</span>(<span class="self">self</span>.protect_memory_on_release.is_some());
         <span class="comment">// We are not using mmapper.protect(). mmapper.protect() protects the whole chunk and
         // may protect memory that is still in use.
         </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = memory::mprotect(start, conversions::pages_to_bytes(pages)) {
@@ -622,8 +626,12 @@
 
     <span class="doccomment">/// Unprotect the memory
     </span><span class="kw">fn </span>munprotect(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize) {
-        <span class="macro">assert!</span>(<span class="self">self</span>.protect_memory_on_release);
-        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = memory::munprotect(start, conversions::pages_to_bytes(pages)) {
+        <span class="macro">assert!</span>(<span class="self">self</span>.protect_memory_on_release.is_some());
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = memory::munprotect(
+            start,
+            conversions::pages_to_bytes(pages),
+            <span class="self">self</span>.protect_memory_on_release.unwrap(),
+        ) {
             <span class="macro">panic!</span>(
                 <span class="string">"Failed at unprotecting memory (starting at {}): {:?}"</span>,
                 start, e
@@ -728,7 +736,7 @@
         //     VM.memory.zero(false, first, Conversions.pagesToBytes(pages));
         </span><span class="macro">debug_assert!</span>(pages <span class="kw">as </span>usize &lt;= <span class="self">self</span>.common.accounting.get_committed_pages());
 
-        <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release {
+        <span class="kw">if </span><span class="self">self</span>.protect_memory_on_release.is_some() {
             <span class="self">self</span>.mprotect(first, pages <span class="kw">as _</span>);
         }
 

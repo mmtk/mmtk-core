@@ -402,11 +402,6 @@
 <a href="#400" id="400">400</a>
 <a href="#401" id="401">401</a>
 <a href="#402" id="402">402</a>
-<a href="#403" id="403">403</a>
-<a href="#404" id="404">404</a>
-<a href="#405" id="405">405</a>
-<a href="#406" id="406">406</a>
-<a href="#407" id="407">407</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -432,7 +427,6 @@
 <span class="kw">pub struct </span>ByteMapMmapper {
     lock: Mutex&lt;()&gt;,
     mapped: [Atomic&lt;MapState&gt;; MMAP_NUM_CHUNKS],
-    strategy: Atomic&lt;MmapStrategy&gt;,
 }
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ByteMapMmapper {
@@ -442,10 +436,6 @@
 }
 
 <span class="kw">impl </span>Mmapper <span class="kw">for </span>ByteMapMmapper {
-    <span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy) {
-        <span class="self">self</span>.strategy.store(strategy, Ordering::Relaxed);
-    }
-
     <span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]) {
         <span class="macro">unimplemented!</span>()
     }
@@ -458,7 +448,7 @@
         }
     }
 
-    <span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize, strategy: MmapStrategy) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>start_chunk = <span class="self">Self</span>::address_to_mmap_chunks_down(start);
         <span class="kw">let </span>end_chunk = <span class="self">Self</span>::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         <span class="macro">trace!</span>(
@@ -476,18 +466,18 @@
 
             <span class="kw">let </span>mmap_start = <span class="self">Self</span>::mmap_chunks_to_address(chunk);
             <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-            MapState::transition_to_mapped(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk],
-                mmap_start,
-                <span class="self">self</span>.strategy.load(Ordering::Relaxed),
-            )
-            .unwrap();
+            MapState::transition_to_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk], mmap_start, strategy).unwrap();
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn </span>quarantine_address_range(<span class="kw-2">&amp;</span><span class="self">self</span>, start: Address, pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">fn </span>quarantine_address_range(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>start_chunk = <span class="self">Self</span>::address_to_mmap_chunks_down(start);
         <span class="kw">let </span>end_chunk = <span class="self">Self</span>::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         <span class="macro">trace!</span>(
@@ -505,12 +495,7 @@
 
             <span class="kw">let </span>mmap_start = <span class="self">Self</span>::mmap_chunks_to_address(chunk);
             <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-            MapState::transition_to_quarantined(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk],
-                mmap_start,
-                <span class="self">self</span>.strategy.load(Ordering::Relaxed),
-            )
-            .unwrap();
+            MapState::transition_to_quarantined(<span class="kw-2">&amp;</span><span class="self">self</span>.mapped[chunk], mmap_start, strategy).unwrap();
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -558,7 +543,6 @@
         ByteMapMmapper {
             lock: Mutex::new(()),
             mapped: [INITIAL_ENTRY; MMAP_NUM_CHUNKS],
-            strategy: Atomic::new(MmapStrategy::Normal),
         }
     }
 
@@ -599,7 +583,7 @@
     <span class="kw">use </span><span class="kw">crate</span>::util::conversions::pages_to_bytes;
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::mmapper::MapState;
     <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::MMAP_CHUNK_BYTES;
-    <span class="kw">use </span><span class="kw">crate</span>::util::memory;
+    <span class="kw">use </span><span class="kw">crate</span>::util::memory::{<span class="self">self</span>, MmapStrategy};
     <span class="kw">use </span><span class="kw">crate</span>::util::test_util::BYTE_MAP_MMAPPER_TEST_REGION;
     <span class="kw">use </span><span class="kw">crate</span>::util::test_util::{serial_test, with_cleanup};
     <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -656,7 +640,9 @@
             with_cleanup(
                 || {
                     <span class="kw">let </span>mmapper = ByteMapMmapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .unwrap();
 
                     <span class="kw">for </span>chunk <span class="kw">in </span>start_chunk..end_chunk {
                         <span class="macro">assert_eq!</span>(
@@ -683,7 +669,9 @@
             with_cleanup(
                 || {
                     <span class="kw">let </span>mmapper = ByteMapMmapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .unwrap();
 
                     <span class="kw">for </span>chunk <span class="kw">in </span>start_chunk..end_chunk {
                         <span class="macro">assert_eq!</span>(
@@ -710,7 +698,9 @@
             with_cleanup(
                 || {
                     <span class="kw">let </span>mmapper = ByteMapMmapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .unwrap();
 
                     <span class="kw">let </span>start_chunk = ByteMapMmapper::address_to_mmap_chunks_down(FIXED_ADDRESS);
                     <span class="kw">let </span>end_chunk = ByteMapMmapper::address_to_mmap_chunks_up(
@@ -743,7 +733,7 @@
                     <span class="comment">// map 2 chunks
                     </span><span class="kw">let </span>mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages)
+                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages, MmapStrategy::TEST)
                         .unwrap();
 
                     <span class="comment">// protect 1 chunk
@@ -778,7 +768,7 @@
                     <span class="comment">// map 2 chunks
                     </span><span class="kw">let </span>mmapper = ByteMapMmapper::new();
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages)
+                        .ensure_mapped(FIXED_ADDRESS, test_memory_pages, MmapStrategy::TEST)
                         .unwrap();
 
                     <span class="comment">// protect 1 chunk
@@ -796,7 +786,7 @@
 
                     <span class="comment">// ensure mapped - this will unprotect the previously protected chunk
                     </span>mmapper
-                        .ensure_mapped(FIXED_ADDRESS, protect_memory_pages_2)
+                        .ensure_mapped(FIXED_ADDRESS, protect_memory_pages_2, MmapStrategy::TEST)
                         .unwrap();
                     <span class="macro">assert_eq!</span>(
                         mmapper.mapped[chunk].load(Ordering::Relaxed),

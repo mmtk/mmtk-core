@@ -478,11 +478,11 @@
         };
 
         <span class="kw">let </span>copyspace0 = CopySpace::new(
-            plan_args.get_space_args(<span class="string">"copyspace0"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+            plan_args.get_space_args(<span class="string">"copyspace0"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             <span class="bool-val">false</span>,
         );
         <span class="kw">let </span>copyspace1 = CopySpace::new(
-            plan_args.get_space_args(<span class="string">"copyspace1"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+            plan_args.get_space_args(<span class="string">"copyspace1"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             <span class="bool-val">true</span>,
         );
 

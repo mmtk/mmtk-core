@@ -526,7 +526,7 @@
                 <span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs::&lt;VM&gt;(),
         };
         <span class="kw">let </span>immix_space = ImmixSpace::new(
-            plan_args.get_space_args(<span class="string">"immix_mature"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+            plan_args.get_space_args(<span class="string">"immix_mature"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: <span class="bool-val">false</span>,
                 <span class="comment">// We don't need to unlog objects at tracing. Instead, we unlog objects at copying.

@@ -382,10 +382,20 @@
 <a href="#380" id="380">380</a>
 <a href="#381" id="381">381</a>
 <a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::address_to_chunked_meta_address;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
@@ -489,9 +499,17 @@
     <span class="kw">let </span>mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     <span class="kw">if </span>mmap_size &gt; <span class="number">0 </span>{
         <span class="kw">if </span>!no_reserve {
-            MMAPPER.ensure_mapped(mmap_start, mmap_size &gt;&gt; LOG_BYTES_IN_PAGE)
+            MMAPPER.ensure_mapped(
+                mmap_start,
+                mmap_size &gt;&gt; LOG_BYTES_IN_PAGE,
+                MmapStrategy::SIDE_METADATA,
+            )
         } <span class="kw">else </span>{
-            MMAPPER.quarantine_address_range(mmap_start, mmap_size &gt;&gt; LOG_BYTES_IN_PAGE)
+            MMAPPER.quarantine_address_range(
+                mmap_start,
+                mmap_size &gt;&gt; LOG_BYTES_IN_PAGE,
+                MmapStrategy::SIDE_METADATA,
+            )
         }
         .map(|<span class="kw">_</span>| mmap_size)
     } <span class="kw">else </span>{

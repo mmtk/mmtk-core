@@ -125,6 +125,7 @@
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
 <a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::global::BasePlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CommonPlan;
 <span class="kw">use </span><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs;
@@ -236,6 +237,7 @@
             ms: MarkSweepSpace::new(plan_args.get_space_args(
                 <span class="string">"ms"</span>,
                 <span class="bool-val">true</span>,
+                <span class="bool-val">false</span>,
                 VMRequest::discontiguous(),
             )),
             common: CommonPlan::new(plan_args),

@@ -225,7 +225,7 @@
 
         <span class="kw">let </span>ret = PageProtect {
             space: LargeObjectSpace::new(
-                plan_args.get_space_args(<span class="string">"pageprotect"</span>, <span class="bool-val">true</span>, VMRequest::discontiguous()),
+                plan_args.get_space_args(<span class="string">"pageprotect"</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, VMRequest::discontiguous()),
                 <span class="bool-val">true</span>,
             ),
             common: CommonPlan::new(plan_args),

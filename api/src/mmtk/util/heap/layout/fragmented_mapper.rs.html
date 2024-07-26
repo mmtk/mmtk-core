@@ -595,6 +595,12 @@
 <a href="#593" id="593">593</a>
 <a href="#594" id="594">594</a>
 <a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::mmapper::MapState;
 <span class="kw">use </span><span class="kw">super</span>::Mmapper;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
@@ -654,7 +660,6 @@
     free_slabs: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
     slab_table: Vec&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;Slab&gt;&gt;&gt;,
     slab_map: Vec&lt;Address&gt;,
-    strategy: Atomic&lt;MmapStrategy&gt;,
 }
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FragmentedMapper {
@@ -664,10 +669,6 @@
 }
 
 <span class="kw">impl </span>Mmapper <span class="kw">for </span>FragmentedMapper {
-    <span class="kw">fn </span>set_mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>, strategy: MmapStrategy) {
-        <span class="self">self</span>.inner().strategy.store(strategy, Ordering::Relaxed);
-    }
-
     <span class="kw">fn </span>eagerly_mmap_all_spaces(<span class="kw-2">&amp;</span><span class="self">self</span>, _space_map: <span class="kw-2">&amp;</span>[Address]) {}
 
     <span class="kw">fn </span>mark_as_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>start: Address, bytes: usize) {
@@ -691,7 +692,12 @@
         }
     }
 
-    <span class="kw">fn </span>quarantine_address_range(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>start: Address, pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">fn </span>quarantine_address_range(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="kw-2">mut </span>start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="macro">debug_assert!</span>(start.is_aligned_to(BYTES_IN_PAGE));
 
         <span class="kw">let </span>end = start + conversions::pages_to_bytes(pages);
@@ -736,14 +742,19 @@
             MapState::bulk_transition_to_quarantined(
                 state_slices.as_slice(),
                 mmap_start,
-                <span class="self">self</span>.inner().strategy.load(Ordering::Relaxed),
+                strategy,
             )<span class="question-mark">?</span>;
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn </span>ensure_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>start: Address, pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">fn </span>ensure_mapped(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="kw-2">mut </span>start: Address,
+        pages: usize,
+        strategy: MmapStrategy,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>end = start + conversions::pages_to_bytes(pages);
         <span class="comment">// Iterate over the slabs covered
         </span><span class="kw">while </span>start &lt; end {
@@ -768,11 +779,7 @@
 
                 <span class="kw">let </span>mmap_start = <span class="self">Self</span>::chunk_index_to_address(base, chunk);
                 <span class="kw">let </span>_guard = <span class="self">self</span>.lock.lock().unwrap();
-                MapState::transition_to_mapped(
-                    entry,
-                    mmap_start,
-                    <span class="self">self</span>.inner().strategy.load(Ordering::Relaxed),
-                )<span class="question-mark">?</span>;
+                MapState::transition_to_mapped(entry, mmap_start, strategy)<span class="question-mark">?</span>;
             }
             start = high;
         }
@@ -832,7 +839,6 @@
                 free_slabs: (<span class="number">0</span>..MAX_SLABS).map(|<span class="kw">_</span>| <span class="prelude-val">Some</span>(<span class="self">Self</span>::new_slab())).collect(),
                 slab_table: (<span class="number">0</span>..SLAB_TABLE_SIZE).map(|<span class="kw">_</span>| <span class="prelude-val">None</span>).collect(),
                 slab_map: <span class="macro">vec!</span>[SENTINEL; SLAB_TABLE_SIZE],
-                strategy: Atomic::new(MmapStrategy::Normal),
             }),
         }
     }
@@ -1042,7 +1048,9 @@
             with_cleanup(
                 || {
                     <span class="kw">let </span>mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .unwrap();
 
                     <span class="kw">let </span>chunks = pages_to_chunks_up(pages);
                     <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..chunks {
@@ -1068,7 +1076,9 @@
             with_cleanup(
                 || {
                     <span class="kw">let </span>mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .unwrap();
 
                     <span class="kw">let </span>chunks = pages_to_chunks_up(pages);
                     <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..chunks {
@@ -1095,7 +1105,9 @@
             with_cleanup(
                 || {
                     <span class="kw">let </span>mmapper = FragmentedMapper::new();
-                    mmapper.ensure_mapped(FIXED_ADDRESS, pages).unwrap();
+                    mmapper
+                        .ensure_mapped(FIXED_ADDRESS, pages, MmapStrategy::TEST)
+                        .unwrap();
 
                     <span class="kw">let </span>chunks = pages_to_chunks_up(pages);
                     <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..chunks {
@@ -1124,7 +1136,7 @@
                     </span><span class="kw">let </span>mmapper = FragmentedMapper::new();
                     <span class="kw">let </span>pages_per_chunk = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>, MmapStrategy::TEST)
                         .unwrap();
 
                     <span class="comment">// protect 1 chunk
@@ -1155,7 +1167,7 @@
                     </span><span class="kw">let </span>mmapper = FragmentedMapper::new();
                     <span class="kw">let </span>pages_per_chunk = MMAP_CHUNK_BYTES &gt;&gt; LOG_BYTES_IN_PAGE <span class="kw">as </span>usize;
                     mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>, MmapStrategy::TEST)
                         .unwrap();
 
                     <span class="comment">// protect 1 chunk
@@ -1172,7 +1184,7 @@
 
                     <span class="comment">// ensure mapped - this will unprotect the previously protected chunk
                     </span>mmapper
-                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>)
+                        .ensure_mapped(FIXED_ADDRESS, pages_per_chunk * <span class="number">2</span>, MmapStrategy::TEST)
                         .unwrap();
                     <span class="macro">assert_eq!</span>(
                         get_chunk_map_state(<span class="kw-2">&amp;</span>mmapper, FIXED_ADDRESS),

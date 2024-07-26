@@ -640,6 +640,27 @@
 <a href="#638" id="638">638</a>
 <a href="#639" id="639">639</a>
 <a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a>
+<a href="#651" id="651">651</a>
+<a href="#652" id="652">652</a>
+<a href="#653" id="653">653</a>
+<a href="#654" id="654">654</a>
+<a href="#655" id="655">655</a>
+<a href="#656" id="656">656</a>
+<a href="#657" id="657">657</a>
+<a href="#658" id="658">658</a>
+<a href="#659" id="659">659</a>
+<a href="#660" id="660">660</a>
+<a href="#661" id="661">661</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
@@ -670,7 +691,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::VMMap;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::HeapMeta;
-<span class="kw">use </span><span class="kw">crate</span>::util::memory;
+<span class="kw">use </span><span class="kw">crate</span>::util::memory::{<span class="self">self</span>, HugePageSupport, MmapProtection, MmapStrategy};
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
 
 <span class="kw">use </span>std::marker::PhantomData;
@@ -779,13 +800,13 @@
                     );
                     <span class="kw">let </span>bytes = conversions::pages_to_bytes(res.pages);
 
-                    <span class="kw">let </span>map_sidemetadata = || {
+                    <span class="kw">let </span>mmap = || {
                         <span class="comment">// Mmap the pages and the side metadata, and handle error. In case of any error,
                         // we will either call back to the VM for OOM, or simply panic.
                         </span><span class="kw">if let </span><span class="prelude-val">Err</span>(mmap_error) = <span class="self">self
                             </span>.common()
                             .mmapper
-                            .ensure_mapped(res.start, res.pages)
+                            .ensure_mapped(res.start, res.pages, <span class="self">self</span>.common().mmap_strategy())
                             .and(
                                 <span class="self">self</span>.common()
                                     .metadata
@@ -802,7 +823,7 @@
                     <span class="comment">// The scope of the lock is important in terms of performance when we have many allocator threads.
                     </span><span class="kw">if </span>SFT_MAP.get_side_metadata().is_some() {
                         <span class="comment">// If the SFT map uses side metadata, so we have to initialize side metadata first.
-                        </span>map_sidemetadata();
+                        </span>mmap();
                         <span class="comment">// then grow space, which will use the side metadata we mapped above
                         </span>grow_space();
                         <span class="comment">// then we can drop the lock after grow_space()
@@ -812,7 +833,7 @@
                         </span>grow_space();
                         drop(lock);
                         <span class="comment">// and map side metadata without holding the lock
-                        </span>map_sidemetadata();
+                        </span>mmap();
                     }
 
                     <span class="comment">// TODO: Concurrent zeroing
@@ -1063,10 +1084,12 @@
     </span><span class="comment">// the copy semantics for the space.
     </span><span class="kw">pub </span>copy: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;,
 
-    immortal: bool,
-    movable: bool,
+    <span class="kw">pub </span>immortal: bool,
+    <span class="kw">pub </span>movable: bool,
     <span class="kw">pub </span>contiguous: bool,
     <span class="kw">pub </span>zeroed: bool,
+
+    <span class="kw">pub </span>permission_exec: bool,
 
     <span class="kw">pub </span>start: Address,
     <span class="kw">pub </span>extent: usize,
@@ -1085,6 +1108,7 @@
 
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub </span>global_state: Arc&lt;GlobalState&gt;,
+    <span class="kw">pub </span>options: Arc&lt;Options&gt;,
 
     p: PhantomData&lt;VM&gt;,
 }
@@ -1101,6 +1125,7 @@
 </span><span class="kw">pub struct </span>PlanCreateSpaceArgs&lt;<span class="lifetime">'a</span>, VM: VMBinding&gt; {
     <span class="kw">pub </span>name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
     <span class="kw">pub </span>zeroed: bool,
+    <span class="kw">pub </span>permission_exec: bool,
     <span class="kw">pub </span>vmrequest: VMRequest,
     <span class="kw">pub </span>global_side_metadata_specs: Vec&lt;SideMetadataSpec&gt;,
     <span class="kw">pub </span>vm_map: <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap,
@@ -1109,7 +1134,7 @@
     <span class="kw">pub </span>constraints: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>PlanConstraints,
     <span class="kw">pub </span>gc_trigger: Arc&lt;GCTrigger&lt;VM&gt;&gt;,
     <span class="kw">pub </span>scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
-    <span class="kw">pub </span>options: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>Options,
+    <span class="kw">pub </span>options: Arc&lt;Options&gt;,
     <span class="kw">pub </span>global_state: Arc&lt;GlobalState&gt;,
 }
 
@@ -1140,6 +1165,7 @@
             immortal: args.immortal,
             movable: args.movable,
             contiguous: <span class="bool-val">true</span>,
+            permission_exec: args.plan_args.permission_exec,
             zeroed: args.plan_args.zeroed,
             start: <span class="kw">unsafe </span>{ Address::zero() },
             extent: <span class="number">0</span>,
@@ -1153,6 +1179,7 @@
             },
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
+            options: args.plan_args.options.clone(),
             p: PhantomData,
         };
 
@@ -1260,6 +1287,21 @@
 
     <span class="kw">pub fn </span>vm_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">dyn </span>VMMap {
         <span class="self">self</span>.vm_map
+    }
+
+    <span class="kw">pub fn </span>mmap_strategy(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MmapStrategy {
+        MmapStrategy {
+            huge_page: <span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.options.transparent_hugepages {
+                HugePageSupport::TransparentHugePages
+            } <span class="kw">else </span>{
+                HugePageSupport::No
+            },
+            prot: <span class="kw">if </span><span class="self">self</span>.permission_exec || <span class="macro">cfg!</span>(feature = <span class="string">"exec_permission_on_all_spaces"</span>) {
+                MmapProtection::ReadWriteExec
+            } <span class="kw">else </span>{
+                MmapProtection::ReadWrite
+            },
+        }
     }
 }
 
