@@ -202,6 +202,86 @@ pub fn break_range(
         .collect()
 }
 
+pub fn break_range_callback<F>(
+    granularity: Granularity,
+    start: BitAddress,
+    end: BitAddress,
+    forwards: bool,
+    visitor: &mut F,
+) where
+    F: FnMut(VisitRange) -> bool,
+{
+    debug_assert!(
+        start.is_normalized(granularity),
+        "{start:?} is not normalized for {granularity:?}"
+    );
+    debug_assert!(
+        end.is_normalized(granularity),
+        "{end:?} is not normalized for {granularity:?}"
+    );
+
+    warn!("break_range: {granularity:?} {start:?} {end:?}");
+
+    if start.addr == end.addr {
+        // The start and the end are in the same grain.
+        if start.bit == end.bit {
+            return;
+        } else {
+            // Yield only one SubGrain range.
+            visitor(VisitRange::SubGrain {
+                addr: start.addr,
+                bit_start: start.bit,
+                bit_end: end.bit,
+            });
+            return;
+        }
+    }
+
+    // Start with a sub-grain range if the start is not aligned.
+    let start_subgrain = |v: &mut F| {
+        if !start.is_grain_aligned(granularity) {
+            v(VisitRange::SubGrain {
+                addr: start.addr,
+                bit_start: start.bit,
+                bit_end: granularity.bits(),
+            });
+        }
+    };
+
+    // Yield a whole-grain in the middle if long enough.
+    let start_whole = start.align_up_to_grain(granularity);
+    let end_whole = end.align_down_to_grain(granularity);
+    let whole = |v: &mut F| {
+        if start_whole < end_whole {
+            v(VisitRange::WholeGrain {
+                start: start_whole,
+                end: end_whole,
+            });
+        }
+    };
+
+    // Finally yield a sub-grain range in the end if not aligned.
+    let end_subgrain = |v: &mut F| {
+        if !end.is_grain_aligned(granularity) {
+            v(VisitRange::SubGrain {
+                addr: end.addr,
+                bit_start: 0,
+                bit_end: end.bit,
+            });
+        }
+    };
+
+    if forwards {
+        start_subgrain(visitor);
+        whole(visitor);
+        end_subgrain(visitor);
+    } else {
+        end_subgrain(visitor);
+        whole(visitor);
+        start_subgrain(visitor);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

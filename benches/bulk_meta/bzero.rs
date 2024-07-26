@@ -21,6 +21,13 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("bzero_bset_modern_callback", |b| {
+        b.iter(|| {
+            SideMetadataSpec::set_meta_bits_callback(start, 0, end, 0);
+            SideMetadataSpec::zero_meta_bits_callback(start, 0, end, 0);
+        })
+    });
+
     c.bench_function("bzero_bset_classic", |b| {
         b.iter(|| {
             SideMetadataSpec::set_meta_bits_classic(start, 0, end, 0);
