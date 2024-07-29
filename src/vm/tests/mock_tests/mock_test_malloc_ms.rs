@@ -18,9 +18,6 @@ fn test_malloc() {
             assert!((address4 + 4_isize).is_aligned_to(64));
 
             assert!(!bool1);
-            #[cfg(feature = "malloc_hoard")]
-            assert!(bool2);
-            #[cfg(not(feature = "malloc_hoard"))]
             assert!(!bool2);
             assert!(bool3);
             assert!(bool4);
@@ -33,9 +30,6 @@ fn test_malloc() {
             unsafe {
                 malloc_ms_util::free(address1.to_mut_ptr());
             }
-            #[cfg(feature = "malloc_hoard")]
-            malloc_ms_util::offset_free(address2);
-            #[cfg(not(feature = "malloc_hoard"))]
             unsafe {
                 malloc_ms_util::free(address2.to_mut_ptr());
             }

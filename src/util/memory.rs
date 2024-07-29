@@ -8,6 +8,82 @@ use std::io::{Error, Result};
 use sysinfo::MemoryRefreshKind;
 use sysinfo::{RefreshKind, System};
 
+#[cfg(target_os = "linux")]
+// MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+#[cfg(target_os = "macos")]
+// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
+
+/// Strategy for performing mmap
+#[derive(Debug, Copy, Clone)]
+pub struct MmapStrategy {
+    /// Do we support huge pages?
+    pub huge_page: HugePageSupport,
+    /// The protection flags for mmap
+    pub prot: MmapProtection,
+}
+
+impl MmapStrategy {
+    /// Create a new strategy
+    pub fn new(transparent_hugepages: bool, prot: MmapProtection) -> Self {
+        Self {
+            huge_page: if transparent_hugepages {
+                HugePageSupport::TransparentHugePages
+            } else {
+                HugePageSupport::No
+            },
+            prot,
+        }
+    }
+
+    /// The strategy for MMTk's own internal memory
+    pub const INTERNAL_MEMORY: Self = Self {
+        huge_page: HugePageSupport::No,
+        prot: MmapProtection::ReadWrite,
+    };
+
+    /// The strategy for MMTk side metadata
+    pub const SIDE_METADATA: Self = Self::INTERNAL_MEMORY;
+
+    /// The strategy for MMTk's test memory
+    #[cfg(test)]
+    pub const TEST: Self = Self::INTERNAL_MEMORY;
+}
+
+/// The protection flags for Mmap
+#[repr(i32)]
+#[derive(Debug, Copy, Clone)]
+pub enum MmapProtection {
+    /// Allow read + write
+    ReadWrite,
+    /// Allow read + write + code execution
+    ReadWriteExec,
+    /// Do not allow any access
+    NoAccess,
+}
+
+impl MmapProtection {
+    /// Turn the protection enum into the native flags
+    pub fn into_native_flags(self) -> libc::c_int {
+        match self {
+            Self::ReadWrite => PROT_READ | PROT_WRITE,
+            Self::ReadWriteExec => PROT_READ | PROT_WRITE | PROT_EXEC,
+            Self::NoAccess => PROT_NONE,
+        }
+    }
+}
+
+/// Support for huge pages
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, NoUninit)]
+pub enum HugePageSupport {
+    /// No support for huge page
+    No,
+    /// Enable transparent huge pages for the pages that are mapped. This option is only for linux.
+    TransparentHugePages,
+}
+
 /// Check the result from an mmap function in this module.
 /// Return true if the mmap has failed due to an existing conflicting mapping.
 pub(crate) fn result_is_mapped(result: Result<()>) -> bool {
@@ -40,9 +116,8 @@ pub fn set(start: Address, val: u8, len: usize) {
 /// may corrupt others' data.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub unsafe fn dzmmap(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = MMAP_PROT;
     let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-    let ret = mmap_fixed(start, size, prot, flags, strategy);
+    let ret = mmap_fixed(start, size, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
@@ -50,42 +125,13 @@ pub unsafe fn dzmmap(start: Address, size: usize, strategy: MmapStrategy) -> Res
     }
     ret
 }
-
-#[cfg(target_os = "linux")]
-// MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
-#[cfg(target_os = "macos")]
-// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
-const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
-
-#[cfg(target_os = "linux")]
-const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
-#[cfg(target_os = "macos")]
-// PROT_EXEC cannot be used with PROT_READ on Apple Silicon
-const MMAP_PROT: libc::c_int = PROT_READ | PROT_WRITE;
-
-/// Strategy for performing mmap
-///
-/// This currently supports switching between different huge page allocation
-/// methods. However, this can later be refactored to reduce other code
-/// repetition.
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, NoUninit)]
-pub enum MmapStrategy {
-    /// The default mmap strategy.
-    Normal,
-    /// Enable transparent huge pages for the pages that are mapped. This option is only for linux.
-    TransparentHugePages,
-}
-
 /// Demand-zero mmap (no replace):
 /// This function mmaps the memory and guarantees to zero all mapped memory.
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = MMAP_PROT;
     let flags = MMAP_FLAGS;
-    let ret = mmap_fixed(start, size, prot, flags, strategy);
+    let ret = mmap_fixed(start, size, flags, strategy);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     #[cfg(not(target_os = "linux"))]
     if ret.is_ok() {
@@ -98,27 +144,27 @@ pub fn dzmmap_noreplace(start: Address, size: usize, strategy: MmapStrategy) -> 
 /// This function does not reserve swap space for this mapping, which means there is no guarantee that writes to the
 /// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
-pub fn mmap_noreserve(start: Address, size: usize, strategy: MmapStrategy) -> Result<()> {
-    let prot = PROT_NONE;
+pub fn mmap_noreserve(start: Address, size: usize, mut strategy: MmapStrategy) -> Result<()> {
+    strategy.prot = MmapProtection::NoAccess;
     let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
-    mmap_fixed(start, size, prot, flags, strategy)
+    mmap_fixed(start, size, flags, strategy)
 }
 
 fn mmap_fixed(
     start: Address,
     size: usize,
-    prot: libc::c_int,
     flags: libc::c_int,
     strategy: MmapStrategy,
 ) -> Result<()> {
     let ptr = start.to_mut_ptr();
+    let prot = strategy.prot.into_native_flags();
     wrap_libc_call(
         &|| unsafe { libc::mmap(start.to_mut_ptr(), size, prot, flags, -1, 0) },
         ptr,
     )?;
-    match strategy {
-        MmapStrategy::Normal => Ok(()),
-        MmapStrategy::TransparentHugePages => {
+    match strategy.huge_page {
+        HugePageSupport::No => Ok(()),
+        HugePageSupport::TransparentHugePages => {
             #[cfg(target_os = "linux")]
             {
                 wrap_libc_call(
@@ -174,6 +220,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
         }
         _ => {}
     }
+    eprintln!("{}", get_process_memory_maps());
     panic!("Unexpected mmap failure: {:?}", error)
 }
 
@@ -182,9 +229,16 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 /// Be very careful about using this function.
 #[cfg(target_os = "linux")]
 pub(crate) fn panic_if_unmapped(start: Address, size: usize) {
-    let prot = PROT_READ | PROT_WRITE;
     let flags = MMAP_FLAGS;
-    match mmap_fixed(start, size, prot, flags, MmapStrategy::Normal) {
+    match mmap_fixed(
+        start,
+        size,
+        flags,
+        MmapStrategy {
+            huge_page: HugePageSupport::No,
+            prot: MmapProtection::ReadWrite,
+        },
+    ) {
         Ok(_) => panic!("{} of size {} is not mapped", start, size),
         Err(e) => {
             assert!(
@@ -207,9 +261,10 @@ pub(crate) fn panic_if_unmapped(_start: Address, _size: usize) {
 }
 
 /// Unprotect the given memory (in page granularity) to allow access (PROT_READ/WRITE/EXEC).
-pub fn munprotect(start: Address, size: usize) -> Result<()> {
+pub fn munprotect(start: Address, size: usize, prot: MmapProtection) -> Result<()> {
+    let prot = prot.into_native_flags();
     wrap_libc_call(
-        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, PROT_READ | PROT_WRITE | PROT_EXEC) },
+        &|| unsafe { libc::mprotect(start.to_mut_ptr(), size, prot) },
         0,
     )
 }
@@ -285,10 +340,10 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                 },
                 || {
@@ -303,7 +358,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal);
+                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_ok());
                     let res = munmap(START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
@@ -322,10 +377,10 @@ mod tests {
             with_cleanup(
                 || {
                     // Make sure we mmapped the memory
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
-                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal);
+                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_err());
                 },
                 || {
@@ -340,10 +395,10 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::Normal);
+                    let res = mmap_noreserve(START, BYTES_IN_PAGE, MmapStrategy::TEST);
                     assert!(res.is_ok());
                     // Try reserve it
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::Normal) };
+                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE, MmapStrategy::TEST) };
                     assert!(res.is_ok());
                 },
                 || {
@@ -375,7 +430,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal).is_ok());
+                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST).is_ok());
                     panic_if_unmapped(START, BYTES_IN_PAGE);
                 },
                 || {
@@ -393,7 +448,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal).is_ok());
+                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST).is_ok());
 
                     // check if the next page is mapped - which should panic
                     panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE);
@@ -415,7 +470,7 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::Normal).is_ok());
+                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE, MmapStrategy::TEST).is_ok());
 
                     // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
                     panic_if_unmapped(START, BYTES_IN_PAGE * 2);

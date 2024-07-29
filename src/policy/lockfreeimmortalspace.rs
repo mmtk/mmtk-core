@@ -232,11 +232,10 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        let strategy = if *args.options.transparent_hugepages {
-            MmapStrategy::TransparentHugePages
-        } else {
-            MmapStrategy::Normal
-        };
+        let strategy = MmapStrategy::new(
+            *args.options.transparent_hugepages,
+            crate::util::memory::MmapProtection::ReadWrite,
+        );
         crate::util::memory::dzmmap_noreplace(start, aligned_total_bytes, strategy).unwrap();
         if space
             .metadata

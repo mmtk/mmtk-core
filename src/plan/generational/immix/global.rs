@@ -247,7 +247,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
         let immix_space = ImmixSpace::new(
-            plan_args.get_space_args("immix_mature", true, VMRequest::discontiguous()),
+            plan_args.get_space_args("immix_mature", true, false, VMRequest::discontiguous()),
             ImmixSpaceArgs {
                 reset_log_bit_in_major_gc: false,
                 // We don't need to unlog objects at tracing. Instead, we unlog objects at copying.

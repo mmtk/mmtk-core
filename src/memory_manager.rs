@@ -644,6 +644,7 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
 /// -   only MMTk can allocate into, or
 /// -   only MMTk's delegated memory allocator (such as a malloc implementation) can allocate into
 ///     for allocation requests from MMTk.
+///
 /// Return false otherwise.  This function never panics.
 ///
 /// Particularly, if this function returns true, `object` cannot be an object allocated by the VM

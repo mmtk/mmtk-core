@@ -45,6 +45,7 @@ pfm = { version = "0.1.1", optional = true }
 portable-atomic = "1.4.3"
 probe = "0.5"
 regex = "1.7.0"
+rustversion = "1.0"
 spin = "0.9.5"
 static_assertions = "1.1.0"
 strum = "0.26.2"
@@ -98,8 +99,11 @@ set_unlog_bits_vm_space = []
 # TODO: This is not properly implemented yet. We currently use an immortal space instead, and do not guarantee read-only semantics.
 ro_space = []
 # A code space with execution permission.
-# TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
+
+# By default, we only allow execution permission for code spaces. With this feature, all the spaces have execution permission.
+# Use with care.
+exec_permission_on_all_spaces = []
 
 # Global valid object (VO) bit metadata.
 # The VO bit is set when an object is allocated, and cleared when the GC determines it is dead.

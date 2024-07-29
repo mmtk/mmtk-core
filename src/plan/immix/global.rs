@@ -150,7 +150,7 @@ impl<VM: VMBinding> Immix<VM> {
     ) -> Self {
         let immix = Immix {
             immix_space: ImmixSpace::new(
-                plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("immix", true, false, VMRequest::discontiguous()),
                 space_args,
             ),
             common: CommonPlan::new(plan_args),

@@ -28,7 +28,7 @@ use crate::util::heap::layout::Mmapper;
 use crate::util::heap::layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
-use crate::util::memory;
+use crate::util::memory::{self, HugePageSupport, MmapProtection, MmapStrategy};
 use crate::vm::VMBinding;
 
 use std::marker::PhantomData;
@@ -137,13 +137,13 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     );
                     let bytes = conversions::pages_to_bytes(res.pages);
 
-                    let map_sidemetadata = || {
+                    let mmap = || {
                         // Mmap the pages and the side metadata, and handle error. In case of any error,
                         // we will either call back to the VM for OOM, or simply panic.
                         if let Err(mmap_error) = self
                             .common()
                             .mmapper
-                            .ensure_mapped(res.start, res.pages)
+                            .ensure_mapped(res.start, res.pages, self.common().mmap_strategy())
                             .and(
                                 self.common()
                                     .metadata
@@ -160,7 +160,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     // The scope of the lock is important in terms of performance when we have many allocator threads.
                     if SFT_MAP.get_side_metadata().is_some() {
                         // If the SFT map uses side metadata, so we have to initialize side metadata first.
-                        map_sidemetadata();
+                        mmap();
                         // then grow space, which will use the side metadata we mapped above
                         grow_space();
                         // then we can drop the lock after grow_space()
@@ -170,7 +170,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         grow_space();
                         drop(lock);
                         // and map side metadata without holding the lock
-                        map_sidemetadata();
+                        mmap();
                     }
 
                     // TODO: Concurrent zeroing
@@ -421,10 +421,12 @@ pub struct CommonSpace<VM: VMBinding> {
     // the copy semantics for the space.
     pub copy: Option<CopySemantics>,
 
-    immortal: bool,
-    movable: bool,
+    pub immortal: bool,
+    pub movable: bool,
     pub contiguous: bool,
     pub zeroed: bool,
+
+    pub permission_exec: bool,
 
     pub start: Address,
     pub extent: usize,
@@ -443,6 +445,7 @@ pub struct CommonSpace<VM: VMBinding> {
 
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub global_state: Arc<GlobalState>,
+    pub options: Arc<Options>,
 
     p: PhantomData<VM>,
 }
@@ -459,6 +462,7 @@ pub struct PolicyCreateSpaceArgs<'a, VM: VMBinding> {
 pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub name: &'static str,
     pub zeroed: bool,
+    pub permission_exec: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
     pub vm_map: &'static dyn VMMap,
@@ -467,7 +471,7 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub constraints: &'a PlanConstraints,
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub scheduler: Arc<GCWorkScheduler<VM>>,
-    pub options: &'a Options,
+    pub options: Arc<Options>,
     pub global_state: Arc<GlobalState>,
 }
 
@@ -498,6 +502,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             immortal: args.immortal,
             movable: args.movable,
             contiguous: true,
+            permission_exec: args.plan_args.permission_exec,
             zeroed: args.plan_args.zeroed,
             start: unsafe { Address::zero() },
             extent: 0,
@@ -511,6 +516,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             },
             acquire_lock: Mutex::new(()),
             global_state: args.plan_args.global_state,
+            options: args.plan_args.options.clone(),
             p: PhantomData,
         };
 
@@ -618,6 +624,21 @@ impl<VM: VMBinding> CommonSpace<VM> {
 
     pub fn vm_map(&self) -> &'static dyn VMMap {
         self.vm_map
+    }
+
+    pub fn mmap_strategy(&self) -> MmapStrategy {
+        MmapStrategy {
+            huge_page: if *self.options.transparent_hugepages {
+                HugePageSupport::TransparentHugePages
+            } else {
+                HugePageSupport::No
+            },
+            prot: if self.permission_exec || cfg!(feature = "exec_permission_on_all_spaces") {
+                MmapProtection::ReadWriteExec
+            } else {
+                MmapProtection::ReadWrite
+            },
+        }
     }
 }
 
