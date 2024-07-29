@@ -215,8 +215,8 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         if self.mark_state.test_and_mark::<VM>(object) {
             // Set the unlog bit if required
             if self.common.needs_log_bit {
-                <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .store_atomic::<E::VM, u8>(object, 1, None, Ordering::SeqCst);
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .store_atomic::<VM, u8>(object, 1, None, Ordering::SeqCst);
             }
             queue.enqueue(object);
         }
