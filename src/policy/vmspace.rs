@@ -287,7 +287,7 @@ impl<VM: VMBinding> VMSpace<VM> {
             // bootimage
             #[cfg(set_unlog_bits_vm_space)]
             if self.common.needs_log_bit {
-                <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
                     1,
                     None,
