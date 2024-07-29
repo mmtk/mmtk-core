@@ -1,3 +1,4 @@
+use super::grain::{BitAddress, Granularity};
 use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
@@ -22,6 +23,43 @@ pub(super) fn address_to_contiguous_meta_address(
         metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> shift)
     } else {
         metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-shift))
+    }
+}
+
+pub(super) fn address_to_contiguous_meta_bit_address(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    granularity: Granularity,
+) -> BitAddress {
+    let log_bits_num = metadata_spec.log_num_of_bits;
+    let log_bytes_in_region = metadata_spec.log_bytes_in_region;
+
+    let meta_start = metadata_spec.get_absolute_offset();
+    let num_regions_from_zero = data_addr >> log_bytes_in_region;
+
+    if log_bits_num < granularity.log_bits() {
+        // Multiple data regions per metadata grain.
+        let log_regions_per_meta_grain = granularity.log_bits() - log_bits_num;
+        let meta_grains_from_start = num_regions_from_zero >> log_regions_per_meta_grain;
+        let meta_bytes_from_start = meta_grains_from_start << granularity.log_bytes();
+
+        let num_regions_in_meta_grain = num_regions_from_zero & (log_regions_per_meta_grain - 1);
+        let meta_in_grain_offset = num_regions_in_meta_grain << log_bits_num;
+
+        BitAddress {
+            addr: meta_start + meta_bytes_from_start,
+            bit: meta_in_grain_offset,
+        }
+    } else {
+        // Multiple metadata grains per data range.
+        let log_meta_grains_per_region = log_bits_num - granularity.log_bits();
+        let meta_grains_from_start = num_regions_from_zero << log_meta_grains_per_region;
+        let meta_bytes_from_start = meta_grains_from_start << granularity.log_bytes();
+
+        BitAddress {
+            addr: meta_start + meta_bytes_from_start,
+            bit: 0,
+        }
     }
 }
 
@@ -164,6 +202,32 @@ pub(super) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Addr
 pub(super) fn meta_byte_mask(metadata_spec: &SideMetadataSpec) -> u8 {
     let bits_num_log = metadata_spec.log_num_of_bits;
     ((1usize << (1usize << bits_num_log)) - 1) as u8
+}
+
+pub(crate) fn address_to_meta_bit_address(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    granularity: Granularity,
+) -> BitAddress {
+    #[cfg(target_pointer_width = "32")]
+    let res = {
+        if metadata_spec.is_global {
+            address_to_contiguous_meta_address(metadata_spec, data_addr)
+        } else {
+            address_to_chunked_meta_address(metadata_spec, data_addr)
+        }
+    };
+    #[cfg(target_pointer_width = "64")]
+    let res = { address_to_contiguous_meta_bit_address(metadata_spec, data_addr, granularity) };
+
+    trace!(
+        "address_to_meta_bit_address({:?}, addr: {}) -> 0x{:?}",
+        metadata_spec,
+        data_addr,
+        res
+    );
+
+    res
 }
 
 /// The result type for find meta bits functions.
