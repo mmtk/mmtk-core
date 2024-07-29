@@ -155,6 +155,26 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
+    pub(super) fn iterate_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+        forwards: bool,
+        visit_bytes: &impl Fn(Address, Address) -> bool,
+        visit_bits: &impl Fn(Address, u8, u8) -> bool,
+    ) -> bool {
+        Self::iterate_meta_bits_inner::<false>(
+            meta_start_addr,
+            meta_start_bit,
+            meta_end_addr,
+            meta_end_bit,
+            forwards,
+            visit_bytes,
+            visit_bits,
+        )
+    }
+
     /// This method is used for iterating side metadata for a data address range. As we cannot guarantee
     /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
     /// we need to mask and zero certain bits in a metadata byte. The end address and the end bit are exclusive.
@@ -166,7 +186,7 @@ impl SideMetadataSpec {
     /// * `forwards`: If true, we iterate forwards (from start/low address to end/high address). Otherwise,
     ///               we iterate backwards (from end/high address to start/low address).
     /// * `visit_bytes`/`visit_bits`: The closures returns whether the itertion is early terminated.
-    pub(super) fn iterate_meta_bits(
+    pub(super) fn iterate_meta_bits_inner<const FAST_PATH: bool>(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
@@ -182,6 +202,14 @@ impl SideMetadataSpec {
             meta_end_addr,
             meta_end_bit
         );
+
+        if FAST_PATH {
+            // zeroing bytes
+            if meta_start_bit == 0 && meta_end_bit == 0 {
+                return visit_bytes(meta_start_addr, meta_end_addr);
+            }
+        }
+
         // Start/end is the same, we don't need to do anything.
         if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
             return false;
@@ -282,14 +310,37 @@ impl SideMetadataSpec {
         }
     }
 
-    pub fn iterate_meta_bits_modern<const CALLBACK: bool>(
+    pub fn iterate_meta_bits_modern<
+        const CALLBACK: bool,
+        const NORMALIZE: bool,
+        const FAST_PATH: bool,
+    >(
         meta_start: BitAddress,
         meta_end: BitAddress,
         granularity: Granularity,
         visitor: &mut impl FnMut(VisitRange) -> bool,
     ) {
-        //let meta_start = meta_start.normalize(granularity);
-        //let meta_end = meta_end.normalize(granularity);
+        if FAST_PATH
+            && meta_start.is_grain_aligned(granularity)
+            && meta_end.is_grain_aligned(granularity)
+        {
+            visitor(VisitRange::WholeGrain {
+                start: meta_start.addr,
+                end: meta_end.addr,
+            });
+            return;
+        }
+
+        let meta_start = if NORMALIZE {
+            meta_start.normalize(granularity)
+        } else {
+            meta_start
+        };
+        let meta_end = if NORMALIZE {
+            meta_end.normalize(granularity)
+        } else {
+            meta_end
+        };
 
         if meta_start == meta_end {
             panic!("Empty range?");
@@ -305,7 +356,7 @@ impl SideMetadataSpec {
     }
 
     /// This method is used for bulk zeroing side metadata for a data address range.
-    pub fn zero_meta_bits_classic(
+    pub fn zero_meta_bits_classic<const FAST_PATH: bool>(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
@@ -322,7 +373,7 @@ impl SideMetadataSpec {
             unsafe { addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
             false
         };
-        Self::iterate_meta_bits(
+        Self::iterate_meta_bits_inner::<FAST_PATH>(
             meta_start_addr,
             meta_start_bit,
             meta_end_addr,
@@ -341,15 +392,20 @@ impl SideMetadataSpec {
     ) {
         let meta_start = meta_start_addr.with_bit_offset(meta_start_bit as usize);
         let meta_end = meta_end_addr.with_bit_offset(meta_end_bit as usize);
-        Self::zero_meta_bits_modern_inner::<usize, true>(meta_start, meta_end);
+        Self::zero_meta_bits_modern_inner::<usize, true, true, true>(meta_start, meta_end);
     }
 
-    pub fn zero_meta_bits_modern_inner<Grain: PrimInt + MetadataValue, const CALLBACK: bool>(
+    pub fn zero_meta_bits_modern_inner<
+        Grain: PrimInt + MetadataValue,
+        const CALLBACK: bool,
+        const NORMALIZE: bool,
+        const FAST_PATH: bool,
+    >(
         meta_start: BitAddress,
         meta_end: BitAddress,
     ) {
         let granularity = Granularity::of_type::<Grain>();
-        Self::iterate_meta_bits_modern::<CALLBACK>(
+        Self::iterate_meta_bits_modern::<CALLBACK, NORMALIZE, FAST_PATH>(
             meta_start,
             meta_end,
             granularity,
@@ -377,7 +433,7 @@ impl SideMetadataSpec {
     }
 
     /// This method is used for bulk setting side metadata for a data address range.
-    pub fn set_meta_bits_classic(
+    pub fn set_meta_bits_classic<const FAST_PATH: bool>(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
@@ -394,7 +450,7 @@ impl SideMetadataSpec {
             unsafe { addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
             false
         };
-        Self::iterate_meta_bits(
+        Self::iterate_meta_bits_inner::<FAST_PATH>(
             meta_start_addr,
             meta_start_bit,
             meta_end_addr,
@@ -413,18 +469,20 @@ impl SideMetadataSpec {
     ) {
         let meta_start = meta_start_addr.with_bit_offset(meta_start_bit as usize);
         let meta_end = meta_end_addr.with_bit_offset(meta_end_bit as usize);
-        Self::set_meta_bits_modern_inner::<usize, true>(meta_start, meta_end);
+        Self::set_meta_bits_modern_inner::<usize, true, true, true>(meta_start, meta_end);
     }
 
     pub fn set_meta_bits_modern_inner<
         Grain: PrimInt + MetadataValue,
         const CALLBACK: bool,
+        const NORMALIZE: bool,
+        const FAST_PATH: bool,
     >(
         meta_start: BitAddress,
         meta_end: BitAddress,
     ) {
         let granularity = Granularity::of_type::<Grain>();
-        Self::iterate_meta_bits_modern::<CALLBACK>(
+        Self::iterate_meta_bits_modern::<CALLBACK, NORMALIZE, FAST_PATH>(
             meta_start,
             meta_end,
             granularity,
