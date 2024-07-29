@@ -285,7 +285,7 @@ impl<VM: VMBinding> VMSpace<VM> {
         if self.mark_state.test_and_mark::<VM>(object) {
             // Flip the per-object unlogged bits to "unlogged" state for objects inside the
             // bootimage
-            #[cfg(set_unlog_bits_vm_space)]
+            #[cfg(feature = "set_unlog_bits_vm_space")]
             if self.common.needs_log_bit {
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<VM, u8>(
                     object,
