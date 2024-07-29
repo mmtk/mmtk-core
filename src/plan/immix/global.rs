@@ -181,7 +181,10 @@ impl<VM: VMBinding> Immix<VM> {
                 .cur_collection_attempts
                 .load(Ordering::SeqCst),
             plan.base().global_state.is_user_triggered_collection(),
-            *plan.base().options.full_heap_system_gc,
+            plan.base()
+                .global_state
+                .user_triggered_exhaustive_gc
+                .load(Ordering::SeqCst),
         );
 
         if in_defrag {

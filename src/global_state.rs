@@ -25,6 +25,8 @@ pub struct GlobalState {
     pub(crate) emergency_collection: AtomicBool,
     /// Is the current GC triggered by the user?
     pub(crate) user_triggered_collection: AtomicBool,
+    /// Is the current user triggered GC an exhaustive GC (e.g. full heap)?
+    pub(crate) user_triggered_exhaustive_gc: AtomicBool,
     /// Is the current GC triggered internally by MMTK? This is unused for now. We may have internally triggered GC
     /// for a concurrent plan.
     pub(crate) internal_triggered_collection: AtomicBool,
@@ -123,7 +125,9 @@ impl GlobalState {
         self.internal_triggered_collection
             .store(false, Ordering::SeqCst);
         self.user_triggered_collection
-            .store(false, Ordering::Relaxed);
+            .store(false, Ordering::SeqCst);
+        self.user_triggered_exhaustive_gc
+            .store(false, Ordering::SeqCst);
     }
 
     /// Are the stacks scanned?
@@ -204,6 +208,7 @@ impl Default for GlobalState {
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
+            user_triggered_exhaustive_gc: AtomicBool::new(false),
             internal_triggered_collection: AtomicBool::new(false),
             last_internal_triggered_collection: AtomicBool::new(false),
             allocation_success: AtomicBool::new(false),
