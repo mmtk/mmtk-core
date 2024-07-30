@@ -651,6 +651,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 #[cfg(feature = "vo_bit")]
                 vo_bit::helper::on_object_marked::<VM>(object);
 
+                if !super::MARK_LINE_AT_SCAN_TIME {
+                    self.mark_lines(object);
+                }
+
                 object
             } else {
                 // We are forwarding objects. When the copy allocator allocates the block, it should

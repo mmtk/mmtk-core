@@ -396,11 +396,13 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
         &mut self,
         name: &'static str,
         zeroed: bool,
+        permission_exec: bool,
         vmrequest: VMRequest,
     ) -> PlanCreateSpaceArgs<VM> {
         PlanCreateSpaceArgs {
             name,
             zeroed,
+            permission_exec,
             vmrequest,
             global_side_metadata_specs: self.global_side_metadata_specs.clone(),
             vm_map: self.global_args.vm_map,
@@ -409,7 +411,7 @@ impl<'a, VM: VMBinding> CreateSpecificPlanArgs<'a, VM> {
             constraints: self.constraints,
             gc_trigger: self.global_args.gc_trigger.clone(),
             scheduler: self.global_args.scheduler.clone(),
-            options: &self.global_args.options,
+            options: self.global_args.options.clone(),
             global_state: self.global_args.state.clone(),
         }
     }
@@ -423,11 +425,13 @@ impl<VM: VMBinding> BasePlan<VM> {
             code_space: ImmortalSpace::new(args.get_space_args(
                 "code_space",
                 true,
+                true,
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "code_space")]
             code_lo_space: ImmortalSpace::new(args.get_space_args(
                 "code_lo_space",
+                true,
                 true,
                 VMRequest::discontiguous(),
             )),
@@ -435,12 +439,14 @@ impl<VM: VMBinding> BasePlan<VM> {
             ro_space: ImmortalSpace::new(args.get_space_args(
                 "ro_space",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             #[cfg(feature = "vm_space")]
             vm_space: VMSpace::new(args.get_space_args(
                 "vm_space",
                 false,
+                false, // it doesn't matter -- we are not mmapping for VM space.
                 VMRequest::discontiguous(),
             )),
 
@@ -585,15 +591,17 @@ impl<VM: VMBinding> CommonPlan<VM> {
             immortal: ImmortalSpace::new(args.get_space_args(
                 "immortal",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             los: LargeObjectSpace::new(
-                args.get_space_args("los", true, VMRequest::discontiguous()),
+                args.get_space_args("los", true, false, VMRequest::discontiguous()),
                 false,
             ),
             nonmoving: ImmortalSpace::new(args.get_space_args(
                 "nonmoving",
                 true,
+                false,
                 VMRequest::discontiguous(),
             )),
             base: BasePlan::new(args),

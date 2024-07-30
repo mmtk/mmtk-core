@@ -402,8 +402,8 @@ impl<B: Region> BlockPool<B> {
 
     /// Iterate all the blocks in the BlockQueue
     pub fn iterate_blocks(&self, f: &mut impl FnMut(B)) {
-        for array in &*self.head_global_freed_blocks.read() {
-            array.iterate_blocks(f)
+        if let Some(array) = &*self.head_global_freed_blocks.read() {
+            array.iterate_blocks(f);
         }
         for array in &*self.global_freed_blocks.read() {
             array.iterate_blocks(f);

@@ -222,7 +222,7 @@ macro_rules! options {
             ///
             /// Arguments:
             /// * `options`: a string that is key value pairs separated by white spaces or commas, e.g. `threads=1 stress_factor=4096`,
-            /// or `threads=1,stress_factor=4096`
+            ///   or `threads=1,stress_factor=4096`
             pub fn set_bulk_from_command_line(&mut self, options: &str) -> bool {
                 for opt in options.replace(",", " ").split_ascii_whitespace() {
                     let kv_pair: Vec<&str> = opt.split('=').collect();
@@ -862,7 +862,8 @@ options! {
     /// Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     /// Default to a fixed heap size of 0.5x physical memory.
     gc_trigger:             GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize),
-    /// Enable transparent hugepage support via madvise (only Linux is supported)
+    /// Enable transparent hugepage support for MMTk spaces via madvise (only Linux is supported)
+    /// This only affects the memory for MMTk spaces.
     transparent_hugepages: bool                  [env_var: true, command_line: true]  [|v: &bool| !v || cfg!(target_os = "linux")] = false
 }
 

@@ -13,7 +13,7 @@
 //!    lto = true
 //!    ```
 //! 2. Make sure that the crate type for a VM binding supports LTO. To our knowledge, `staticlib` and `cdylib` support LTO, and
-//! `rlib` does *not* support LTO.
+//!    `rlib` does *not* support LTO.
 
 mod active_plan;
 mod collection;
