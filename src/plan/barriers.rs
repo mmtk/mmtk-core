@@ -231,7 +231,6 @@ impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
         target: Option<ObjectReference>,
     ) {
         if self.log_object(src) {
-            debug_assert!(src.is_live::<S::VM>(), "{} was logged but is not live", src);
             self.semantics
                 .object_reference_write_slow(src, slot, target);
         }
