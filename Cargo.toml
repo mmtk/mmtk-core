@@ -55,7 +55,7 @@ sysinfo = "0.30.9"
 [dev-dependencies]
 paste = "1.0.8"
 rand = "0.8.5"
-criterion = "0.4"
+criterion = "0.5.1"
 
 [build-dependencies]
 built = { version = "0.7.1", features = ["git2"] }
@@ -74,6 +74,10 @@ perf_counter = ["pfm"]
 # This feature is only used for tests with MockVM.
 # CI scripts run those tests with this feature.
 mock_test = []
+
+# This feature is only used for benchmarks.
+# It will expose some private functions for benchmarking.
+bench = []
 
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
