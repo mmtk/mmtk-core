@@ -8,7 +8,7 @@ use crate::util::metadata::metadata_val_traits::*;
 use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::Address;
 use num_traits::FromPrimitive;
-use std::cell::RefCell;
+use ranges::BitByteRange;
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -155,26 +155,33 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    /// This method is used for iterating side metadata for a data address range. As we cannot guarantee
-    /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
-    /// we need to mask and zero certain bits in a metadata byte. The end address and the end bit are exclusive.
-    /// The end bit for update_bits could be 8, so overflowing needs to be taken care of.
+    /// This method is used for iterating side metadata for a data address range. As we cannot
+    /// guarantee that the data address range can be mapped to whole metadata bytes, we have to deal
+    /// with visiting only a bit range in a metadata byte.
     ///
-    /// Returns true if we iterate through every bits in the range. Return false if we abort iteration early.
+    /// The metadata bit range starts at the bit at index `meta_start_bit` in the byte at address
+    /// `meta_start_addr`, and ends at (but does not include) the bit at index `meta_end_bit` in the
+    /// byte at address `meta_end_addr`.
     ///
     /// Arguments:
-    /// * `forwards`: If true, we iterate forwards (from start/low address to end/high address). Otherwise,
-    ///               we iterate backwards (from end/high address to start/low address).
-    /// * `visit_bytes`/`visit_bits`: The closures returns whether the itertion is early terminated.
-    pub(super) fn iterate_meta_bits(
+    /// * `forwards`: If true, we iterate forwards (from start/low address to end/high address).
+    ///               Otherwise, we iterate backwards (from end/high address to start/low address).
+    /// * `visitor`: The callback that visits ranges of bits or bytes.  It returns whether the
+    ///   itertion is early terminated.
+    ///
+    /// Returns true if we iterate through every bits in the range. Return false if we abort
+    /// iteration early.
+    pub(super) fn iterate_meta_bits<V>(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
         meta_end_bit: u8,
         forwards: bool,
-        visit_bytes: &impl Fn(Address, Address) -> bool,
-        visit_bits: &impl Fn(Address, u8, u8) -> bool,
-    ) -> bool {
+        visitor: &mut V,
+    ) -> bool
+    where
+        V: FnMut(BitByteRange) -> bool,
+    {
         trace!(
             "iterate_meta_bits: {} {}, {} {}",
             meta_start_addr,
@@ -187,97 +194,68 @@ impl SideMetadataSpec {
             return false;
         }
 
-        // zeroing bytes
+        // visit whole bytes
         if meta_start_bit == 0 && meta_end_bit == 0 {
-            return visit_bytes(meta_start_addr, meta_end_addr);
+            return visitor(BitByteRange::Bytes {
+                start: meta_start_addr,
+                end: meta_end_addr,
+            });
         }
 
         if meta_start_addr == meta_end_addr {
-            // Update bits in the same byte between start and end bit
-            visit_bits(meta_start_addr, meta_start_bit, meta_end_bit)
+            // Visit bits in the same byte between start and end bit
+            return visitor(BitByteRange::BitsInByte {
+                addr: meta_start_addr,
+                bit_start: meta_start_bit as usize,
+                bit_end: meta_end_bit as usize,
+            });
         } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
-            // Update bits in the same byte after the start bit (between start bit and 8)
-            visit_bits(meta_start_addr, meta_start_bit, 8)
+            // Visit bits in the same byte after the start bit (between start bit and 8)
+            return visitor(BitByteRange::BitsInByte {
+                addr: meta_start_addr,
+                bit_start: meta_start_bit as usize,
+                bit_end: 8usize,
+            });
         } else {
+            // We cannot let multiple closures capture `visitor` mutably at the same time, so we
+            // pass the visitor in as `v` every time.
+
+            // update bits in the first byte
+            let visit_start = |v: &mut V| {
+                v(BitByteRange::BitsInByte {
+                    addr: meta_start_addr,
+                    bit_start: meta_start_bit as usize,
+                    bit_end: 8usize,
+                })
+            };
+
+            // update bytes in the middle
+            let visit_middle = |v: &mut V| {
+                let start = meta_start_addr + 1usize;
+                let end = meta_end_addr;
+                if start < end {
+                    // non-empty middle range
+                    v(BitByteRange::Bytes { start, end })
+                } else {
+                    // empty middle range
+                    false
+                }
+            };
+
+            // update bits in the last byte
+            let visit_end = |v: &mut V| {
+                v(BitByteRange::BitsInByte {
+                    addr: meta_end_addr,
+                    bit_start: 0 as usize,
+                    bit_end: meta_end_bit as usize,
+                })
+            };
+
             // Update each segments.
-            // Clippy wants to move this if block up as a else-if block. But I think this is logically more clear. So disable the clippy warning.
-            #[allow(clippy::collapsible_else_if)]
             if forwards {
-                // update bits in the first byte
-                if Self::iterate_meta_bits(
-                    meta_start_addr,
-                    meta_start_bit,
-                    meta_start_addr + 1usize,
-                    0,
-                    forwards,
-                    visit_bytes,
-                    visit_bits,
-                ) {
-                    return true;
-                }
-                // update bytes in the middle
-                if Self::iterate_meta_bits(
-                    meta_start_addr + 1usize,
-                    0,
-                    meta_end_addr,
-                    0,
-                    forwards,
-                    visit_bytes,
-                    visit_bits,
-                ) {
-                    return true;
-                }
-                // update bits in the last byte
-                if Self::iterate_meta_bits(
-                    meta_end_addr,
-                    0,
-                    meta_end_addr,
-                    meta_end_bit,
-                    forwards,
-                    visit_bytes,
-                    visit_bits,
-                ) {
-                    return true;
-                }
-                false
+                visit_start(visitor) || visit_middle(visitor) || visit_end(visitor)
             } else {
-                // update bits in the last byte
-                if Self::iterate_meta_bits(
-                    meta_end_addr,
-                    0,
-                    meta_end_addr,
-                    meta_end_bit,
-                    forwards,
-                    visit_bytes,
-                    visit_bits,
-                ) {
-                    return true;
-                }
-                // update bytes in the middle
-                if Self::iterate_meta_bits(
-                    meta_start_addr + 1usize,
-                    0,
-                    meta_end_addr,
-                    0,
-                    forwards,
-                    visit_bytes,
-                    visit_bits,
-                ) {
-                    return true;
-                }
-                // update bits in the first byte
-                if Self::iterate_meta_bits(
-                    meta_start_addr,
-                    meta_start_bit,
-                    meta_start_addr + 1usize,
-                    0,
-                    forwards,
-                    visit_bytes,
-                    visit_bits,
-                ) {
-                    return true;
-                }
-                false
+                visit_end(visitor) || visit_middle(visitor) || visit_start(visitor)
             }
         }
     }
@@ -289,16 +267,25 @@ impl SideMetadataSpec {
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        let zero_bytes = |start: Address, end: Address| -> bool {
-            memory::zero(start, end - start);
-            false
-        };
-        let zero_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
-            // we are zeroing selected bits in one byte
-            let mask: u8 =
-                u8::MAX.checked_shl(end_bit.into()).unwrap_or(0) | !(u8::MAX << start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
-            unsafe { addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
-            false
+        let mut visitor = |range| {
+            match range {
+                BitByteRange::Bytes { start, end } => {
+                    memory::zero(start, end - start);
+                    false
+                }
+                BitByteRange::BitsInByte {
+                    addr,
+                    bit_start,
+                    bit_end,
+                } => {
+                    // we are zeroing selected bit in one byte
+                    // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
+                    let mask: u8 =
+                        u8::MAX.checked_shl(bit_end as u32).unwrap_or(0) | !(u8::MAX << bit_start);
+                    unsafe { addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+                    false
+                }
+            }
         };
         Self::iterate_meta_bits(
             meta_start_addr,
@@ -306,9 +293,19 @@ impl SideMetadataSpec {
             meta_end_addr,
             meta_end_bit,
             true,
-            &zero_bytes,
-            &zero_bits,
+            &mut visitor,
         );
+    }
+
+    /// Expose `zero_meta_bits` when running `cargo bench`.
+    #[cfg(feature = "bench")]
+    pub fn bench_zero_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        Self::zero_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
     }
 
     /// This method is used for bulk setting side metadata for a data address range.
@@ -318,16 +315,25 @@ impl SideMetadataSpec {
         meta_end_addr: Address,
         meta_end_bit: u8,
     ) {
-        let set_bytes = |start: Address, end: Address| -> bool {
-            memory::set(start, 0xff, end - start);
-            false
-        };
-        let set_bits = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
-            // we are setting selected bits in one byte
-            let mask: u8 =
-                !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
-            unsafe { addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
-            false
+        let mut visitor = |range| {
+            match range {
+                BitByteRange::Bytes { start, end } => {
+                    memory::set(start, 0xff, end - start);
+                    false
+                }
+                BitByteRange::BitsInByte {
+                    addr,
+                    bit_start,
+                    bit_end,
+                } => {
+                    // we are setting selected bits in one byte
+                    // Get a mask that the bits we need to set are 1, and the other bits are 0.
+                    let mask: u8 = !(u8::MAX.checked_shl(bit_end as u32).unwrap_or(0))
+                        & (u8::MAX << bit_start);
+                    unsafe { addr.as_ref::<AtomicU8>() }.fetch_or(mask, Ordering::SeqCst);
+                    false
+                }
+            }
         };
         Self::iterate_meta_bits(
             meta_start_addr,
@@ -335,9 +341,19 @@ impl SideMetadataSpec {
             meta_end_addr,
             meta_end_bit,
             true,
-            &set_bytes,
-            &set_bits,
+            &mut visitor,
         );
+    }
+
+    /// Expose `set_meta_bits` when running `cargo bench`.
+    #[cfg(feature = "bench")]
+    pub fn bench_set_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        Self::set_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
     }
 
     /// This method does bulk update for the given data range. It calculates the metadata bits for the given data range,
@@ -499,27 +515,35 @@ impl SideMetadataSpec {
 
         debug_assert_eq!(dst_meta_start_bit, src_meta_start_bit);
 
-        let copy_bytes = |dst_start: Address, dst_end: Address| -> bool {
-            unsafe {
-                let byte_offset = dst_start - dst_meta_start_addr;
-                let src_start = src_meta_start_addr + byte_offset;
-                let size = dst_end - dst_start;
-                std::ptr::copy::<u8>(src_start.to_ptr(), dst_start.to_mut_ptr(), size);
-                false
+        let mut visitor = |range| {
+            match range {
+                BitByteRange::Bytes {
+                    start: dst_start,
+                    end: dst_end,
+                } => unsafe {
+                    let byte_offset = dst_start - dst_meta_start_addr;
+                    let src_start = src_meta_start_addr + byte_offset;
+                    let size = dst_end - dst_start;
+                    std::ptr::copy::<u8>(src_start.to_ptr(), dst_start.to_mut_ptr(), size);
+                    false
+                },
+                BitByteRange::BitsInByte {
+                    addr: dst,
+                    bit_start,
+                    bit_end,
+                } => {
+                    let byte_offset = dst - dst_meta_start_addr;
+                    let src = src_meta_start_addr + byte_offset;
+                    // we are setting selected bits in one byte
+                    let mask: u8 = !(u8::MAX.checked_shl(bit_end as u32).unwrap_or(0))
+                        & (u8::MAX << bit_start); // Get a mask that the bits we need to set are 1, and the other bits are 0.
+                    let old_src = unsafe { src.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
+                    let old_dst = unsafe { dst.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
+                    let new = (old_src & mask) | (old_dst & !mask);
+                    unsafe { dst.as_ref::<AtomicU8>() }.store(new, Ordering::Relaxed);
+                    false
+                }
             }
-        };
-
-        let copy_bits = |dst: Address, start_bit: u8, end_bit: u8| -> bool {
-            let byte_offset = dst - dst_meta_start_addr;
-            let src = src_meta_start_addr + byte_offset;
-            // we are setting selected bits in one byte
-            let mask: u8 =
-                !(u8::MAX.checked_shl(end_bit.into()).unwrap_or(0)) & (u8::MAX << start_bit); // Get a mask that the bits we need to set are 1, and the other bits are 0.
-            let old_src = unsafe { src.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
-            let old_dst = unsafe { dst.as_ref::<AtomicU8>() }.load(Ordering::Relaxed);
-            let new = (old_src & mask) | (old_dst & !mask);
-            unsafe { dst.as_ref::<AtomicU8>() }.store(new, Ordering::Relaxed);
-            false
         };
 
         Self::iterate_meta_bits(
@@ -528,8 +552,7 @@ impl SideMetadataSpec {
             dst_meta_end_addr,
             dst_meta_end_bit,
             true,
-            &copy_bytes,
-            &copy_bits,
+            &mut visitor,
         );
     }
 
@@ -1170,32 +1193,44 @@ impl SideMetadataSpec {
 
         // The result will be set by one of the following closures.
         // Use Cell so it doesn't need to be mutably borrowed by the two closures which Rust will complain.
-        let res = std::cell::Cell::new(None);
+        let mut res = None;
 
-        let check_bytes_backwards = |start: Address, end: Address| -> bool {
-            match helpers::find_last_non_zero_bit_in_metadata_bytes(start, end) {
-                helpers::FindMetaBitResult::Found { addr, bit } => {
-                    res.set(Some(contiguous_meta_address_to_address(self, addr, bit)));
-                    // Return true to abort the search. We found the bit.
-                    true
+        let mut visitor = |range: BitByteRange| {
+            match range {
+                BitByteRange::Bytes { start, end } => {
+                    match helpers::find_last_non_zero_bit_in_metadata_bytes(start, end) {
+                        helpers::FindMetaBitResult::Found { addr, bit } => {
+                            res = Some(contiguous_meta_address_to_address(self, addr, bit));
+                            // Return true to abort the search. We found the bit.
+                            true
+                        }
+                        // If we see unmapped metadata, we don't need to search any more.
+                        helpers::FindMetaBitResult::UnmappedMetadata => true,
+                        // Return false to continue searching.
+                        helpers::FindMetaBitResult::NotFound => false,
+                    }
                 }
-                // If we see unmapped metadata, we don't need to search any more.
-                helpers::FindMetaBitResult::UnmappedMetadata => true,
-                // Return false to continue searching.
-                helpers::FindMetaBitResult::NotFound => false,
-            }
-        };
-        let check_bits_backwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
-            match helpers::find_last_non_zero_bit_in_metadata_bits(addr, start_bit, end_bit) {
-                helpers::FindMetaBitResult::Found { addr, bit } => {
-                    res.set(Some(contiguous_meta_address_to_address(self, addr, bit)));
-                    // Return true to abort the search. We found the bit.
-                    true
+                BitByteRange::BitsInByte {
+                    addr,
+                    bit_start,
+                    bit_end,
+                } => {
+                    match helpers::find_last_non_zero_bit_in_metadata_bits(
+                        addr,
+                        bit_start as u8,
+                        bit_end as u8,
+                    ) {
+                        helpers::FindMetaBitResult::Found { addr, bit } => {
+                            res = Some(contiguous_meta_address_to_address(self, addr, bit));
+                            // Return true to abort the search. We found the bit.
+                            true
+                        }
+                        // If we see unmapped metadata, we don't need to search any more.
+                        helpers::FindMetaBitResult::UnmappedMetadata => true,
+                        // Return false to continue searching.
+                        helpers::FindMetaBitResult::NotFound => false,
+                    }
                 }
-                // If we see unmapped metadata, we don't need to search any more.
-                helpers::FindMetaBitResult::UnmappedMetadata => true,
-                // Return false to continue searching.
-                helpers::FindMetaBitResult::NotFound => false,
             }
         };
 
@@ -1205,12 +1240,10 @@ impl SideMetadataSpec {
             end_meta_addr,
             end_meta_shift,
             false,
-            &check_bytes_backwards,
-            &check_bits_backwards,
+            &mut visitor,
         );
 
-        res.get()
-            .map(|addr| addr.align_down(1 << self.log_bytes_in_region))
+        res.map(|addr| addr.align_down(1 << self.log_bytes_in_region))
     }
 
     pub fn scan_non_zero_values<T: MetadataValue>(
@@ -1255,7 +1288,7 @@ impl SideMetadataSpec {
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
-        visit_data: impl FnMut(Address),
+        mut visit_data: impl FnMut(Address),
     ) {
         debug_assert!(self.uses_contiguous_side_metadata());
 
@@ -1265,29 +1298,30 @@ impl SideMetadataSpec {
         let end_meta_addr = address_to_contiguous_meta_address(self, data_end_addr);
         let end_meta_shift = meta_byte_lshift(self, data_end_addr);
 
-        // FIXME: This is probably not going to perform well.  We need to refactor
-        // `iterate_meta_bits` to change from two callbacks to one.
-        let cell = RefCell::new(visit_data);
-
-        let check_bytes_forwards = |start: Address, end: Address| -> bool {
-            helpers::scan_non_zero_bits_in_metadata_bytes(start, end, &mut |addr, bit| {
-                (cell.borrow_mut())(helpers::contiguous_meta_address_to_address(
-                    self, addr, bit as u8,
-                ));
-            });
-            false
-        };
-        let check_bits_forwards = |addr: Address, start_bit: u8, end_bit: u8| -> bool {
-            helpers::scan_non_zero_bits_in_metadata_bits(
-                addr,
-                start_bit as u32,
-                end_bit as u32,
-                &mut |addr, bit| {
-                    (cell.borrow_mut())(helpers::contiguous_meta_address_to_address(
-                        self, addr, bit as u8,
-                    ));
-                },
-            );
+        let mut check_bytes = |range| {
+            match range {
+                BitByteRange::Bytes { start, end } => {
+                    helpers::scan_non_zero_bits_in_metadata_bytes(start, end, &mut |addr, bit| {
+                        visit_data(helpers::contiguous_meta_address_to_address(
+                            self, addr, bit as u8,
+                        ));
+                    });
+                }
+                BitByteRange::BitsInByte {
+                    addr,
+                    bit_start,
+                    bit_end,
+                } => helpers::scan_non_zero_bits_in_metadata_bits(
+                    addr,
+                    bit_start as u32,
+                    bit_end as u32,
+                    &mut |addr, bit| {
+                        visit_data(helpers::contiguous_meta_address_to_address(
+                            self, addr, bit as u8,
+                        ));
+                    },
+                ),
+            }
             false
         };
 
@@ -1297,8 +1331,7 @@ impl SideMetadataSpec {
             end_meta_addr,
             end_meta_shift,
             false,
-            &check_bytes_forwards,
-            &check_bits_forwards,
+            &mut check_bytes,
         );
     }
 }

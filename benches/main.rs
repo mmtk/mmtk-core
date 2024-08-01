@@ -19,11 +19,14 @@ use criterion::Criterion;
 // However, I will just keep these benchmarks here. If we find it not useful, and we do not plan to improve MockVM, we can delete
 // them.
 
+#[cfg(feature = "bench")]
+mod bulk_meta;
+
 #[cfg(feature = "mock_test")]
 mod mock_bench;
 
-pub fn bench_main(_c: &mut Criterion) {
-    #[cfg(feature = "mock_test")]
+#[cfg(feature = "mock_test")]
+pub fn bench_mock(_c: &mut Criterion) {
     match std::env::var("MMTK_BENCH") {
         Ok(bench) => match bench.as_str() {
             "alloc" => mock_bench::alloc::bench(_c),
@@ -33,12 +36,17 @@ pub fn bench_main(_c: &mut Criterion) {
         },
         Err(_) => panic!("Need to name a benchmark by the env var MMTK_BENCH"),
     }
+}
 
-    #[cfg(not(feature = "mock_test"))]
-    {
-        eprintln!("ERROR: Currently there are no benchmarks when the \"mock_test\" feature is not enabled.");
-        std::process::exit(1);
-    }
+pub fn bench_main(_c: &mut Criterion) {
+    // If the "mock_test" feature is enabled, we only run mock test.
+    #[cfg(feature = "mock_test")]
+    return bench_mock(_c);
+
+    // Some benchmarks rely on the "bench" feature to expose some private functions.
+    // Run them with `cargo bench --features bench`.
+    #[cfg(feature = "bench")]
+    bulk_meta::bzero_bset::bench(_c);
 }
 
 criterion_group!(benches, bench_main);
