@@ -155,119 +155,6 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    /// This method is used for iterating side metadata for a data address range. As we cannot
-    /// guarantee that the data address range can be mapped to whole metadata bytes, we have to deal
-    /// with visiting only a bit range in a metadata byte.
-    ///
-    /// The metadata bit range starts at the bit at index `meta_start_bit` in the byte at address
-    /// `meta_start_addr`, and ends at (but does not include) the bit at index `meta_end_bit` in the
-    /// byte at address `meta_end_addr`.
-    ///
-    /// Arguments:
-    /// * `forwards`: If true, we iterate forwards (from start/low address to end/high address).
-    ///               Otherwise, we iterate backwards (from end/high address to start/low address).
-    /// * `visitor`: The callback that visits ranges of bits or bytes.  It returns whether the
-    ///   itertion is early terminated.
-    ///
-    /// Returns true if we iterate through every bits in the range. Return false if we abort
-    /// iteration early.
-    pub(super) fn iterate_meta_bits<V>(
-        meta_start_addr: Address,
-        meta_start_bit: u8,
-        meta_end_addr: Address,
-        meta_end_bit: u8,
-        forwards: bool,
-        visitor: &mut V,
-    ) -> bool
-    where
-        V: FnMut(BitByteRange) -> bool,
-    {
-        trace!(
-            "iterate_meta_bits: {} {}, {} {}",
-            meta_start_addr,
-            meta_start_bit,
-            meta_end_addr,
-            meta_end_bit
-        );
-
-        // The start and the end are the same, we don't need to do anything.
-        if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
-            return false;
-        }
-
-        // If the range is already byte-aligned, visit whole bits.
-        if meta_start_bit == 0 && meta_end_bit == 0 {
-            return visitor(BitByteRange::Bytes {
-                start: meta_start_addr,
-                end: meta_end_addr,
-            });
-        }
-
-        // If the start and the end are within the same byte,
-        // visit the bit range within the byte.
-        if meta_start_addr == meta_end_addr {
-            return visitor(BitByteRange::BitsInByte {
-                addr: meta_start_addr,
-                bit_start: meta_start_bit as usize,
-                bit_end: meta_end_bit as usize,
-            });
-        }
-
-        // If the end is the 0th bit of the next byte of the start,
-        // visit the bit range from the start to the end (bit 8) of the same byte.
-        if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
-            return visitor(BitByteRange::BitsInByte {
-                addr: meta_start_addr,
-                bit_start: meta_start_bit as usize,
-                bit_end: 8usize,
-            });
-        }
-
-        // Otherwise, the range spans over multiple bytes, and is bit-unaligned at either the start
-        // or the end.  Try to break it into (at most) three sub-ranges.
-
-        // We cannot let multiple closures capture `visitor` mutably at the same time, so we
-        // pass the visitor in as `v` every time.
-
-        // update bits in the first byte
-        let visit_start = |v: &mut V| {
-            v(BitByteRange::BitsInByte {
-                addr: meta_start_addr,
-                bit_start: meta_start_bit as usize,
-                bit_end: 8usize,
-            })
-        };
-
-        // update bytes in the middle
-        let visit_middle = |v: &mut V| {
-            let start = meta_start_addr + 1usize;
-            let end = meta_end_addr;
-            if start < end {
-                // non-empty middle range
-                v(BitByteRange::Bytes { start, end })
-            } else {
-                // empty middle range
-                false
-            }
-        };
-
-        // update bits in the last byte
-        let visit_end = |v: &mut V| {
-            v(BitByteRange::BitsInByte {
-                addr: meta_end_addr,
-                bit_start: 0usize,
-                bit_end: meta_end_bit as usize,
-            })
-        };
-
-        // Update each segments.
-        if forwards {
-            visit_start(visitor) || visit_middle(visitor) || visit_end(visitor)
-        } else {
-            visit_end(visitor) || visit_middle(visitor) || visit_start(visitor)
-        }
-    }
-
     /// This method is used for bulk zeroing side metadata for a data address range.
     pub(super) fn zero_meta_bits(
         meta_start_addr: Address,
@@ -295,7 +182,7 @@ impl SideMetadataSpec {
                 }
             }
         };
-        Self::iterate_meta_bits(
+        ranges::break_bit_range(
             meta_start_addr,
             meta_start_bit,
             meta_end_addr,
@@ -343,7 +230,7 @@ impl SideMetadataSpec {
                 }
             }
         };
-        Self::iterate_meta_bits(
+        ranges::break_bit_range(
             meta_start_addr,
             meta_start_bit,
             meta_end_addr,
@@ -554,7 +441,7 @@ impl SideMetadataSpec {
             }
         };
 
-        Self::iterate_meta_bits(
+        ranges::break_bit_range(
             dst_meta_start_addr,
             dst_meta_start_bit,
             dst_meta_end_addr,
@@ -1242,7 +1129,7 @@ impl SideMetadataSpec {
             }
         };
 
-        Self::iterate_meta_bits(
+        ranges::break_bit_range(
             start_meta_addr,
             start_meta_shift,
             end_meta_addr,
