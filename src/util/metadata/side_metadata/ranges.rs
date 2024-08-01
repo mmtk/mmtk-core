@@ -36,16 +36,3 @@ pub enum BitByteRange {
         bit_end: BitOffset,
     },
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ByteWordRange {
-    Words {
-        start: Address,
-        end: Address,
-    },
-    BytesInWord {
-        start: Address,
-        end: Address,
-    },
-}
-
