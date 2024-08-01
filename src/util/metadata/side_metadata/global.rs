@@ -189,12 +189,13 @@ impl SideMetadataSpec {
             meta_end_addr,
             meta_end_bit
         );
-        // Start/end is the same, we don't need to do anything.
+
+        // The start and the end are the same, we don't need to do anything.
         if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
             return false;
         }
 
-        // visit whole bytes
+        // If the range is already byte-aligned, visit whole bits.
         if meta_start_bit == 0 && meta_end_bit == 0 {
             return visitor(BitByteRange::Bytes {
                 start: meta_start_addr,
@@ -202,61 +203,68 @@ impl SideMetadataSpec {
             });
         }
 
+        // If the start and the end are within the same byte,
+        // visit the bit range within the byte.
         if meta_start_addr == meta_end_addr {
-            // Visit bits in the same byte between start and end bit
             return visitor(BitByteRange::BitsInByte {
                 addr: meta_start_addr,
                 bit_start: meta_start_bit as usize,
                 bit_end: meta_end_bit as usize,
             });
-        } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
-            // Visit bits in the same byte after the start bit (between start bit and 8)
+        }
+
+        // If the end is the 0th bit of the next byte of the start,
+        // visit the bit range from the start to the end (bit 8) of the same byte.
+        if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
             return visitor(BitByteRange::BitsInByte {
                 addr: meta_start_addr,
                 bit_start: meta_start_bit as usize,
                 bit_end: 8usize,
             });
-        } else {
-            // We cannot let multiple closures capture `visitor` mutably at the same time, so we
-            // pass the visitor in as `v` every time.
+        }
 
-            // update bits in the first byte
-            let visit_start = |v: &mut V| {
-                v(BitByteRange::BitsInByte {
-                    addr: meta_start_addr,
-                    bit_start: meta_start_bit as usize,
-                    bit_end: 8usize,
-                })
-            };
+        // Otherwise, the range spans over multiple bytes, and is bit-unaligned at either the start
+        // or the end.  Try to break it into (at most) three sub-ranges.
 
-            // update bytes in the middle
-            let visit_middle = |v: &mut V| {
-                let start = meta_start_addr + 1usize;
-                let end = meta_end_addr;
-                if start < end {
-                    // non-empty middle range
-                    v(BitByteRange::Bytes { start, end })
-                } else {
-                    // empty middle range
-                    false
-                }
-            };
+        // We cannot let multiple closures capture `visitor` mutably at the same time, so we
+        // pass the visitor in as `v` every time.
 
-            // update bits in the last byte
-            let visit_end = |v: &mut V| {
-                v(BitByteRange::BitsInByte {
-                    addr: meta_end_addr,
-                    bit_start: 0 as usize,
-                    bit_end: meta_end_bit as usize,
-                })
-            };
+        // update bits in the first byte
+        let visit_start = |v: &mut V| {
+            v(BitByteRange::BitsInByte {
+                addr: meta_start_addr,
+                bit_start: meta_start_bit as usize,
+                bit_end: 8usize,
+            })
+        };
 
-            // Update each segments.
-            if forwards {
-                visit_start(visitor) || visit_middle(visitor) || visit_end(visitor)
+        // update bytes in the middle
+        let visit_middle = |v: &mut V| {
+            let start = meta_start_addr + 1usize;
+            let end = meta_end_addr;
+            if start < end {
+                // non-empty middle range
+                v(BitByteRange::Bytes { start, end })
             } else {
-                visit_end(visitor) || visit_middle(visitor) || visit_start(visitor)
+                // empty middle range
+                false
             }
+        };
+
+        // update bits in the last byte
+        let visit_end = |v: &mut V| {
+            v(BitByteRange::BitsInByte {
+                addr: meta_end_addr,
+                bit_start: 0usize,
+                bit_end: meta_end_bit as usize,
+            })
+        };
+
+        // Update each segments.
+        if forwards {
+            visit_start(visitor) || visit_middle(visitor) || visit_end(visitor)
+        } else {
+            visit_end(visitor) || visit_middle(visitor) || visit_start(visitor)
         }
     }
 
