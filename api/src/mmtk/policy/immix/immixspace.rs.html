@@ -1137,6 +1137,12 @@
 <a href="#1135" id="1135">1135</a>
 <a href="#1136" id="1136">1136</a>
 <a href="#1137" id="1137">1137</a>
+<a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1148,7 +1154,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocatorContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
-<span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::BlockPageResource;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::PageResource;
@@ -1158,6 +1163,7 @@
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{<span class="self">self</span>, MetadataSpec};
 <span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;
+<span class="kw">use </span><span class="kw">crate</span>::util::{copy::<span class="kw-2">*</span>, epilogue};
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use crate</span>::{
@@ -2115,6 +2121,12 @@
             // Now flush the BlockPageResource.
             </span><span class="self">self</span>.space.flush_page_resource()
         }
+    }
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Drop <span class="kw">for </span>FlushPageResource&lt;VM&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        epilogue::debug_assert_counter_zero(<span class="kw-2">&amp;</span><span class="self">self</span>.counter, <span class="string">"FlushPageResource::counter"</span>);
     }
 }
 

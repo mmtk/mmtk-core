@@ -82,6 +82,7 @@
 <a href="#80" id="80">80</a>
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
 </span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
@@ -128,6 +129,7 @@
 </span><span class="doccomment">/// An analysis framework for collecting data and profiling in GC.
 </span><span class="attr">#[cfg(feature = <span class="string">"analysis"</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>analysis;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>epilogue;
 <span class="doccomment">/// Non-generic refs to generic types of `&lt;VM&gt;`.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>erase_vm;
 <span class="doccomment">/// Finalization implementation.

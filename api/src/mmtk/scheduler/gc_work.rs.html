@@ -1179,6 +1179,18 @@
 <a href="#1177" id="1177">1177</a>
 <a href="#1178" id="1178">1178</a>
 <a href="#1179" id="1179">1179</a>
+<a href="#1180" id="1180">1180</a>
+<a href="#1181" id="1181">1181</a>
+<a href="#1182" id="1182">1182</a>
+<a href="#1183" id="1183">1183</a>
+<a href="#1184" id="1184">1184</a>
+<a href="#1185" id="1185">1185</a>
+<a href="#1186" id="1186">1186</a>
+<a href="#1187" id="1187">1187</a>
+<a href="#1188" id="1188">1188</a>
+<a href="#1189" id="1189">1189</a>
+<a href="#1190" id="1190">1190</a>
+<a href="#1191" id="1191">1191</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::work_bucket::WorkBucketStage;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::global_state::GcStatus;
@@ -1241,11 +1253,17 @@
         plan_mut.prepare(worker.tls);
 
         <span class="kw">if </span>plan_mut.constraints().needs_prepare_mutator {
-            <span class="kw">for </span>mutator <span class="kw">in </span>&lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators() {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                    .add(PrepareMutator::&lt;C::VM&gt;::new(mutator));
-            }
+            <span class="kw">let </span>prepare_mutator_packets = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators()
+                .map(|mutator| Box::new(PrepareMutator::&lt;C::VM&gt;::new(mutator)) <span class="kw">as _</span>)
+                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+            <span class="comment">// Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+            </span><span class="macro">debug_assert_eq!</span>(
+                prepare_mutator_packets.len(),
+                &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators()
+            );
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(prepare_mutator_packets);
         }
+
         <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
             <span class="kw">let </span>result = w.designated_work.push(Box::new(PrepareCollector));
             <span class="macro">debug_assert!</span>(result.is_ok());
@@ -1314,10 +1332,16 @@
         </span><span class="kw">let </span>plan_mut: <span class="kw-2">&amp;mut </span>C::PlanType = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.plan <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span><span class="kw">_</span>) };
         plan_mut.release(worker.tls);
 
-        <span class="kw">for </span>mutator <span class="kw">in </span>&lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-                .add(ReleaseMutator::&lt;C::VM&gt;::new(mutator));
-        }
+        <span class="kw">let </span>release_mutator_packets = &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::mutators()
+            .map(|mutator| Box::new(ReleaseMutator::&lt;C::VM&gt;::new(mutator)) <span class="kw">as _</span>)
+            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="comment">// Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+        </span><span class="macro">debug_assert_eq!</span>(
+            release_mutator_packets.len(),
+            &lt;C::VM <span class="kw">as </span>VMBinding&gt;::VMActivePlan::number_of_mutators()
+        );
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(release_mutator_packets);
+
         <span class="kw">for </span>w <span class="kw">in </span><span class="kw-2">&amp;</span>mmtk.scheduler.worker_group.workers_shared {
             <span class="kw">let </span>result = w.designated_work.push(Box::new(ReleaseCollector));
             <span class="macro">debug_assert!</span>(result.is_ok());

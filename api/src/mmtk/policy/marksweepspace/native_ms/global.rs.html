@@ -583,6 +583,20 @@
 <a href="#581" id="581">581</a>
 <a href="#582" id="582">582</a>
 <a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -593,6 +607,7 @@
     scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         copy::CopySemantics,
+        epilogue,
         heap::{BlockPageResource, PageResource},
         metadata::{<span class="self">self</span>, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
@@ -958,6 +973,13 @@
         <span class="self">self</span>.scheduler.work_buckets[<span class="kw">crate</span>::scheduler::WorkBucketStage::Release].add(work_packet);
     }
 
+    <span class="kw">pub fn </span>end_of_gc(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        epilogue::debug_assert_counter_zero(
+            <span class="kw-2">&amp;</span><span class="self">self</span>.pending_release_packets,
+            <span class="string">"pending_release_packets"</span>,
+        );
+    }
+
     <span class="doccomment">/// Release a block.
     </span><span class="kw">pub fn </span>release_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block: Block) {
         <span class="self">self</span>.block_clear_metadata(block);
@@ -1164,6 +1186,12 @@
         <span class="kw">if </span><span class="number">1 </span>== <span class="self">self</span>.counter.fetch_sub(<span class="number">1</span>, Ordering::SeqCst) {
             <span class="self">self</span>.space.recycle_blocks()
         }
+    }
+}
+
+<span class="kw">impl</span>&lt;VM: VMBinding&gt; Drop <span class="kw">for </span>RecycleBlocks&lt;VM&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        epilogue::debug_assert_counter_zero(<span class="kw-2">&amp;</span><span class="self">self</span>.counter, <span class="string">"RecycleBlocks::counter"</span>);
     }
 }
 </code></pre></div></section></main></body></html>
