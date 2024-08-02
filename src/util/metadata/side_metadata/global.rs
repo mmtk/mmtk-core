@@ -1138,6 +1138,12 @@ impl SideMetadataSpec {
         res.map(|addr| addr.align_down(1 << self.log_bytes_in_region))
     }
 
+    /// Search for data addresses that have non zero values in the side metadata.
+    ///
+    /// This function searches the side metadata for the data address range from `data_start_addr`
+    /// (inclusive) to `data_end_addr` (exclusive).
+    ///
+    /// `visit_data` is called for each data address that has non-zero side metadata.
     pub fn scan_non_zero_values<T: MetadataValue>(
         &self,
         data_start_addr: Address,
@@ -1217,7 +1223,7 @@ impl SideMetadataSpec {
             false
         };
 
-        Self::iterate_meta_bits(
+        ranges::break_bit_range(
             start_meta_addr,
             start_meta_shift,
             end_meta_addr,
