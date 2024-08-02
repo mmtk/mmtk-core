@@ -8,7 +8,10 @@ use super::{
     heap::{
         chunk_map::{ChunkMap, ChunkState},
         MonotonePageResource,
-    }, linear_scan::Region, metadata::side_metadata::spec_defs::VO_BIT, Address, ObjectReference
+    },
+    linear_scan::Region,
+    metadata::side_metadata::spec_defs::VO_BIT,
+    Address, ObjectReference,
 };
 
 /// A trait for enumerating objects in spaces.
