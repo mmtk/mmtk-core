@@ -1110,11 +1110,8 @@ impl SideMetadataSpec {
                     bit_start,
                     bit_end,
                 } => {
-                    match helpers::find_last_non_zero_bit_in_metadata_bits(
-                        addr,
-                        bit_start as u8,
-                        bit_end as u8,
-                    ) {
+                    match helpers::find_last_non_zero_bit_in_metadata_bits(addr, bit_start, bit_end)
+                    {
                         helpers::FindMetaBitResult::Found { addr, bit } => {
                             res = Some(contiguous_meta_address_to_address(self, addr, bit));
                             // Return true to abort the search. We found the bit.

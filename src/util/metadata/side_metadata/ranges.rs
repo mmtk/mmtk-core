@@ -2,11 +2,8 @@
 
 use crate::util::Address;
 
-/// The type for bit offset in a byte, word or a SIMD vector.
-///
-/// We use usize because it is generic and we may use AVX-512 some day, where u8 (256 max) is not
-/// big enough.
-pub type BitOffset = usize;
+/// The type for bit offset in a byte.
+pub type BitOffset = u8;
 
 /// A range of bytes or bits within a byte.  It is the unit of visiting a contiguous bit range of a
 /// side metadata.
@@ -57,23 +54,15 @@ pub enum BitByteRange {
 /// early.
 pub fn break_bit_range<V>(
     start_addr: Address,
-    start_bit: u8,
+    start_bit: BitOffset,
     end_addr: Address,
-    end_bit: u8,
+    end_bit: BitOffset,
     forwards: bool,
     visitor: &mut V,
 ) -> bool
 where
     V: FnMut(BitByteRange) -> bool,
 {
-    trace!(
-        "iterate_meta_bits: {} {}, {} {}",
-        start_addr,
-        start_bit,
-        end_addr,
-        end_bit
-    );
-
     // The start and the end are the same, we don't need to do anything.
     if start_addr == end_addr && start_bit == end_bit {
         return false;
@@ -92,8 +81,8 @@ where
     if start_addr == end_addr {
         return visitor(BitByteRange::BitsInByte {
             addr: start_addr,
-            bit_start: start_bit as usize,
-            bit_end: end_bit as usize,
+            bit_start: start_bit,
+            bit_end: end_bit,
         });
     }
 
@@ -102,8 +91,8 @@ where
     if start_addr + 1usize == end_addr && end_bit == 0 {
         return visitor(BitByteRange::BitsInByte {
             addr: start_addr,
-            bit_start: start_bit as usize,
-            bit_end: 8usize,
+            bit_start: start_bit,
+            bit_end: 8_u8,
         });
     }
 
@@ -121,8 +110,8 @@ where
         if !start_aligned {
             v(BitByteRange::BitsInByte {
                 addr: start_addr,
-                bit_start: start_bit as usize,
-                bit_end: 8usize,
+                bit_start: start_bit,
+                bit_end: 8_u8,
             })
         } else {
             // The start is already aligned.  No sub-byte range at the start.
@@ -153,8 +142,8 @@ where
         if !end_aligned {
             v(BitByteRange::BitsInByte {
                 addr: end_addr,
-                bit_start: 0usize,
-                bit_end: end_bit as usize,
+                bit_start: 0_u8,
+                bit_end: end_bit,
             })
         } else {
             // The end is aligned.  No sub-byte range at the end.
@@ -223,8 +212,8 @@ mod tests {
                     result,
                     vec![BitByteRange::BitsInByte {
                         addr: base,
-                        bit_start: bit0,
-                        bit_end: bit1
+                        bit_start: bit0 as u8,
+                        bit_end: bit1 as u8
                     }],
                     "Not equal.  bit0: {bit0}, bit1: {bit1}",
                 );
@@ -241,8 +230,8 @@ mod tests {
                 result,
                 vec![BitByteRange::BitsInByte {
                     addr: base,
-                    bit_start: bit0,
-                    bit_end: BITS_IN_BYTE
+                    bit_start: bit0 as u8,
+                    bit_end: BITS_IN_BYTE as u8
                 }],
                 "Not equal.  bit0: {bit0}",
             );
@@ -260,13 +249,13 @@ mod tests {
                     vec![
                         BitByteRange::BitsInByte {
                             addr: base,
-                            bit_start: bit0,
-                            bit_end: BITS_IN_BYTE,
+                            bit_start: bit0 as u8,
+                            bit_end: BITS_IN_BYTE as u8,
                         },
                         BitByteRange::BitsInByte {
                             addr: base + 1usize,
                             bit_start: 0,
-                            bit_end: bit1,
+                            bit_end: bit1 as u8,
                         },
                     ],
                     "Not equal.  bit0: {bit0}, bit1: {bit1}",
@@ -286,8 +275,8 @@ mod tests {
                     vec![
                         BitByteRange::BitsInByte {
                             addr: base,
-                            bit_start: bit0,
-                            bit_end: BITS_IN_BYTE,
+                            bit_start: bit0 as u8,
+                            bit_end: BITS_IN_BYTE as u8,
                         },
                         BitByteRange::Bytes {
                             start: base + 1usize,
@@ -316,7 +305,7 @@ mod tests {
                         BitByteRange::BitsInByte {
                             addr: base,
                             bit_start: 0,
-                            bit_end: bit1,
+                            bit_end: bit1 as u8,
                         },
                     ],
                     "Not equal.  byte0: {byte0}, bit1: {bit1}",
@@ -351,8 +340,8 @@ mod tests {
                     vec![
                         BitByteRange::BitsInByte {
                             addr: base0 - 1usize,
-                            bit_start: bit0,
-                            bit_end: BITS_IN_BYTE,
+                            bit_start: bit0 as u8,
+                            bit_end: BITS_IN_BYTE as u8,
                         },
                         BitByteRange::Bytes {
                             start: base0,
@@ -361,7 +350,7 @@ mod tests {
                         BitByteRange::BitsInByte {
                             addr: base1,
                             bit_start: 0,
-                            bit_end: bit1,
+                            bit_end: bit1 as u8,
                         },
                     ],
                     "Not equal.  bit0: {bit0}, bit1: {bit1}",
