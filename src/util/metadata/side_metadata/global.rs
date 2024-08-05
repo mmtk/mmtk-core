@@ -1138,10 +1138,11 @@ impl SideMetadataSpec {
         res.map(|addr| addr.align_down(1 << self.log_bytes_in_region))
     }
 
-    /// Search for data addresses that have non zero values in the side metadata.
+    /// Search for data addresses that have non zero values in the side metadata.  This method is
+    /// primarily used for heap traversal by scanning the VO bits.
     ///
     /// This function searches the side metadata for the data address range from `data_start_addr`
-    /// (inclusive) to `data_end_addr` (exclusive).
+    /// (inclusive) to `data_end_addr` (exclusive).  The data address range must be fully mapped.
     ///
     /// `visit_data` is called for each data address that has non-zero side metadata.
     pub fn scan_non_zero_values<T: MetadataValue>(
@@ -1150,19 +1151,27 @@ impl SideMetadataSpec {
         data_end_addr: Address,
         visit_data: impl FnMut(Address),
     ) {
-        if self.uses_contiguous_side_metadata() {
-            // Contiguous side metadata
-            self.scan_non_zero_values_fast::<T>(data_start_addr, data_end_addr, visit_data);
+        if self.uses_contiguous_side_metadata() && self.log_num_of_bits == 0 {
+            // Contiguous one-bit-per-region side metadata
+            // TODO: VO bits is one-bit-per-word.  But if we want to scan other metadata (such as
+            // the forwarding bits which has two bits per word), we will need to refactor the
+            // algorithm of `scan_non_zero_values_fast`.
+            self.scan_non_zero_values_fast(data_start_addr, data_end_addr, visit_data);
         } else {
-            // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
-            // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
-            // This won't be used for VO bit, as VO bit is global and is always contiguous. So for now, I am not bothered to do it.
-            warn!("We are trying to search non zero bits in an discontiguous side metadata. The performance is slow, as MMTk does not optimize for this case.");
+            // TODO: VO bits are always contiguous.  But if we want to scan other metadata, such as
+            // side mark bits, we need to refactor `bulk_update_metadata` to support `FnMut`, too,
+            // and use it to apply `scan_non_zero_values_fast` on each contiguous side metadata
+            // range.
+            warn!(
+                "We are trying to search for non zero bits in a discontiguous side metadata \
+            or the metadata has more than one bit per region. \
+                The performance is slow, as MMTk does not optimize for this case."
+            );
             self.scan_non_zero_values_simple::<T>(data_start_addr, data_end_addr, visit_data);
         }
     }
 
-    pub fn scan_non_zero_values_simple<T: MetadataValue>(
+    fn scan_non_zero_values_simple<T: MetadataValue>(
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
@@ -1182,13 +1191,14 @@ impl SideMetadataSpec {
         }
     }
 
-    pub fn scan_non_zero_values_fast<T: MetadataValue>(
+    fn scan_non_zero_values_fast(
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
         mut visit_data: impl FnMut(Address),
     ) {
         debug_assert!(self.uses_contiguous_side_metadata());
+        debug_assert_eq!(self.log_num_of_bits, 0);
 
         // Then figure out the start and end metadata address and bits.
         let start_meta_addr = address_to_contiguous_meta_address(self, data_start_addr);
@@ -1196,13 +1206,11 @@ impl SideMetadataSpec {
         let end_meta_addr = address_to_contiguous_meta_address(self, data_end_addr);
         let end_meta_shift = meta_byte_lshift(self, data_end_addr);
 
-        let mut check_bytes = |range| {
+        let mut visitor = |range| {
             match range {
                 BitByteRange::Bytes { start, end } => {
                     helpers::scan_non_zero_bits_in_metadata_bytes(start, end, &mut |addr, bit| {
-                        visit_data(helpers::contiguous_meta_address_to_address(
-                            self, addr, bit as u8,
-                        ));
+                        visit_data(helpers::contiguous_meta_address_to_address(self, addr, bit));
                     });
                 }
                 BitByteRange::BitsInByte {
@@ -1211,12 +1219,10 @@ impl SideMetadataSpec {
                     bit_end,
                 } => helpers::scan_non_zero_bits_in_metadata_bits(
                     addr,
-                    bit_start as u32,
-                    bit_end as u32,
+                    bit_start,
+                    bit_end,
                     &mut |addr, bit| {
-                        visit_data(helpers::contiguous_meta_address_to_address(
-                            self, addr, bit as u8,
-                        ));
+                        visit_data(helpers::contiguous_meta_address_to_address(self, addr, bit));
                     },
                 ),
             }
@@ -1229,7 +1235,7 @@ impl SideMetadataSpec {
             end_meta_addr,
             end_meta_shift,
             false,
-            &mut check_bytes,
+            &mut visitor,
         );
     }
 }

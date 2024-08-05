@@ -1,3 +1,4 @@
+use super::ranges::BitOffset;
 use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
@@ -272,7 +273,7 @@ fn find_last_non_zero_bit_in_u8(byte_value: u8) -> Option<u8> {
 pub fn scan_non_zero_bits_in_metadata_bytes(
     meta_start: Address,
     meta_end: Address,
-    visit_bit: &mut impl FnMut(Address, u32),
+    visit_bit: &mut impl FnMut(Address, BitOffset),
 ) {
     use crate::util::constants::BYTES_IN_ADDRESS;
 
@@ -296,23 +297,23 @@ pub fn scan_non_zero_bits_in_metadata_bytes(
     }
 }
 
-pub fn scan_non_zero_bits_in_metadata_word(
+fn scan_non_zero_bits_in_metadata_word(
     meta_addr: Address,
     mut word: usize,
-    visit_bit: &mut impl FnMut(Address, u32),
+    visit_bit: &mut impl FnMut(Address, BitOffset),
 ) {
     while word != 0 {
         let bit = word.trailing_zeros();
-        visit_bit(meta_addr, bit);
+        visit_bit(meta_addr, bit as u8);
         word = word & (word - 1);
     }
 }
 
 pub fn scan_non_zero_bits_in_metadata_bits(
     meta_addr: Address,
-    bit_start: u32,
-    bit_end: u32,
-    visit_bit: &mut impl FnMut(Address, u32),
+    bit_start: BitOffset,
+    bit_end: BitOffset,
+    visit_bit: &mut impl FnMut(Address, BitOffset),
 ) {
     let byte = unsafe { meta_addr.load::<u8>() };
     for bit in bit_start..bit_end {
