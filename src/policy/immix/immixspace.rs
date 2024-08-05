@@ -9,7 +9,6 @@ use crate::policy::sft_map::SFTMap;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::alloc::allocator::AllocatorContext;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::copy::*;
 use crate::util::heap::chunk_map::*;
 use crate::util::heap::BlockPageResource;
 use crate::util::heap::PageResource;
@@ -19,6 +18,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding;
+use crate::util::{copy::*, epilogue};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
@@ -976,6 +976,12 @@ impl<VM: VMBinding> FlushPageResource<VM> {
             // Now flush the BlockPageResource.
             self.space.flush_page_resource()
         }
+    }
+}
+
+impl<VM: VMBinding> Drop for FlushPageResource<VM> {
+    fn drop(&mut self) {
+        epilogue::debug_assert_counter_zero(&self.counter, "FlushPageResource::counter");
     }
 }
 
