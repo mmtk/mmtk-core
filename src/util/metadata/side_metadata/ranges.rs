@@ -96,16 +96,16 @@ where
         });
     }
 
-    // Otherwise, the range spans over multiple bytes, and is bit-unaligned at either the start
-    // or the end.  Try to break it into (at most) three sub-ranges.
+    // Otherwise, the range spans over multiple bytes, and is bit-unaligned at either the start or
+    // the end.  Try to break it into (at most) three sub-ranges.
 
     let start_aligned = start_bit == 0;
     let end_aligned = end_bit == 0;
 
-    // We cannot let multiple closures capture `visitor` mutably at the same time, so we
-    // pass the visitor in as `v` every time.
+    // We cannot let multiple closures capture `visitor` mutably at the same time, so we pass the
+    // visitor in as `v` every time.
 
-    // update bits in the first byte
+    // visit bits within the first byte
     let visit_start = |v: &mut V| {
         if !start_aligned {
             v(BitByteRange::BitsInByte {
@@ -119,7 +119,7 @@ where
         }
     };
 
-    // update bytes in the middle
+    // visit whole bytes in the middle
     let visit_middle = |v: &mut V| {
         let start = if start_aligned {
             start_addr
@@ -129,15 +129,14 @@ where
         };
         let end = end_addr;
         if start < end {
-            // non-empty middle range
             v(BitByteRange::Bytes { start, end })
         } else {
-            // empty middle range
+            // There are no whole bytes in the middle.
             false
         }
     };
 
-    // update bits in the last byte
+    // visit bits within the last byte
     let visit_end = |v: &mut V| {
         if !end_aligned {
             v(BitByteRange::BitsInByte {
