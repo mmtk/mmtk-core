@@ -46,7 +46,10 @@ pub fn bench_main(_c: &mut Criterion) {
     // Some benchmarks rely on the "bench" feature to expose some private functions.
     // Run them with `cargo bench --features bench`.
     #[cfg(feature = "bench")]
-    bulk_meta::bzero_bset::bench(_c);
+    {
+        bulk_meta::bzero_bset::bench(_c);
+        bulk_meta::bscan::bench(_c);
+    }
 }
 
 criterion_group!(benches, bench_main);

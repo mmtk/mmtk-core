@@ -1149,7 +1149,7 @@ impl SideMetadataSpec {
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
-        visit_data: impl FnMut(Address),
+        visit_data: &mut impl FnMut(Address),
     ) {
         if self.uses_contiguous_side_metadata() && self.log_num_of_bits == 0 {
             // Contiguous one-bit-per-region side metadata
@@ -1175,7 +1175,7 @@ impl SideMetadataSpec {
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
-        mut visit_data: impl FnMut(Address),
+        visit_data: &mut impl FnMut(Address),
     ) {
         let region_bytes = 1usize << self.log_bytes_in_region;
 
@@ -1195,7 +1195,7 @@ impl SideMetadataSpec {
         &self,
         data_start_addr: Address,
         data_end_addr: Address,
-        mut visit_data: impl FnMut(Address),
+        visit_data: &mut impl FnMut(Address),
     ) {
         debug_assert!(self.uses_contiguous_side_metadata());
         debug_assert_eq!(self.log_num_of_bits, 0);

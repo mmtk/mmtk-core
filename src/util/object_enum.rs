@@ -62,7 +62,7 @@ where
     }
 
     fn visit_address_range(&mut self, addr_range: std::ops::Range<Address>) {
-        VO_BIT.scan_non_zero_values::<u8>(addr_range.start, addr_range.end, |address| {
+        VO_BIT.scan_non_zero_values::<u8>(addr_range.start, addr_range.end, &mut |address| {
             let object = ObjectReference::from_address::<VM>(address);
             (self.object_callback)(object);
         })
