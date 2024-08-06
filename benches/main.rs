@@ -3,10 +3,10 @@ use criterion::criterion_main;
 use criterion::Criterion;
 
 #[cfg(all(feature = "mock_test", feature = "test_private"))]
-mod mock_bench;
+pub mod mock_bench;
 
 #[cfg(all(not(feature = "mock_test"), feature = "test_private"))]
-mod regular_bench;
+pub mod regular_bench;
 
 pub fn bench_main(c: &mut Criterion) {
     cfg_if::cfg_if! {

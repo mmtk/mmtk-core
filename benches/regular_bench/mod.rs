@@ -1,4 +1,4 @@
-use criterion::Criterion;
+pub use criterion::Criterion;
 
 mod bulk_meta;
 
