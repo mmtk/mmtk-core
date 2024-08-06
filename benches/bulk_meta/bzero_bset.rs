@@ -3,7 +3,7 @@
 use std::os::raw::c_void;
 
 use criterion::Criterion;
-use mmtk::util::{constants::LOG_BITS_IN_WORD, metadata::side_metadata::SideMetadataSpec, Address};
+use mmtk::util::{constants::LOG_BITS_IN_WORD, test_private, Address};
 
 fn allocate_aligned(size: usize) -> Address {
     let ptr = unsafe {
@@ -25,8 +25,8 @@ pub fn bench(c: &mut Criterion) {
         let end = start + LINE_META_BYTES;
 
         b.iter(|| {
-            SideMetadataSpec::bench_set_meta_bits(start, 0, end, 0);
-            SideMetadataSpec::bench_zero_meta_bits(start, 0, end, 0);
+            test_private::set_meta_bits(start, 0, end, 0);
+            test_private::zero_meta_bits(start, 0, end, 0);
         })
     });
 
@@ -45,8 +45,8 @@ pub fn bench(c: &mut Criterion) {
         let end = start + BLOCK_META_BYTES;
 
         b.iter(|| {
-            SideMetadataSpec::bench_set_meta_bits(start, 0, end, 0);
-            SideMetadataSpec::bench_zero_meta_bits(start, 0, end, 0);
+            test_private::set_meta_bits(start, 0, end, 0);
+            test_private::zero_meta_bits(start, 0, end, 0);
         })
     });
 

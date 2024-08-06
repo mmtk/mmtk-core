@@ -156,7 +156,7 @@ impl SideMetadataSpec {
     }
 
     /// This method is used for bulk zeroing side metadata for a data address range.
-    pub(super) fn zero_meta_bits(
+    pub(crate) fn zero_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
@@ -192,19 +192,8 @@ impl SideMetadataSpec {
         );
     }
 
-    /// Expose `zero_meta_bits` when running `cargo bench`.
-    #[cfg(feature = "test_private")]
-    pub fn bench_zero_meta_bits(
-        meta_start_addr: Address,
-        meta_start_bit: u8,
-        meta_end_addr: Address,
-        meta_end_bit: u8,
-    ) {
-        Self::zero_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
-    }
-
     /// This method is used for bulk setting side metadata for a data address range.
-    pub(super) fn set_meta_bits(
+    pub(crate) fn set_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
@@ -238,17 +227,6 @@ impl SideMetadataSpec {
             true,
             &mut visitor,
         );
-    }
-
-    /// Expose `set_meta_bits` when running `cargo bench`.
-    #[cfg(feature = "test_private")]
-    pub fn bench_set_meta_bits(
-        meta_start_addr: Address,
-        meta_start_bit: u8,
-        meta_end_addr: Address,
-        meta_end_bit: u8,
-    ) {
-        Self::set_meta_bits(meta_start_addr, meta_start_bit, meta_end_addr, meta_end_bit)
     }
 
     /// This method does bulk update for the given data range. It calculates the metadata bits for the given data range,
