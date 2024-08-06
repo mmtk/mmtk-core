@@ -600,7 +600,7 @@ impl ObjectReference {
 
     /// Can the object be moved?
     pub fn is_movable<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_movable()
+        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_movable(self)
     }
 
     /// Get forwarding pointer if the object is forwarded.

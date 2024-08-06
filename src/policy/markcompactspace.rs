@@ -61,7 +61,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         false
     }
 
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
         true
     }
 
