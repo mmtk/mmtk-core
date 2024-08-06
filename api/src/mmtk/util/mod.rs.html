@@ -83,6 +83,8 @@
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
 </span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
@@ -121,6 +123,8 @@
 </span><span class="kw">pub mod </span>opaque_pointer;
 <span class="doccomment">/// MMTk command line options.
 </span><span class="kw">pub mod </span>options;
+<span class="attr">#[cfg(feature = <span class="string">"test_private"</span>)]
+</span><span class="kw">pub mod </span>test_private;
 <span class="doccomment">/// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
 </span><span class="attr">#[cfg(any(test, feature = <span class="string">"mock_test"</span>))]
 </span><span class="kw">pub mod </span>test_util;
