@@ -193,7 +193,7 @@ impl SideMetadataSpec {
     }
 
     /// Expose `zero_meta_bits` when running `cargo bench`.
-    #[cfg(feature = "bench")]
+    #[cfg(feature = "test_private")]
     pub fn bench_zero_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
@@ -241,7 +241,7 @@ impl SideMetadataSpec {
     }
 
     /// Expose `set_meta_bits` when running `cargo bench`.
-    #[cfg(feature = "bench")]
+    #[cfg(feature = "test_private")]
     pub fn bench_set_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,

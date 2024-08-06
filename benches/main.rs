@@ -19,7 +19,7 @@ use criterion::Criterion;
 // However, I will just keep these benchmarks here. If we find it not useful, and we do not plan to improve MockVM, we can delete
 // them.
 
-#[cfg(feature = "bench")]
+#[cfg(feature = "test_private")]
 mod bulk_meta;
 
 #[cfg(feature = "mock_test")]
@@ -43,9 +43,9 @@ pub fn bench_main(_c: &mut Criterion) {
     #[cfg(feature = "mock_test")]
     return bench_mock(_c);
 
-    // Some benchmarks rely on the "bench" feature to expose some private functions.
-    // Run them with `cargo bench --features bench`.
-    #[cfg(feature = "bench")]
+    // Some benchmarks rely on the "test_private" feature to expose some private functions.
+    // Run them with `cargo bench --features test_private`.
+    #[cfg(feature = "test_private")]
     bulk_meta::bzero_bset::bench(_c);
 }
 
