@@ -1,4 +1,14 @@
-//! Data types for visiting metadata ranges at different granularities
+//! Data types for visiting metadata ranges at different granularities.
+//!
+//! Currently, the `break_bit_range` function can break a bit range into sub-ranges of whole bytes
+//! and in-byte bits.
+//!
+//! TODO:
+//!
+//! -   Add a function to break a byte range into sub-ranges of whole words and in-word bytes.
+//!     -   And use it for searching side metadata for non-zero bits.
+//! -   Add a function to break a byte range at chunk boundaries.
+//!     -   And use it for visiting discontiguous side metadata in bulk.
 
 use crate::util::Address;
 
@@ -40,15 +50,14 @@ pub enum BitByteRange {
 /// guarantee that the data address range can be mapped to whole metadata bytes, we have to deal
 /// with visiting only a bit range in a metadata byte.
 ///
-/// The bit range starts at the bit at index `meta_start_bit` in the byte at address
-/// `meta_start_addr`, and ends at (but does not include) the bit at index `meta_end_bit` in the
-/// byte at address `meta_end_addr`.
+/// The bit range starts at the bit at index `start_bit` in the byte at address `start_addr`, and
+/// ends at (but does not include) the bit at index `end_bit` in the byte at address `end_addr`.
 ///
 /// Arguments:
-/// * `forwards`: If true, we iterate forwards (from start/low address to end/high address).
-///               Otherwise, we iterate backwards (from end/high address to start/low address).
-/// * `visitor`: The callback that visits ranges of bits or bytes.  It returns whether the itertion
-///   is early terminated.
+/// *   `forwards`: If true, we iterate forwards (from start/low address to end/high address).
+///     Otherwise, we iterate backwards (from end/high address to start/low address).
+/// *   `visitor`: The callback that visits ranges of bits or bytes.  It returns whether the
+///     itertion is early terminated.
 ///
 /// Returns true if we iterate through every bits in the range. Return false if we abort iteration
 /// early.
@@ -68,7 +77,7 @@ where
         return false;
     }
 
-    // If the range is already byte-aligned, visit whole bits.
+    // If the range is already byte-aligned, visit the entire range as whole bytes.
     if start_bit == 0 && end_bit == 0 {
         return visitor(BitByteRange::Bytes {
             start: start_addr,
@@ -150,7 +159,7 @@ where
         }
     };
 
-    // Update each segments.
+    // Visit the three segments forwards or backwards.
     if forwards {
         visit_start(visitor) || visit_middle(visitor) || visit_end(visitor)
     } else {

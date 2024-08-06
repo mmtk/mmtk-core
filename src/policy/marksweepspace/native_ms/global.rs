@@ -8,6 +8,7 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         copy::CopySemantics,
+        epilogue,
         heap::{BlockPageResource, PageResource},
         metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         object_enum::{self, ObjectEnumerator},
@@ -378,6 +379,13 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.scheduler.work_buckets[crate::scheduler::WorkBucketStage::Release].add(work_packet);
     }
 
+    pub fn end_of_gc(&mut self) {
+        epilogue::debug_assert_counter_zero(
+            &self.pending_release_packets,
+            "pending_release_packets",
+        );
+    }
+
     /// Release a block.
     pub fn release_block(&self, block: Block) {
         self.block_clear_metadata(block);
@@ -584,5 +592,11 @@ impl<VM: VMBinding> RecycleBlocks<VM> {
         if 1 == self.counter.fetch_sub(1, Ordering::SeqCst) {
             self.space.recycle_blocks()
         }
+    }
+}
+
+impl<VM: VMBinding> Drop for RecycleBlocks<VM> {
+    fn drop(&mut self) {
+        epilogue::debug_assert_counter_zero(&self.counter, "RecycleBlocks::counter");
     }
 }

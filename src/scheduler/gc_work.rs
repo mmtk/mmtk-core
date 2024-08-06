@@ -60,11 +60,17 @@ impl<C: GCWorkContext> GCWork<C::VM> for Prepare<C> {
         plan_mut.prepare(worker.tls);
 
         if plan_mut.constraints().needs_prepare_mutator {
-            for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                    .add(PrepareMutator::<C::VM>::new(mutator));
-            }
+            let prepare_mutator_packets = <C::VM as VMBinding>::VMActivePlan::mutators()
+                .map(|mutator| Box::new(PrepareMutator::<C::VM>::new(mutator)) as _)
+                .collect::<Vec<_>>();
+            // Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+            debug_assert_eq!(
+                prepare_mutator_packets.len(),
+                <C::VM as VMBinding>::VMActivePlan::number_of_mutators()
+            );
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].bulk_add(prepare_mutator_packets);
         }
+
         for w in &mmtk.scheduler.worker_group.workers_shared {
             let result = w.designated_work.push(Box::new(PrepareCollector));
             debug_assert!(result.is_ok());
@@ -133,10 +139,16 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
-        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-                .add(ReleaseMutator::<C::VM>::new(mutator));
-        }
+        let release_mutator_packets = <C::VM as VMBinding>::VMActivePlan::mutators()
+            .map(|mutator| Box::new(ReleaseMutator::<C::VM>::new(mutator)) as _)
+            .collect::<Vec<_>>();
+        // Just in case the VM binding is inconsistent about the number of mutators and the actual mutator list.
+        debug_assert_eq!(
+            release_mutator_packets.len(),
+            <C::VM as VMBinding>::VMActivePlan::number_of_mutators()
+        );
+        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(release_mutator_packets);
+
         for w in &mmtk.scheduler.worker_group.workers_shared {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());

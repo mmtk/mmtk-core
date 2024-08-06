@@ -19,7 +19,7 @@ use crate::util::metadata::vo_bit;
 use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_enum::ObjectEnumerator;
 use crate::util::object_forwarding;
-use crate::util::{copy::*, object_enum};
+use crate::util::{copy::*, epilogue, object_enum};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
@@ -981,6 +981,12 @@ impl<VM: VMBinding> FlushPageResource<VM> {
             // Now flush the BlockPageResource.
             self.space.flush_page_resource()
         }
+    }
+}
+
+impl<VM: VMBinding> Drop for FlushPageResource<VM> {
+    fn drop(&mut self) {
+        epilogue::debug_assert_counter_zero(&self.counter, "FlushPageResource::counter");
     }
 }
 
