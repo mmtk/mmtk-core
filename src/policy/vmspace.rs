@@ -147,7 +147,7 @@ impl<VM: VMBinding> Space<VM> for VMSpace<VM> {
         SFT_MAP.get_checked(start).name() == self.name()
     }
 
-    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
         let external_pages = self.pr.get_external_pages();
         for ep in external_pages.iter() {
             enumerator.visit_address_range(ep.start..ep.end);

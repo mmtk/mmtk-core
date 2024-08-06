@@ -350,17 +350,27 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
 
-    /// Enumerate ranges of addresses that may contain objects.  Used for enumerating objects in the
-    /// space.  Implementors should call `f` for each address range that may contain objects, and
-    /// may ignore address ranges that are guaranteed not to include objects.  The address range
-    /// will then be linearly scanned.
+    /// Enumerate objects at a coarser granularity.
     ///
-    /// # Implementation consideration
+    /// Implementers can use the `enumerator` to report
     ///
-    /// Because `Space` is a trait object type and `f` is a `dyn` reference, each invocation of `f`
-    /// involves a dynamic dispatching.  The overhead is OK if we call it a block at a time, but it
-    /// will be too costly if we call a `dyn` callback for each object.
-    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
+    /// -   individual objects within the space using `enumerator.visit_object`, and
+    /// -   ranges of address that may contain objects using `enumerator.visit_address_range`. The
+    ///     caller will then enumerate objects in the range using the VO bits metadata.
+    ///
+    /// Each object in the space shall be covered by one of the two methods above.
+    ///
+    /// # Implementation considerations
+    ///
+    /// **Skipping empty ranges**: When enumerating address ranges, spaces can skip ranges (blocks,
+    /// chunks, etc.) that are guarenteed not to contain objects.
+    ///
+    /// **Dynamic dispatch**: Because `Space` is a trait object type and `enumerator` is a `dyn`
+    /// reference, invoking methods of `enumerator` involves a dynamic dispatching.  But the
+    /// overhead is OK if we call it a block at a time because scanning the VO bits will dominate
+    /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
+    /// scanning VO bits because it is sparse.
+    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator);
 }
 
 /// Print the VM map for a space.
