@@ -7,6 +7,7 @@ mod helpers;
 mod helpers_32;
 
 mod global;
+pub(crate) mod ranges;
 mod sanity;
 mod side_metadata_tests;
 pub(crate) mod spec_defs;
