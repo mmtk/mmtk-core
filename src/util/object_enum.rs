@@ -26,7 +26,7 @@ pub trait ObjectEnumerator {
     /// Visit a single object.
     fn visit_object(&mut self, object: ObjectReference);
     /// Visit an address range that may contain objects.
-    fn visit_address_range(&mut self, addr_range: std::ops::Range<Address>);
+    fn visit_address_range(&mut self, start: Address, end: Address);
 }
 
 /// An implementation of `ObjectEnumerator` that wraps a callback.
@@ -61,8 +61,8 @@ where
         (self.object_callback)(object);
     }
 
-    fn visit_address_range(&mut self, addr_range: std::ops::Range<Address>) {
-        VO_BIT.scan_non_zero_values::<u8>(addr_range.start, addr_range.end, &mut |address| {
+    fn visit_address_range(&mut self, start: Address, end: Address) {
+        VO_BIT.scan_non_zero_values::<u8>(start, end, &mut |address| {
             let object = ObjectReference::from_address::<VM>(address);
             (self.object_callback)(object);
         })
@@ -93,7 +93,7 @@ pub(crate) fn enumerate_blocks_from_chunk_map<B>(
         if chunk_map.get(chunk) == ChunkState::Allocated {
             for block in chunk.iter_region::<B>() {
                 if block.may_have_objects() {
-                    enumerator.visit_address_range(block.as_range());
+                    enumerator.visit_address_range(block.start(), block.end());
                 }
             }
         }
@@ -107,6 +107,6 @@ pub(crate) fn enumerate_blocks_from_monotonic_page_resource<VM>(
     VM: VMBinding,
 {
     for (start, size) in pr.iterate_allocated_regions() {
-        enumerator.visit_address_range(start..(start + size));
+        enumerator.visit_address_range(start, start + size);
     }
 }
