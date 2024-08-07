@@ -2,7 +2,7 @@
 // For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
 mod constants;
-mod helpers;
+pub(crate) mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
 
@@ -22,9 +22,3 @@ pub(crate) use helpers::*;
 #[allow(unused_imports)]
 pub(crate) use helpers_32::*;
 pub(crate) use sanity::SideMetadataSanity;
-
-/// Exposed methods for benchmarking.
-#[cfg(feature = "bench")]
-pub mod bench {
-    pub use super::helpers::scan_non_zero_bits_in_metadata_bytes;
-}

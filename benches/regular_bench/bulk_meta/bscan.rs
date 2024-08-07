@@ -2,8 +2,7 @@
 
 use criterion::Criterion;
 use mmtk::util::{
-    constants::LOG_BITS_IN_WORD,
-    metadata::side_metadata::bench::scan_non_zero_bits_in_metadata_bytes, Address,
+    constants::LOG_BITS_IN_WORD, test_private::scan_non_zero_bits_in_metadata_bytes, Address,
 };
 use rand::{seq::IteratorRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;

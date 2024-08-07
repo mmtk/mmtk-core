@@ -36,6 +36,8 @@ pub mod metadata;
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
+#[cfg(feature = "test_private")]
+pub mod test_private;
 /// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
 #[cfg(any(test, feature = "mock_test"))]
 pub mod test_util;

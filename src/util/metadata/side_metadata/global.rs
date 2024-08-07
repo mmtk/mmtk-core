@@ -156,7 +156,7 @@ impl SideMetadataSpec {
     }
 
     /// This method is used for bulk zeroing side metadata for a data address range.
-    pub(super) fn zero_meta_bits(
+    pub(crate) fn zero_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
@@ -204,7 +204,7 @@ impl SideMetadataSpec {
     }
 
     /// This method is used for bulk setting side metadata for a data address range.
-    pub(super) fn set_meta_bits(
+    pub(crate) fn set_meta_bits(
         meta_start_addr: Address,
         meta_start_bit: u8,
         meta_end_addr: Address,
