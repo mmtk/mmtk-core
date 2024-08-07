@@ -8,13 +8,13 @@ pub mod mock_bench;
 #[cfg(all(not(feature = "mock_test"), feature = "test_private"))]
 pub mod regular_bench;
 
-pub fn bench_main(c: &mut Criterion) {
+pub fn bench_main(_c: &mut Criterion) {
     cfg_if::cfg_if! {
         if #[cfg(feature = "mock_test")] {
             // If the "mock_test" feature is enabled, we only run mock test.
-            mock_bench::bench(c);
+            mock_bench::bench(_c);
         } else if #[cfg(feature = "test_private")] {
-            regular_bench::bench(c);
+            regular_bench::bench(_c);
         } else {
             eprintln!("ERROR: Benchmarks in mmtk_core requires the test_priavte feature (implied by mock_test) to run.");
             eprintln!("  Rerun with `MMTK_BENCH=\"bench_name\" cargo bench --features mock_test` to run mock-test benchmarks.");
