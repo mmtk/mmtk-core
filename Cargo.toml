@@ -79,10 +79,6 @@ mock_test = ["test_private"]
 # This feature will expose some private functions for testings or benchmarking.
 test_private = []
 
-# This feature is only used for benchmarks.
-# It will expose some private functions for benchmarking.
-bench = []
-
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
 
