@@ -14,14 +14,9 @@ use super::{
     Address, ObjectReference,
 };
 
-/// A trait for enumerating objects in spaces.
+/// A trait for enumerating objects in spaces, used by [`Space::enumerate_objects_coarse`].
 ///
-/// This is a trait object type, so we avoid using generics.  Because this trait may be used as a
-/// `&mut dyn`, we avoid the cost of dynamic dispatching by allowing the user to supply an address
-/// range instead of a single object reference.  The implementor of this trait will use linear
-/// scanning to find objects in the range in batch.  But if the space is too sparse (e.g. LOS) and
-/// the cost of linear scanning is greater than the dynamic dispatching, use `visit_object`
-/// directly.
+/// [`Space::enumerate_objects_coarse`]: crate::policy::space::Space::enumerate_objects_coarse
 pub trait ObjectEnumerator {
     /// Visit a single object.
     fn visit_object(&mut self, object: ObjectReference);

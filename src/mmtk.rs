@@ -471,7 +471,33 @@ impl<VM: VMBinding> MMTK<VM> {
     }
 
     /// Enumerate objects in all spaces in this MMTK instance.
-    /// The call-back function `f` is called for every object.
+    ///
+    /// The call-back function `f` is called for every object that has the valid object bit (VO
+    /// bit), i.e. objects that are allocated in the heap of this MMTK instance, but has not been
+    /// reclaimed, yet.
+    ///
+    /// # Interaction with allocation and GC
+    ///
+    /// This function does not mutate the heap.  It is safe if multiple threads execute this
+    /// function concurrently during mutator time.
+    ///
+    /// This function will visit all objects that have been allocated at the time when this function
+    /// is called.  But if new objects are allocated while this function is being executed, this
+    /// function may or may not visit objects allocated after this function started.
+    ///
+    /// Also note that when this function visits an object, it only guarantees that its VO bit must
+    /// have been set.  It is not guaranteed if the object has been "fully initialized" in the sense
+    /// of the programming language the VM is implementing.  For example, the object header and the
+    /// type information may not have been written.
+    ///
+    /// It has *undefined behavior* if GC happens while this function is being executed.  The VM
+    /// binding must ensure GC does not start while executing this function.  One way to prevent GC
+    /// from starting is not letting the current thread yield for GC.
+    ///
+    /// Some programming languages may provide an API that allows the user to allocate objects and
+    /// trigger GC while enumerating objects.  The VM binding may use the callback of this function
+    /// to save all visited objects in an array and let the user visit the array after this function
+    /// returned.
     #[cfg(feature = "vo_bit")]
     pub fn enumerate_objects<F>(&self, f: F)
     where
