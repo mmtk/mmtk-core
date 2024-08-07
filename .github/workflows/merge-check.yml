@@ -11,7 +11,7 @@ env:
   # Ignore some actions for the merge check:
   # - This action itself
   # - Public API check, doc broken link check: we allow them to fail.
-  # - Minimal tests for stable Rust: we allow them to fail.
+  # - Minimal tests and style checks for stable Rust: we allow them to fail.
   # - Extended binding tests: it may take long to run. We don't want to wait for them.
   #   Note: The action name for openjdk tests is different due to the reused workflow.
   IGNORED_ACTIONS: |
@@ -23,6 +23,9 @@ env:
       "minimal-tests-core/x86_64-unknown-linux-gnu/stable",
       "minimal-tests-core/i686-unknown-linux-gnu/stable",
       "minimal-tests-core/x86_64-apple-darwin/stable",
+      "style-check/x86_64-unknown-linux-gnu/stable",
+      "style-check/i686-unknown-linux-gnu/stable",
+      "style-check/x86_64-apple-darwin/stable",
       "extended-tests-openjdk / test",
       "extended-tests-v8",
       "extended-tests-jikesrvm",
