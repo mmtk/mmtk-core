@@ -79,6 +79,46 @@ jobs:
       - name: Test
         run: ./.github/scripts/ci-test.sh
 
+  style-check:
+    needs: setup-test-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04, triple: i686-unknown-linux-gnu }
+          - { os: macos-12, triple: x86_64-apple-darwin }
+        rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
+
+    name: style-check/${{ matrix.target.triple }}/${{ matrix.rust }}
+
+    # We always run on ubuntu-latest because `cargo clippy` is known to crash randomly on macos.
+    runs-on: ubuntu-latest
+
+    env:
+      # This determines the default target which cargo-build, cargo-test, etc. use.
+      CARGO_BUILD_TARGET: "${{ matrix.target.triple }}"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          # "rustup toolchain install" should always install the host toolchain,
+          # so we don't specify the triple.
+          rustup toolchain install ${{ matrix.rust }}
+          rustup override set ${{ matrix.rust }}
+
+          # Ensure we install the target support for the target we are testing for.
+          # We use cross toolchains for i686-unknown-linux-gnu and x86_64-apple-darwin
+          rustup target add ${{ matrix.target.triple }}
+
+          rustup component add rustfmt clippy
+
+      # Show the Rust toolchain and target we are actually using
+      - run: rustup show
+      - run: cargo --version
+      - run: cargo rustc -- --print cfg
+
       # Style checks
       - name: Style checks
         run: ./.github/scripts/ci-style.sh

@@ -36,6 +36,9 @@ cargo clippy --features mock_test
 cargo clippy --features mock_test --tests
 cargo clippy --features mock_test --benches
 
+# non-mock benchmarks
+cargo clippy --features test_private --benches
+
 # --- Check auxiliary crate ---
 
 style_check_auxiliary_crate() {
