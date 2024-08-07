@@ -91,9 +91,7 @@ jobs:
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: style-check/${{ matrix.target.triple }}/${{ matrix.rust }}
-
-    # We always run on ubuntu-latest because `cargo clippy` is known to crash randomly on macos.
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.target.os }}
 
     env:
       # This determines the default target which cargo-build, cargo-test, etc. use.
@@ -109,7 +107,8 @@ jobs:
           rustup override set ${{ matrix.rust }}
 
           # Ensure we install the target support for the target we are testing for.
-          # We use cross toolchains for i686-unknown-linux-gnu and x86_64-apple-darwin
+          # This is especially important for i686-unknown-linux-gnu
+          # because it's different from the host.
           rustup target add ${{ matrix.target.triple }}
 
           rustup component add rustfmt clippy
