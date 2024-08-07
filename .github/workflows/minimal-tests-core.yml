@@ -119,6 +119,10 @@ jobs:
       - run: cargo --version
       - run: cargo rustc -- --print cfg
 
+      # Setup Environments
+      - name: Setup Environments
+        run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
+
       # Style checks
       - name: Style checks
         run: ./.github/scripts/ci-style.sh
