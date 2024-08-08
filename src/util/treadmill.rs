@@ -102,7 +102,7 @@ impl TreadMill {
         }
     }
 
-    pub(crate) fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
+    pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         let mut visit_objects = |set: &Mutex<HashSet<ObjectReference>>| {
             let set = set.lock().unwrap();
             for object in set.iter() {

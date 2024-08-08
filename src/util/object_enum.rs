@@ -14,9 +14,9 @@ use super::{
     Address, ObjectReference,
 };
 
-/// A trait for enumerating objects in spaces, used by [`Space::enumerate_objects_coarse`].
+/// A trait for enumerating objects in spaces, used by [`Space::enumerate_objects`].
 ///
-/// [`Space::enumerate_objects_coarse`]: crate::policy::space::Space::enumerate_objects_coarse
+/// [`Space::enumerate_objects`]: crate::policy::space::Space::enumerate_objects
 pub trait ObjectEnumerator {
     /// Visit a single object.
     fn visit_object(&mut self, object: ObjectReference);
