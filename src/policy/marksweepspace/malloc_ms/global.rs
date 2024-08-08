@@ -231,7 +231,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
 
-    fn enumerate_objects_coarse(&self, _enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
         unimplemented!()
     }
 }

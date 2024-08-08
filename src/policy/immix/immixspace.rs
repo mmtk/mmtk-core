@@ -191,7 +191,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         panic!("We do not use SFT to trace objects for Immix. set_copy_context() cannot be used.")
     }
 
-    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
 }

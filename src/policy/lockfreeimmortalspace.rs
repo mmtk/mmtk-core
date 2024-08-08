@@ -168,7 +168,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
 
-    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         enumerator.visit_address_range(self.start, self.start + self.total_bytes);
     }
 }

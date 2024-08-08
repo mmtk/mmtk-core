@@ -350,7 +350,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
 
-    /// Enumerate objects at a coarser granularity.
+    /// Enumerate objects in the current space.
     ///
     /// Implementers can use the `enumerator` to report
     ///
@@ -370,7 +370,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// overhead is OK if we call it a block at a time because scanning the VO bits will dominate
     /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
     /// scanning VO bits because it is sparse.
-    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator);
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator);
 }
 
 /// Print the VM map for a space.

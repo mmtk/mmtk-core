@@ -508,7 +508,7 @@ impl<VM: VMBinding> MMTK<VM> {
         let mut enumerator = object_enum::ClosureObjectEnumerator::<_, VM>::new(f);
         let plan = self.get_plan();
         plan.for_each_space(&mut |space| {
-            space.enumerate_objects_coarse(&mut enumerator);
+            space.enumerate_objects(&mut enumerator);
         })
     }
 }

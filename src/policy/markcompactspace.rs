@@ -133,7 +133,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
         panic!("markcompactspace only releases pages enmasse")
     }
 
-    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
 }

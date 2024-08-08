@@ -177,7 +177,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
         self.pr.release_pages(start);
     }
 
-    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         self.treadmill.enumerate_objects_coarse(enumerator);
     }
 }

@@ -249,7 +249,7 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
         todo!()
     }
 
-    fn enumerate_objects_coarse(&self, enumerator: &mut dyn ObjectEnumerator) {
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
         object_enum::enumerate_blocks_from_chunk_map::<Block>(enumerator, &self.chunk_map);
     }
 }
