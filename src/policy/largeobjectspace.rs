@@ -8,6 +8,7 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
@@ -174,6 +175,10 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        self.treadmill.enumerate_objects(enumerator);
     }
 }
 
