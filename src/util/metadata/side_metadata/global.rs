@@ -1122,7 +1122,9 @@ impl SideMetadataSpec {
     /// This function searches the side metadata for the data address range from `data_start_addr`
     /// (inclusive) to `data_end_addr` (exclusive).  The data address range must be fully mapped.
     ///
-    /// `visit_data` is called for each data address that has non-zero side metadata.
+    /// For each data region that has non-zero side metadata, `visit_data` is called with the lowest
+    /// address of that region.  Note that it may not be the original address used to set the
+    /// metadata bits.
     pub fn scan_non_zero_values<T: MetadataValue>(
         &self,
         data_start_addr: Address,
