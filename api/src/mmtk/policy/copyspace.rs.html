@@ -341,6 +341,11 @@
 <a href="#339" id="339">339</a>
 <a href="#340" id="340">340</a>
 <a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext;
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TRACE_KIND_TRANSITIVE_PIN;
@@ -349,10 +354,11 @@
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::{CommonSpace, Space};
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorker;
 <span class="kw">use </span><span class="kw">crate</span>::util::alloc::allocator::AllocatorContext;
-<span class="kw">use </span><span class="kw">crate</span>::util::copy::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{extract_side_metadata, MetadataSpec};
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;
+<span class="kw">use </span><span class="kw">crate</span>::util::{copy::<span class="kw-2">*</span>, object_enum};
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use </span>libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
@@ -475,6 +481,10 @@
 
     <span class="kw">fn </span>set_copy_for_sft_trace(<span class="kw-2">&amp;mut </span><span class="self">self</span>, semantics: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;) {
         <span class="self">self</span>.common.copy = semantics;
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.pr);
     }
 }
 

@@ -436,6 +436,13 @@
 <a href="#434" id="434">434</a>
 <a href="#435" id="435">435</a>
 <a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
 </pre></div><pre class="rust"><code><span class="comment">// adapted from Immix
 
 </span><span class="kw">use </span>atomic::Ordering;
@@ -445,6 +452,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::chunk_map::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::linear_scan::Region;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::BlockMayHaveObjects;
 <span class="kw">use </span><span class="kw">crate</span>::vm::ObjectModel;
 <span class="kw">use crate</span>::{
     util::{
@@ -483,6 +491,12 @@
 
     <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
         <span class="kw">unsafe </span>{ Address::from_usize(<span class="self">self</span>.<span class="number">0</span>.get()) }
+    }
+}
+
+<span class="kw">impl </span>BlockMayHaveObjects <span class="kw">for </span>Block {
+    <span class="kw">fn </span>may_have_objects(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.get_state() != BlockState::Unallocated
     }
 }
 

@@ -85,6 +85,7 @@
 <a href="#83" id="83">83</a>
 <a href="#84" id="84">84</a>
 <a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.
 
 </span><span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,
@@ -140,6 +141,7 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>finalizable_processor;
 <span class="doccomment">/// Logger initialization
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>logger;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_enum;
 <span class="doccomment">/// Forwarding word in object copying.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>object_forwarding;
 <span class="doccomment">/// Reference processing implementation.

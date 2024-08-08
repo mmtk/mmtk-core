@@ -251,6 +251,11 @@
 <a href="#249" id="249">249</a>
 <a href="#250" id="250">250</a>
 <a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span>std::sync::atomic::Ordering;
@@ -269,6 +274,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::memory::MmapStrategy;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::VMBinding;
@@ -418,6 +424,10 @@
     </span><span class="kw">fn </span>verify_side_metadata_sanity(<span class="kw-2">&amp;</span><span class="self">self</span>, side_metadata_sanity_checker: <span class="kw-2">&amp;mut </span>SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::&lt;<span class="self">Self</span>&gt;(), <span class="kw-2">&amp;</span><span class="self">self</span>.metadata)
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        enumerator.visit_address_range(<span class="self">self</span>.start, <span class="self">self</span>.start + <span class="self">self</span>.total_bytes);
     }
 }
 

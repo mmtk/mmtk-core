@@ -391,7 +391,62 @@
 <a href="#389" id="389">389</a>
 <a href="#390" id="390">390</a>
 <a href="#391" id="391">391</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::ranges::BitOffset;
+<span class="kw">use </span><span class="kw">super</span>::SideMetadataSpec;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::layout::vm_layout::VMLayout;
@@ -660,6 +715,59 @@
     } <span class="kw">else </span>{
         <span class="prelude-val">None
     </span>}
+}
+
+<span class="kw">pub fn </span>scan_non_zero_bits_in_metadata_bytes(
+    meta_start: Address,
+    meta_end: Address,
+    visit_bit: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(Address, BitOffset),
+) {
+    <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_ADDRESS;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>cursor = meta_start;
+    <span class="kw">while </span>cursor &lt; meta_end &amp;&amp; !cursor.is_aligned_to(BYTES_IN_ADDRESS) {
+        <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ cursor.load::&lt;u8&gt;() };
+        scan_non_zero_bits_in_metadata_word(cursor, byte <span class="kw">as </span>usize, visit_bit);
+        cursor += <span class="number">1usize</span>;
+    }
+
+    <span class="kw">while </span>cursor + BYTES_IN_ADDRESS &lt; meta_end {
+        <span class="kw">let </span>word = <span class="kw">unsafe </span>{ cursor.load::&lt;usize&gt;() };
+        scan_non_zero_bits_in_metadata_word(cursor, word, visit_bit);
+        cursor += BYTES_IN_ADDRESS;
+    }
+
+    <span class="kw">while </span>cursor &lt; meta_end {
+        <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ cursor.load::&lt;u8&gt;() };
+        scan_non_zero_bits_in_metadata_word(cursor, byte <span class="kw">as </span>usize, visit_bit);
+        cursor += <span class="number">1usize</span>;
+    }
+}
+
+<span class="kw">fn </span>scan_non_zero_bits_in_metadata_word(
+    meta_addr: Address,
+    <span class="kw-2">mut </span>word: usize,
+    visit_bit: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(Address, BitOffset),
+) {
+    <span class="kw">while </span>word != <span class="number">0 </span>{
+        <span class="kw">let </span>bit = word.trailing_zeros();
+        visit_bit(meta_addr, bit <span class="kw">as </span>u8);
+        word = word &amp; (word - <span class="number">1</span>);
+    }
+}
+
+<span class="kw">pub fn </span>scan_non_zero_bits_in_metadata_bits(
+    meta_addr: Address,
+    bit_start: BitOffset,
+    bit_end: BitOffset,
+    visit_bit: <span class="kw-2">&amp;mut </span><span class="kw">impl </span>FnMut(Address, BitOffset),
+) {
+    <span class="kw">let </span>byte = <span class="kw">unsafe </span>{ meta_addr.load::&lt;u8&gt;() };
+    <span class="kw">for </span>bit <span class="kw">in </span>bit_start..bit_end {
+        <span class="kw">if </span>byte &amp; (<span class="number">1 </span>&lt;&lt; bit) != <span class="number">0 </span>{
+            visit_bit(meta_addr, bit);
+        }
+    }
 }
 
 <span class="attr">#[cfg(test)]

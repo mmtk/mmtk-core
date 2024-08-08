@@ -282,6 +282,14 @@
 <a href="#280" id="280">280</a>
 <a href="#281" id="281">281</a>
 <a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::mmtk::SFT_MAP;
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::GCWorkerMutRef;
@@ -295,6 +303,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::mark_bit::MarkState;
 <span class="attr">#[cfg(feature = <span class="string">"set_unlog_bits_vm_space"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 <span class="kw">use </span><span class="kw">crate</span>::vm::{ObjectModel, VMBinding};
@@ -428,6 +437,13 @@
         // the address range for spaces and the VM space may break those assumptions (as the space is
         // mmapped by the runtime rather than us). So we we use SFT here.
         </span>SFT_MAP.get_checked(start).name() == <span class="self">self</span>.name()
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        <span class="kw">let </span>external_pages = <span class="self">self</span>.pr.get_external_pages();
+        <span class="kw">for </span>ep <span class="kw">in </span>external_pages.iter() {
+            enumerator.visit_address_range(ep.start, ep.end);
+        }
     }
 }
 

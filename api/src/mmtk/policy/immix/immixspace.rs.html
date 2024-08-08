@@ -1143,6 +1143,11 @@
 <a href="#1141" id="1141">1141</a>
 <a href="#1142" id="1142">1142</a>
 <a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::defrag::StatsForDefrag;
 <span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
@@ -1162,8 +1167,9 @@
 <span class="attr">#[cfg(feature = <span class="string">"vo_bit"</span>)]
 </span><span class="kw">use </span><span class="kw">crate</span>::util::metadata::vo_bit;
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::{<span class="self">self</span>, MetadataSpec};
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::object_forwarding;
-<span class="kw">use </span><span class="kw">crate</span>::util::{copy::<span class="kw-2">*</span>, epilogue};
+<span class="kw">use </span><span class="kw">crate</span>::util::{copy::<span class="kw-2">*</span>, epilogue, object_enum};
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
 <span class="kw">use </span><span class="kw">crate</span>::vm::<span class="kw-2">*</span>;
 <span class="kw">use crate</span>::{
@@ -1333,6 +1339,10 @@
     }
     <span class="kw">fn </span>set_copy_for_sft_trace(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _semantics: <span class="prelude-ty">Option</span>&lt;CopySemantics&gt;) {
         <span class="macro">panic!</span>(<span class="string">"We do not use SFT to trace objects for Immix. set_copy_context() cannot be used."</span>)
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_chunk_map::&lt;Block&gt;(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.chunk_map);
     }
 }
 

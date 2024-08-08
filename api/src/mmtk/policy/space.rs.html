@@ -661,6 +661,29 @@
 <a href="#659" id="659">659</a>
 <a href="#660" id="660">660</a>
 <a href="#661" id="661">661</a>
+<a href="#662" id="662">662</a>
+<a href="#663" id="663">663</a>
+<a href="#664" id="664">664</a>
+<a href="#665" id="665">665</a>
+<a href="#666" id="666">666</a>
+<a href="#667" id="667">667</a>
+<a href="#668" id="668">668</a>
+<a href="#669" id="669">669</a>
+<a href="#670" id="670">670</a>
+<a href="#671" id="671">671</a>
+<a href="#672" id="672">672</a>
+<a href="#673" id="673">673</a>
+<a href="#674" id="674">674</a>
+<a href="#675" id="675">675</a>
+<a href="#676" id="676">676</a>
+<a href="#677" id="677">677</a>
+<a href="#678" id="678">678</a>
+<a href="#679" id="679">679</a>
+<a href="#680" id="680">680</a>
+<a href="#681" id="681">681</a>
+<a href="#682" id="682">682</a>
+<a href="#683" id="683">683</a>
+<a href="#684" id="684">684</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::global_state::GlobalState;
 <span class="kw">use </span><span class="kw">crate</span>::plan::PlanConstraints;
 <span class="kw">use </span><span class="kw">crate</span>::scheduler::GCWorkScheduler;
@@ -668,6 +691,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
 
@@ -1011,6 +1035,28 @@
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::&lt;<span class="self">Self</span>&gt;(), <span class="kw-2">&amp;</span><span class="self">self</span>.common().metadata)
     }
+
+    <span class="doccomment">/// Enumerate objects in the current space.
+    ///
+    /// Implementers can use the `enumerator` to report
+    ///
+    /// -   individual objects within the space using `enumerator.visit_object`, and
+    /// -   ranges of address that may contain objects using `enumerator.visit_address_range`. The
+    ///     caller will then enumerate objects in the range using the VO bits metadata.
+    ///
+    /// Each object in the space shall be covered by one of the two methods above.
+    ///
+    /// # Implementation considerations
+    ///
+    /// **Skipping empty ranges**: When enumerating address ranges, spaces can skip ranges (blocks,
+    /// chunks, etc.) that are guarenteed not to contain objects.
+    ///
+    /// **Dynamic dispatch**: Because `Space` is a trait object type and `enumerator` is a `dyn`
+    /// reference, invoking methods of `enumerator` involves a dynamic dispatching.  But the
+    /// overhead is OK if we call it a block at a time because scanning the VO bits will dominate
+    /// the execution time.  For LOS, it will be cheaper to enumerate individual objects than
+    /// scanning VO bits because it is sparse.
+    </span><span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator);
 }
 
 <span class="doccomment">/// Print the VM map for a space.

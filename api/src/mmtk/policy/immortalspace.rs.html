@@ -215,6 +215,11 @@
 <a href="#213" id="213">213</a>
 <a href="#214" id="214">214</a>
 <a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::policy::sft::SFT;
@@ -223,6 +228,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{MonotonePageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::mark_bit::MarkState;
 
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::{<span class="self">self</span>, ObjectEnumerator};
 <span class="kw">use </span><span class="kw">crate</span>::util::{metadata, ObjectReference};
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::{ObjectQueue, VectorObjectQueue};
@@ -328,6 +334,10 @@
 
     <span class="kw">fn </span>release_multiple_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _start: Address) {
         <span class="macro">panic!</span>(<span class="string">"immortalspace only releases pages enmasse"</span>)
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.pr);
     }
 }
 

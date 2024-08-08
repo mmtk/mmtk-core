@@ -108,11 +108,26 @@
 <a href="#106" id="106">106</a>
 <a href="#107" id="107">107</a>
 <a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
 <span class="kw">use </span>std::mem::swap;
 <span class="kw">use </span>std::sync::Mutex;
 
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
+
+<span class="kw">use </span><span class="kw">super</span>::object_enum::ObjectEnumerator;
 
 <span class="kw">pub struct </span>TreadMill {
     from_space: Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;,
@@ -208,6 +223,17 @@
             swap(<span class="kw-2">&amp;mut </span><span class="self">self</span>.from_space, <span class="kw-2">&amp;mut </span><span class="self">self</span>.to_space);
             <span class="macro">trace!</span>(<span class="string">"Flipped from_space and to_space"</span>);
         }
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        <span class="kw">let </span><span class="kw-2">mut </span>visit_objects = |set: <span class="kw-2">&amp;</span>Mutex&lt;HashSet&lt;ObjectReference&gt;&gt;| {
+            <span class="kw">let </span>set = set.lock().unwrap();
+            <span class="kw">for </span>object <span class="kw">in </span>set.iter() {
+                enumerator.visit_object(<span class="kw-2">*</span>object);
+            }
+        };
+        visit_objects(<span class="kw-2">&amp;</span><span class="self">self</span>.alloc_nursery);
+        visit_objects(<span class="kw-2">&amp;</span><span class="self">self</span>.to_space);
     }
 }
 

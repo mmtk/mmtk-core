@@ -442,7 +442,7 @@
 }
 
 <span class="doccomment">/// Get the object reference from an aligned address where VO bit is set.
-</span><span class="kw">fn </span>get_object_ref_for_vo_addr&lt;VM: VMBinding&gt;(vo_addr: Address) -&gt; ObjectReference {
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_object_ref_for_vo_addr&lt;VM: VMBinding&gt;(vo_addr: Address) -&gt; ObjectReference {
     <span class="kw">let </span>addr = vo_addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
     <span class="kw">let </span>aligned = addr.align_up(ObjectReference::ALIGNMENT);
     <span class="kw">unsafe </span>{ ObjectReference::from_raw_address_unchecked(aligned) }

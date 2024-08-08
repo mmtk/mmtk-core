@@ -28,7 +28,7 @@
 </span><span class="comment">// For convenience, this module is public and the bindings may create and use side metadata for their purpose.
 
 </span><span class="kw">mod </span>constants;
-<span class="kw">mod </span>helpers;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>helpers;
 <span class="attr">#[cfg(target_pointer_width = <span class="string">"32"</span>)]
 </span><span class="kw">mod </span>helpers_32;
 

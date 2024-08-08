@@ -597,6 +597,11 @@
 <a href="#595" id="595">595</a>
 <a href="#596" id="596">596</a>
 <a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -610,6 +615,7 @@
         epilogue,
         heap::{BlockPageResource, PageResource},
         metadata::{<span class="self">self</span>, side_metadata::SideMetadataSpec, MetadataSpec},
+        object_enum::{<span class="self">self</span>, ObjectEnumerator},
         ObjectReference,
     },
     vm::{ActivePlan, VMBinding},
@@ -845,6 +851,10 @@
 
     <span class="kw">fn </span>release_multiple_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _start: <span class="kw">crate</span>::util::Address) {
         <span class="macro">todo!</span>()
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_chunk_map::&lt;Block&gt;(enumerator, <span class="kw-2">&amp;</span><span class="self">self</span>.chunk_map);
     }
 }
 

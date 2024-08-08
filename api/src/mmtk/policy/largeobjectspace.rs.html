@@ -370,6 +370,11 @@
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
 <a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="kw">crate</span>::plan::ObjectQueue;
@@ -380,6 +385,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE;
 <span class="kw">use </span><span class="kw">crate</span>::util::heap::{FreeListPageResource, PageResource};
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::treadmill::TreadMill;
 <span class="kw">use </span><span class="kw">crate</span>::util::{Address, ObjectReference};
@@ -546,6 +552,10 @@
 
     <span class="kw">fn </span>release_multiple_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start: Address) {
         <span class="self">self</span>.pr.release_pages(start);
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        <span class="self">self</span>.treadmill.enumerate_objects(enumerator);
     }
 }
 

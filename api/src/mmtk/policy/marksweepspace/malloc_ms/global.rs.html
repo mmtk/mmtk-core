@@ -833,6 +833,11 @@
 <a href="#831" id="831">831</a>
 <a href="#832" id="832">832</a>
 <a href="#833" id="833">833</a>
+<a href="#834" id="834">834</a>
+<a href="#835" id="835">835</a>
+<a href="#836" id="836">836</a>
+<a href="#837" id="837">837</a>
+<a href="#838" id="838">838</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Atomic;
 
 <span class="kw">use </span><span class="kw">super</span>::metadata::<span class="kw-2">*</span>;
@@ -850,6 +855,7 @@
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 <span class="kw">use </span><span class="kw">crate</span>::util::metadata::MetadataSpec;
+<span class="kw">use </span><span class="kw">crate</span>::util::object_enum::ObjectEnumerator;
 <span class="kw">use </span><span class="kw">crate</span>::util::opaque_pointer::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::Address;
 <span class="kw">use </span><span class="kw">crate</span>::util::ObjectReference;
@@ -1063,6 +1069,10 @@
     <span class="kw">fn </span>verify_side_metadata_sanity(<span class="kw-2">&amp;</span><span class="self">self</span>, side_metadata_sanity_checker: <span class="kw-2">&amp;mut </span>SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::&lt;<span class="self">Self</span>&gt;(), <span class="kw-2">&amp;</span><span class="self">self</span>.metadata)
+    }
+
+    <span class="kw">fn </span>enumerate_objects(<span class="kw-2">&amp;</span><span class="self">self</span>, _enumerator: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ObjectEnumerator) {
+        <span class="macro">unimplemented!</span>()
     }
 }
 

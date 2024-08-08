@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["enumerate_blocks_from_chunk_map","enumerate_blocks_from_monotonic_page_resource"],"struct":["ClosureObjectEnumerator"],"trait":["BlockMayHaveObjects","ObjectEnumerator"]};
