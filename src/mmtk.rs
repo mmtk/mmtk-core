@@ -476,28 +476,36 @@ impl<VM: VMBinding> MMTK<VM> {
     /// bit), i.e. objects that are allocated in the heap of this MMTK instance, but has not been
     /// reclaimed, yet.
     ///
+    /// # Notes about object initialization and finalization
+    ///
+    /// When this function visits an object, it only guarantees that its VO bit must have been set.
+    /// It is not guaranteed if the object has been "fully initialized" in the sense of the
+    /// programming language the VM is implementing.  For example, the object header and the type
+    /// information may not have been written.
+    ///
+    /// It will also visit objects that have been "finalized" in the sense of the programming
+    /// langauge the VM is implementing, as long as the object has not been reclaimed by the GC,
+    /// yet.  Be careful.  If the object header is destroyed, it may not be safe to access such
+    /// objects in the high-level language.
+    ///
     /// # Interaction with allocation and GC
     ///
     /// This function does not mutate the heap.  It is safe if multiple threads execute this
     /// function concurrently during mutator time.
     ///
-    /// This function will visit all objects that have been allocated at the time when this function
-    /// is called.  But if new objects are allocated while this function is being executed, this
-    /// function may or may not visit objects allocated after this function started.
+    /// It has *undefined behavior* if allocation or GC happens while this function is being
+    /// executed.  The VM binding must ensure no threads are allocating and GC does not start while
+    /// executing this function.  One way to do this is stopping all mutators before calling this
+    /// function.
     ///
-    /// Also note that when this function visits an object, it only guarantees that its VO bit must
-    /// have been set.  It is not guaranteed if the object has been "fully initialized" in the sense
-    /// of the programming language the VM is implementing.  For example, the object header and the
-    /// type information may not have been written.
+    /// Some high-level languages may provide an API that allows the user to allocate objects and
+    /// trigger GC while enumerating objects.  One example is [`ObjectSpace::each_object`][os_eo] in
+    /// Ruby.  The VM binding may use the callback of this function to save all visited object
+    /// references and let the user visit those references after this function returns.  Make sure
+    /// those saved references are in the root set or in an object that will live through GCs before
+    /// the high-level language finishes visiting the saved object references.
     ///
-    /// It has *undefined behavior* if GC happens while this function is being executed.  The VM
-    /// binding must ensure GC does not start while executing this function.  One way to prevent GC
-    /// from starting is not letting the current thread yield for GC.
-    ///
-    /// Some programming languages may provide an API that allows the user to allocate objects and
-    /// trigger GC while enumerating objects.  The VM binding may use the callback of this function
-    /// to save all visited objects in an array and let the user visit the array after this function
-    /// returned.
+    /// [os_eo]: https://docs.ruby-lang.org/en/master/ObjectSpace.html#method-c-each_object
     #[cfg(feature = "vo_bit")]
     pub fn enumerate_objects<F>(&self, f: F)
     where
