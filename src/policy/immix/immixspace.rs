@@ -129,7 +129,11 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_object_pinned(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
+        #[cfg(feature = "object_pinning")]
+        if self.is_object_pinned(_object) {
+            return false;
+        }
         !super::NEVER_MOVE_OBJECTS
     }
 

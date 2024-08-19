@@ -50,7 +50,7 @@ impl<VM: VMBinding> SFT for VMSpace<VM> {
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         true
     }
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
         false
     }
     #[cfg(feature = "sanity")]

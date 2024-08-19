@@ -87,7 +87,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         false
     }
 
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
         false
     }
 

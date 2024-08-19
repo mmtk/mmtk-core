@@ -56,7 +56,7 @@ pub trait SFT {
 
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
-    fn is_movable(&self) -> bool;
+    fn is_movable(&self, object: ObjectReference) -> bool;
 
     /// Is the object sane? A policy should return false if there is any abnormality about
     /// object - the sanity checker will fail if an object is not sane.
@@ -146,7 +146,7 @@ impl SFT for EmptySpaceSFT {
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         false
     }
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
         /*
          * FIXME steveb I think this should panic (ie the function should not
          * be invoked on an empty space).   However, JikesRVM currently does

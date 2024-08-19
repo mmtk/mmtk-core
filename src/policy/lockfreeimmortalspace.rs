@@ -63,7 +63,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         true
     }
-    fn is_movable(&self) -> bool {
+    fn is_movable(&self, _object: ObjectReference) -> bool {
         unimplemented!()
     }
     #[cfg(feature = "sanity")]
