@@ -235,6 +235,12 @@ impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
     /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
     /// and flush as soon as the underlying buffer of `process_edges_work` is full.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        debug_assert!(!object.is_null());
+        debug_assert!(
+            <E::VM as VMBinding>::VMObjectModel::is_object_sane(object),
+            "Object {:?} is not sane!",
+            object,
+        );
         let result = self.process_edges_work.trace_object(object);
         self.flush_if_full();
         result
@@ -693,6 +699,13 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::sft::GCWorkerMutRef;
 
+        debug_assert!(!object.is_null());
+        debug_assert!(
+            <VM as VMBinding>::VMObjectModel::is_object_sane(object),
+            "Object {:?} is not sane!",
+            object,
+        );
+
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
 
@@ -840,6 +853,11 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
                 if <VM as VMBinding>::VMScanning::support_slot_enqueuing(tls, object) {
                     trace!("Scan object (slot) {}", object);
+                    debug_assert!(
+                        <VM as VMBinding>::VMObjectModel::is_object_sane(object),
+                        "Object {:?} is not sane!",
+                        object,
+                    );
                     // If an object supports slot-enqueuing, we enqueue its slots.
                     <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
@@ -977,6 +995,12 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
             // Skip slots that are not holding an object reference.
             return;
         };
+        debug_assert!(
+            <VM as VMBinding>::VMObjectModel::is_object_sane(object),
+            "Object {:?} from slot {:?} is not sane!",
+            object,
+            slot,
+        );
         let new_object = self.trace_object(object);
         if P::may_move_objects::<KIND>() && new_object != object {
             slot.store(new_object);
