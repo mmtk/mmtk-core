@@ -36,6 +36,8 @@ pub mod metadata;
 pub mod opaque_pointer;
 /// MMTk command line options.
 pub mod options;
+#[cfg(feature = "test_private")]
+pub mod test_private;
 /// Test utilities. We need this module for `MockVM` in criterion benches, which does not include code with `cfg(test)`.
 #[cfg(any(test, feature = "mock_test"))]
 pub mod test_util;
@@ -44,12 +46,14 @@ pub mod test_util;
 /// An analysis framework for collecting data and profiling in GC.
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
+pub(crate) mod epilogue;
 /// Non-generic refs to generic types of `<VM>`.
 pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
 /// Logger initialization
 pub(crate) mod logger;
+pub(crate) mod object_enum;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
 /// Reference processing implementation.

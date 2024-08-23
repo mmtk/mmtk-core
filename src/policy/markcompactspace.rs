@@ -11,6 +11,7 @@ use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::{extract_side_metadata, vo_bit};
+use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
@@ -130,6 +131,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("markcompactspace only releases pages enmasse")
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
 }
 

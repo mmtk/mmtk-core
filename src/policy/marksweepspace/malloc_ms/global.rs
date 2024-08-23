@@ -15,6 +15,7 @@ use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::metadata::MetadataSpec;
+use crate::util::object_enum::ObjectEnumerator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -228,6 +229,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+
+    fn enumerate_objects(&self, _enumerator: &mut dyn ObjectEnumerator) {
+        unimplemented!()
     }
 }
 

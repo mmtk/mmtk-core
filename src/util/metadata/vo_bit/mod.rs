@@ -201,7 +201,7 @@ fn get_in_object_address_for_potential_object<VM: VMBinding>(potential_obj: Addr
 }
 
 /// Get the object reference from an aligned address where VO bit is set.
-fn get_object_ref_for_vo_addr<VM: VMBinding>(vo_addr: Address) -> ObjectReference {
+pub(crate) fn get_object_ref_for_vo_addr<VM: VMBinding>(vo_addr: Address) -> ObjectReference {
     let addr = vo_addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
     let aligned = addr.align_up(ObjectReference::ALIGNMENT);
     unsafe { ObjectReference::from_raw_address_unchecked(aligned) }

@@ -1,3 +1,30 @@
+0.27.0 (2024-08-09)
+===
+
+## What's Changed
+
+### Policy
+* Clear pin bits by @udesou in https://github.com/mmtk/mmtk-core/pull/1166
+* Set the unlog bits for objects in the bootimage by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1168
+* Fix bug in line mark when `MARK_LINE_AT_SCAN_TIME=false` by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1171
+
+### API
+* Require object reference to be aligned by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1159
+* Internal pointer support by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1165
+* Heap traversal by @wks in https://github.com/mmtk/mmtk-core/pull/1174
+
+### CI
+* Parallelize and workaround CI style checks by @wks in https://github.com/mmtk/mmtk-core/pull/1184
+
+### Misc
+* Extensible eBPF timeline attributes by @wks in https://github.com/mmtk/mmtk-core/pull/1162
+* Only map with executable permissions when using code space by @k-sareen in https://github.com/mmtk/mmtk-core/pull/1176
+* Fix style check for Rust 1.80 by @qinsoon in https://github.com/mmtk/mmtk-core/pull/1178
+* Extra assertions for mutators and epilogues by @wks in https://github.com/mmtk/mmtk-core/pull/1182
+* Refactor iterate_meta_bits by @wks in https://github.com/mmtk/mmtk-core/pull/1181
+
+**Full Changelog**: https://github.com/mmtk/mmtk-core/compare/v0.26.0...v0.27.0
+
 0.26.0 (2024-07-01)
 ===
 

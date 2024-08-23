@@ -65,6 +65,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.release(tls, true);
     }
 
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
+        self.ms.end_of_gc();
+    }
+
     fn collection_required(&self, space_full: bool, _space: Option<SpaceStats<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }

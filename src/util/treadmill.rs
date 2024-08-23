@@ -4,6 +4,8 @@ use std::sync::Mutex;
 
 use crate::util::ObjectReference;
 
+use super::object_enum::ObjectEnumerator;
+
 pub struct TreadMill {
     from_space: Mutex<HashSet<ObjectReference>>,
     to_space: Mutex<HashSet<ObjectReference>>,
@@ -98,6 +100,17 @@ impl TreadMill {
             swap(&mut self.from_space, &mut self.to_space);
             trace!("Flipped from_space and to_space");
         }
+    }
+
+    pub(crate) fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        let mut visit_objects = |set: &Mutex<HashSet<ObjectReference>>| {
+            let set = set.lock().unwrap();
+            for object in set.iter() {
+                enumerator.visit_object(*object);
+            }
+        };
+        visit_objects(&self.alloc_nursery);
+        visit_objects(&self.to_space);
     }
 }
 

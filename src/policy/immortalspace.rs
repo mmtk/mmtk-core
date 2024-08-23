@@ -6,6 +6,7 @@ use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::mark_bit::MarkState;
 
+use crate::util::object_enum::{self, ObjectEnumerator};
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};
@@ -111,6 +112,10 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
+    }
+
+    fn enumerate_objects(&self, enumerator: &mut dyn ObjectEnumerator) {
+        object_enum::enumerate_blocks_from_monotonic_page_resource(enumerator, &self.pr);
     }
 }
 
