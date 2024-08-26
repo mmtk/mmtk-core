@@ -1,5 +1,7 @@
-// GITHUB-CI: MMTK_PLAN=all
+// GITHUB-CI: MMTK_PLAN=Immix,GenImmix,StickyImmix,MarkSweep,MarkCompact
 // GITHUB-CI: FEATURES=is_mmtk_object
+
+// Only test this with plans that use LOS. NoGC does not use large object space.
 
 use super::mock_test_prelude::*;
 
