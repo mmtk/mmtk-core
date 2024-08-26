@@ -6,7 +6,6 @@ use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::memory::MmapStrategy;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
-use crate::util::metadata::MetadataValue;
 use crate::util::Address;
 use crate::MMAPPER;
 use std::io::Result;
@@ -253,7 +252,7 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
             // Load and check a usize word
             let value = unsafe { cur.load::<usize>() };
             if value != 0 {
-                let bit = find_last_non_zero_bit(value, 0, usize::BITS as u8).unwrap();
+                let bit = find_last_non_zero_bit_usize(value, 0, usize::BITS as u8).unwrap();
                 let byte_offset = bit >> LOG_BITS_IN_BYTE;
                 let bit_offset = bit - ((byte_offset) << LOG_BITS_IN_BYTE);
                 return FindMetaBitResult::Found {
@@ -264,7 +263,7 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
         } else {
             // Load and check a byte
             let value = unsafe { cur.load::<u8>() };
-            if let Some(bit) = find_last_non_zero_bit::<u8>(value, 0, 8) {
+            if let Some(bit) = find_last_non_zero_bit_u8(value, 0, 8) {
                 return FindMetaBitResult::Found { addr: cur, bit };
             }
         }
@@ -282,23 +281,30 @@ pub fn find_last_non_zero_bit_in_metadata_bits(
         return FindMetaBitResult::UnmappedMetadata;
     }
     let byte = unsafe { addr.load::<u8>() };
-    if let Some(bit) = find_last_non_zero_bit::<u8>(byte, start_bit, end_bit) {
+    if let Some(bit) = find_last_non_zero_bit_u8(byte, start_bit, end_bit) {
         return FindMetaBitResult::Found { addr, bit };
     }
     FindMetaBitResult::NotFound
 }
 
-fn find_last_non_zero_bit<T: MetadataValue>(value: T, start: u8, end: u8) -> Option<u8> {
-    for cur_bit in (start..end).rev() {
-        assert!(cur_bit < T::BITS as u8);
-        if !value
-            .bitand(T::from_usize(1usize << cur_bit).unwrap())
-            .is_zero()
-        {
-            return Some(cur_bit);
-        }
+fn find_last_non_zero_bit_u8(value: u8, start: u8, end: u8) -> Option<u8> {
+    let mask: u8 = ((1 << (end - start + 1)) - 1) << start;
+    let leading_zeroes = (value & mask).leading_zeros();
+    if leading_zeroes >= u8::BITS {
+        None
+    } else {
+        Some(u8::BITS as u8 - leading_zeroes as u8)
     }
-    None
+}
+
+fn find_last_non_zero_bit_usize(value: usize, start: u8, end: u8) -> Option<u8> {
+    let mask: usize = ((1 << (end - start + 1)) - 1) << start;
+    let leading_zeroes = (value & mask).leading_zeros();
+    if leading_zeroes >= usize::BITS {
+        None
+    } else {
+        Some(usize::BITS as u8 - leading_zeroes as u8)
+    }
 }
 
 pub fn scan_non_zero_bits_in_metadata_bytes(
@@ -476,14 +482,14 @@ mod tests {
 
     #[test]
     fn test_find_last_non_zero_bit_in_u8() {
-        use super::find_last_non_zero_bit;
-        let bit = find_last_non_zero_bit::<u8>(0b100101, 0, 1);
+        use super::find_last_non_zero_bit_u8;
+        let bit = find_last_non_zero_bit_u8(0b100101, 0, 1);
         assert_eq!(bit, Some(0));
 
-        let bit = find_last_non_zero_bit::<u8>(0b100101, 0, 3);
+        let bit = find_last_non_zero_bit_u8(0b100101, 0, 3);
         assert_eq!(bit, Some(2));
 
-        let bit = find_last_non_zero_bit::<u8>(0b100101, 0, 8);
+        let bit = find_last_non_zero_bit_u8(0b100101, 0, 8);
         assert_eq!(bit, Some(5));
     }
 
