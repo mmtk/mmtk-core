@@ -6,6 +6,7 @@ use crate::util::heap::layout::vm_layout::VMLayout;
 use crate::util::memory::MmapStrategy;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
+use crate::util::metadata::MetadataValue;
 use crate::util::Address;
 use crate::MMAPPER;
 use std::io::Result;
@@ -28,6 +29,7 @@ pub(super) fn address_to_contiguous_meta_address(
 }
 
 /// Performs reverse address translation from contiguous metadata bits to data addresses.
+/// The input address and bit shift should be aligned.
 ///
 /// Arguments:
 /// * `metadata_spec`: The side metadata spec. It should be contiguous side metadata.
@@ -38,6 +40,10 @@ pub(super) fn contiguous_meta_address_to_address(
     metadata_addr: Address,
     bit: u8,
 ) -> Address {
+    debug_assert_eq!(
+        align_metadata_address(metadata_spec, metadata_addr, bit),
+        (metadata_addr, bit)
+    );
     let shift = (LOG_BITS_IN_BYTE as i32) - metadata_spec.log_num_of_bits as i32;
     let relative_meta_addr = metadata_addr - metadata_spec.get_absolute_offset();
 
@@ -56,6 +62,32 @@ pub(super) fn contiguous_meta_address_to_address(
         + ((bit as usize) << data_addr_bit_shift);
 
     unsafe { Address::from_usize(data_addr) }
+}
+
+/// Align an pair of a metadata address and a metadata bit offset to the start of this metadata value.
+/// For example, when the metadata is 4 bits, it should only start at bit 0 or bit 4.
+/// When the metadata is 16 bits, it should only start at bit 0, and its metadata address should be aligned to 2 bytes.
+/// This is important, as [`contiguous_meta_address_to_address`] can only convert the start address of metadata to
+/// the data address.
+pub(super) fn align_metadata_address(
+    spec: &SideMetadataSpec,
+    metadata_addr: Address,
+    bit: u8,
+) -> (Address, u8) {
+    if spec.log_num_of_bits >= LOG_BITS_IN_BYTE as usize {
+        (
+            metadata_addr.align_down(1 << (spec.log_num_of_bits - LOG_BITS_IN_BYTE as usize)),
+            0,
+        )
+    } else {
+        (
+            metadata_addr,
+            crate::util::conversions::raw_align_down(
+                bit as usize,
+                (1 << spec.log_num_of_bits) as usize,
+            ) as u8,
+        )
+    }
 }
 
 /// Unmaps the specified metadata range, or panics.
@@ -221,20 +253,18 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
             // Load and check a usize word
             let value = unsafe { cur.load::<usize>() };
             if value != 0 {
-                // Find the exact non-zero byte within the usize using bitwise operations
-                let byte_offset = (value.trailing_zeros() / 8) as usize;
-                let byte_addr = cur + byte_offset;
-                let byte_value: u8 = ((value >> (byte_offset * 8)) & 0xFF) as u8;
-                let bit = find_last_non_zero_bit_in_u8(byte_value).unwrap();
+                let bit = find_last_non_zero_bit(value, 0, usize::BITS as u8).unwrap();
+                let byte_offset = bit >> LOG_BITS_IN_BYTE;
+                let bit_offset = bit - ((byte_offset) << LOG_BITS_IN_BYTE);
                 return FindMetaBitResult::Found {
-                    addr: byte_addr,
-                    bit,
+                    addr: cur + byte_offset as usize,
+                    bit: bit_offset,
                 };
             }
         } else {
             // Load and check a byte
             let value = unsafe { cur.load::<u8>() };
-            if let Some(bit) = find_last_non_zero_bit_in_u8(value) {
+            if let Some(bit) = find_last_non_zero_bit::<u8>(value, 0, 8) {
                 return FindMetaBitResult::Found { addr: cur, bit };
             }
         }
@@ -252,22 +282,23 @@ pub fn find_last_non_zero_bit_in_metadata_bits(
         return FindMetaBitResult::UnmappedMetadata;
     }
     let byte = unsafe { addr.load::<u8>() };
-    if let Some(bit) = find_last_non_zero_bit_in_u8(byte) {
-        if bit >= start_bit && bit < end_bit {
-            return FindMetaBitResult::Found { addr, bit };
-        }
+    if let Some(bit) = find_last_non_zero_bit::<u8>(byte, start_bit, end_bit) {
+        return FindMetaBitResult::Found { addr, bit };
     }
     FindMetaBitResult::NotFound
 }
 
-fn find_last_non_zero_bit_in_u8(byte_value: u8) -> Option<u8> {
-    if byte_value != 0 {
-        let bit = byte_value.trailing_zeros();
-        debug_assert!(bit < 8);
-        Some(bit as u8)
-    } else {
-        None
+fn find_last_non_zero_bit<T: MetadataValue>(value: T, start: u8, end: u8) -> Option<u8> {
+    for cur_bit in (start..end).rev() {
+        assert!(cur_bit < T::BITS as u8);
+        if !value
+            .bitand(T::from_usize(1usize << cur_bit).unwrap())
+            .is_zero()
+        {
+            return Some(cur_bit);
+        }
     }
+    None
 }
 
 pub fn scan_non_zero_bits_in_metadata_bytes(
@@ -441,5 +472,208 @@ mod tests {
         };
 
         test_round_trip_conversion(&spec, &TEST_ADDRESS_4KB_REGION);
+    }
+
+    #[test]
+    fn test_find_last_non_zero_bit_in_u8() {
+        use super::find_last_non_zero_bit;
+        let bit = find_last_non_zero_bit::<u8>(0b100101, 0, 1);
+        assert_eq!(bit, Some(0));
+
+        let bit = find_last_non_zero_bit::<u8>(0b100101, 0, 3);
+        assert_eq!(bit, Some(2));
+
+        let bit = find_last_non_zero_bit::<u8>(0b100101, 0, 8);
+        assert_eq!(bit, Some(5));
+    }
+
+    #[test]
+    fn test_align_metadata_address() {
+        let create_spec = |log_num_of_bits: usize| SideMetadataSpec {
+            name: "AlignMetadataBitTestSpec",
+            is_global: true,
+            offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+            log_num_of_bits,
+            log_bytes_in_region: 3,
+        };
+
+        const ADDR_1000: Address = unsafe { Address::from_usize(0x1000) };
+        const ADDR_1001: Address = unsafe { Address::from_usize(0x1001) };
+        const ADDR_1002: Address = unsafe { Address::from_usize(0x1002) };
+        const ADDR_1003: Address = unsafe { Address::from_usize(0x1003) };
+        const ADDR_1004: Address = unsafe { Address::from_usize(0x1004) };
+        const ADDR_1005: Address = unsafe { Address::from_usize(0x1005) };
+        const ADDR_1006: Address = unsafe { Address::from_usize(0x1006) };
+        const ADDR_1007: Address = unsafe { Address::from_usize(0x1007) };
+        const ADDR_1008: Address = unsafe { Address::from_usize(0x1008) };
+        const ADDR_1009: Address = unsafe { Address::from_usize(0x1009) };
+
+        let metadata_2bits = create_spec(1);
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 0),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 1),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 2),
+            (ADDR_1000, 2)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 3),
+            (ADDR_1000, 2)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 4),
+            (ADDR_1000, 4)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 5),
+            (ADDR_1000, 4)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 6),
+            (ADDR_1000, 6)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_2bits, ADDR_1000, 7),
+            (ADDR_1000, 6)
+        );
+
+        let metadata_4bits = create_spec(2);
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 0),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 1),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 2),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 3),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 4),
+            (ADDR_1000, 4)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 5),
+            (ADDR_1000, 4)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 6),
+            (ADDR_1000, 4)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_4bits, ADDR_1000, 7),
+            (ADDR_1000, 4)
+        );
+
+        let metadata_8bits = create_spec(3);
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 0),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 1),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 2),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 3),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 4),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 5),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 6),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_8bits, ADDR_1000, 7),
+            (ADDR_1000, 0)
+        );
+
+        let metadata_16bits = create_spec(4);
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 0),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 1),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 2),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 3),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 4),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 5),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 6),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1000, 7),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 0),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 1),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 2),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 3),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 4),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 5),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 6),
+            (ADDR_1000, 0)
+        );
+        assert_eq!(
+            align_metadata_address(&metadata_16bits, ADDR_1001, 7),
+            (ADDR_1000, 0)
+        );
     }
 }
