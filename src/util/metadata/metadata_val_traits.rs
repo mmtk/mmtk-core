@@ -10,30 +10,12 @@ pub trait Bits {
     const BITS: u32;
     /// The size (in log2) of this atomic type in bits.
     const LOG2: u32;
-
-    fn leading_zeros(self) -> u32;
-    fn trailing_zeros(self) -> u32;
-    fn leading_ones(self) -> u32;
-    fn trailing_ones(self) -> u32;
 }
 macro_rules! impl_bits_trait {
     ($t: ty) => {
         impl Bits for $t {
             const BITS: u32 = <$t>::BITS;
             const LOG2: u32 = Self::BITS.trailing_zeros();
-
-            fn leading_zeros(self) -> u32 {
-                <$t>::leading_zeros(self)
-            }
-            fn trailing_zeros(self) -> u32 {
-                <$t>::trailing_zeros(self)
-            }
-            fn leading_ones(self) -> u32 {
-                <$t>::leading_ones(self)
-            }
-            fn trailing_ones(self) -> u32 {
-                <$t>::trailing_ones(self)
-            }
         }
     };
 }
