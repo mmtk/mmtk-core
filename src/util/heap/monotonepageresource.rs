@@ -350,7 +350,11 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 } else {
                     let start = self.discontiguous_start;
                     self.discontiguous_start = self.pr.vm_map().get_next_contiguous_region(start);
-                    let size = self.pr.vm_map().get_contiguous_region_size(start);
+                    let size = if self.pr.cursor().chunk_index() == start.chunk_index() {
+                        self.pr.cursor() - start
+                    } else {
+                        self.pr.vm_map().get_contiguous_region_size(start)
+                    };
                     Some((start, size))
                 }
             }
