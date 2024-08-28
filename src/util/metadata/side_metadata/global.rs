@@ -1027,12 +1027,10 @@ impl SideMetadataSpec {
         let region_bytes = 1 << self.log_bytes_in_region;
         // Figure out the range that we need to search.
         let start_addr = data_addr.align_down(region_bytes);
-        let end_addr = data_addr
-            .saturating_sub(search_limit_bytes)
-            .align_down(region_bytes);
+        let end_addr = data_addr.saturating_sub(search_limit_bytes) + 1usize;
 
         let mut cursor = start_addr;
-        while cursor > end_addr {
+        while cursor >= end_addr {
             // We encounter an unmapped address. Just return None.
             if !cursor.is_mapped() {
                 return None;
