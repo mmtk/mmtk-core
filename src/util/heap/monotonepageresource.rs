@@ -350,6 +350,8 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 } else {
                     let start = self.discontiguous_start;
                     self.discontiguous_start = self.pr.vm_map().get_next_contiguous_region(start);
+                    // If the current cursor is within the current discontiguous region (i.e. chunk),
+                    // then return the size till the cursor
                     let size = if self.pr.cursor().chunk_index() == start.chunk_index() {
                         self.pr.cursor() - start
                     } else {
