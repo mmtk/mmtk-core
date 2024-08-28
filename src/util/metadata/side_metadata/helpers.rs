@@ -228,15 +228,21 @@ pub fn find_last_non_zero_bit_in_metadata_bytes(
     let mut mapped_chunk = Address::MAX;
     while cur > meta_start {
         // If we can check the whole word, set step to word size. Otherwise, the step is 1 (byte) and we check byte.
-        let step = if cur.is_aligned_to(BYTES_IN_ADDRESS)
-            && cur.align_down(BYTES_IN_ADDRESS) >= meta_start
-        {
+        let step = if cur.is_aligned_to(BYTES_IN_ADDRESS) && cur - BYTES_IN_ADDRESS >= meta_start {
             BYTES_IN_ADDRESS
         } else {
             1
         };
         // Move to the address so we can load from it
         cur -= step;
+        // The value we check has to be in the range.
+        debug_assert!(
+            cur >= meta_start && cur < meta_end,
+            "Check metadata value at meta address {}, which is not in the range of [{}, {})",
+            cur,
+            meta_start,
+            meta_end
+        );
 
         // If we are looking at an address that is not in a mapped chunk, we need to check if the chunk if mapped.
         if cur < mapped_chunk {
