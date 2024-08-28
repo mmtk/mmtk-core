@@ -401,6 +401,12 @@
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
 <a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::layout::vm_layout::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 <span class="kw">use </span><span class="kw">crate</span>::policy::space::required_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::util::address::Address;
@@ -753,7 +759,13 @@
                 </span>} <span class="kw">else </span>{
                     <span class="kw">let </span>start = <span class="self">self</span>.discontiguous_start;
                     <span class="self">self</span>.discontiguous_start = <span class="self">self</span>.pr.vm_map().get_next_contiguous_region(start);
-                    <span class="kw">let </span>size = <span class="self">self</span>.pr.vm_map().get_contiguous_region_size(start);
+                    <span class="comment">// If the current cursor is within the current discontiguous region (i.e. chunk),
+                    // then return the size till the cursor
+                    </span><span class="kw">let </span>size = <span class="kw">if </span><span class="self">self</span>.pr.cursor().chunk_index() == start.chunk_index() {
+                        <span class="self">self</span>.pr.cursor() - start
+                    } <span class="kw">else </span>{
+                        <span class="self">self</span>.pr.vm_map().get_contiguous_region_size(start)
+                    };
                     <span class="prelude-val">Some</span>((start, size))
                 }
             }
