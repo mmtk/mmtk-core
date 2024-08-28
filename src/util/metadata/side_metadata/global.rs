@@ -991,6 +991,7 @@ impl SideMetadataSpec {
     ///
     /// This function uses non-atomic load for the side metadata. The user needs to make sure
     /// that there is no other thread that is mutating the side metadata.
+    #[allow(clippy::let_and_return)]
     pub unsafe fn find_prev_non_zero_value<T: MetadataValue>(
         &self,
         data_addr: Address,
@@ -1000,7 +1001,15 @@ impl SideMetadataSpec {
 
         if self.uses_contiguous_side_metadata() {
             // Contiguous side metadata
-            self.find_prev_non_zero_value_fast::<T>(data_addr, search_limit_bytes)
+            let result = self.find_prev_non_zero_value_fast::<T>(data_addr, search_limit_bytes);
+            #[cfg(debug_assertions)]
+            {
+                // Double check if the implementation is correct
+                let result2 =
+                    self.find_prev_non_zero_value_simple::<T>(data_addr, search_limit_bytes);
+                assert_eq!(result, result2, "find_prev_non_zero_value_fast returned a diffrent result from the naive implementation.");
+            }
+            result
         } else {
             // TODO: We should be able to optimize further for this case. However, we need to be careful that the side metadata
             // is not contiguous, and we need to skip to the next chunk's side metadata when we search to a different chunk.
@@ -1018,12 +1027,10 @@ impl SideMetadataSpec {
         let region_bytes = 1 << self.log_bytes_in_region;
         // Figure out the range that we need to search.
         let start_addr = data_addr.align_down(region_bytes);
-        let end_addr = data_addr
-            .saturating_sub(search_limit_bytes)
-            .align_down(region_bytes);
+        let end_addr = data_addr.saturating_sub(search_limit_bytes) + 1usize;
 
         let mut cursor = start_addr;
-        while cursor > end_addr {
+        while cursor >= end_addr {
             // We encounter an unmapped address. Just return None.
             if !cursor.is_mapped() {
                 return None;
@@ -1073,6 +1080,7 @@ impl SideMetadataSpec {
                 BitByteRange::Bytes { start, end } => {
                     match helpers::find_last_non_zero_bit_in_metadata_bytes(start, end) {
                         helpers::FindMetaBitResult::Found { addr, bit } => {
+                            let (addr, bit) = align_metadata_address(self, addr, bit);
                             res = Some(contiguous_meta_address_to_address(self, addr, bit));
                             // Return true to abort the search. We found the bit.
                             true
@@ -1091,6 +1099,7 @@ impl SideMetadataSpec {
                     match helpers::find_last_non_zero_bit_in_metadata_bits(addr, bit_start, bit_end)
                     {
                         helpers::FindMetaBitResult::Found { addr, bit } => {
+                            let (addr, bit) = align_metadata_address(self, addr, bit);
                             res = Some(contiguous_meta_address_to_address(self, addr, bit));
                             // Return true to abort the search. We found the bit.
                             true
