@@ -1071,8 +1071,6 @@ impl SideMetadataSpec {
         let end_meta_addr = address_to_contiguous_meta_address(self, end_addr);
         let end_meta_shift = meta_byte_lshift(self, end_addr);
 
-        // The result will be set by one of the following closures.
-        // Use Cell so it doesn't need to be mutably borrowed by the two closures which Rust will complain.
         let mut res = None;
 
         let mut visitor = |range: BitByteRange| {
