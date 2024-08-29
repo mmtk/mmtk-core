@@ -1173,7 +1173,7 @@
     </span><span class="kw">pub fn </span>from_raw_address(addr: Address) -&gt; <span class="prelude-ty">Option</span>&lt;ObjectReference&gt; {
         <span class="macro">debug_assert!</span>(
             addr.is_aligned_to(<span class="self">Self</span>::ALIGNMENT),
-            <span class="string">"ObjectReference is required to be word aligned"
+            <span class="string">"ObjectReference is required to be word aligned.  addr: {addr}"
         </span>);
         NonZeroUsize::new(addr.<span class="number">0</span>).map(ObjectReference)
     }
@@ -1190,7 +1190,7 @@
         <span class="macro">debug_assert!</span>(!addr.is_zero());
         <span class="macro">debug_assert!</span>(
             addr.is_aligned_to(<span class="self">Self</span>::ALIGNMENT),
-            <span class="string">"ObjectReference is required to be word aligned"
+            <span class="string">"ObjectReference is required to be word aligned.  addr: {addr}"
         </span>);
         ObjectReference(NonZeroUsize::new_unchecked(addr.<span class="number">0</span>))
     }
@@ -1233,7 +1233,7 @@
         <span class="macro">debug_assert!</span>(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), <span class="string">"The binding claims unified object reference address, but for address {}, the object reference is {}"</span>, addr, obj);
         <span class="macro">debug_assert!</span>(
             obj.to_raw_address().is_aligned_to(<span class="self">Self</span>::ALIGNMENT),
-            <span class="string">"ObjectReference is required to be word aligned"
+            <span class="string">"ObjectReference is required to be word aligned.  addr: {addr}, obj: {obj}"
         </span>);
         obj
     }

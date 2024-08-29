@@ -2103,8 +2103,6 @@
 <a href="#2101" id="2101">2101</a>
 <a href="#2102" id="2102">2102</a>
 <a href="#2103" id="2103">2103</a>
-<a href="#2104" id="2104">2104</a>
-<a href="#2105" id="2105">2105</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
@@ -3178,9 +3176,7 @@
         <span class="kw">let </span>end_meta_addr = address_to_contiguous_meta_address(<span class="self">self</span>, end_addr);
         <span class="kw">let </span>end_meta_shift = meta_byte_lshift(<span class="self">self</span>, end_addr);
 
-        <span class="comment">// The result will be set by one of the following closures.
-        // Use Cell so it doesn't need to be mutably borrowed by the two closures which Rust will complain.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>res = <span class="prelude-val">None</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>res = <span class="prelude-val">None</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>visitor = |range: BitByteRange| {
             <span class="kw">match </span>range {
