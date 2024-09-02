@@ -2103,6 +2103,13 @@
 <a href="#2101" id="2101">2101</a>
 <a href="#2102" id="2102">2102</a>
 <a href="#2103" id="2103">2103</a>
+<a href="#2104" id="2104">2104</a>
+<a href="#2105" id="2105">2105</a>
+<a href="#2106" id="2106">2106</a>
+<a href="#2107" id="2107">2107</a>
+<a href="#2108" id="2108">2108</a>
+<a href="#2109" id="2109">2109</a>
+<a href="#2110" id="2110">2110</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::util::constants::{BYTES_IN_PAGE, BYTES_IN_WORD, LOG_BITS_IN_BYTE};
 <span class="kw">use </span><span class="kw">crate</span>::util::conversions::raw_align_up;
@@ -3171,6 +3178,8 @@
         <span class="kw">let </span>end_addr = data_addr;
 
         <span class="comment">// Then figure out the start and end metadata address and bits.
+        // The start bit may not be accurate, as we map any address in the region to the same bit.
+        // We will filter the result at the end to make sure the found address is in the search range.
         </span><span class="kw">let </span>start_meta_addr = address_to_contiguous_meta_address(<span class="self">self</span>, start_addr);
         <span class="kw">let </span>start_meta_shift = meta_byte_lshift(<span class="self">self</span>, start_addr);
         <span class="kw">let </span>end_meta_addr = address_to_contiguous_meta_address(<span class="self">self</span>, end_addr);
@@ -3225,7 +3234,12 @@
             <span class="kw-2">&amp;mut </span>visitor,
         );
 
-        res.map(|addr| addr.align_down(<span class="number">1 </span>&lt;&lt; <span class="self">self</span>.log_bytes_in_region))
+        <span class="comment">// We have to filter the result. We search between [start_addr, end_addr). But we actually
+        // search with metadata bits. It is possible the metadata bit for start_addr is the same bit
+        // as an address that is before start_addr. E.g. 0x2010f026360 and 0x2010f026361 are mapped
+        // to the same bit, 0x2010f026361 is the start address and 0x2010f026360 is outside the search range.
+        </span>res.map(|addr| addr.align_down(<span class="number">1 </span>&lt;&lt; <span class="self">self</span>.log_bytes_in_region))
+            .filter(|addr| <span class="kw-2">*</span>addr &gt;= start_addr &amp;&amp; <span class="kw-2">*</span>addr &lt; end_addr)
     }
 
     <span class="doccomment">/// Search for data addresses that have non zero values in the side metadata.  This method is
