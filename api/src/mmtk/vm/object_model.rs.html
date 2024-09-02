@@ -647,6 +647,9 @@
 <a href="#645" id="645">645</a>
 <a href="#646" id="646">646</a>
 <a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>atomic::Ordering;
 
 <span class="kw">use </span><span class="self">self</span>::specs::<span class="kw-2">*</span>;
@@ -1105,6 +1108,9 @@
 
     <span class="doccomment">/// Return the lowest address of the storage associated with an object. This should be
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
+    ///
+    /// Note that the return value needs to satisfy the invariant mentioned in the doc comment of
+    /// [`Self::OBJECT_REF_OFFSET_LOWER_BOUND`].
     ///
     /// Arguments:
     /// * `object`: The object to be queried.
