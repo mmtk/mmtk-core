@@ -568,6 +568,15 @@ impl ObjectReference {
         use crate::vm::ObjectModel;
         let object_start = VM::VMObjectModel::ref_to_object_start(self);
         debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_object_start() returns {}", self, object_start);
+        debug_assert!(
+            self.to_raw_address()
+                >= object_start + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
+            "The invariant `object_ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND` is violated. \
+            object_ref: {}, object_start: {}, OBJECT_REF_OFFSET_LOWER_BOUND: {}",
+            self.to_raw_address(),
+            object_start,
+            VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
+        );
         object_start
     }
 

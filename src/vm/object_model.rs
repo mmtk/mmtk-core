@@ -457,6 +457,9 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Return the lowest address of the storage associated with an object. This should be
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///
+    /// Note that the return value needs to satisfy the invariant mentioned in the doc comment of
+    /// [`Self::OBJECT_REF_OFFSET_LOWER_BOUND`].
+    ///
     /// Arguments:
     /// * `object`: The object to be queried.
     fn ref_to_object_start(object: ObjectReference) -> Address;
