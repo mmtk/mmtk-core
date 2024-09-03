@@ -467,32 +467,73 @@ mod tests {
 
 use crate::vm::VMBinding;
 
-/// ObjectReference represents address for an object. Compared with Address,
-/// operations allowed on ObjectReference are very limited. No address arithmetics
-/// are allowed for ObjectReference. The idea is from the paper
-/// High-level Low-level Programming (VEE09) and JikesRVM.
+/// `ObjectReference` represents address for an object. Compared with `Address`, operations allowed
+/// on `ObjectReference` are very limited. No address arithmetics are allowed for `ObjectReference`.
+/// The idea is from the paper [Demystifying Magic: High-level Low-level Programming (VEE09)][FBC09]
+/// and [JikesRVM].
 ///
-/// A runtime may define its "object references" differently. It may define an object reference as
-/// the address of an object, a handle that points to an indirection table entry where a pointer to
-/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a
-/// pointer to the object (an address) in each object reference, and that address should be used
-/// for this `ObjectReference` type.
+/// In MMTk, `ObjectReference` holds a non-zero address.  It either points into one of MMTk's spaces
+/// or not.
 ///
-/// We currently do not allow an opaque `ObjectReference` type for which a binding can define
-/// their layout. We now only allow a binding to define their semantics through a set of
-/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
-/// the opaque `ObjectReference` type, and we haven't seen a use case for now.
+/// -   When the address is in one of MMTk's spaces, it refers to an object allocated in that space.
+///     In this case, the address
+///     -   must be within the address range of the object it refers to, and
+///     -   must be word-aligned, but
+///     -   is not necessarily the starting address of the object.
+/// -   When the address is outside any MMTk space, its semantics is VM-defined.
 ///
-/// Note that [`ObjectReference`] cannot be null.  For the cases where a non-null object reference
-/// may or may not exist, (such as the result of [`crate::vm::slot::Slot::load`])
-/// `Option<ObjectReference>` should be used.  [`ObjectReference`] is backed by `NonZeroUsize`
-/// which cannot be zero, and it has the `#[repr(transparent)]` attribute.  Thanks to [null pointer
-/// optimization (NPO)][NPO], `Option<ObjectReference>` has the same size as `NonZeroUsize` and
-/// `usize`.  For the convenience of passing `Option<ObjectReference>` to and from native (C/C++)
-/// programs, mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+/// The address value held inside an `ObjectReference` instance is its **raw address**.  When
+/// accessing side metadata, MMTk uses the raw address to locate the side metadata bits.
 ///
-/// Note that [`ObjectReference`] has to be word aligned.
+/// In addition to the raw address, there are also two addresses related to each object allocated in
+/// MMTk heap, namely **starting address** and **header address**.  See the
+/// [`crate::vm::ObjectModel`] trait for their precise definition.
 ///
+/// # Notes
+///
+/// ## About VMs own concepts of "object references"
+///
+/// A runtime may define its own concept of "object references" differently from MMTk's
+/// `ObjectReference` type.  It may define its object reference as
+///
+/// -   the starting address of an object,
+/// -   an address inside an object,
+/// -   an address at a certain offset outside an object,
+/// -   a handle that points to an indirection table entry where a pointer to the object is held, or
+/// -   anything else that refers to an object.
+///
+/// Regardless, when passing an `ObjectReference` value to MMTk through the API, MMTk expectes its
+/// value to satisfy MMTk's definition.  This means MMTk's `ObjectReference` may not be the value
+/// held in an object field.  Some VM bindings may need to do conversions when passing object
+/// references to MMTk.  For example, adding an offset to the VM-level object reference so that the
+/// resulting address is within the object.  When using handles, the VM binding may use the *pointer
+/// stored in the entry* of the indirection table instead of the *pointer to the entry* itself as
+/// MMTk-level `ObjectReference`.
+///
+/// ## About null references
+///
+/// An [`ObjectReference`] always refers to an object.  Some VMs have special values (such as `null`
+/// in Java) that do not refer to any object.  Those values cannot be represented by
+/// `ObjectReference`.  When scanning roots and object fields, the VM binding should ignore slots
+/// that do not hold a reference to an object.  Specifically, [`crate::vm::slot::Slot::load`]
+/// returns `Option<ObjectReference>`.  It can return `None` so that MMTk skips that slot.
+///
+/// (Note: Although the VM binding can implement `crate::vm::ActivePlan::vm_trace_object` to ignore
+/// special addresses outside MMTk spaces that represent `null`, it is advisable not to let MMTk
+/// trace such `ObjectReference` values in the first place.)
+///
+/// `Option<ObjectReference>` should be used for the cases where a non-null object reference may or
+/// may not exist,  That includes several API functions, including [`crate::vm::slot::Slot::load`].
+/// [`ObjectReference`] is backed by `NonZeroUsize` which cannot be zero, and it has the
+/// `#[repr(transparent)]` attribute. Thanks to [null pointer optimization (NPO)][NPO],
+/// `Option<ObjectReference>` has the same size as `NonZeroUsize` and `usize`.
+///
+/// For the convenience of passing `Option<ObjectReference>` to and from native (C/C++) programs,
+/// mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+///
+/// [FBC09]: https://dl.acm.org/doi/10.1145/1508293.1508305
+/// [JikesRVM]: https://www.jikesrvm.org/
+/// [`ObjectModel`]: crate::vm::ObjectModel
 /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, PartialEq, NoUninit)]
