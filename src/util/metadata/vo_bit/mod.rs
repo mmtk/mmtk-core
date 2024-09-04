@@ -95,17 +95,17 @@ pub fn is_vo_bit_set(object: ObjectReference) -> bool {
 
 /// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
+///
+/// The `address` must be word-aligned.
 pub fn is_vo_bit_set_for_addr(address: Address) -> Option<ObjectReference> {
-    // if the address is not aligned, it cannot be an object reference.
-    if !address.is_aligned_to(ObjectReference::ALIGNMENT) {
-        return None;
-    }
     is_vo_bit_set_inner::<true>(address)
 }
 
 /// Check if an address can be turned directly into an object reference using the VO bit.
 /// If so, return `Some(object)`. Otherwise return `None`. The caller needs to ensure the side
 /// metadata for the VO bit for the object is accessed by only one thread.
+///
+/// The `address` must be word-aligned.
 ///
 /// # Safety
 ///
@@ -115,6 +115,11 @@ pub unsafe fn is_vo_bit_set_unsafe(address: Address) -> Option<ObjectReference> 
 }
 
 fn is_vo_bit_set_inner<const ATOMIC: bool>(address: Address) -> Option<ObjectReference> {
+    debug_assert!(
+        address.is_aligned_to(ObjectReference::ALIGNMENT),
+        "Address is not word-aligned: {address}"
+    );
+
     let addr = get_in_object_address_for_potential_object(address);
 
     // If we haven't mapped VO bit for the address, it cannot be an object

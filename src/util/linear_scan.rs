@@ -27,6 +27,14 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
     /// that the VO bit metadata is mapped for the address range.
     pub fn new(start: Address, end: Address) -> Self {
         debug_assert!(start < end);
+        debug_assert!(
+            start.is_aligned_to(ObjectReference::ALIGNMENT),
+            "start is not word-aligned: {start}"
+        );
+        debug_assert!(
+            end.is_aligned_to(ObjectReference::ALIGNMENT),
+            "end is not word-aligned: {end}"
+        );
         ObjectIterator {
             start,
             end,
