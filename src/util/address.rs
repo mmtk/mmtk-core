@@ -544,22 +544,14 @@ impl ObjectReference {
     /// you will see an assertion failure in the debug build when constructing an object reference instance.
     pub const ALIGNMENT: usize = crate::util::constants::BYTES_IN_ADDRESS;
 
-    /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
-    ///
-    /// MMTk should not make any assumption on the actual location of the address with the object reference.
-    /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
-    /// setting object metadata, MMTk should use [`crate::util::ObjectReference::to_address`] or [`crate::util::ObjectReference::to_header`].
+    /// Cast the object reference to its raw address.
     pub fn to_raw_address(self) -> Address {
         Address(self.0.get())
     }
 
-    /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
-    /// This is how a binding creates `ObjectReference` instances.
+    /// Cast a raw address to an object reference.
     ///
     /// If `addr` is 0, the result is `None`.
-    ///
-    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::util::ObjectReference::from_address`]
-    /// to turn addresses that are from [`crate::util::ObjectReference::to_address`] back to object.
     pub fn from_raw_address(addr: Address) -> Option<ObjectReference> {
         debug_assert!(
             addr.is_aligned_to(Self::ALIGNMENT),
