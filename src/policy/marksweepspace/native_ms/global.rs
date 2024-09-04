@@ -191,12 +191,12 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(_object);
+        crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
 
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
 
     #[cfg(feature = "is_mmtk_object")]
@@ -341,7 +341,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
             VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
-            let block = Block::containing::<VM>(object);
+            let block = Block::containing(object);
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
         }

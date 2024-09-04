@@ -242,7 +242,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        self.address_in_space(object.to_address::<VM>())
+        self.address_in_space(object.to_raw_address())
     }
 
     /**

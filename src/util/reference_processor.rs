@@ -208,17 +208,17 @@ impl ReferenceProcessor {
 
     /// Return the new `ObjectReference` of a referent if it is already moved, or its current
     /// `ObjectReference` otherwise.  The referent must be live when calling this function.
-    fn get_forwarded_referent<VM: VMBinding>(referent: ObjectReference) -> ObjectReference {
-        debug_assert!(referent.is_live::<VM>());
-        referent.get_forwarded_object::<VM>().unwrap_or(referent)
+    fn get_forwarded_referent(referent: ObjectReference) -> ObjectReference {
+        debug_assert!(referent.is_live());
+        referent.get_forwarded_object().unwrap_or(referent)
     }
 
     /// Return the new `ObjectReference` of a reference object if it is already moved, or its
     /// current `ObjectReference` otherwise.  The reference object must be live when calling this
     /// function.
-    fn get_forwarded_reference<VM: VMBinding>(object: ObjectReference) -> ObjectReference {
-        debug_assert!(object.is_live::<VM>());
-        object.get_forwarded_object::<VM>().unwrap_or(object)
+    fn get_forwarded_reference(object: ObjectReference) -> ObjectReference {
+        debug_assert!(object.is_live());
+        object.get_forwarded_object().unwrap_or(object)
     }
 
     // These funcions call `trace_object()`, which will ensure the object and its descendents will
@@ -259,10 +259,10 @@ impl ReferenceProcessor {
         {
             // For references in the table, the reference needs to be valid, and if the referent is not cleared, it should be valid as well
             sync.references.iter().for_each(|reff| {
-                debug_assert!(reff.is_in_any_space::<VM>());
+                debug_assert!(reff.is_in_any_space());
                 if let Some(referent) = VM::VMReferenceGlue::get_referent(*reff) {
                     debug_assert!(
-                        referent.is_in_any_space::<VM>(),
+                        referent.is_in_any_space(),
                         "Referent {:?} (of reference {:?}) is not in any space",
                         referent,
                         reff
@@ -271,7 +271,7 @@ impl ReferenceProcessor {
             });
             // For references that will be enqueue'd, the reference needs to be valid, and the referent needs to be cleared.
             sync.enqueued_references.iter().for_each(|reff| {
-                debug_assert!(reff.is_in_any_space::<VM>());
+                debug_assert!(reff.is_in_any_space());
                 let maybe_referent = VM::VMReferenceGlue::get_referent(*reff);
                 debug_assert!(maybe_referent.is_none());
             });
@@ -403,7 +403,7 @@ impl ReferenceProcessor {
         for reference in sync.references.iter() {
             trace!("Processing reference: {:?}", reference);
 
-            if !reference.is_live::<E::VM>() {
+            if !reference.is_live() {
                 // Reference is currently unreachable but may get reachable by the
                 // following trace. We postpone the decision.
                 continue;
@@ -435,14 +435,14 @@ impl ReferenceProcessor {
 
         // If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
-        if !reference.is_live::<VM>() {
+        if !reference.is_live() {
             VM::VMReferenceGlue::clear_referent(reference);
             trace!(" UNREACHABLE reference: {}", reference);
             return None;
         }
 
         // The reference object is live.
-        let new_reference = Self::get_forwarded_reference::<VM>(reference);
+        let new_reference = Self::get_forwarded_reference(reference);
         trace!(" forwarded to: {}", new_reference);
 
         // Get the old referent.
@@ -458,11 +458,11 @@ impl ReferenceProcessor {
             return None;
         };
 
-        if old_referent.is_live::<VM>() {
+        if old_referent.is_live() {
             // Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
-            let new_referent = Self::get_forwarded_referent::<VM>(old_referent);
-            debug_assert!(new_referent.is_live::<VM>());
+            let new_referent = Self::get_forwarded_referent(old_referent);
+            debug_assert!(new_referent.is_live());
             trace!("  forwarded referent to: {}", new_referent);
 
             // The reference object stays on the waiting list, and the

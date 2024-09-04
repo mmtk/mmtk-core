@@ -192,7 +192,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
-            assert!(object.is_sane::<VM>(), "Invalid reference {:?}", object);
+            assert!(object.is_sane(), "Invalid reference {:?}", object);
 
             // Let plan check object
             assert!(
@@ -217,7 +217,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         // If the valid object (VO) bit metadata is enabled, all live objects should have the VO
         // bit set when sanity GC starts.
         #[cfg(feature = "vo_bit")]
-        if !crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object) {
+        if !crate::util::metadata::vo_bit::is_vo_bit_set(object) {
             panic!("VO bit is not set: {}", object);
         }
 

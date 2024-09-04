@@ -585,15 +585,6 @@ impl ObjectReference {
         ObjectReference(NonZeroUsize::new_unchecked(addr.0))
     }
 
-    /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
-    /// for an object reference.
-    pub fn to_address<VM: VMBinding>(self) -> Address {
-        use crate::vm::ObjectModel;
-        let to_address = Address(self.0.get()).offset(VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET);
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, in-object addr is {}", self, to_address);
-        to_address
-    }
-
     /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
     /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
     /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
@@ -621,52 +612,36 @@ impl ObjectReference {
         object_start
     }
 
-    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`].
-    pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
-        use crate::vm::ObjectModel;
-        let obj = unsafe {
-            ObjectReference::from_raw_address_unchecked(
-                addr.offset(-VM::VMObjectModel::IN_OBJECT_ADDRESS_OFFSET),
-            )
-        };
-        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, the object reference is {}", addr, obj);
-        debug_assert!(
-            obj.to_raw_address().is_aligned_to(Self::ALIGNMENT),
-            "ObjectReference is required to be word aligned.  addr: {addr}, obj: {obj}"
-        );
-        obj
-    }
-
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    pub fn is_reachable<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_reachable(self)
+    pub fn is_reachable(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_reachable(self)
     }
 
     /// Is the object live, determined by the policy?
-    pub fn is_live<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_live(self)
+    pub fn is_live(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_live(self)
     }
 
     /// Can the object be moved?
-    pub fn is_movable<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_movable()
+    pub fn is_movable(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
-    pub fn get_forwarded_object<VM: VMBinding>(self) -> Option<Self> {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.get_forwarded_object(self)
+    pub fn get_forwarded_object(self) -> Option<Self> {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.get_forwarded_object(self)
     }
 
     /// Is the object in any MMTk spaces?
-    pub fn is_in_any_space<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_in_space(self)
+    pub fn is_in_any_space(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_in_space(self)
     }
 
     /// Is the object sane?
     #[cfg(feature = "sanity")]
-    pub fn is_sane<VM: VMBinding>(self) -> bool {
-        unsafe { SFT_MAP.get_unchecked(self.to_address::<VM>()) }.is_sane()
+    pub fn is_sane(self) -> bool {
+        unsafe { SFT_MAP.get_unchecked(self.to_raw_address()) }.is_sane()
     }
 }
 

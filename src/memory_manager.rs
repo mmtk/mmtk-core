@@ -579,8 +579,8 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMut
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
-    object.is_live::<VM>()
+pub fn is_live_object(object: ObjectReference) -> bool {
+    object.is_live()
 }
 
 /// Check if `addr` is the address of an object reference to an MMTk object.
@@ -633,7 +633,7 @@ pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
 /// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
 /// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
 #[cfg(feature = "is_mmtk_object")]
-pub fn find_object_from_internal_pointer<VM: VMBinding>(
+pub fn find_object_from_internal_pointer(
     internal_ptr: Address,
     max_search_bytes: usize,
 ) -> Option<ObjectReference> {
@@ -669,10 +669,10 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_in_mmtk_spaces<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .is_in_space(object)
 }
 
@@ -766,10 +766,10 @@ pub fn add_finalizer<VM: VMBinding>(
 /// Arguments:
 /// * `object`: The object to be pinned
 #[cfg(feature = "object_pinning")]
-pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn pin_object(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .pin_object(object)
 }
 
@@ -780,10 +780,10 @@ pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Arguments:
 /// * `object`: The object to be pinned
 #[cfg(feature = "object_pinning")]
-pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn unpin_object(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .unpin_object(object)
 }
 
@@ -792,10 +792,10 @@ pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Arguments:
 /// * `object`: The object to be checked
 #[cfg(feature = "object_pinning")]
-pub fn is_pinned<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_pinned(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .is_object_pinned(object)
 }
 
