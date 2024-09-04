@@ -88,7 +88,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             let offset_from_page_start = vo_addr & ((1 << LOG_BYTES_IN_PAGE) - 1) as usize;
             debug_assert!(
                 offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
-                "The in-object address is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
+                "The raw address of ObjectReference is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
             );
         }
 
@@ -117,7 +117,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             }
             // For performance, we only check the first word which maps to the first 512 bytes in the page.
             // In almost all the cases, it should be sufficient.
-            // However, if the in-object address is not in the first 512 bytes, this won't work.
+            // However, if the raw address of ObjectReference is not in the first 512 bytes, this won't work.
             // We assert this when we set VO bit for LOS.
             if vo_bit::get_raw_vo_bit_word(cur_page) != 0 {
                 // Find the exact address that has vo bit set
