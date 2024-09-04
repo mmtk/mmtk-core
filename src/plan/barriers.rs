@@ -182,7 +182,7 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     fn log_object(&self, object: ObjectReference) -> bool {
         #[cfg(all(feature = "vo_bit", feature = "extreme_assertions"))]
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<S::VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "object bit is unset"
         );
         loop {
