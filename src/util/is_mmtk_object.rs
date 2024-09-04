@@ -7,6 +7,11 @@ use crate::util::{Address, ObjectReference};
 
 pub(crate) fn check_object_reference(addr: Address) -> Option<ObjectReference> {
     use crate::mmtk::SFT_MAP;
+    debug_assert_ne!(addr, Address::ZERO, "Address is zero");
+    debug_assert!(
+        addr.is_aligned_to(ObjectReference::ALIGNMENT),
+        "Address is not aligned to word size: {addr}"
+    );
     SFT_MAP.get_checked(addr).is_mmtk_object(addr)
 }
 
