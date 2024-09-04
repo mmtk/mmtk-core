@@ -114,13 +114,11 @@ pub unsafe fn is_vo_bit_set_unsafe(address: Address) -> Option<ObjectReference> 
     is_vo_bit_set_inner::<false>(address)
 }
 
-fn is_vo_bit_set_inner<const ATOMIC: bool>(address: Address) -> Option<ObjectReference> {
+fn is_vo_bit_set_inner<const ATOMIC: bool>(addr: Address) -> Option<ObjectReference> {
     debug_assert!(
-        address.is_aligned_to(ObjectReference::ALIGNMENT),
-        "Address is not word-aligned: {address}"
+        addr.is_aligned_to(ObjectReference::ALIGNMENT),
+        "Address is not word-aligned: {addr}"
     );
-
-    let addr = get_in_object_address_for_potential_object(address);
 
     // If we haven't mapped VO bit for the address, it cannot be an object
     if !VO_BIT_SIDE_METADATA_SPEC.is_mapped(addr) {
@@ -133,12 +131,7 @@ fn is_vo_bit_set_inner<const ATOMIC: bool>(address: Address) -> Option<ObjectRef
         unsafe { VO_BIT_SIDE_METADATA_SPEC.load::<u8>(addr) }
     };
 
-    if vo_bit == 1 {
-        let obj = get_object_ref_for_vo_addr(addr);
-        Some(obj)
-    } else {
-        None
-    }
+    (vo_bit == 1).then(|| get_object_ref_for_vo_addr(addr))
 }
 
 /// Bulk zero the VO bit.
@@ -194,16 +187,12 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
     }
 }
 
-/// Turning a potential object reference into its in-object address (the ref_to_address address) where the metadata is set for.
-fn get_in_object_address_for_potential_object(potential_obj: Address) -> Address {
-    potential_obj
-}
-
 /// Get the object reference from an aligned address where VO bit is set.
 pub(crate) fn get_object_ref_for_vo_addr(vo_addr: Address) -> ObjectReference {
-    let addr = vo_addr;
-    let aligned = addr.align_up(ObjectReference::ALIGNMENT);
-    unsafe { ObjectReference::from_raw_address_unchecked(aligned) }
+    // VO bit should be set on the address.
+    debug_assert!(vo_addr.is_aligned_to(ObjectReference::ALIGNMENT));
+    debug_assert!(unsafe { is_vo_addr(vo_addr) });
+    unsafe { ObjectReference::from_raw_address_unchecked(vo_addr) }
 }
 
 /// Check if the address could be an internal pointer in the object.
@@ -218,9 +207,6 @@ pub fn is_internal_ptr_from_vo_bit<VM: VMBinding>(
     vo_addr: Address,
     internal_ptr: Address,
 ) -> Option<ObjectReference> {
-    // VO bit should be set on the address.
-    debug_assert!(unsafe { is_vo_addr(vo_addr) });
-
     let obj = get_object_ref_for_vo_addr(vo_addr);
     if is_internal_ptr::<VM>(obj, internal_ptr) {
         Some(obj)
