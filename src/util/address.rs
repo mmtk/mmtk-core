@@ -477,17 +477,17 @@ use crate::vm::VMBinding;
 ///
 /// -   When the address is in one of MMTk's spaces, it refers to an object allocated in that space.
 ///     In this case, the address must satisfy the following requirements.
-///     -   The address must be within the address range of the object it refers to. *(Note 1)*
+///     -   The address must be within the address range of the object it refers to.  But it is not
+///         necessarily the starting address.
 ///     -   The address must be word-aligned.
-///     -   For each object, the same address shall be used for all `ObjectReference` instances
-///         referring to that object, until the object is moved by the GC. *(Note 2)*
 /// -   When the address is outside any MMTk space, its semantics is VM-defined.
 ///
-/// *Note 1*: The address is not necessarily the starting address of the object.
-///
-/// *Note 2*: When an object is moved, the VM binding shall choose another address to use for the
-/// `ObjectReference` of the new copy (in [`crate::vm::ObjectModel::copy`] or
-/// [`crate::vm::ObjectModel::get_reference_when_copied_to`]).
+/// The address used as the `ObjectReference` is nominated by the VM binding when an object is
+/// allocated in the MMTk heap (i.e. the argument of [`crate::memory_manager::post_alloc`]).  The
+/// same address is used by all `ObjectReference`s that refer to that object until the object is
+/// moved, at which time the VM binding shall choose another address to use as the `ObjectReference`
+/// of the new copy (in [`crate::vm::ObjectModel::copy`] or
+/// [`crate::vm::ObjectModel::get_reference_when_copied_to`]) until it is moved again.
 ///
 /// The address value held inside an `ObjectReference` instance is its **raw address**.  When
 /// accessing side metadata, MMTk uses the raw address to locate the side metadata bits.
