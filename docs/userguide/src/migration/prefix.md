@@ -55,6 +55,9 @@ API changes:
         *   `is_movable`
         *   `is_reachable`
 -   module `memory_manager`
+    +   `is_mmtk_object`: It now requires the address parameter to be non-zero and word-aligned.
+        *   Otherwise it will not be a legal `ObjectReference` in the first place.  The user should
+            filter out such illegal values.
     +   The following functions no longer have the `<VM>` type argument.
         *   `find_object_from_internal_pointer`
         *   `is_in_mmtk_space`
@@ -67,6 +70,13 @@ API changes:
         *   `containing`
 -   trait `ObjectModel`
     +   `IN_OBJECT_ADDRESS_OFFSET`: removed because it is no longer needed.
+
+See also:
+
+-   PR: <https://github.com/mmtk/mmtk-core/issues/1170>
+-   Examples:
+    +   https://github.com/mmtk/mmtk-openjdk/pull/286: a simple case
+    +   https://github.com/mmtk/mmtk-jikesrvm/issues/178: a VM that needs much change for this
 
 ## 0.27.0
 

@@ -125,7 +125,7 @@ pub trait Region: Copy + PartialEq + PartialOrd {
         debug_assert!(self.start().as_usize() < usize::MAX - (n << Self::LOG_BYTES));
         Self::from_aligned_address(self.start() + (n << Self::LOG_BYTES))
     }
-    /// Return the region that contains the object (by its cell address).
+    /// Return the region that contains the object.
     fn containing(object: ObjectReference) -> Self {
         Self::from_unaligned_address(object.to_raw_address())
     }
