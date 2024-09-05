@@ -30,6 +30,44 @@ Notes for the mmtk-core developers:
 
 <!-- Insert new versions here -->
 
+## 0.28.0
+
+### `ObjectReference` must point inside an object
+
+```admonish tldr
+`ObjectReference` is now required to be an address within an object.  The concept of "in-object
+address" and related methods are removed.  Some methods which used to depend on the "in-object
+address" no longer need the `<VM>` type argument.
+```
+
+API changes:
+
+-   struct `ObjectReference`
+    +   Its "raw address" must be within an object now.
+    +   The following methods which were used to access the in-object address are removed.
+        *   `from_address`
+        *   `to_address`
+        *   When accessing side metadata, the "raw address" should be used, instead.
+    +   The following methods no longer have the `<VM>` type argument.
+        *   `get_forwarded_object`
+        *   `is_in_any_space`
+        *   `is_live`
+        *   `is_movable`
+        *   `is_reachable`
+-   module `memory_manager`
+    +   The following functions no longer have the `<VM>` type argument.
+        *   `find_object_from_internal_pointer`
+        *   `is_in_mmtk_space`
+        *   `is_live_object`
+        *   `is_pinned`
+        *   `pin_object`
+        *   `unpin_object`
+-   struct `Region`
+    +   The following methods no longer have the `<VM>` type argument.
+        *   `containing`
+-   trait `ObjectModel`
+    +   `IN_OBJECT_ADDRESS_OFFSET`: removed because it is no longer needed.
+
 ## 0.27.0
 
 ### `is_mmtk_object` returns `Option<ObjectReference>
