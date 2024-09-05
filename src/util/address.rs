@@ -479,15 +479,13 @@ use crate::vm::VMBinding;
 ///     In this case, the address must satisfy the following requirements.
 ///     -   The address must be within the address range of the object it refers to. *(Note 1)*
 ///     -   The address must be word-aligned.
-///     -   After an object is allocated, the same address is used for all `ObjectReference`
-///         instances referring that object, until the object is moved by the (moving) GC.
-///         *(Note 2)*
+///     -   For each object, the same address shall be used for all `ObjectReference` instances
+///         referring to that object, until the object is moved by the GC. *(Note 2)*
 /// -   When the address is outside any MMTk space, its semantics is VM-defined.
 ///
 /// *Note 1*: The address is not necessarily the starting address of the object.
 ///
-/// *Note 2*: When an object is moved, the GC performs another allocation
-/// (`CopyContext::alloc_copy`), and the VM binding shall choose another address to use for the
+/// *Note 2*: When an object is moved, the VM binding shall choose another address to use for the
 /// `ObjectReference` of the new copy (in [`crate::vm::ObjectModel::copy`] or
 /// [`crate::vm::ObjectModel::get_reference_when_copied_to`]).
 ///
