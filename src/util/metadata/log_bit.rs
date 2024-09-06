@@ -23,7 +23,7 @@ impl VMGlobalLogBitSpec {
             // know we are setting log bit for mature space, and every object in the space should have log
             // bit as 1.
             MetadataSpec::OnSide(spec) => unsafe {
-                spec.set_raw_byte_atomic(object.to_address::<VM>(), order)
+                spec.set_raw_byte_atomic(object.to_raw_address(), order)
             },
         }
     }

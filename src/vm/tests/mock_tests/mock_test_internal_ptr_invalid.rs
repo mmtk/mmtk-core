@@ -15,10 +15,8 @@ pub fn interior_pointer_invalid() {
             let _ = MutatorFixture::create_with_heapsize(10 * MB);
 
             let assert_no_object = |addr: Address| {
-                let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
-                    addr,
-                    usize::MAX,
-                );
+                let base_ref =
+                    crate::memory_manager::find_object_from_internal_pointer(addr, usize::MAX);
                 assert!(base_ref.is_none());
             };
 

@@ -80,15 +80,15 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::set_vo_bit::<VM>(object);
+        crate::util::metadata::vo_bit::set_vo_bit(object);
         #[cfg(all(feature = "is_mmtk_object", debug_assertions))]
         {
             use crate::util::constants::LOG_BYTES_IN_PAGE;
-            let vo_addr = object.to_address::<VM>();
+            let vo_addr = object.to_raw_address();
             let offset_from_page_start = vo_addr & ((1 << LOG_BYTES_IN_PAGE) - 1) as usize;
             debug_assert!(
                 offset_from_page_start < crate::util::metadata::vo_bit::VO_BIT_WORD_TO_REGION,
-                "The in-object address is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
+                "The raw address of ObjectReference is not in the first 512 bytes of a page. The internal pointer searching for LOS won't work."
             );
         }
 
@@ -96,7 +96,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     }
     #[cfg(feature = "is_mmtk_object")]
     fn is_mmtk_object(&self, addr: Address) -> Option<ObjectReference> {
-        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr::<VM>(addr)
+        crate::util::metadata::vo_bit::is_vo_bit_set_for_addr(addr)
     }
     #[cfg(feature = "is_mmtk_object")]
     fn find_object_from_internal_pointer(
@@ -117,19 +117,14 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             }
             // For performance, we only check the first word which maps to the first 512 bytes in the page.
             // In almost all the cases, it should be sufficient.
-            // However, if the in-object address is not in the first 512 bytes, this won't work.
+            // However, if the raw address of ObjectReference is not in the first 512 bytes, this won't work.
             // We assert this when we set VO bit for LOS.
             if vo_bit::get_raw_vo_bit_word(cur_page) != 0 {
                 // Find the exact address that has vo bit set
                 for offset in 0..vo_bit::VO_BIT_WORD_TO_REGION {
                     let addr = cur_page + offset;
                     if unsafe { vo_bit::is_vo_addr(addr) } {
-                        let obj = vo_bit::is_internal_ptr_from_vo_bit::<VM>(addr, ptr);
-                        if obj.is_some() {
-                            return obj;
-                        } else {
-                            return None;
-                        }
+                        return vo_bit::is_internal_ptr_from_vo_bit::<VM>(addr, ptr);
                     }
                 }
                 unreachable!(
@@ -257,7 +252,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::metadata::vo_bit::is_vo_bit_set::<VM>(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO bit not set",
             object
         );
@@ -292,7 +287,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
         let sweep = |object: ObjectReference| {
             #[cfg(feature = "vo_bit")]
-            crate::util::metadata::vo_bit::unset_vo_bit::<VM>(object);
+            crate::util::metadata::vo_bit::unset_vo_bit(object);
             self.pr
                 .release_pages(get_super_page(object.to_object_start::<VM>()));
         };

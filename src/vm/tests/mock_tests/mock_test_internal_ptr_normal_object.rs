@@ -32,11 +32,10 @@ pub fn interior_pointer_in_normal_object() {
 
                 let obj = MockVM::object_start_to_ref(addr);
                 println!(
-                    "start = {}, end = {}, obj = {}, in-obj addr = {}",
+                    "start = {}, end = {}, obj = {}",
                     addr,
                     addr + OBJECT_SIZE,
                     obj,
-                    obj.to_address::<MockVM>()
                 );
                 memory_manager::post_alloc(
                     &mut fixture.mutator,
@@ -49,23 +48,25 @@ pub fn interior_pointer_in_normal_object() {
                     if ptr >= addr + OBJECT_SIZE {
                         println!("ptr = {}, not internal pointer", ptr);
                         // not internal pointer
-                        let base_ref = crate::memory_manager::find_object_from_internal_pointer::<
-                            MockVM,
-                        >(ptr, usize::MAX);
+                        let base_ref = crate::memory_manager::find_object_from_internal_pointer(
+                            ptr,
+                            usize::MAX,
+                        );
                         println!("{:?}", base_ref);
                         assert!(base_ref.is_none());
                     } else {
                         println!("ptr = {}, internal pointer", ptr);
                         // is internal pointer
-                        let base_ref = crate::memory_manager::find_object_from_internal_pointer::<
-                            MockVM,
-                        >(ptr, usize::MAX);
+                        let base_ref = crate::memory_manager::find_object_from_internal_pointer(
+                            ptr,
+                            usize::MAX,
+                        );
                         assert!(base_ref.is_some());
                         assert_eq!(base_ref.unwrap(), obj);
                     }
                 };
 
-                let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
+                let base_ref = crate::memory_manager::find_object_from_internal_pointer(
                     obj.to_raw_address(),
                     OBJECT_SIZE,
                 );

@@ -12,8 +12,13 @@ lazy_static! {
 }
 
 fn basic_filter(addr: Address) -> bool {
-    !addr.is_zero()
-        && addr.as_usize() % VO_BIT_REGION_SIZE == (DEFAULT_OBJECT_REF_OFFSET % VO_BIT_REGION_SIZE)
+    // `is_mmtk_object` only accept addresses that are aligned to `ObjectReference::ALIGNMENT`.
+    // It currently has the same value as `VO_BIT_REGION_SIZE`.
+    !addr.is_zero() && addr.is_aligned_to(VO_BIT_REGION_SIZE)
+}
+
+fn iter_aligned_offsets(limit: usize) -> impl Iterator<Item = usize> {
+    (VO_BIT_REGION_SIZE..limit).step_by(VO_BIT_REGION_SIZE)
 }
 
 fn assert_filter_pass(addr: Address) {
@@ -60,17 +65,9 @@ fn assert_invalid_objref(addr: Address, real: Address) {
 
 #[test]
 pub fn null() {
-    with_mockvm(
-        default_setup,
-        || {
-            SINGLE_OBJECT.with_fixture(|fixture| {
-                let addr = Address::ZERO;
-                assert_filter_fail(addr);
-                assert_invalid_objref(addr, fixture.objref.to_raw_address());
-            });
-        },
-        no_cleanup,
-    )
+    let addr = Address::ZERO;
+    // Zero address cannot be passed to `is_mmtk_object`.  We just test if our filter is good.
+    assert_filter_fail(addr);
 }
 
 // This should be small enough w.r.t `HEAP_START` and `HEAP_END`.
@@ -82,7 +79,7 @@ pub fn too_small() {
         default_setup,
         || {
             SINGLE_OBJECT.with_fixture(|fixture| {
-                for offset in 1usize..SMALL_OFFSET {
+                for offset in iter_aligned_offsets(SMALL_OFFSET) {
                     let addr = Address::ZERO + offset;
                     assert_invalid_objref(addr, fixture.objref.to_raw_address());
                 }
@@ -98,7 +95,7 @@ pub fn max() {
         default_setup,
         || {
             SINGLE_OBJECT.with_fixture(|fixture| {
-                let addr = Address::MAX;
+                let addr = Address::MAX.align_down(VO_BIT_REGION_SIZE);
                 assert_invalid_objref(addr, fixture.objref.to_raw_address());
             });
         },
@@ -112,8 +109,8 @@ pub fn too_big() {
         default_setup,
         || {
             SINGLE_OBJECT.with_fixture(|fixture| {
-                for offset in 1usize..SMALL_OFFSET {
-                    let addr = Address::MAX - offset;
+                for offset in iter_aligned_offsets(SMALL_OFFSET) {
+                    let addr = unsafe { Address::from_usize(0usize.wrapping_sub(offset)) };
                     assert_invalid_objref(addr, fixture.objref.to_raw_address());
                 }
             });
@@ -145,7 +142,7 @@ pub fn small_offsets() {
         default_setup,
         || {
             SINGLE_OBJECT.with_fixture(|fixture| {
-                for offset in 1usize..SEVERAL_PAGES {
+                for offset in iter_aligned_offsets(SEVERAL_PAGES) {
                     let addr = fixture.objref.to_raw_address() + offset;
                     if basic_filter(addr) {
                         assert_invalid_objref(addr, fixture.objref.to_raw_address());

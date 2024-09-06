@@ -33,11 +33,10 @@ pub fn interior_pointer_in_large_object() {
 
             let obj = MockVM::object_start_to_ref(addr);
             println!(
-                "start = {}, end = {}, obj = {}, in-obj addr = {}",
+                "start = {}, end = {}, obj = {}",
                 addr,
                 addr + OBJECT_SIZE,
                 obj,
-                obj.to_address::<MockVM>()
             );
 
             memory_manager::post_alloc(
@@ -47,25 +46,22 @@ pub fn interior_pointer_in_large_object() {
                 AllocationSemantics::Los,
             );
 
-            let test_internal_ptr =
-                |ptr: Address| {
-                    println!("ptr = {}", ptr);
-                    if ptr > addr + OBJECT_SIZE {
-                        // not internal pointer
-                        let base_ref = crate::memory_manager::find_object_from_internal_pointer::<
-                            MockVM,
-                        >(ptr, usize::MAX);
-                        println!("{:?}", base_ref);
-                        assert!(base_ref.is_none());
-                    } else {
-                        // is internal pointer
-                        let base_ref = crate::memory_manager::find_object_from_internal_pointer::<
-                            MockVM,
-                        >(ptr, usize::MAX);
-                        assert!(base_ref.is_some());
-                        assert_eq!(base_ref.unwrap(), obj);
-                    }
-                };
+            let test_internal_ptr = |ptr: Address| {
+                println!("ptr = {}", ptr);
+                if ptr > addr + OBJECT_SIZE {
+                    // not internal pointer
+                    let base_ref =
+                        crate::memory_manager::find_object_from_internal_pointer(ptr, usize::MAX);
+                    println!("{:?}", base_ref);
+                    assert!(base_ref.is_none());
+                } else {
+                    // is internal pointer
+                    let base_ref =
+                        crate::memory_manager::find_object_from_internal_pointer(ptr, usize::MAX);
+                    assert!(base_ref.is_some());
+                    assert_eq!(base_ref.unwrap(), obj);
+                }
+            };
 
             // Test with the first 1024 bytes as offset in the object
             for offset in 0..1024usize {

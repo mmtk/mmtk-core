@@ -42,10 +42,7 @@ pub fn bench(c: &mut Criterion) {
             );
             let obj_end = addr + NORMAL_OBJECT_SIZE;
             _b.iter(|| {
-                memory_manager::find_object_from_internal_pointer::<MockVM>(
-                    obj_end - 1,
-                    NORMAL_OBJECT_SIZE,
-                );
+                memory_manager::find_object_from_internal_pointer(obj_end - 1, NORMAL_OBJECT_SIZE);
             })
         }
         #[cfg(not(feature = "is_mmtk_object"))]
@@ -83,10 +80,7 @@ pub fn bench(c: &mut Criterion) {
             );
             let obj_end = addr + LARGE_OBJECT_SIZE;
             _b.iter(|| {
-                memory_manager::find_object_from_internal_pointer::<MockVM>(
-                    obj_end - 1,
-                    LARGE_OBJECT_SIZE,
-                );
+                memory_manager::find_object_from_internal_pointer(obj_end - 1, LARGE_OBJECT_SIZE);
             })
         }
         #[cfg(not(feature = "is_mmtk_object"))]

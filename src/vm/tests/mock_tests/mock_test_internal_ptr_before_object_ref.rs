@@ -30,11 +30,10 @@ pub fn interior_pointer_before_object_ref() {
 
             let obj = MockVM::object_start_to_ref(addr);
             println!(
-                "start = {}, end = {}, obj = {}, in-obj addr = {}",
+                "start = {}, end = {}, obj = {}",
                 addr,
                 addr + OBJECT_SIZE,
                 obj,
-                obj.to_address::<MockVM>()
             );
             memory_manager::post_alloc(
                 &mut fixture.mutator,
@@ -42,21 +41,6 @@ pub fn interior_pointer_before_object_ref() {
                 OBJECT_SIZE,
                 AllocationSemantics::Default,
             );
-
-            // Forge a pointer that points before the object reference, but after in-object address. MMTk should still find the base reference properly.
-
-            let before_obj_ref = addr;
-            assert!(before_obj_ref < obj.to_raw_address());
-            assert!(before_obj_ref >= obj.to_address::<MockVM>());
-
-            println!("Check {:?}", before_obj_ref);
-            let base_ref = crate::memory_manager::find_object_from_internal_pointer::<MockVM>(
-                before_obj_ref,
-                usize::MAX,
-            );
-            println!("base_ref {:?}", base_ref);
-            assert!(base_ref.is_some());
-            assert_eq!(base_ref.unwrap(), obj);
         },
         no_cleanup,
     )

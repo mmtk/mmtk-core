@@ -27,6 +27,14 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool>
     /// that the VO bit metadata is mapped for the address range.
     pub fn new(start: Address, end: Address) -> Self {
         debug_assert!(start < end);
+        debug_assert!(
+            start.is_aligned_to(ObjectReference::ALIGNMENT),
+            "start is not word-aligned: {start}"
+        );
+        debug_assert!(
+            end.is_aligned_to(ObjectReference::ALIGNMENT),
+            "end is not word-aligned: {end}"
+        );
         ObjectIterator {
             start,
             end,
@@ -44,9 +52,9 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_VO_BIT: bool> std
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
             let is_object = if ATOMIC_LOAD_VO_BIT {
-                vo_bit::is_vo_bit_set_for_addr::<VM>(self.cursor)
+                vo_bit::is_vo_bit_set_for_addr(self.cursor)
             } else {
-                unsafe { vo_bit::is_vo_bit_set_unsafe::<VM>(self.cursor) }
+                unsafe { vo_bit::is_vo_bit_set_unsafe(self.cursor) }
             };
 
             if let Some(object) = is_object {
@@ -117,9 +125,9 @@ pub trait Region: Copy + PartialEq + PartialOrd {
         debug_assert!(self.start().as_usize() < usize::MAX - (n << Self::LOG_BYTES));
         Self::from_aligned_address(self.start() + (n << Self::LOG_BYTES))
     }
-    /// Return the region that contains the object (by its cell address).
-    fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from_unaligned_address(object.to_address::<VM>())
+    /// Return the region that contains the object.
+    fn containing(object: ObjectReference) -> Self {
+        Self::from_unaligned_address(object.to_raw_address())
     }
     /// Check if the given address is in the region.
     fn includes_address(&self, addr: Address) -> bool {

@@ -95,13 +95,39 @@ We recommend going through the [list of metadata specifications](https://docs.mm
 
 #### `ObjectReference` vs `Address`
 
-A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address. You might be interested in reading the *Demystifying Magic: High-level Low-level Programming* paper[^3] which describes the above in more detail.
+A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address. You might be interested in reading the [*Demystifying Magic: High-level Low-level Programming*][FBC09] paper which describes the above in more detail.
 
-In MMTk, `ObjectReference` is a special address that represents an object. A binding may use tagged references, compressed pointers, etc.
-They need to deal with the encoding and the decoding in their [`Slot`](https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html) implementation,
-and always present plain `ObjectReference`s to MMTk. See [this test](https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs) for some `Slot` implementation examples.
+In MMTk, `ObjectReference` is a special address that represents an object.  It is required to be
+within the address range of the object it refers to, and must be word-aligned.  This address is used
+by MMTk to access side metadata, and find the space or regions (chunk, block, line, etc.) that
+contains the object.  It must also be efficient to locate the object header (where in-header MMTk
+metadata are held) and the object's VM-specific metadata, such as type information, from a given
+`ObjectReference`.  MMTk will need to access those information, either directly or indirectly via
+traits implemented by the binding, during tracing, which is performance-critical.
 
-[^3]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
+The address used as `ObjectReference` is nominated by the VM binding when an object is allocated (or
+moved by a moving GC, which we can ignore for now when supporting NoGC).  VMs usually have their own
+concepts of "object reference" which refer to objects.  Some of them, including OpenJDK and CRuby,
+uses addresses to the object (the starting address or at an offset within the object) to refer to an
+object.  Such VMs can directly use their "object reference" for the address of MMTk's
+`ObjectReference`.
+
+Some VMs, such as JikesRVM, refers to an object by an address at a constant offset after the header,
+and can be outside the object.  This does not satisfy the requirement of MMTk's `ObjectReference`,
+and the VM binding needs to make a clear distinction between the VM-level object reference and
+MMTk's `ObjectReference` type.  A detailed example for supporting such a VM can be found
+[here][jikesrvm-objref].
+
+Other VMs may use tagged references, compressed pointers, etc.  They need to convert them to plain
+addresses to be used as MMTk's `ObjectReference`.  Specifically, if the VM use such representations
+in object fields, the VM binding can deal with the encoding and the decoding in its
+[`Slot`][slot-trait] implementation, and always present plain `ObjectReference`s to MMTk. See [this
+test] for some `Slot` implementation examples.
+
+[FBC09]: https://users.cecs.anu.edu.au/~steveb/pubs/papers/vmmagic-vee-2009.pdf
+[jikesrvm-objref]: https://github.com/mmtk/mmtk-jikesrvm/issues/178
+[slot-trait]: https://docs.mmtk.io/api/mmtk/vm/slot/trait.Slot.html
+[slot-test]: https://github.com/mmtk/mmtk-core/blob/master/src/vm/tests/mock_tests/mock_test_slots.rs
 
 #### Miscellaneous configuration options
 
@@ -261,7 +287,7 @@ void *mmtk_alloc(MmtkMutator mutator, size_t size, size_t align,
  * Set relevant object metadata
  *
  * @param mutator the mutator instance that is requesting the allocation
- * @param object the returned address of the allocated object
+ * @param object the ObjectReference address chosen by the VM binding
  * @param size the size of the allocated object
  * @param allocator the allocation semantics to use for the allocation
  */
@@ -274,13 +300,21 @@ In order to perform allocations, you will need to know what object alignment the
 
 Now that MMTk is aware of each mutator thread, you have to change the runtime's allocation functions to call into MMTk to allocate using `mmtk_alloc` and set object metadata using `mmtk_post_alloc`. Note that there may be multiple allocation functions in the runtime so make sure that you edit them all!
 
-You should use the saved `Mutator` pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.
+When calling `mmtk_alloc`, you should use the saved `Mutator` pointer as the first parameter, the requested object size as the next parameter, and any alignment requirements the runtimes has as the third parameter.
 
 If your runtime requires a non-zero allocation offset (i.e. the alignment requirements are for the offset address, not the returned address) then you have to provide the required value as the fourth parameter. Note that you ***must*** also update the [`USE_ALLOCATION_OFFSET`](https://docs.mmtk.io/api/mmtk/vm/trait.VMBinding.html#associatedconstant.USE_ALLOCATION_OFFSET) constant in the `VMBinding` implementation if your runtime requires a non-zero allocation offset.
 
 For the time-being, you can ignore the `allocator` parameter in both these functions and always pass a value of `0` which means MMTk will pick the default allocator for your collector (a bump pointer allocator in the case of NoGC).
 
-Finally, you need to call `mmtk_post_alloc` with the object address returned from the previous `mmtk_alloc` call in order to initialize object metadata.
+The return value of `mmtk_alloc` is the starting address of the allocated object.
+
+Then you should nominate a word-aligned address within the allocated bytes to be the
+`ObjectReference` used to refer to that object from now on.  It doesn't have to be the starting
+address.
+
+Finally, you need to call `mmtk_post_alloc` with your chosen `ObjectReference` in order to
+initialize MMTk-level object metadata, such as logging bits, valid-object (VO) bits, etc.  As a VM
+binding developer, you can ignore the details for now.
 
 **Note:** Currently MMTk assumes object sizes are multiples of the `MIN_ALIGNMENT`. If you encounter errors with alignment, a simple workaround would be to align the requested object size up to the `MIN_ALIGNMENT`. See [here](https://github.com/mmtk/mmtk-core/issues/730) for the tracking issue to fix this bug.
 

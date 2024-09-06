@@ -98,7 +98,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     // For malloc space, we need to further check the VO bit.
     fn is_in_space(&self, object: ObjectReference) -> bool {
-        is_alloced_by_malloc::<VM>(object)
+        is_alloced_by_malloc(object)
     }
 
     /// For malloc space, we just use the side metadata.
@@ -107,7 +107,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc::<VM>(addr)
+        has_object_alloced_by_malloc(addr)
     }
 
     #[cfg(feature = "is_mmtk_object")]
@@ -124,7 +124,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        set_vo_bit::<VM>(object);
+        set_vo_bit(object);
     }
 
     fn sft_trace_object(
@@ -173,7 +173,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     // We have assertions in a debug build. We allow this pattern for the release build.
     #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
-        let ret = is_alloced_by_malloc::<VM>(object);
+        let ret = is_alloced_by_malloc(object);
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
@@ -556,7 +556,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
             trace!("free object {}", object);
-            unsafe { unset_vo_bit_unsafe::<VM>(object) };
+            unsafe { unset_vo_bit_unsafe(object) };
 
             true
         } else {

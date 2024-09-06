@@ -406,7 +406,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // unset allocation bit
         // Note: We cannot use `unset_vo_bit_unsafe` because two threads may attempt to free
         // objects at adjacent addresses, and they may share the same byte in the VO bit metadata.
-        crate::util::metadata::vo_bit::unset_vo_bit::<VM>(unsafe {
+        crate::util::metadata::vo_bit::unset_vo_bit(unsafe {
             ObjectReference::from_raw_address_unchecked(addr)
         })
     }

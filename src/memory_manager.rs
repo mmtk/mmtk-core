@@ -579,16 +579,17 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMut
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
-    object.is_live::<VM>()
+pub fn is_live_object(object: ObjectReference) -> bool {
+    object.is_live()
 }
 
-/// Check if `addr` is the address of an object reference to an MMTk object.
+/// Check if `addr` is the raw address of an object reference to an MMTk object.
 ///
 /// Concretely:
-/// 1.  Return true if `ObjectReference::from_raw_address(addr)` is a valid object reference to an
-///     object in any space in MMTk.
-/// 2.  Return false otherwise.
+/// 1.  Return `Some(object)` if `ObjectReference::from_raw_address(addr)` is a valid object
+///     reference to an object in any space in MMTk. `object` is the result of
+///     `ObjectReference::from_raw_address(addr)`.
+/// 2.  Return `None` otherwise.
 ///
 /// This function is useful for conservative root scanning.  The VM can iterate through all words in
 /// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
@@ -603,7 +604,9 @@ pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Argument:
-/// * `addr`: An arbitrary address.
+/// * `addr`: A non-zero word-aligned address.  Because the raw address of an `ObjectReference`
+///   cannot be zero and must be word-aligned, the caller must filter out zero and misaligned
+///   addresses before calling this function.  Otherwise the behavior is undefined.
 #[cfg(feature = "is_mmtk_object")]
 pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
     crate::util::is_mmtk_object::check_object_reference(addr)
@@ -613,12 +616,13 @@ pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
 /// This should be used instead of [`crate::memory_manager::is_mmtk_object`] for conservative stack scanning if
 /// the binding may have internal pointers on the stack.
 ///
-/// Note that, we only consider pointers that point to addresses that are equal or greater than the in-object addresss
-/// (i.e. [`crate::util::ObjectReference::to_address()`] which is the same as `object_ref.to_raw_address() + ObjectModel::IN_OBJECT_ADDRESS_OFFSET`),
-/// and within the allocation as 'internal pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
-/// `[obj_ref + ObjectModel::IN_OBJECT_ADDRESS_OFFSET, ObjectModel::ref_to_object_start(obj_ref) + ObjectModel::get_current_size(obj_ref))`.
-/// If a binding defines internal pointers differently, calling this method is undefined behavior.
-/// If this is the case for you, please submit an issue or engage us on Zulip to discuss more.
+/// Note that, we only consider pointers that point to addresses that are equal to or greater than
+/// the raw addresss of the object's `ObjectReference`, and within the allocation as 'internal
+/// pointers'. To be precise, for each object ref `obj_ref`, internal pointers are in the range
+/// `[obj_ref.to_raw_address(), obj_ref.to_object_start() +
+/// ObjectModel::get_current_size(obj_ref))`. If a binding defines internal pointers differently,
+/// calling this method is undefined behavior. If this is the case for you, please submit an issue
+/// or engage us on Zulip to discuss more.
 ///
 /// Note that, in the similar situation as [`crate::memory_manager::is_mmtk_object`], the binding should filter
 /// out obvious non-pointers (e.g. alignment check, bound check, etc) before calling this function to avoid unnecessary
@@ -633,7 +637,7 @@ pub fn is_mmtk_object(addr: Address) -> Option<ObjectReference> {
 /// * `internal_ptr`: The address to start searching. We search backwards from this address (including this address) to find the base reference.
 /// * `max_search_bytes`: The maximum number of bytes we may search for an object with VO bit set. `internal_ptr - max_search_bytes` is not included.
 #[cfg(feature = "is_mmtk_object")]
-pub fn find_object_from_internal_pointer<VM: VMBinding>(
+pub fn find_object_from_internal_pointer(
     internal_ptr: Address,
     max_search_bytes: usize,
 ) -> Option<ObjectReference> {
@@ -655,7 +659,7 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
 /// object for the VM in response to `memory_manager::alloc`, this function will return true; but
 /// if the VM directly called `malloc` to allocate the object, this function will return false.
 ///
-/// If `is_mmtk_object(object.to_address())` returns true, `is_in_mmtk_spaces(object)` must also
+/// If `is_mmtk_object(object.to_raw_address())` returns true, `is_in_mmtk_spaces(object)` must also
 /// return true.
 ///
 /// This function is useful if an object reference in the VM can be either a pointer into the MMTk
@@ -669,10 +673,10 @@ pub fn find_object_from_internal_pointer<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_in_mmtk_spaces<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .is_in_space(object)
 }
 
@@ -766,10 +770,10 @@ pub fn add_finalizer<VM: VMBinding>(
 /// Arguments:
 /// * `object`: The object to be pinned
 #[cfg(feature = "object_pinning")]
-pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn pin_object(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .pin_object(object)
 }
 
@@ -780,10 +784,10 @@ pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Arguments:
 /// * `object`: The object to be pinned
 #[cfg(feature = "object_pinning")]
-pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn unpin_object(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .unpin_object(object)
 }
 
@@ -792,10 +796,10 @@ pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 /// Arguments:
 /// * `object`: The object to be checked
 #[cfg(feature = "object_pinning")]
-pub fn is_pinned<VM: VMBinding>(object: ObjectReference) -> bool {
+pub fn is_pinned(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     SFT_MAP
-        .get_checked(object.to_address::<VM>())
+        .get_checked(object.to_raw_address())
         .is_object_pinned(object)
 }
 
