@@ -98,9 +98,12 @@ We recommend going through the [list of metadata specifications](https://docs.mm
 A key principle in MMTk is the distinction between [`ObjectReference`](https://docs.mmtk.io/api/mmtk/util/address/struct.ObjectReference.html) and [`Address`](https://docs.mmtk.io/api/mmtk/util/address/struct.Address.html). The idea is that very few operations are allowed on an `ObjectReference`. For example, MMTk does not allow address arithmetic on `ObjectReference`s. This allows us to preserve memory-safety, only performing unsafe operations when required, and gives us a cleaner and more flexible abstraction to work with as it can allow object handles or offsets etc. `Address`, on the other hand, represents an arbitrary machine address. You might be interested in reading the [*Demystifying Magic: High-level Low-level Programming*][FBC09] paper which describes the above in more detail.
 
 In MMTk, `ObjectReference` is a special address that represents an object.  It is required to be
-with the address range of the object it refers to, and must be word-aligned.  This address is used
+within the address range of the object it refers to, and must be word-aligned.  This address is used
 by MMTk to access side metadata, and find the space or regions (chunk, block, line, etc.) that
-contains the object.
+contains the object.  It must also be efficient to locate the object header (where in-header MMTk
+metadata are held) and the object's VM-specific metadata, such as type information, from a given
+`ObjectReference`.  MMTk will need to access those information, either directly or indirectly via
+traits implemented by the binding, during tracing, which is performance-critical.
 
 The address used as `ObjectReference` is nominated by the VM binding when an object is allocated (or
 moved by a moving GC, which we can ignore for now when supporting NoGC).  VMs usually have their own

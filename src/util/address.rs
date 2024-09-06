@@ -472,29 +472,40 @@ use crate::vm::VMBinding;
 /// The idea is from the paper [Demystifying Magic: High-level Low-level Programming (VEE09)][FBC09]
 /// and [JikesRVM].
 ///
-/// In MMTk, `ObjectReference` holds a non-zero address.  It either points into one of MMTk's spaces
-/// or not.
+/// In MMTk, `ObjectReference` holds a non-zero address, i.e. its **raw address**.  It must satisfy
+/// the following requirements.
 ///
-/// -   When the address is in one of MMTk's spaces, it refers to an object allocated in that space.
-///     In this case, the address must satisfy the following requirements.
-///     -   The address must be within the address range of the object it refers to.  But it is not
-///         necessarily the starting address.
-///     -   The address must be word-aligned.
-/// -   When the address is outside any MMTk space, its semantics is VM-defined.
+/// -   It uniquely references an MMTk object.
+/// -   The address must be within the address range of the object it refers to.
+/// -   The address must be word-aligned.
+/// -   It must be efficient to access object metadata from an `ObjectReference`.
 ///
-/// The address used as the `ObjectReference` is nominated by the VM binding when an object is
-/// allocated in the MMTk heap (i.e. the argument of [`crate::memory_manager::post_alloc`]).  The
-/// same address is used by all `ObjectReference`s that refer to that object until the object is
-/// moved, at which time the VM binding shall choose another address to use as the `ObjectReference`
-/// of the new copy (in [`crate::vm::ObjectModel::copy`] or
-/// [`crate::vm::ObjectModel::get_reference_when_copied_to`]) until it is moved again.
+/// Each `ObjectReference` uniquely identifies exactly one MMTk object.  There is no "null
+/// reference" (see below for details).
 ///
-/// The address value held inside an `ObjectReference` instance is its **raw address**.  When
-/// accessing side metadata, MMTk uses the raw address to locate the side metadata bits.
+/// Conversely, each object has a unique (raw) address used for `ObjectReference`.  That address is
+/// nominated by the VM binding right after an object is allocated in the MMTk heap (i.e. the
+/// argument of [`crate::memory_manager::post_alloc`]).  The same address is used by all
+/// `ObjectReference` instances that refer to that object until the object is moved, at which time
+/// the VM binding shall choose another address to use as the `ObjectReference` of the new copy (in
+/// [`crate::vm::ObjectModel::copy`] or [`crate::vm::ObjectModel::get_reference_when_copied_to`])
+/// until the object is moved again.
 ///
 /// In addition to the raw address, there are also two addresses related to each object allocated in
 /// MMTk heap, namely **starting address** and **header address**.  See the
 /// [`crate::vm::ObjectModel`] trait for their precise definition.
+///
+/// The VM binding may, in theory, pick any aligned address within the object, and it doesn't have
+/// to be the starting address.  However, during tracing, MMTk will need to access object metadata
+/// from a `ObjectReference`.  Particularly, it needs to identify reference fields, and query
+/// information about the object, such as object size.  Such information is usually accessed from
+/// object headers.  The choice of `ObjectReference` must make such accesses efficient.
+///
+/// Because the raw address is within the object, MMTk will also use the raw address to identify the
+/// space or region (chunk, block, line, etc.) that contains the object, and to access side metadata
+/// and the SFTMap.  If a VM binding needs to access side metadata directly (particularly, setting
+/// the "valid-object (VO) bit" in allocation fast paths), it shall use the raw address to compute
+/// the byte and bit address of the metadata bits.
 ///
 /// # Notes
 ///
@@ -537,6 +548,16 @@ use crate::vm::VMBinding;
 ///
 /// For the convenience of passing `Option<ObjectReference>` to and from native (C/C++) programs,
 /// mmtk-core provides [`crate::util::api_util::NullableObjectReference`].
+///
+/// ## About `ObjectReference` pointing outside MMTk spaces
+///
+/// If a VM binding implements `ActivePlan::vm_trace_object`, `ObjectReference` is allowed to point
+/// to locations outside any MMTk spaces.  When tracing objects, such `ObjectReference` values will
+/// be processed by `ActivePlan::vm_trace_object` so that the VM binding can trace its own allocated
+/// objects during GC.  However, **this is an experimental feature**, and may not interact well with
+/// other parts of MMTk.  Notably, MMTk will not allocate side metadata for such `ObjectReference`,
+/// and attempts to access side metadata with a non-MMTk `ObjectReference` will result in crash. Use
+/// with caution.
 ///
 /// [FBC09]: https://dl.acm.org/doi/10.1145/1508293.1508305
 /// [JikesRVM]: https://www.jikesrvm.org/

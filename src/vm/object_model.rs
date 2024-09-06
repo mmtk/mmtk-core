@@ -425,7 +425,7 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// If this is true, the binding guarantees that the object reference's raw addressand the
+    /// If this is true, the binding guarantees that the object reference's raw address and the
     /// object start are always the same address.  In other words, an object reference's raw
     /// address is always equal to the return value of the `ref_to_object_start` method,
     ///
